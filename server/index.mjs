@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
+import { getCachedEvents, getEngineState, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 
 const config = getConfig();
@@ -91,6 +92,24 @@ async function handleApi(req, res, url) {
     }
     return;
   }
+  if (url.pathname === '/api/engine/run') {
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    const token = process.env.ENGINE_RUN_TOKEN || '';
+    if (!token || req.headers.authorization !== `Bearer ${token}`) {
+      send(res, 401, { error: 'Engine run is not authorized.' });
+      return;
+    }
+    try {
+      send(res, 200, await runEngineCycle());
+    } catch (error) {
+      console.error(`[engine] Cycle failed: ${error.message || error}`);
+      send(res, 500, { error: error.message || 'Engine cycle failed' });
+    }
+    return;
+  }
   if (req.method !== 'GET') {
     send(res, 405, { error: 'Method not allowed' });
     return;
@@ -99,11 +118,19 @@ async function handleApi(req, res, url) {
     send(res, 200, { ok: true, mode: config.mode });
     return;
   }
+  if (url.pathname === '/api/engine') {
+    if (req.method !== 'GET') {
+      send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    send(res, 200, getEngineState());
+    return;
+  }
   if (url.pathname === '/api/config') {
     send(res, 200, {
       mode: 'sporty',
       provider: 'Betspapa fixtures',
-      pollMs: 30000,
+      pollMs: 120000,
       reason: null,
     });
     return;
@@ -116,11 +143,18 @@ async function handleApi(req, res, url) {
       return;
     }
     try {
-      const events = await cached('sporty-upcoming', 20_000, async () => {
-        const response = await fetch('https://api.betspapa.com/api/sportybet/upcoming', { signal: AbortSignal.timeout(12_000) });
+      const events = await cached('sporty-upcoming', 60_000, async () => {
+        const response = await fetch('https://api.betspapa.com/api/sportybet/upcoming', { signal: AbortSignal.timeout(25_000) });
         if (!response.ok) throw new Error(`Betspapa fixtures returned ${response.status}`);
         const body = await response.json();
         return Array.isArray(body.events) ? body.events : [];
+      }).catch((error) => {
+        const saved = getCachedEvents();
+        if (saved.length) {
+          console.error(`[engine] Fixture proxy failed: ${error.message}. Serving ${saved.length} cached events.`);
+          return saved;
+        }
+        throw error;
       });
       const fromMs = new Date(from).getTime();
       const toMs = new Date(to).getTime();
@@ -208,4 +242,5 @@ const server = createServer((req, res) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`Betspapa listening on http://0.0.0.0:${port} (${config.mode})`);
+  startEngine();
 });

@@ -724,11 +724,34 @@ button:disabled { cursor: default; opacity: 0.35; }
 .trend-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .trend-side b { font-family: var(--score); font-size: 28px; line-height: 0.9; }
 .trend-side span, .trend-side em { color: var(--faint); font-size: 11px; font-style: normal; }
+.match { content-visibility: auto; contain-intrinsic-size: auto 76px; }
 .code-card { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.code-card header { justify-content: space-between; width: 100%; }
+.code-card header { justify-content: space-between; width: 100%; align-items: center; }
+.code-card header strong { flex: 1; }
 .code-card header span { color: var(--gold); font-size: 12px; font-weight: 700; }
+.book-mark { width: 32px; height: 32px; flex: none; }
 .booking-code { margin: 0; font-family: var(--score); font-size: 32px; letter-spacing: 0.04em; }
 .booking-link { color: var(--gold); font-size: 13px; font-weight: 700; }
+.book-sportybet { background: #0d9f4c; border-color: #087a38; color: #fff; }
+.book-footballcom { background: #111111; border-color: #2a2a2a; color: #fff; }
+.book-msport { background: #0a4dff; border-color: #083ec4; color: #fff; }
+.book-betika { background: #148a3c; border-color: #0e6b2e; color: #fff; }
+.book-betpawa { background: #1a1a1a; border-color: #ffe14a; color: #ffe14a; }
+.book-sportybet .lede,
+.book-footballcom .lede,
+.book-msport .lede,
+.book-betika .lede,
+.book-sportybet header span,
+.book-footballcom header span,
+.book-msport header span,
+.book-betika header span { color: rgba(255, 255, 255, 0.86); }
+.book-betpawa .lede,
+.book-betpawa header span { color: #ffe14a; }
+.book-sportybet .booking-link,
+.book-footballcom .booking-link,
+.book-msport .booking-link,
+.book-betika .booking-link,
+.book-betpawa .booking-link { color: inherit; text-decoration: underline; }
 .booking-part + .booking-part { margin-top: 8px; }
 .ranks { list-style: none; margin: 0; padding: 0; }
 .ranks li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
