@@ -1,4 +1,5 @@
 import { bookAll, publicError } from './bookers.mjs';
+import { requestJson } from './curl-request.mjs';
 import { selectionKey, toSelection } from './selection.mjs';
 
 const jobs = new Map();
@@ -41,7 +42,7 @@ export function submitBooking(rawLegs) {
     const oldest = jobs.keys().next().value;
     if (oldest && oldest !== key) jobs.delete(oldest);
   }
-  bookAll(legs, undefined, (name, result) => {
+  bookAll(legs, requestJson, (name, result) => {
     job.books = { ...job.books, [name]: result };
   })
     .then((books) => {
