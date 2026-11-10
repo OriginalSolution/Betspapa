@@ -55,4 +55,36 @@ Settings can turn each event type on or off, and can enable browser notification
 
 ## Stack
 
-Vite, React, TypeScript, and a small Node server that proxies football-data.org and serves the production build.
+Vite, React, TypeScript, and a small Node server that proxies football-data.org and serves the production build. The Android app is that same web build inside a Capacitor shell.
+
+## Android APK
+
+The sideload APK is Betspapa (`com.betspapa.scores`). It does not include the scores server, so it opens in demo mode: follows, the goal cheer, and simulated live events all run on the device. Android 13 and newer will ask for notification permission when you enable browser alerts.
+
+This environment assembled and checked the signed release APK. It was not installed on a phone or emulator here.
+
+### Rebuild
+
+You need Node 20 or newer, JDK 21, and Android SDK 36. Point `ANDROID_HOME` at the SDK, then:
+
+```bash
+npm install
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+npm run android:apk
+```
+
+The signed APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
+
+`npm run icons` redraws the web icons and the Android launcher and splash from the same mark.
+
+### Signing
+
+The release build is signed with `android/betspapa-release.keystore`, which is committed so a rebuild can be installed as an update over the GitHub APK. This key is only for that sideload distribution. It is not a Play Store upload key, and the password is public on purpose:
+
+| Field | Value |
+| --- | --- |
+| Alias | `betspapa` |
+| Store password | `betspapa` |
+| Key password | `betspapa` |
+
+Replacing the keystore makes Android treat the result as a different app, so existing installs will not upgrade in place. Do not reuse this keystore for a Play Console listing.

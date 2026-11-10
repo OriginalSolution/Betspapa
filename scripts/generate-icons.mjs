@@ -1,5 +1,5 @@
 import { deflateSync } from 'node:zlib';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,13 +23,13 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-function png(size, pixel) {
-  const raw = Buffer.alloc((size * 4 + 1) * size);
-  for (let y = 0; y < size; y += 1) {
-    const row = y * (size * 4 + 1);
+function pngRect(width, height, pixel) {
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (width * 4 + 1);
     raw[row] = 0;
-    for (let x = 0; x < size; x += 1) {
-      const [r, g, b, a] = pixel(x, y, size);
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b, a] = pixel(x, y, width, height);
       const index = row + 1 + x * 4;
       raw[index] = r;
       raw[index + 1] = g;
@@ -38,8 +38,8 @@ function png(size, pixel) {
     }
   }
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8;
   ihdr[9] = 6;
   return Buffer.concat([
@@ -64,6 +64,10 @@ function inB(nx, ny) {
   return stem || upper || lower;
 }
 
+function png(size, pixel) {
+  return pngRect(size, size, (x, y) => pixel(x, y, size));
+}
+
 function paint(maskable) {
   return (x, y, size) => {
     const radius = maskable ? 0 : size * 0.22;
@@ -82,3 +86,38 @@ writeFileSync(join(root, 'icon-512.png'), png(512, paint(false)));
 writeFileSync(join(root, 'icon-maskable-512.png'), png(512, paint(true)));
 writeFileSync(join(root, 'apple-touch-icon.png'), png(180, paint(false)));
 console.log('Wrote icons to public/icons');
+
+const androidRes = join(dirname(fileURLToPath(import.meta.url)), '..', 'android', 'app', 'src', 'main', 'res');
+if (existsSync(androidRes)) {
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.png')) {
+        const header = readFileSync(path);
+        const width = header.readUInt32BE(16);
+        const height = header.readUInt32BE(20);
+        const square = width === height;
+        const file = entry.name;
+        let image;
+        if (file.startsWith('splash')) {
+          image = pngRect(width, height, (x, y) => {
+            const mark = Math.round(Math.min(width, height) * 0.28);
+            const left = Math.round((width - mark) / 2);
+            const top = Math.round((height - mark) / 2);
+            if (x < left || y < top || x >= left + mark || y >= top + mark) return [7, 8, 12, 255];
+            const color = paint(false)(x - left, y - top, mark);
+            return color[3] === 0 ? [7, 8, 12, 255] : color;
+          });
+        } else if (file.includes('foreground') && square) {
+          image = png(width, paint(true));
+        } else if (square) {
+          image = png(width, paint(false));
+        }
+        if (image) writeFileSync(path, image);
+      }
+    }
+  };
+  walk(androidRes);
+  console.log('Wrote Android launcher and splash icons');
+}
