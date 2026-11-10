@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  applyShares,
   bookingCodes,
   buildPicks,
   isBlacklisted,
@@ -12,6 +13,7 @@ import {
   suggestPicks,
   type BookingCode,
   type LedgerEntry,
+  type SharePayload,
   type LegStatus,
   type ListItem,
   type PickView,
@@ -96,7 +98,17 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   );
   const suggestions = useMemo(() => suggestPicks(picks, slip, greenMarkets).filter((pick) => !isBlacklisted(pick, lists)), [picks, slip, greenMarkets, lists]);
   const slipPicks = useMemo(() => picks.filter((pick) => slip.includes(pick.id)), [picks, slip]);
-  const codes = useMemo(() => bookingCodes(slipPicks), [slipPicks]);
+  const [shares, setShares] = useState<SharePayload | null>(null);
+  const codes = useMemo(() => applyShares(bookingCodes(slipPicks), shares), [slipPicks, shares]);
+  const bookKey = useMemo(
+    () =>
+      slipPicks
+        .filter((pick) => pick.matchId.startsWith('sr:match:'))
+        .map((pick) => `${pick.matchId}:${pick.market}`)
+        .sort()
+        .join('|'),
+    [slipPicks],
+  );
   const visiblePicks = useMemo(() => picks.filter((pick) => !isBlacklisted(pick, lists)), [picks, lists]);
   const hiddenCount = picks.length - visiblePicks.length;
 
@@ -104,6 +116,54 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   useEffect(() => write('betspapa.dismissed.v1', dismissed), [dismissed]);
   useEffect(() => write(LIST_KEY, lists), [lists]);
   useEffect(() => write(LEDGER_KEY, extra), [extra]);
+
+  const bookLegs = useRef(slipPicks);
+  const bookMatches = useRef(matches);
+  bookLegs.current = slipPicks;
+  bookMatches.current = matches;
+
+  useEffect(() => {
+    if (!bookKey) {
+      setShares(null);
+      return;
+    }
+    const byId = new Map(bookMatches.current.map((match) => [match.id, match]));
+    const legs = bookLegs.current
+      .filter((pick) => pick.matchId.startsWith('sr:match:'))
+      .map((pick) => {
+        const match = byId.get(pick.matchId);
+        return {
+          eventId: pick.matchId,
+          market: pick.market,
+          odds: pick.odds,
+          match: match ? `${match.home.shortName} vs ${match.away.shortName}` : pick.label,
+        };
+      });
+    let stop = false;
+    let timer = 0;
+    const run = async () => {
+      try {
+        const response = await fetch('/api/book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ legs }),
+        });
+        if (!response.ok) throw new Error('booking');
+        const body = (await response.json()) as SharePayload;
+        if (stop) return;
+        setShares(body);
+        if (body.status === 'pending') timer = window.setTimeout(() => void run(), 2000);
+      } catch {
+        if (!stop) setShares({ status: 'error', error: 'Booking request failed.' });
+      }
+    };
+    setShares({ status: 'pending', books: {} });
+    void run();
+    return () => {
+      stop = true;
+      window.clearTimeout(timer);
+    };
+  }, [bookKey]);
 
   useEffect(() => {
     const status = new Map(picks.map((pick) => [pick.id, pick.status]));
@@ -157,7 +217,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
           slipPicks[0]?.matchId ?? '',
           slipStatus === 'won' ? 'win' : 'bust',
           slipStatus === 'won' ? 'Slip won' : 'Slip bust',
-          'Booked trends settled on Betspapa. Bookmaker codes are still unavailable.',
+          'Booked trends settled on Betspapa.',
         ),
       );
     }

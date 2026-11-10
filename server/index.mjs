@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 
@@ -43,7 +44,53 @@ function client() {
   return createClient({ token: config.token });
 }
 
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > 256_000) {
+        reject(new Error('Booking request is too large.'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      if (!raw) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        reject(new Error('Booking request must be JSON.'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 async function handleApi(req, res, url) {
+  if (url.pathname === '/api/book') {
+    if (req.method === 'GET') {
+      send(res, 200, latestBooking());
+      return;
+    }
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    try {
+      const body = await readJson(req);
+      send(res, 200, submitBooking(body.legs));
+    } catch (error) {
+      send(res, 400, { error: error.message || 'Invalid booking request' });
+    }
+    return;
+  }
   if (req.method !== 'GET') {
     send(res, 405, { error: 'Method not allowed' });
     return;

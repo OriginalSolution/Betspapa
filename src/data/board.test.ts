@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { projectDemo } from './project';
-import { bookingCodes, buildPicks, listTrends, qualifying, rankLedger, seedLedger, settle } from './board';
+import { applyShares, bookingCodes, buildPicks, listTrends, qualifying, rankLedger, seedLedger, settle } from './board';
 
 const t0 = Date.parse('2026-11-10T18:00:00Z');
 const today = '2026-11-10';
@@ -56,17 +56,28 @@ describe('VAR settlement', () => {
     expect(buildPicks(board(24_000)).find((pick) => pick.id === 'che-mci:che-score')?.status).toBe('won');
   });
 
-  it('books the same won legs at each bookmaker and leaves the code unavailable', () => {
+  it('tracks the same won legs at each bookmaker until a real share code arrives', () => {
     const picks = qualifying(buildPicks(board(32_000)));
     const slip = picks.filter((pick) => pick.id === 'ars-liv:ars-over35' || pick.id === 'che-mci:che-score');
     const codes = bookingCodes(slip);
-    expect(codes.map((code) => code.name)).toEqual(['SportyBet', 'Betway']);
+    expect(codes.map((code) => code.name)).toEqual(['SportyBet', 'Football.com', 'MSport', 'Betika', 'BetPawa']);
     for (const code of codes) {
       expect(code.bookingState).toBe('unavailable');
       expect(code.code).toBe('');
       expect(code.status).toBe('won');
       expect(code.legs.map((leg) => leg.market).sort()).toEqual(['home-score', 'over35']);
     }
+    const live = applyShares(codes, {
+      status: 'ready',
+      books: {
+        sportybet: { parts: [{ code: 'DPA1QE', link: 'https://www.sportybet.com/gh/?shareCode=DPA1QE', totalOdds: 1.04, legs: 1 }] },
+        betika: { parts: [], error: 'No open selections on this bookmaker.' },
+      },
+    });
+    expect(live.find((code) => code.id === 'sportybet')?.bookingState).toBe('ready');
+    expect(live.find((code) => code.id === 'sportybet')?.code).toBe('DPA1QE');
+    expect(live.find((code) => code.id === 'betika')?.bookingState).toBe('error');
+    expect(live.find((code) => code.id === 'footballcom')?.bookingState).toBe('unavailable');
     expect(settle('over35', board(24_000).find((match) => match.id === 'ars-liv')!, true)).toBe('open');
   });
 });

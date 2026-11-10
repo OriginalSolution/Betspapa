@@ -177,20 +177,11 @@ export type Bookmaker = {
 };
 
 export const bookmakers: Bookmaker[] = [
-  {
-    id: 'sportybet',
-    name: 'SportyBet',
-    prefix: '',
-    markets: MARKETS.map((market) => market.id),
-    note: 'Code unavailable. No live booking connection.',
-  },
-  {
-    id: 'betway',
-    name: 'Betway',
-    prefix: '',
-    markets: MARKETS.map((market) => market.id),
-    note: 'Code unavailable. No live booking connection.',
-  },
+  { id: 'sportybet', name: 'SportyBet', prefix: '', markets: MARKETS.map((market) => market.id), note: 'Share code has not been issued.' },
+  { id: 'footballcom', name: 'Football.com', prefix: '', markets: MARKETS.map((market) => market.id), note: 'Share code has not been issued.' },
+  { id: 'msport', name: 'MSport', prefix: '', markets: MARKETS.map((market) => market.id), note: 'Share code has not been issued.' },
+  { id: 'betika', name: 'Betika', prefix: '', markets: MARKETS.map((market) => market.id), note: 'Share code has not been issued.' },
+  { id: 'betpawa', name: 'BetPawa', prefix: '', markets: MARKETS.map((market) => market.id), note: 'Share code has not been issued.' },
 ];
 
 const TIP_RATE = 0.8;
@@ -433,15 +424,36 @@ export function qualifying(picks: PickView[]): PickView[] {
   return picks.filter((pick) => pick.bookmarked && pick.confidence > TIP_RATE);
 }
 
+export type SharePart = {
+  code: string;
+  link: string;
+  totalOdds: number | null;
+  legs: number;
+};
+
+export type ShareBook = {
+  parts?: SharePart[];
+  error?: string | null;
+};
+
+export type SharePayload = {
+  status: 'pending' | 'ready' | 'empty' | 'error';
+  books?: Record<string, ShareBook>;
+  error?: string | null;
+};
+
 export type BookingCode = {
   id: string;
   name: string;
   note: string;
   code: string;
-  bookingState: 'unavailable' | 'ready';
+  link: string;
+  parts: SharePart[];
+  bookingState: 'unavailable' | 'ready' | 'pending' | 'error';
   legs: PickView[];
   skipped: PickView[];
   status: LegStatus;
+  error?: string;
 };
 
 export function bookingCodes(slip: PickView[]): BookingCode[] {
@@ -458,11 +470,41 @@ export function bookingCodes(slip: PickView[]): BookingCode[] {
       name: book.name,
       note: book.note,
       code: '',
+      link: '',
+      parts: [],
       bookingState: 'unavailable',
       legs,
       skipped,
       status,
     };
+  });
+}
+
+const SAFE_LINK = /^https:\/\/(?:www\.sportybet\.com|www\.football\.com|www\.msport\.com|betika\.com|www\.betpawa\.com\.gh)\//i;
+
+export function applyShares(codes: BookingCode[], shares: SharePayload | null): BookingCode[] {
+  if (!shares) return codes;
+  return codes.map((code) => {
+    const book = shares.books?.[code.id];
+    const parts = (book?.parts || []).filter((part) => part.code && SAFE_LINK.test(part.link));
+    if (parts.length) {
+      return {
+        ...code,
+        bookingState: 'ready',
+        code: parts[0].code,
+        link: parts[0].link,
+        parts,
+        note: parts.length > 1 ? `${parts.length} share codes. A long slip is split.` : 'Share code is ready.',
+      };
+    }
+    if (!book) {
+      return shares.status === 'pending' ? { ...code, bookingState: 'pending', note: 'Booking this slip.' } : code;
+    }
+    if (shares.status === 'pending' && !book.error) {
+      return { ...code, bookingState: 'pending', note: 'Booking this slip.' };
+    }
+    const error = book.error || shares.error || 'No code returned.';
+    return { ...code, bookingState: 'error', note: error, error };
   });
 }
 

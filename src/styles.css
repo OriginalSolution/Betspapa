@@ -728,6 +728,8 @@ button:disabled { cursor: default; opacity: 0.35; }
 .code-card header { justify-content: space-between; width: 100%; }
 .code-card header span { color: var(--gold); font-size: 12px; font-weight: 700; }
 .booking-code { margin: 0; font-family: var(--score); font-size: 32px; letter-spacing: 0.04em; }
+.booking-link { color: var(--gold); font-size: 13px; font-weight: 700; }
+.booking-part + .booking-part { margin-top: 8px; }
 .ranks { list-style: none; margin: 0; padding: 0; }
 .ranks li { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .ranks strong { display: block; }
