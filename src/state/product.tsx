@@ -17,6 +17,8 @@ import {
   type PickView,
   type TrendView,
 } from '../data/board';
+import { bookOnDevice } from '../lib/deviceBook';
+import { isNativeApp } from '../lib/nativeHttp';
 import type { InboxItem, Match } from '../types';
 import { useStore } from './store';
 
@@ -140,6 +142,20 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     let stop = false;
     let timer = 0;
     const run = async () => {
+      if (isNativeApp()) {
+        try {
+          await bookOnDevice(
+            legs,
+            (payload) => {
+              if (!stop) setShares(payload);
+            },
+            () => stop,
+          );
+        } catch {
+          if (!stop) setShares({ status: 'error', error: 'Booking request failed.' });
+        }
+        return;
+      }
       try {
         const response = await fetch('/api/book', {
           method: 'POST',

@@ -1,7 +1,21 @@
+import { CapacitorHttp } from '@capacitor/core';
 import type { AppConfig, Follows, Match } from '../types';
 import { mapSportyEvents, type SportyEvent } from './sporty';
 import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
+import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
+
+export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
+
+export type FixtureBody = { events?: SportyEvent[]; error?: string; message?: string };
+
+export type FixtureResult = { status: number; body: FixtureBody };
+
+export type FixtureTransport = {
+  native: boolean;
+  local: (url: string) => Promise<FixtureResult>;
+  direct: (url: string) => Promise<FixtureResult>;
+};
 
 export async function fetchConfig(): Promise<AppConfig> {
   try {
@@ -25,26 +39,63 @@ export async function fetchConfig(): Promise<AppConfig> {
   }
 }
 
-export async function fetchSportyBoard(date: string): Promise<Match[]> {
-  const { from, to } = dayRangeIso(date);
-  const urls = [
-    `/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-    'https://api.betspapa.com/api/sportybet/upcoming',
-  ];
-  let lastError = 'Fixture feed failed';
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        lastError = await readError(response);
-        continue;
+function fixtureFailure(result: FixtureResult): string {
+  return result.body?.message || result.body?.error || `Could not load scores (${result.status})`;
+}
+
+function asFixtureBody(data: unknown): FixtureBody {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
+  return data as FixtureBody;
+}
+
+async function browserResult(response: Response): Promise<FixtureResult> {
+  let body: FixtureBody = {};
+  try {
+    body = asFixtureBody(await response.json());
+  } catch {
+    body = {};
+  }
+  return { status: response.status, body };
+}
+
+function defaultTransport(): FixtureTransport {
+  return {
+    native: isNativeApp(),
+    local: async (url) => browserResult(await fetch(url)),
+    direct: async (url) => {
+      if (isNativeApp()) {
+        const response = await CapacitorHttp.request(nativeRequestOptions('GET', url, { timeout: 20 }));
+        return { status: response.status, body: asFixtureBody(readJsonBody(response.data)) };
       }
-      const body = (await response.json()) as { events?: SportyEvent[] };
-      const events = body.events ?? [];
-      return mapSportyEvents(url.startsWith('https://') ? events : events, from, to);
+      return browserResult(await fetch(url));
+    },
+  };
+}
+
+export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
+  const { from, to } = dayRangeIso(date);
+  let lastError = 'Fixture feed failed';
+  // The packaged app has no local /api server. Browser fetch would send Origin
+  // https://localhost and the fixtures API would reject it.
+  if (!transport.native) {
+    try {
+      const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+      if (local.status >= 200 && local.status < 300 && Array.isArray(local.body?.events)) {
+        return mapSportyEvents(local.body.events, from, to);
+      }
+      lastError = fixtureFailure(local);
     } catch (error) {
       lastError = error instanceof Error ? error.message : lastError;
     }
+  }
+  try {
+    const direct = await transport.direct(FIXTURE_FEED);
+    if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
+      throw new Error(direct.status ? fixtureFailure(direct) : lastError);
+    }
+    return mapSportyEvents(direct.body.events, from, to);
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : lastError;
   }
   throw new Error(lastError);
 }

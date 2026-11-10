@@ -61,9 +61,9 @@ Vite, React, TypeScript, and a small Node server that proxies football-data.org 
 
 ## Android APK
 
-The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.0. It packages the same boards as the site. Fixtures load from the Betspapa fixtures API when the device is online. Share codes are requested from the site’s booking service (`/api/book`); the APK does not include that server. Android 13 and newer will ask for notification permission when you enable browser alerts.
+The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.1 (versionCode 3). It packages the same boards as the site. Fixtures load from the Betspapa fixtures API with Android’s native HTTP client, which does not send the WebView origin (`https://localhost`). The website keeps using same-origin `/api/fixtures`. Share codes are booked on the phone with that same native client, on the no-login Ghana desks (SportyBet, Football.com, MSport, Betika, BetPawa; Betway is skipped). The APK does not need a local booking server. Android 13 and newer will ask for notification permission when you enable browser alerts.
 
-This environment assembled and checked the signed release APK. It was not installed on a phone or emulator here.
+The signed 0.2.1 APK was assembled with JDK 21 and Android SDK 36. It was not installed on a phone or emulator, so the WebView origin was not executed on a device. Browser checks against the live feed are in `docs/progress/`.
 
 ### Rebuild
 

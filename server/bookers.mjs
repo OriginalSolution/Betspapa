@@ -1,8 +1,6 @@
 /** No-login Ghana share booking. Betway is omitted because it needs a logged-in account. */
-import { spawn } from 'node:child_process';
 import { loadOfferIndex, stillOffered, toSelection } from './selection.mjs';
 
-export const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
 const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
 const FOOTBALL_SHARE = 'https://www.football.com/api/gh/orders/share';
 const MSPORT_SHARE = 'https://www.msport.com/api/gh/orders/real-sports/order/share';
@@ -36,38 +34,6 @@ export function resetBookerCache() {
   eventCache.clear();
   priceCache.clear();
   offerCache = null;
-}
-
-export function requestJson(method, url, { body, headers = {}, timeout = 25 } = {}) {
-  const headerList = { Accept: 'application/json', ...headers };
-  if (body !== undefined) headerList['Content-Type'] = 'application/json';
-  const args = ['-sS', '-m', String(timeout), '-A', UA, '-X', method];
-  for (const [key, value] of Object.entries(headerList)) {
-    if (value != null) args.push('-H', `${key}: ${value}`);
-  }
-  args.push(url);
-  if (body !== undefined) args.push('-d', JSON.stringify(body));
-  return new Promise((resolve) => {
-    const child = spawn('curl', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    child.stdout.on('data', (buf) => {
-      out += buf;
-    });
-    const finish = () => {
-      const text = out.trim();
-      if (!text || !/^[{\[]/.test(text)) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(text));
-      } catch {
-        resolve({});
-      }
-    };
-    child.on('close', finish);
-    child.on('error', () => resolve({}));
-  });
 }
 
 function product(values) {
@@ -355,7 +321,8 @@ async function cachedIndex(request) {
   }
 }
 
-export async function bookAll(legs, request = requestJson, onBook) {
+export async function bookAll(legs, request, onBook) {
+  if (typeof request !== 'function') throw new Error('Booking needs an HTTP client.');
   const mapped = [];
   const seen = new Set();
   for (const leg of legs.map(toSelection).filter(Boolean)) {
