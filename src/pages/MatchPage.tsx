@@ -1,0 +1,151 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { Crest } from '../components/Crest';
+import { IconBall, IconCard } from '../components/Icons';
+import { fetchLiveMatch } from '../data/remote';
+import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/format';
+import type { EventType, Match, MatchEvent } from '../types';
+import { useStore } from '../state/store';
+
+const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, ht: 2, ft: 3 };
+
+export function MatchPage() {
+  const { id = '' } = useParams();
+  const { findMatch, mode, setActiveMatch, follows, toggleMatch, toggleTeam } = useStore();
+  const local = findMatch(id);
+  const [remote, setRemote] = useState<Match | null>(null);
+
+  useEffect(() => {
+    setActiveMatch(id);
+    return () => setActiveMatch(null);
+  }, [id, setActiveMatch]);
+
+  useEffect(() => {
+    if (local || mode !== 'live') return;
+    let cancelled = false;
+    fetchLiveMatch(id).then((match) => {
+      if (!cancelled) setRemote(match);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, local, mode]);
+
+  const match = local ?? remote;
+  if (!match) {
+    return (
+      <div className="empty">
+        <h2>Match unavailable</h2>
+        <p>This fixture is not on the current board.</p>
+        <Link to="/" className="btn">
+          Back to today
+        </Link>
+      </div>
+    );
+  }
+
+  const followed = follows.matches.includes(match.id);
+  const homeOn = follows.teams.some((team) => team.id === match.home.id);
+  const awayOn = follows.teams.some((team) => team.id === match.away.id);
+  const showHt =
+    match.htHome != null &&
+    match.htAway != null &&
+    (match.status === 'finished' || (match.status === 'live' && (match.minute ?? 0) >= 45));
+  const timeline = [...match.events].sort((a, b) => (b.minute ?? -1) - (a.minute ?? -1) || later[b.type] - later[a.type]);
+
+  return (
+    <article className="detail">
+      <p className="detail-comp">
+        <span className="code">{match.competition.code}</span>
+        {match.competition.name}
+      </p>
+      {match.venue && <p className="venue">{match.venue}</p>}
+      <section className="scoreboard" style={{ ['--home' as string]: match.home.color, ['--away' as string]: match.away.color }}>
+        <div className="scoreline">
+          <div className="side">
+            <Crest team={match.home} size={56} followed={homeOn} />
+            <span className="side-name">{match.home.shortName}</span>
+          </div>
+          <div className="result">
+            {match.homeScore == null ? (
+              <span className="kickoff-time">{minuteLabel(match)}</span>
+            ) : (
+              <p className="big-score">
+                <span>{match.homeScore}</span>
+                <span className="big-dash">–</span>
+                <span>{match.awayScore}</span>
+              </p>
+            )}
+            <p className={cx('status-pill', (match.status === 'live' || match.status === 'halftime') && 'is-live')}>
+              {(match.status === 'live' || match.status === 'halftime') && <i />}
+              {statusLine(match)}
+            </p>
+            {showHt && <p className="ht-line">HT {scoreDash(match.htHome, match.htAway)}</p>}
+          </div>
+          <div className="side">
+            <Crest team={match.away} size={56} followed={awayOn} />
+            <span className="side-name">{match.away.shortName}</span>
+          </div>
+        </div>
+        <div className="actions">
+          <button type="button" className={cx('btn', followed && 'btn-quiet')} onClick={() => toggleMatch(match.id)}>
+            {followed ? 'Following match' : 'Follow match'}
+          </button>
+          <button type="button" className={cx('btn', 'btn-quiet', homeOn && 'is-on')} onClick={() => toggleTeam(teamFollow(match.home))}>
+            {homeOn ? `Following ${match.home.shortName}` : `Follow ${match.home.shortName}`}
+          </button>
+          <button type="button" className={cx('btn', 'btn-quiet', awayOn && 'is-on')} onClick={() => toggleTeam(teamFollow(match.away))}>
+            {awayOn ? `Following ${match.away.shortName}` : `Follow ${match.away.shortName}`}
+          </button>
+        </div>
+      </section>
+      <section className="timeline-wrap">
+        <h2>Events</h2>
+        {timeline.length === 0 ? (
+          <p className="lede">Events show up once the match kicks off.</p>
+        ) : (
+          <ol className="timeline">
+            {timeline.map((event) => (
+              <EventRow key={event.id} event={event} match={match} />
+            ))}
+          </ol>
+        )}
+      </section>
+    </article>
+  );
+}
+
+function EventRow({ event, match }: { event: MatchEvent; match: Match }) {
+  if (event.type === 'kickoff' || event.type === 'ht' || event.type === 'ft') {
+    const label = event.type === 'kickoff' ? 'Kick-off' : event.type === 'ht' ? `Half-time ${event.homeScore ?? 0}–${event.awayScore ?? 0}` : `Full-time ${event.homeScore ?? 0}–${event.awayScore ?? 0}`;
+    return (
+      <li className="event event-marker">
+        <span>{label}</span>
+      </li>
+    );
+  }
+  const team = event.teamId === match.home.id ? match.home : event.teamId === match.away.id ? match.away : null;
+  const note = event.detail === 'Penalty' ? ' (pen)' : event.detail === 'Own goal' ? ' (og)' : '';
+  return (
+    <li className={cx('event', `ev-${event.type}`)}>
+      <span className="ev-min">{event.minute ?? '–'}′</span>
+      <span className="ev-icon" aria-hidden="true">
+        {event.type === 'goal' ? <IconBall /> : <IconCard tone={event.type === 'red' ? 'red' : 'yellow'} />}
+      </span>
+      <span className="ev-copy">
+        <strong>
+          {event.player ?? (event.type === 'goal' ? 'Goal' : 'Card')}
+          {note}
+        </strong>
+        {team && <em>{team.shortName}</em>}
+      </span>
+      {event.type === 'goal' && event.homeScore != null ? (
+        <b className="ev-score">
+          {event.homeScore}–{event.awayScore}
+        </b>
+      ) : (
+        <span />
+      )}
+    </li>
+  );
+}
