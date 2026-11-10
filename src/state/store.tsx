@@ -313,7 +313,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const teamKey = state.matches.map((match) => `${match.home.name}|${match.away.name}`).join('\n');
 
   useEffect(() => {
-    const names = [...new Set(stateRef.current.matches.flatMap((match) => [match.home.name, match.away.name]))];
+    const names = stateRef.current.matches.flatMap((match) => [
+      { name: match.home.name, area: match.competition.area, competition: match.competition.name },
+      { name: match.away.name, area: match.competition.area, competition: match.competition.name },
+    ]);
     let stop = false;
     void resolveCrests(names, (found) => {
       if (stop) return;
