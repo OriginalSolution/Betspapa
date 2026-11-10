@@ -4,7 +4,7 @@ import type { GoalSound } from '../types';
 import { useStore } from '../state/store';
 
 const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'browser'; label: string; detail: string }> = [
-  { key: 'kickoff', label: 'Kick-off', detail: 'When a followed match starts' },
+  { key: 'kickoff', label: 'Kick-off', detail: 'When a followed match starts, including if you open the app after kick-off' },
   { key: 'goal', label: 'Goals', detail: 'Including penalties and own goals' },
   { key: 'red', label: 'Red cards', detail: 'Straight reds and second yellows' },
   { key: 'ht', label: 'Half-time', detail: 'The break, and the score at the break' },

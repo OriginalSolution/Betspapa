@@ -135,6 +135,28 @@ async function handleApi(req, res, url) {
     });
     return;
   }
+  if (url.pathname === '/api/live') {
+    try {
+      const events = await cached('inplay-football', 20_000, async () => {
+        const response = await fetch(
+          'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1',
+          {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+            },
+            signal: AbortSignal.timeout(20_000),
+          },
+        );
+        if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
+        return response.json();
+      });
+      send(res, 200, events);
+    } catch (error) {
+      send(res, 502, { error: error.message || 'In-play scores failed' });
+    }
+    return;
+  }
   if (url.pathname === '/api/fixtures') {
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');

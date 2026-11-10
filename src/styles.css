@@ -735,6 +735,8 @@ img.crest { padding: 1px; }
 .leg-bust { color: var(--red-2); }
 .leg-open { color: var(--muted); }
 .trend { justify-content: space-between; margin-bottom: 8px; }
+.trend-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.trend-hit { box-shadow: inset 3px 0 0 var(--live, #21c45a); }
 .trend-hot { box-shadow: inset 3px 0 0 var(--gold); }
 .trend-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .trend-side b { font-family: var(--score); font-size: 28px; line-height: 0.9; }

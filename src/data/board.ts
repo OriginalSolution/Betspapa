@@ -5,15 +5,28 @@ export type MarketId =
   | 'home'
   | 'draw'
   | 'away'
+  | 'dc-1x'
+  | 'dc-12'
+  | 'dc-x2'
+  | 'dnb-home'
+  | 'dnb-away'
+  | 'over05'
   | 'over15'
   | 'over25'
   | 'over35'
+  | 'under15'
   | 'under25'
+  | 'under35'
   | 'btts'
   | 'btts-no'
   | 'home-score'
   | 'away-score'
-  | 'clean';
+  | 'clean'
+  | 'fh-home'
+  | 'fh-draw'
+  | 'fh-away'
+  | 'fh-over05'
+  | 'fh-over15';
 
 export type FormMark = 'W' | 'D' | 'L';
 export type SquadStrength = 'full' | 'weakened' | 'rotated';
@@ -27,19 +40,47 @@ export type MarketInfo = {
 };
 
 export const MARKETS: MarketInfo[] = [
-  { id: 'home', label: 'Home win', short: '1' },
-  { id: 'draw', label: 'Draw', short: 'X' },
-  { id: 'away', label: 'Away win', short: '2' },
+  { id: 'home', label: 'Full-time home win', short: 'FT 1' },
+  { id: 'draw', label: 'Full-time draw', short: 'FT X' },
+  { id: 'away', label: 'Full-time away win', short: 'FT 2' },
+  { id: 'dc-1x', label: 'Double chance 1X', short: '1X' },
+  { id: 'dc-12', label: 'Double chance 12', short: '12' },
+  { id: 'dc-x2', label: 'Double chance X2', short: 'X2' },
+  { id: 'dnb-home', label: 'Draw no bet · home', short: 'DNB 1' },
+  { id: 'dnb-away', label: 'Draw no bet · away', short: 'DNB 2' },
+  { id: 'over05', label: 'Over 0.5 goals', short: 'O0.5' },
   { id: 'over15', label: 'Over 1.5 goals', short: 'O1.5' },
   { id: 'over25', label: 'Over 2.5 goals', short: 'O2.5' },
   { id: 'over35', label: 'Over 3.5 goals', short: 'O3.5' },
+  { id: 'under15', label: 'Under 1.5 goals', short: 'U1.5' },
   { id: 'under25', label: 'Under 2.5 goals', short: 'U2.5' },
+  { id: 'under35', label: 'Under 3.5 goals', short: 'U3.5' },
   { id: 'btts', label: 'Both teams to score', short: 'BTTS' },
   { id: 'btts-no', label: 'Both teams not to score', short: 'BTTS no' },
   { id: 'home-score', label: 'Home team to score', short: 'Home score' },
   { id: 'away-score', label: 'Away team to score', short: 'Away score' },
   { id: 'clean', label: 'Clean sheet', short: 'Clean' },
+  { id: 'fh-home', label: 'First-half home win', short: 'FH 1' },
+  { id: 'fh-draw', label: 'First-half draw', short: 'FH X' },
+  { id: 'fh-away', label: 'First-half away win', short: 'FH 2' },
+  { id: 'fh-over05', label: 'First-half over 0.5', short: 'FH O0.5' },
+  { id: 'fh-over15', label: 'First-half over 1.5', short: 'FH O1.5' },
 ];
+
+/** Markets the no-login share route can book. Other major markets can be followed without joining the slip. */
+export const SLIP_MARKETS = new Set<MarketId>([
+  'home',
+  'draw',
+  'away',
+  'over15',
+  'over25',
+  'over35',
+  'under25',
+  'btts',
+  'btts-no',
+  'home-score',
+  'away-score',
+]);
 
 const marketById = new Map(MARKETS.map((market) => [market.id, market]));
 
@@ -114,15 +155,18 @@ const trendSeeds: TrendSeed[] = [
 
 export type TrendView = {
   id: string;
+  matchId: string;
   teamId: string;
   teamName: string;
   market: MarketId;
   marketLabel: string;
+  label: string;
   sample: number;
   hits: number;
   rate: number;
   bookmarked: boolean;
   developing: boolean;
+  status: LegStatus;
   note: string;
   form: FormMark[];
   squad: SquadStrength;
@@ -194,20 +238,23 @@ export function trendsFromPicks(picks: PickView[]): TrendView[] {
   return picks
     .map((pick) => ({
       id: pick.id,
+      matchId: pick.matchId,
       teamId: pick.teamId,
       teamName: pick.teamName,
       market: pick.market,
       marketLabel: pick.marketLabel,
+      label: pick.label,
       sample: 0,
       hits: 0,
       rate: pick.rate,
       bookmarked: pick.bookmarked,
       developing: !pick.bookmarked && pick.rate >= 0.7 && pick.rate <= TIP_RATE,
+      status: pick.status,
       note: pick.supportText,
       form: pick.form,
       squad: pick.squad,
     }))
-    .sort((a, b) => b.rate - a.rate || a.teamName.localeCompare(b.teamName));
+    .sort((a, b) => Number(b.status === 'won') - Number(a.status === 'won') || b.rate - a.rate || a.teamName.localeCompare(b.teamName));
 }
 
 export function listTrends(): TrendView[] {
@@ -218,15 +265,18 @@ export function listTrends(): TrendView[] {
       const recentWins = form.slice(-3).filter((mark) => mark === 'W').length;
       return {
         id: seed.id,
+        matchId: '',
         teamId: seed.teamId,
         teamName: teamName(seed.teamId),
         market: seed.market,
         marketLabel: marketInfo(seed.market).label,
+        label: `${teamName(seed.teamId)} · ${marketInfo(seed.market).label}`,
         sample: seed.sample,
         hits: seed.hits,
         rate,
         bookmarked: rate > TIP_RATE,
         developing: rate <= TIP_RATE && rate >= 0.7 && recentWins >= 2,
+        status: 'open' as const,
         note: seed.note,
         form,
         squad: profile(seed.teamId).squad,
@@ -276,7 +326,25 @@ export function demoOdds(confidence: number, market: MarketId): number {
   return Math.round((1.32 + (1 - confidence) * 6 + bias) * 100) / 100;
 }
 
+function halfReady(match: Match): boolean {
+  if (match.htHome == null || match.htAway == null) return false;
+  return match.status === 'halftime' || match.status === 'finished' || (match.status === 'live' && (match.minute ?? 0) >= 45);
+}
+
 export function settle(market: MarketId, match: Match, teamIsHome: boolean): LegStatus {
+  const firstHalf =
+    market === 'fh-home' || market === 'fh-draw' || market === 'fh-away' || market === 'fh-over05' || market === 'fh-over15';
+  if (firstHalf) {
+    if (!halfReady(match) || match.htHome == null || match.htAway == null) return 'open';
+    const home = match.htHome;
+    const away = match.htAway;
+    const total = home + away;
+    if (market === 'fh-over05') return total >= 1 ? 'won' : 'bust';
+    if (market === 'fh-over15') return total >= 2 ? 'won' : 'bust';
+    if (market === 'fh-home') return home > away ? 'won' : 'bust';
+    if (market === 'fh-away') return away > home ? 'won' : 'bust';
+    return home === away ? 'won' : 'bust';
+  }
   if (match.status === 'scheduled' || match.status === 'postponed' || match.homeScore == null || match.awayScore == null) {
     return 'open';
   }
@@ -286,10 +354,13 @@ export function settle(market: MarketId, match: Match, teamIsHome: boolean): Leg
   const finished = match.status === 'finished';
   const conceded = teamIsHome ? away : home;
   const scored = teamIsHome ? home : away;
+  if (market === 'over05') return total >= 1 ? 'won' : finished ? 'bust' : 'open';
   if (market === 'over15') return total >= 2 ? 'won' : finished ? 'bust' : 'open';
   if (market === 'over25') return total >= 3 ? 'won' : finished ? 'bust' : 'open';
   if (market === 'over35') return total >= 4 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'under15') return total >= 2 ? 'bust' : finished ? 'won' : 'open';
   if (market === 'under25') return total >= 3 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'under35') return total >= 4 ? 'bust' : finished ? 'won' : 'open';
   if (market === 'btts') return home > 0 && away > 0 ? 'won' : finished ? 'bust' : 'open';
   if (market === 'btts-no') return home > 0 && away > 0 ? 'bust' : finished ? 'won' : 'open';
   if (market === 'home-score') return home > 0 ? 'won' : finished ? 'bust' : 'open';
@@ -298,6 +369,21 @@ export function settle(market: MarketId, match: Match, teamIsHome: boolean): Leg
   if (market === 'home') return finished ? (home > away ? 'won' : 'bust') : 'open';
   if (market === 'away') return finished ? (away > home ? 'won' : 'bust') : 'open';
   if (market === 'draw') return finished ? (home === away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-1x') return finished ? (home >= away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-12') return finished ? (home !== away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-x2') return finished ? (away >= home ? 'won' : 'bust') : 'open';
+  if (market === 'dnb-home') {
+    if (!finished) return 'open';
+    if (home > away) return 'won';
+    if (away > home) return 'bust';
+    return 'open';
+  }
+  if (market === 'dnb-away') {
+    if (!finished) return 'open';
+    if (away > home) return 'won';
+    if (home > away) return 'bust';
+    return 'open';
+  }
   return scored > 0 && finished ? 'won' : 'open';
 }
 
@@ -316,15 +402,62 @@ const ODDS_MARKETS: Array<[string, MarketId, boolean]> = [
   ['home', 'home', true],
   ['draw', 'draw', false],
   ['away', 'away', false],
+  ['home-dnb', 'dnb-home', true],
+  ['away-dnb', 'dnb-away', false],
+  ['over-05', 'over05', true],
   ['over-15', 'over15', true],
   ['over-25', 'over25', true],
   ['over-35', 'over35', true],
+  ['under-15', 'under15', false],
   ['under-25', 'under25', false],
+  ['under-35', 'under35', false],
   ['btts-yes', 'btts', true],
   ['btts-no', 'btts-no', false],
   ['home-over-05', 'home-score', true],
   ['away-over-05', 'away-score', true],
+  ['fh-over-05', 'fh-over05', true],
+  ['fh-over-15', 'fh-over15', true],
 ];
+
+function combinePrice(left?: number, right?: number): number | null {
+  if (left == null || right == null || left <= 1 || right <= 1) return null;
+  const implied = 1 / left + 1 / right;
+  if (!Number.isFinite(implied) || implied <= 0) return null;
+  return Math.round((1 / implied) * 100) / 100;
+}
+
+function pricePick(match: Match, market: MarketId, price: number | null, note: string, support: -1 | 0 | 1 = 0): PickView {
+  const implied = price != null && price > 1 ? Math.min(0.99, 1 / price) : 0.5;
+  const confidence = confidenceOf(implied, support);
+  const slip = SLIP_MARKETS.has(market);
+  const backingAway = market === 'away' || market === 'away-score' || market === 'dnb-away' || market === 'fh-away';
+  const backed = backingAway ? match.away : match.home;
+  const opposed = backingAway ? match.home : match.away;
+  return {
+    id: `${match.id}:${market}`,
+    trendId: `price:${market}`,
+    matchId: match.id,
+    competitionId: match.competition.id,
+    competitionName: match.competition.name,
+    teamId: backed.id,
+    teamName: backed.shortName,
+    opponentName: opposed.shortName,
+    market,
+    marketLabel: marketInfo(market).label,
+    rate: implied,
+    support,
+    supportText: note,
+    confidence,
+    grade: slip ? gradeFor(confidence) : null,
+    bookmarked: slip && implied > TIP_RATE,
+    softened: slip && implied > TIP_RATE && confidence <= TIP_RATE,
+    odds: price != null && price > 1 ? Math.round(price * 100) / 100 : 0,
+    status: settle(market, match, !backingAway),
+    form: [],
+    squad: 'full',
+    label: `${match.home.shortName} vs ${match.away.shortName} · ${marketInfo(market).label}`,
+  };
+}
 
 function picksFromOdds(match: Match): PickView[] {
   const odds = match.odds;
@@ -334,43 +467,42 @@ function picksFromOdds(match: Match): PickView[] {
   const awayImp = odds.away ? 1 / odds.away : 0;
   const book = homeImp + drawImp + awayImp || 1;
   const picks: PickView[] = [];
-  for (const [key, market, openGame] of ODDS_MARKETS) {
+  for (const [key, market] of ODDS_MARKETS) {
     const price = odds[key];
     if (typeof price !== 'number' || price <= 1) continue;
-    const raw = 1 / price;
+    const raw = Math.min(0.99, 1 / price);
     const implied = market === 'home' ? homeImp / book : market === 'draw' ? drawImp / book : market === 'away' ? awayImp / book : raw;
     const oneXTwo = market === 'home' || market === 'away' || market === 'draw';
-    const backingAway = market === 'away' || market === 'away-score';
+    const backingAway = market === 'away' || market === 'away-score' || market === 'dnb-away';
     const gap = backingAway ? awayImp - homeImp : homeImp - awayImp;
+    const support: -1 | 0 | 1 = oneXTwo ? (gap > 0.15 ? 1 : gap < -0.05 ? -1 : 0) : raw >= 0.75 ? 1 : raw < 0.55 ? -1 : 0;
     const backed = backingAway ? match.away : match.home;
     const opposed = backingAway ? match.home : match.away;
-    const support: -1 | 0 | 1 = oneXTwo ? (gap > 0.15 ? 1 : gap < -0.05 ? -1 : 0) : raw >= 0.75 ? 1 : raw < 0.55 ? -1 : 0;
-    const confidence = confidenceOf(implied, support);
-    void openGame;
-    picks.push({
-      id: `${match.id}:${market}`,
-      trendId: `price:${market}`,
-      matchId: match.id,
-      competitionId: match.competition.id,
-      competitionName: match.competition.name,
-      teamId: backed.id,
-      teamName: backed.shortName,
-      opponentName: opposed.shortName,
-      market,
-      marketLabel: marketInfo(market).label,
-      rate: implied,
-      support,
-      supportText: `Price ${price.toFixed(2)}. ${oneXTwo ? supportText(support, opposed.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`,
-      confidence,
-      grade: gradeFor(confidence),
-      bookmarked: implied > TIP_RATE,
-      softened: implied > TIP_RATE && confidence <= TIP_RATE,
-      odds: Math.round(price * 100) / 100,
-      status: settle(market, match, true),
-      form: [],
-      squad: 'full',
-      label: `${match.home.shortName} vs ${match.away.shortName} · ${marketInfo(market).label}`,
-    });
+    const note = `Price ${price.toFixed(2)}. ${oneXTwo ? supportText(support, opposed.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`;
+    const pick = pricePick(match, market, price, note, support);
+    pick.rate = Math.min(0.99, implied);
+    pick.teamId = backed.id;
+    pick.teamName = backed.shortName;
+    pick.opponentName = opposed.shortName;
+    pick.confidence = confidenceOf(pick.rate, support);
+    pick.grade = SLIP_MARKETS.has(market) ? gradeFor(pick.confidence) : null;
+    pick.bookmarked = SLIP_MARKETS.has(market) && pick.rate > TIP_RATE;
+    pick.softened = pick.bookmarked && pick.confidence <= TIP_RATE;
+    picks.push(pick);
+  }
+  const doubles: Array<[MarketId, number | null]> = [
+    ['dc-1x', combinePrice(odds.home, odds.draw)],
+    ['dc-12', combinePrice(odds.home, odds.away)],
+    ['dc-x2', combinePrice(odds.draw, odds.away)],
+  ];
+  for (const [market, price] of doubles) {
+    if (price == null) continue;
+    picks.push(pricePick(match, market, price, 'Combined from the full-time 1X2 prices.'));
+  }
+  if (match.status === 'live' || match.status === 'halftime' || match.status === 'finished') {
+    for (const market of ['fh-home', 'fh-draw', 'fh-away'] as MarketId[]) {
+      picks.push(pricePick(match, market, null, 'Settles from the half-time score.'));
+    }
   }
   return picks;
 }
@@ -421,7 +553,7 @@ export function buildPicks(matches: Match[]): PickView[] {
 }
 
 export function qualifying(picks: PickView[]): PickView[] {
-  return picks.filter((pick) => pick.bookmarked && pick.confidence > TIP_RATE);
+  return picks.filter((pick) => SLIP_MARKETS.has(pick.market) && pick.bookmarked && pick.confidence > TIP_RATE);
 }
 
 export type SharePart = {

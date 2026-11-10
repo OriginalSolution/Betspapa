@@ -17,8 +17,10 @@ import {
   type PickView,
   type TrendView,
 } from '../data/board';
+import { trendHitNotices } from '../lib/alerts';
 import { bookOnDevice } from '../lib/deviceBook';
 import { isNativeApp } from '../lib/nativeHttp';
+import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
 import { useStore } from './store';
 
@@ -37,6 +39,8 @@ type Product = {
   toggleList: (item: Omit<ListItem, 'list'>, list: 'black' | 'green') => void;
   clearList: (list: 'black' | 'green') => void;
   pickListed: (pick: PickView, list: 'black' | 'green') => boolean;
+  trendFollows: string[];
+  toggleTrend: (id: string) => void;
 };
 
 const ProductContext = createContext<Product | null>(null);
@@ -44,6 +48,7 @@ const SLIP_KEY = 'betspapa.slip.v1';
 const LIST_KEY = 'betspapa.lists.v1';
 const LEDGER_KEY = 'betspapa.ledger.v1';
 const SQUAD_KEY = 'betspapa.squadSeen.v1';
+const TREND_KEY = 'betspapa.trendFollows.v1';
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -81,6 +86,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const [manual, setManual] = useState<string[]>(() => read<string[]>(SLIP_KEY, []));
   const [dismissed, setDismissed] = useState<string[]>(() => read<string[]>('betspapa.dismissed.v1', []));
   const [lists, setLists] = useState<ListItem[]>(() => read<ListItem[]>(LIST_KEY, []));
+  const [trendFollows, setTrendFollows] = useState<string[]>(() => read<string[]>(TREND_KEY, []).filter((id) => typeof id === 'string'));
   const [extra, setExtra] = useState<LedgerEntry[]>(() => read<LedgerEntry[]>(LEDGER_KEY, []));
   const baseline = useRef<{ t0: number; status: Map<string, LegStatus>; codes: Map<string, LegStatus> } | null>(null);
 
@@ -115,6 +121,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   useEffect(() => write(SLIP_KEY, manual), [manual]);
   useEffect(() => write('betspapa.dismissed.v1', dismissed), [dismissed]);
   useEffect(() => write(LIST_KEY, lists), [lists]);
+  useEffect(() => write(TREND_KEY, trendFollows), [trendFollows]);
   useEffect(() => write(LEDGER_KEY, extra), [extra]);
 
   const bookLegs = useRef(slipPicks);
@@ -241,6 +248,13 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     if (notes.length) pushNotices(notes);
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
+  useEffect(() => {
+    if (!trendFollows.length) return;
+    const seen = loadAlerted();
+    const notes = trendHitNotices(picks, trendFollows, seen, Date.now());
+    if (notes.length) pushNotices(notes);
+  }, [picks, trendFollows, pushNotices]);
+
   const value = useMemo<Product>(
     () => ({
       picks,
@@ -268,8 +282,10 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         }),
       clearList: (list) => setLists((current) => current.filter((entry) => entry.list !== list)),
       pickListed: (pick, list) => (list === 'black' ? isBlacklisted(pick, lists) : isGreenlisted(pick, lists)),
+      trendFollows,
+      toggleTrend: (id) => setTrendFollows((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id])),
     }),
-    [picks, visiblePicks, trends, suggestions, slip, lists, ledger, codes, hiddenCount],
+    [picks, visiblePicks, trends, suggestions, slip, lists, ledger, codes, hiddenCount, trendFollows],
   );
 
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;

@@ -106,8 +106,6 @@ export function applyCrests(matches: Match[], crests: Record<string, string>): M
   });
 }
 
-const KICKOFF_WINDOW_MS = 20 * 60 * 1000;
-
 export function kickoffNotices(
   matches: Match[],
   follows: Follows,
@@ -121,7 +119,7 @@ export function kickoffNotices(
   for (const match of matches) {
     if (match.status === 'finished' || match.status === 'postponed') continue;
     const kick = new Date(match.utcDate).getTime();
-    if (!Number.isFinite(kick) || now < kick || now > kick + KICKOFF_WINDOW_MS) continue;
+    if (!Number.isFinite(kick) || now < kick) continue;
     const followed =
       follows.matches.includes(match.id) || follows.teams.some((team) => team.id === match.home.id || team.id === match.away.id);
     if (!followed) continue;

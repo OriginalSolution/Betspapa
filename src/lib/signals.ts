@@ -31,14 +31,14 @@ function goalCopy(event: MatchEvent | undefined, teamName: string): string {
   return `${event.player}${minute}`;
 }
 
-export function signalsFor(match: Match, generation: number): AlertSignal[] {
+export function signalsFor(match: Match, _generation: number): AlertSignal[] {
   if (match.status === 'scheduled' || match.status === 'postponed') return [];
   const out: AlertSignal[] = [];
   const versus = `${match.home.shortName} vs ${match.away.shortName}`;
   const current = scoreText(match.homeScore, match.awayScore);
 
   out.push({
-    key: `${generation}:${match.id}:kickoff`,
+    key: `${match.id}:kickoff`,
     matchId: match.id,
     kind: 'kickoff',
     title: 'Kick-off',
@@ -48,7 +48,7 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
   if (match.varReview) {
     const team = match.varReview.teamId === match.home.id ? match.home : match.away;
     out.push({
-      key: `${generation}:${match.id}:var:${match.varReview.minute}:${match.varReview.player}`,
+      key: `${match.id}:var:${match.varReview.minute}:${match.varReview.player}`,
       matchId: match.id,
       kind: 'var',
       title: 'VAR',
@@ -65,7 +65,7 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
       const home = event?.homeScore ?? match.homeScore;
       const away = event?.awayScore ?? match.awayScore;
       out.push({
-        key: `${generation}:${match.id}:goal:${side}:${index}`,
+        key: `${match.id}:goal:${side}:${index}`,
         matchId: match.id,
         kind: 'goal',
         title: `Goal · ${team.shortName}`,
@@ -82,7 +82,7 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
     const minute = event.minute != null ? `${event.minute}′` : '';
     const player = event.player ? `${event.player}${minute ? ` ${minute}` : ''}` : minute || 'Red card';
     out.push({
-      key: `${generation}:${event.id}`,
+      key: `${match.id}:red:${event.id}`,
       matchId: match.id,
       kind: 'red',
       title: `Red card · ${team?.shortName ?? 'Red card'}`,
@@ -98,7 +98,7 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
     const ht =
       match.htHome != null && match.htAway != null ? scoreText(match.htHome, match.htAway) : current;
     out.push({
-      key: `${generation}:${match.id}:ht`,
+      key: `${match.id}:ht`,
       matchId: match.id,
       kind: 'ht',
       title: 'Half-time',
@@ -108,7 +108,7 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
 
   if (match.status === 'finished') {
     out.push({
-      key: `${generation}:${match.id}:ft`,
+      key: `${match.id}:ft`,
       matchId: match.id,
       kind: 'ft',
       title: 'Full-time',

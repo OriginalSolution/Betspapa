@@ -1,8 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
-import { fetchConfig, fetchSportyBoard } from '../data/remote';
+import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
+import { followedNotices } from '../lib/alerts';
 import { resolveCrests } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
-import { applyCrests, applyLiveUpdates, fetchDayScores, followedInWindow, kickoffNotices, type LiveUpdate } from '../lib/liveScores';
+import { applyCrests } from '../lib/liveScores';
+import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate } from '../lib/dates';
 import { playGoalSound } from '../lib/cheer';
 import { pushBrowserNotification, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
@@ -13,6 +15,8 @@ import {
   loadInbox,
   loadSettings,
   markNotificationSent,
+  loadAlerted,
+  rememberAlerted,
   saveFollows,
   saveInbox,
   saveSettings,
@@ -266,7 +270,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         try {
           const matches = await fetchSportyBoard(current.date);
           const choice = chooseFixtures({ ok: true, matches }, []);
-          const decorated = applyCrests(applyLiveUpdates(choice.matches, liveRef.current), crestRef.current);
+          upcomingRef.current = choice.matches;
+          const merged = mergeBoard(stateRef.current.matches, choice.matches, liveRef.current, Date.now());
+          const decorated = applyCrests(merged, crestRef.current);
           saveFixtureCache(current.date, decorated);
           if (!cancelled) dispatch({ type: 'snapshot', matches: decorated, now: Date.now(), usingDemo: false, feedNote: null });
         } catch (error) {
@@ -302,7 +308,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.ready, state.config.pollMs, state.date, state.t0]);
 
   const crestRef = useRef<Record<string, string>>({});
-  const liveRef = useRef<LiveUpdate[]>([]);
+  const liveRef = useRef<Match[]>([]);
+  const upcomingRef = useRef<Match[]>([]);
   const teamKey = state.matches.map((match) => `${match.home.name}|${match.away.name}`).join('\n');
 
   useEffect(() => {
@@ -318,35 +325,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [teamKey]);
 
+  const boardKey = state.matches.map((match) => `${match.id}:${match.status}:${match.homeScore}:${match.awayScore}:${match.minute}:${match.htHome}`).join('|');
+  const followKey = `${state.follows.matches.join(',')}|${state.follows.teams.map((team) => team.id).join(',')}`;
+
+  useEffect(() => {
+    upcomingRef.current = [];
+    liveRef.current = [];
+  }, [state.date]);
+
   useEffect(() => {
     if (!state.ready) return;
-    const timer = window.setInterval(() => {
-      const current = stateRef.current;
-      const seen = new Set(current.inbox.map((item) => item.id));
-      const notes = kickoffNotices(current.matches, current.follows, current.settings, current.t0, seen, Date.now());
-      if (notes.length) dispatch({ type: 'notices', items: notes });
-    }, 15_000);
-    return () => window.clearInterval(timer);
-  }, [state.ready]);
+    const current = stateRef.current;
+    const seen = loadAlerted();
+    for (const item of current.inbox) seen.add(item.id);
+    const notes = followedNotices(current.matches, current.follows, current.settings, seen, Date.now());
+    if (notes.length) dispatch({ type: 'notices', items: notes });
+  }, [state.ready, boardKey, followKey, state.settings]);
 
   useEffect(() => {
     if (!state.ready) return;
     let stop = false;
-    const tick = async () => {
+    const paint = (live: Match[]) => {
+      liveRef.current = live;
       const current = stateRef.current;
-      if (!followedInWindow(current.matches, current.follows, Date.now())) return;
+      const base = upcomingRef.current.length ? upcomingRef.current : current.matches;
+      const merged = applyCrests(mergeBoard(current.matches, base, live, Date.now()), crestRef.current);
+      saveFixtureCache(current.date, merged);
+      dispatch({ type: 'snapshot', matches: merged, now: Date.now(), usingDemo: false, feedNote: current.feedNote });
+    };
+    const tick = async () => {
       try {
-        const updates = await fetchDayScores(current.date);
+        const live = await fetchInPlay();
         if (stop) return;
-        liveRef.current = updates;
-        const merged = applyCrests(applyLiveUpdates(current.matches, updates), crestRef.current);
-        dispatch({ type: 'snapshot', matches: merged, now: Date.now(), usingDemo: false, feedNote: current.feedNote });
+        paint(live);
       } catch {
         /* a missed score must not clear the board or the crests */
       }
     };
     void tick();
-    const timer = window.setInterval(() => void tick(), 60_000);
+    const timer = window.setInterval(() => void tick(), 30_000);
     return () => {
       stop = true;
       window.clearInterval(timer);
@@ -361,6 +378,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.settings]);
   useEffect(() => {
     saveInbox(state.inbox);
+    rememberAlerted(state.inbox.map((item) => item.id));
   }, [state.inbox]);
 
   useEffect(() => {

@@ -65,6 +65,8 @@ describe('live scores', () => {
     expect(notes[0]?.body).toContain('Man City vs Fulham');
     const again = kickoffNotices([match()], follows, settings, 5, new Set([notes[0]!.id]), now);
     expect(again).toEqual([]);
+    const later = kickoffNotices([match()], follows, settings, 9, new Set(), Date.parse('2026-11-10T20:30:00.000Z'));
+    expect(later.map((note) => note.kind)).toEqual(['kickoff']);
     const quiet = kickoffNotices([match()], { matches: [], teams: [] }, settings, 5, new Set(), now);
     expect(quiet).toEqual([]);
   });
