@@ -1,3 +1,4 @@
+import { BookMark } from '../components/BookMark';
 import { PickCard } from '../components/PickCard';
 import { cx } from '../lib/format';
 import { useProduct } from '../state/product';
@@ -19,8 +20,9 @@ export function SlipsPage() {
       <section className="stack-block">
         <h2>Booking codes</h2>
         {codes.map((code) => (
-          <article key={code.id} className={cx('code-card', code.status !== 'open' && `pick-${code.status}`)}>
+          <article key={code.id} className={cx('code-card', `book-${code.id}`, code.status !== 'open' && `pick-${code.status}`)}>
             <header>
+              <BookMark id={code.id} />
               <strong>{code.name}</strong>
               <span>{code.bookingState === 'ready' ? 'Code ready' : code.bookingState === 'pending' ? 'Booking' : code.bookingState === 'error' ? 'Could not book' : 'Not booked'}</span>
             </header>

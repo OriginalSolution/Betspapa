@@ -36,23 +36,27 @@ export type NativeCall = {
   readTimeout: number;
 };
 
+/** The full upcoming list is about 800 KB. A slow mobile link can stall longer than 20s, and Android then reports the socket error as "timeout". */
+export const FIXTURE_CONNECT_MS = 30_000;
+export const FIXTURE_READ_MS = 90_000;
+
 export function nativeRequestOptions(
   method: string,
   url: string,
-  opts: { body?: unknown; headers?: Record<string, string | undefined>; timeout?: number } = {},
+  opts: { body?: unknown; headers?: Record<string, string | undefined>; timeout?: number; connectMs?: number; readMs?: number } = {},
 ): NativeCall {
   const headers = nativeHeaders({
     ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(opts.headers ?? {}),
   });
-  const timeout = (opts.timeout ?? 25) * 1000;
+  const fallback = (opts.timeout ?? 25) * 1000;
   const call: NativeCall = {
     url,
     method,
     headers,
     responseType: 'json',
-    connectTimeout: timeout,
-    readTimeout: timeout,
+    connectTimeout: opts.connectMs ?? fallback,
+    readTimeout: opts.readMs ?? fallback,
   };
   if (opts.body !== undefined) call.data = opts.body;
   return call;

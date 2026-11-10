@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_FEED } from '../data/remote';
-import { nativeHeaders, nativeRequestOptions, readJsonBody } from './nativeHttp';
+import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, nativeHeaders, nativeRequestOptions, readJsonBody } from './nativeHttp';
 
 describe('native HTTP headers', () => {
   it('omits the WebView origin and referer', () => {
@@ -26,8 +26,15 @@ describe('native HTTP headers', () => {
     expect(call.method).toBe('GET');
     expect(call.data).toBeUndefined();
     expect(call.connectTimeout).toBe(20_000);
+    expect(call.readTimeout).toBe(20_000);
     expect(call.headers.Origin).toBeUndefined();
     expect(call.responseType).toBe('json');
+  });
+
+  it('gives the fixture download a long connect and read timeout', () => {
+    const call = nativeRequestOptions('GET', FIXTURE_FEED, { connectMs: FIXTURE_CONNECT_MS, readMs: FIXTURE_READ_MS });
+    expect(call.connectTimeout).toBe(30_000);
+    expect(call.readTimeout).toBe(90_000);
   });
 
   it('keeps a JSON booking body and drops a non-JSON payload', () => {

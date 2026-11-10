@@ -321,7 +321,7 @@ async function cachedIndex(request) {
   }
 }
 
-export async function bookAll(legs, request, onBook) {
+export async function bookAll(legs, request, onBook, only) {
   if (typeof request !== 'function') throw new Error('Booking needs an HTTP client.');
   const mapped = [];
   const seen = new Set();
@@ -333,13 +333,14 @@ export async function bookAll(legs, request, onBook) {
   }
   const index = mapped.length ? await cachedIndex(request) : null;
   const open = mapped.filter((leg) => stillOffered(index, leg));
+  const allowed = Array.isArray(only) ? new Set(only) : null;
   const runners = [
     ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request))],
     ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request))],
     ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request))],
     ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request))],
     ['betpawa', (group) => chunked(group, (chunk) => betpawaTry(chunk, request))],
-  ];
+  ].filter(([name]) => !allowed || allowed.has(name));
   const books = {};
   await Promise.all(
     runners.map(async ([name, run]) => {

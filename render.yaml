@@ -12,3 +12,22 @@ services:
         value: demo
       - key: FOOTBALL_DATA_API_KEY
         sync: false
+      - key: ENGINE_RUN_TOKEN
+        generateValue: true
+  - type: cron
+    name: betspapa-engine
+    runtime: node
+    schedule: "*/15 * * * *"
+    buildCommand: npm install
+    startCommand: node server/engine-tick.mjs
+    envVars:
+      - key: BETSPAPA_URL
+        fromService:
+          name: betspapa
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ENGINE_RUN_TOKEN
+        fromService:
+          name: betspapa
+          type: web
+          envVarKey: ENGINE_RUN_TOKEN

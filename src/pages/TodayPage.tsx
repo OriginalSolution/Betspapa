@@ -17,6 +17,11 @@ export function TodayPage() {
       {feedNote && (
         <div className="banner" role="status">
           <p>{feedNote}</p>
+          {matches.length > 0 && (
+            <button type="button" onClick={refresh}>
+              Retry
+            </button>
+          )}
         </div>
       )}
       <ErrorBanner />

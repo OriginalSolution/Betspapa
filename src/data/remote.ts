@@ -3,7 +3,7 @@ import type { AppConfig, Follows, Match } from '../types';
 import { mapSportyEvents, type SportyEvent } from './sporty';
 import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
-import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
+import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 
@@ -26,14 +26,14 @@ export async function fetchConfig(): Promise<AppConfig> {
     return {
       mode: body.mode,
       provider: body.provider || 'Betspapa fixtures',
-      pollMs: typeof body.pollMs === 'number' ? body.pollMs : 30_000,
+      pollMs: typeof body.pollMs === 'number' ? body.pollMs : 120_000,
       reason: body.reason ?? null,
     };
   } catch {
     return {
       mode: 'sporty',
       provider: 'Betspapa fixtures',
-      pollMs: 30_000,
+      pollMs: 120_000,
       reason: null,
     };
   }
@@ -64,7 +64,9 @@ function defaultTransport(): FixtureTransport {
     local: async (url) => browserResult(await fetch(url)),
     direct: async (url) => {
       if (isNativeApp()) {
-        const response = await CapacitorHttp.request(nativeRequestOptions('GET', url, { timeout: 20 }));
+        const response = await CapacitorHttp.request(
+          nativeRequestOptions('GET', url, { connectMs: FIXTURE_CONNECT_MS, readMs: FIXTURE_READ_MS }),
+        );
         return { status: response.status, body: asFixtureBody(readJsonBody(response.data)) };
       }
       return browserResult(await fetch(url));

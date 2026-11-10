@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { fetchConfig, fetchSportyBoard } from '../data/remote';
+import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
 import { isoFromDate } from '../lib/dates';
 import { playGoalSound } from '../lib/cheer';
 import { pushBrowserNotification, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
@@ -109,18 +110,19 @@ function applySnapshot(state: State, matches: Match[], now: number, usingDemo = 
 
 function init(): State {
   const today = isoFromDate(new Date());
+  const cached = loadFixtureCache(today);
   return {
-    config: { mode: 'sporty', provider: 'Betspapa fixtures', pollMs: 30_000, reason: null },
+    config: { mode: 'sporty', provider: 'Betspapa fixtures', pollMs: 120_000, reason: null },
     usingDemo: false,
     feedNote: null,
     ready: false,
     loading: true,
     error: null,
-    updatedAt: null,
+    updatedAt: cached.savedAt,
     date: today,
     today,
     t0: loadDemoStart(),
-    matches: [],
+    matches: cached.matches,
     baseline: null,
     follows: loadFollows(),
     settings: loadSettings(),
@@ -142,7 +144,15 @@ function reducer(state: State, action: Action): State {
     case 'error':
       return { ...state, error: action.error, loading: false };
     case 'set-date':
-      return { ...state, date: action.date, baseline: null, matches: [], loading: true, error: null };
+      return {
+        ...state,
+        date: action.date,
+        baseline: null,
+        matches: loadFixtureCache(action.date).matches,
+        loading: true,
+        error: null,
+        feedNote: null,
+      };
     case 'toggle-match': {
       const has = state.follows.matches.includes(action.id);
       const matches = has ? state.follows.matches.filter((id) => id !== action.id) : [...state.follows.matches, action.id];
@@ -242,26 +252,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!state.ready) return;
     let cancelled = false;
+    let inflight = false;
     const run = async () => {
+      if (inflight) return;
+      inflight = true;
       const current = stateRef.current;
       try {
         try {
           const matches = await fetchSportyBoard(current.date);
-          if (!cancelled) dispatch({ type: 'snapshot', matches, now: Date.now(), usingDemo: false, feedNote: null });
+          const choice = chooseFixtures({ ok: true, matches }, []);
+          saveFixtureCache(current.date, choice.matches);
+          if (!cancelled) dispatch({ type: 'snapshot', matches: choice.matches, now: Date.now(), usingDemo: false, feedNote: null });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Fixture feed failed';
+          const kept = stateRef.current.matches.length ? stateRef.current.matches : loadFixtureCache(current.date).matches;
+          const choice = chooseFixtures({ ok: false, message }, kept);
           if (!cancelled) {
             dispatch({
               type: 'snapshot',
-              matches: [],
+              matches: choice.matches,
               now: Date.now(),
               usingDemo: false,
-              feedNote: `Fixture feed is unreachable (${message}).`,
+              feedNote: choice.feedNote,
             });
           }
         }
       } catch (error) {
         if (!cancelled) dispatch({ type: 'error', error: error instanceof Error ? error.message : 'Could not load scores' });
+      } finally {
+        inflight = false;
       }
     };
     refreshRef.current = () => {
