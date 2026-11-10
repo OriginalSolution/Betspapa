@@ -356,7 +356,10 @@ function picksFromOdds(match: Match): PickView[] {
     const raw = 1 / price;
     const implied = market === 'home' ? homeImp / book : market === 'draw' ? drawImp / book : market === 'away' ? awayImp / book : raw;
     const oneXTwo = market === 'home' || market === 'away' || market === 'draw';
-    const gap = market === 'away' ? awayImp - homeImp : homeImp - awayImp;
+    const backingAway = market === 'away' || market === 'away-score';
+    const gap = backingAway ? awayImp - homeImp : homeImp - awayImp;
+    const backed = backingAway ? match.away : match.home;
+    const opposed = backingAway ? match.home : match.away;
     const support: -1 | 0 | 1 = oneXTwo ? (gap > 0.15 ? 1 : gap < -0.05 ? -1 : 0) : raw >= 0.75 ? 1 : raw < 0.55 ? -1 : 0;
     const confidence = confidenceOf(implied, support);
     void openGame;
@@ -366,14 +369,14 @@ function picksFromOdds(match: Match): PickView[] {
       matchId: match.id,
       competitionId: match.competition.id,
       competitionName: match.competition.name,
-      teamId: match.home.id,
-      teamName: match.home.shortName,
-      opponentName: match.away.shortName,
+      teamId: backed.id,
+      teamName: backed.shortName,
+      opponentName: opposed.shortName,
       market,
       marketLabel: marketInfo(market).label,
       rate: implied,
       support,
-      supportText: `SportyBet ${price.toFixed(2)}. ${oneXTwo ? supportText(support, match.away.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`,
+      supportText: `SportyBet ${price.toFixed(2)}. ${oneXTwo ? supportText(support, opposed.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`,
       confidence,
       grade: gradeFor(confidence),
       bookmarked: implied > TIP_RATE,
