@@ -4,6 +4,7 @@ const KEYS = {
   follows: 'betspapa.follows.v1',
   settings: 'betspapa.settings.v1',
   inbox: 'betspapa.inbox.v1',
+  alerted: 'betspapa.alerted.v1',
   t0: 'betspapa.demo.t0',
   sent: 'betspapa.browserSent.v1',
 };
@@ -68,6 +69,24 @@ export function loadInbox(): InboxItem[] {
 
 export function saveInbox(inbox: InboxItem[]) {
   write(KEYS.inbox, inbox.slice(0, 80));
+}
+
+export function loadAlerted(): Set<string> {
+  const raw = read<string[]>(KEYS.alerted);
+  return new Set(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
+}
+
+export function rememberAlerted(ids: string[]) {
+  if (!ids.length) return;
+  const next = loadAlerted();
+  let changed = false;
+  for (const id of ids) {
+    if (next.has(id)) continue;
+    next.add(id);
+    changed = true;
+  }
+  if (!changed) return;
+  write(KEYS.alerted, [...next].slice(-400));
 }
 
 export function loadDemoStart(): number {

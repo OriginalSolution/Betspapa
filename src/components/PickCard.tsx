@@ -29,7 +29,7 @@ function teamFromBoard(matches: ReturnType<typeof useStore>['matches'], name: st
 }
 
 export function PickCard({ pick }: { pick: PickView }) {
-  const { slip, addLeg, removeLeg, toggleList, pickListed } = useProduct();
+  const { slip, addLeg, removeLeg, toggleList, pickListed, trendFollows, toggleTrend } = useProduct();
   const { matches } = useStore();
   const side = useMemo(() => teamFromBoard(matches, pick.teamName), [matches, pick.teamName]);
   const opponent = useMemo(() => teamFromBoard(matches, pick.opponentName), [matches, pick.opponentName]);
@@ -51,7 +51,7 @@ export function PickCard({ pick }: { pick: PickView }) {
             <span> · {pick.competitionName}</span>
           </p>
         </div>
-        <b className="odds">{pick.odds.toFixed(2)}</b>
+        <b className="odds">{pick.odds >= 1 ? pick.odds.toFixed(2) : '—'}</b>
       </div>
       <p className="pick-support">{pick.supportText}</p>
       <div className="pick-meta">
@@ -62,6 +62,9 @@ export function PickCard({ pick }: { pick: PickView }) {
       <div className="pick-actions">
         <button type="button" className={cx('btn', 'btn-tiny', saved && 'btn-quiet')} onClick={() => (saved ? removeLeg(pick.id) : addLeg(pick.id))}>
           {saved ? 'On slip' : 'Add to slip'}
+        </button>
+        <button type="button" className={cx('btn', 'btn-tiny', trendFollows.includes(pick.id) && 'btn-quiet')} onClick={() => toggleTrend(pick.id)}>
+          {trendFollows.includes(pick.id) ? 'Following trend' : 'Follow trend'}
         </button>
         <button
           type="button"

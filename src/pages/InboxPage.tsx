@@ -14,7 +14,7 @@ export function InboxPage() {
     return (
       <EmptyState
         title="No alerts yet"
-        body="Kick-off, goals, red cards, half-time and full-time for matches and teams you follow will collect here."
+        body="Kick-off, goals, half-time and full-time for teams you follow, plus a trend you follow once that market hits, collect here and stay after you reopen the app."
         action={
           <Link to="/" className="btn">
             Find a match

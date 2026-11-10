@@ -23,7 +23,7 @@ export function LivePage() {
       ) : live.length === 0 ? (
         <EmptyState
           title="No live matches"
-          body="The fixture feed lists upcoming kickoffs. In-play scores are not on the working endpoint yet."
+          body="No match on today’s board is in play right now. Started matches move here, with the score when it is known."
           action={
             <Link to="/" className="btn">
               Today

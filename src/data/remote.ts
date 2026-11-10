@@ -3,9 +3,11 @@ import type { AppConfig, Follows, Match } from '../types';
 import { mapSportyEvents, type SportyEvent } from './sporty';
 import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
+import { LIVE_FEED, parseLivePayload } from '../lib/liveBoard';
 import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
+export { LIVE_FEED };
 
 export type FixtureBody = { events?: SportyEvent[]; error?: string; message?: string };
 
@@ -96,6 +98,27 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
       throw new Error(direct.status ? fixtureFailure(direct) : lastError);
     }
     return mapSportyEvents(direct.body.events, from, to);
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : lastError;
+  }
+  throw new Error(lastError);
+}
+
+export async function fetchInPlay(transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
+  const read = (result: FixtureResult): Match[] => {
+    if (result.status < 200 || result.status >= 300) throw new Error(`In-play scores returned ${result.status}`);
+    return parseLivePayload(result.body as { data?: [] });
+  };
+  let lastError = 'In-play scores failed';
+  if (!transport.native) {
+    try {
+      return read(await transport.local('/api/live'));
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+    }
+  }
+  try {
+    return read(await transport.direct(LIVE_FEED));
   } catch (error) {
     lastError = error instanceof Error ? error.message : lastError;
   }
