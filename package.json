@@ -1,20 +1,35 @@
 {
-  "name": "betynz-chronos-fusion",
+  "name": "betspapa",
   "private": true,
-  "version": "2.3.0",
-  "workspaces": [
-    "apps/web",
-    "apps/api"
-  ],
+  "version": "3.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "concurrently -n API,WEB -c auto \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
-    "build": "npm run build -w apps/api && npm run build -w apps/web",
-    "start": "npm run start -w apps/api",
-    "import:local": "npm run import:local -w apps/api",
-    "test:engine": "npm run test:engine -w apps/api",
-    "test:betexplorer-parser": "npm run test:betexplorer-parser -w apps/api"
+    "dev": "concurrently -k -n web,api -c cyan,red \"vite --host 0.0.0.0 --port 5173\" \"node server/index.mjs\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "node server/index.mjs",
+    "test": "vitest run && node --test server/**/*.test.mjs scripts/goal-cheer.test.mjs",
+    "icons": "node scripts/generate-icons.mjs",
+    "android:sync": "npm run build && cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.4"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@capacitor/cli": "^8.6.0",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12",
+    "vitest": "^3.2.4"
   }
 }
