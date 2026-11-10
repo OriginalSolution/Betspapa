@@ -58,6 +58,7 @@ export type Settings = {
   ht: boolean;
   ft: boolean;
   browser: boolean;
+  cheer: boolean;
 };
 
 export type Follows = {
@@ -89,4 +90,5 @@ export const defaultSettings: Settings = {
   ht: true,
   ft: true,
   browser: true,
+  cheer: true,
 };

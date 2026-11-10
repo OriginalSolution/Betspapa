@@ -51,7 +51,7 @@ Live mode polls football-data.org every 20 seconds (list, plus detail for the op
 
 ## Notifications
 
-Settings can turn each event type on or off, and can enable browser notifications through the Notification API. A production build registers a service worker so a granted notification can reopen the match. In `npm run dev`, browser alerts use the page Notification API.
+Settings can turn each event type on or off, and can enable browser notifications through the Notification API. Goal alerts also play `public/sounds/goal-cheer.wav`, a short original synthesized roar (not a stadium recording). The Goal cheer switch in Settings turns that sound off. A production build registers a service worker so a granted notification can reopen the match. In `npm run dev`, browser alerts use the page Notification API.
 
 ## Stack
 

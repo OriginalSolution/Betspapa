@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Match, Settings } from '../types';
 import { diffAlerts, type DiffContext } from './signals';
 
-const settings: Settings = { kickoff: true, goal: true, red: true, ht: true, ft: true, browser: true };
+const settings: Settings = { kickoff: true, goal: true, red: true, ht: true, ft: true, browser: true, cheer: true };
 
 function match(patch: Partial<Match>): Match {
   return {

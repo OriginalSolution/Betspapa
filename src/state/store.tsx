@@ -3,6 +3,7 @@ import { DEMO_POLL_MS } from '../data/catalog';
 import { findDemoMatch, projectDemo } from '../data/project';
 import { fetchConfig, fetchLiveBoard } from '../data/remote';
 import { isoFromDate } from '../lib/dates';
+import { playGoalCheer } from '../lib/cheer';
 import { pushBrowserNotification, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
 import { diffAlerts, type AlertSignal } from '../lib/signals';
 import {
@@ -288,16 +289,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const seenToast = useRef(new Set<string>());
   useEffect(() => {
+    let goalCheer = false;
     for (const toast of state.toasts) {
       if (!seenToast.current.has(toast.id)) {
         seenToast.current.add(toast.id);
         vibrateAlert();
+        if (toast.kind === 'goal' && state.settings.cheer) goalCheer = true;
       }
       if (!state.settings.browser || state.permission !== 'granted' || wasNotificationSent(toast.id)) continue;
       markNotificationSent(toast.id);
       void pushBrowserNotification(toast);
     }
-  }, [state.toasts, state.settings.browser, state.permission]);
+    if (goalCheer) playGoalCheer();
+  }, [state.toasts, state.settings.browser, state.settings.cheer, state.permission]);
 
   const setDate = useCallback((date: string) => dispatch({ type: 'set-date', date }), []);
   const refresh = useCallback(() => refreshRef.current(), []);

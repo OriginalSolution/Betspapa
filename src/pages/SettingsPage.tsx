@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DEMO_GUIDE } from '../data/catalog';
+import { playGoalCheer } from '../lib/cheer';
 import type { Settings } from '../types';
 import { useStore } from '../state/store';
 
@@ -33,6 +34,7 @@ export function SettingsPage() {
       <section className="panel">
         <h2>Notifications</h2>
         <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team.</p>
+        <CheerSetting on={settings.cheer} onChange={(value) => setSetting('cheer', value)} />
         <Permission permission={permission} onEnable={() => void requestPermission()} />
         {toggles.map((toggle) => (
           <div className="setting" key={toggle.key}>
@@ -111,6 +113,32 @@ export function SettingsPage() {
           A matchday board for football scores and alerts. Club names identify fixtures. Betspapa is not affiliated with those clubs, the competitions, or SofaScore.
         </p>
       </section>
+    </div>
+  );
+}
+
+function CheerSetting({ on, onChange }: { on: boolean; onChange: (value: boolean) => void }) {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div className="setting cheer-setting">
+      <div>
+        <strong>Goal cheer</strong>
+        <span>A short crowd roar plays with each goal alert, including demo goals.</span>
+      </div>
+      <div className="setting-controls">
+        <button
+          type="button"
+          className="btn btn-quiet btn-tiny"
+          onClick={() => {
+            playGoalCheer();
+            setPlaying(true);
+            window.setTimeout(() => setPlaying(false), 1600);
+          }}
+        >
+          {playing ? 'Playing' : 'Preview'}
+        </button>
+        <Switch on={on} label="Goal cheer" onChange={onChange} />
+      </div>
     </div>
   );
 }
