@@ -14,10 +14,10 @@ function assertLoudWav(name, minSeconds, maxSeconds) {
   for (let offset = 44; offset < buffer.length; offset += 2) {
     peak = Math.max(peak, Math.abs(buffer.readInt16LE(offset)) / 32767);
   }
-  assert.ok(peak >= 0.75 && peak <= 0.95, `${name} peak ${peak}`);
+  assert.ok(peak >= 0.38 && peak <= 0.46, `${name} peak ${peak}`);
 }
 
-test('bundled goal sounds are short and loud', () => {
+test('bundled goal sounds are a comfortable mid level', () => {
   assertLoudWav('goal-cheer.wav', 1, 2);
   assertLoudWav('goal-chant.wav', 1.5, 2.6);
 });

@@ -89,10 +89,11 @@ function synthesize() {
     const pulse = hits.reduce((sum, hit) => sum + (time >= hit.start && time < hit.start + hit.length ? 1 : 0), 0);
     samples[index] = voice * 0.85 + (crowd.band * 0.55 + crowd.low * 0.35) * (0.25 + pulse * 0.75);
   }
+  // Peak 0.42 (−7.5 dBFS). The previous pass used tanh(sample * gain * 1.35) and peaked at 0.874.
   let peak = 0;
   for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
-  const gain = peak > 0.0001 ? 1 / peak : 1;
-  for (let index = 0; index < samples.length; index += 1) samples[index] = Math.tanh(samples[index] * gain * 1.35);
+  const gain = peak > 0.0001 ? 0.42 / peak : 1;
+  for (let index = 0; index < samples.length; index += 1) samples[index] *= gain;
   return samples;
 }
 

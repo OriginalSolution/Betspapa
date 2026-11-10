@@ -63,17 +63,16 @@ export function synthesizeGoalCheer() {
     const mixed = a.low * 0.72 + a.band * 0.95 + b.band * 0.42 + b.high * 0.05 + roar * 0.22;
     samples[index] = mixed * env;
   }
-  makeLoud(samples);
+  scaleToPeak(samples, 0.42);
   return { samples, sampleRate: SAMPLE_RATE };
 }
 
-function makeLoud(samples) {
+/** Peak at 0.42 (−7.5 dBFS). The previous pass normalized to full scale and then drove tanh by 1.35, which landed at 0.874. */
+function scaleToPeak(samples, target) {
   let peak = 0;
   for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
-  const gain = peak > 0.0001 ? 1 / peak : 1;
-  for (let index = 0; index < samples.length; index += 1) {
-    samples[index] = Math.tanh(samples[index] * gain * 1.35);
-  }
+  const gain = peak > 0.0001 ? target / peak : 1;
+  for (let index = 0; index < samples.length; index += 1) samples[index] *= gain;
 }
 
 function encodeWav(samples, sampleRate) {
