@@ -61,7 +61,7 @@ Vite, React, TypeScript, and a small Node server that proxies football-data.org 
 
 ## Android APK
 
-The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.3 (versionCode 5). It packages the same boards as the site. Fixtures load from the Betspapa fixtures API with Android’s native HTTP client, which does not send the WebView origin (`https://localhost`). That download can take a while on a slow connection, so the read timeout is 90 seconds. The last good board stays on screen if a later refresh times out. The board refreshes every 2 minutes, and a new request does not start while one is already running. The website keeps using same-origin `/api/fixtures`. Share codes are booked on the phone with that same native client, on the no-login Ghana desks (SportyBet, Football.com, MSport, Betika, BetPawa; Betway is skipped). Each desk’s card uses that bookmaker’s colors. Fixture groups show the country flag beside its three-letter code. The source label stays Betspapa fixtures. Android 13 and newer will ask for notification permission when you enable browser alerts.
+The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.4 (versionCode 6). It packages the same boards as the site. Fixtures load from the Betspapa fixtures API with Android’s native HTTP client, which does not send the WebView origin (`https://localhost`). That download can take a while on a slow connection, so the read timeout is 90 seconds. The last good board stays on screen if a later refresh times out. The board refreshes every 2 minutes, and a new request does not start while one is already running. The website keeps using same-origin `/api/fixtures`. Share codes are booked on the phone with that same native client, on the no-login Ghana desks (SportyBet, Football.com, MSport, Betika, BetPawa; Betway is skipped). Each desk’s card uses that bookmaker’s official mark and colors: SportyBet red and white, Football.com navy with a lime dot, MSport gold on charcoal, Betika’s B! on lime, and BetPawa’s grey-and-lime bP on charcoal. Fixture groups show the country flag beside its three-letter code. The source label stays Betspapa fixtures. Android 13 and newer will ask for notification permission when you enable browser alerts.
 
 ## Unattended engine
 
@@ -69,7 +69,7 @@ The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.3 (versionCode
 
 The snapshot is written to `data/engine/engine-state.json` (or `ENGINE_DATA_DIR`). On Render that file lasts until the service restarts; the next cycle then rebuilds it and rebooks any open legs that no longer have a valid code. A cron job every 15 minutes calls `POST /api/engine/run` with `ENGINE_RUN_TOKEN` so a sleeping service still runs a cycle. The cron does not book by itself and does not call Predict2u.
 
-The signed 0.2.3 APK is assembled with JDK 21 and Android SDK 36. It was not installed on a phone or emulator, so the WebView origin was not executed on a device. Browser checks against the live feed are in `docs/progress/`.
+The signed 0.2.4 APK is assembled with JDK 21 and Android SDK 36. It was not installed on a phone or emulator, so the WebView origin was not executed on a device. Browser checks against the live feed are in `docs/progress/`.
 
 ### Rebuild
 
