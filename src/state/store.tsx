@@ -1,6 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
-import { DEMO_POLL_MS } from '../data/catalog';
-import { findDemoMatch, projectDemo } from '../data/project';
 import { fetchConfig, fetchSportyBoard } from '../data/remote';
 import { isoFromDate } from '../lib/dates';
 import { playGoalSound } from '../lib/cheer';
@@ -12,7 +10,6 @@ import {
   loadInbox,
   loadSettings,
   markNotificationSent,
-  saveDemoStart,
   saveFollows,
   saveInbox,
   saveSettings,
@@ -48,7 +45,6 @@ type Action =
   | { type: 'snapshot'; matches: Match[]; now: number; usingDemo?: boolean; feedNote?: string | null }
   | { type: 'error'; error: string }
   | { type: 'set-date'; date: string }
-  | { type: 'restart'; t0: number }
   | { type: 'toggle-match'; id: string }
   | { type: 'toggle-team'; team: FollowedTeam }
   | { type: 'setting'; key: keyof Settings; value: Settings[keyof Settings] }
@@ -147,10 +143,6 @@ function reducer(state: State, action: Action): State {
       return { ...state, error: action.error, loading: false };
     case 'set-date':
       return { ...state, date: action.date, baseline: null, matches: [], loading: true, error: null };
-    case 'restart': {
-      const matches = projectDemo({ t0: action.t0, now: action.t0, selectedDate: state.date, todayDate: state.today });
-      return { ...state, t0: action.t0, matches, baseline: matches, flash: [], loading: false, updatedAt: action.t0, usingDemo: true };
-    }
     case 'toggle-match': {
       const has = state.follows.matches.includes(action.id);
       const matches = has ? state.follows.matches.filter((id) => id !== action.id) : [...state.follows.matches, action.id];
@@ -216,7 +208,6 @@ type Store = {
   unread: number;
   setDate: (date: string) => void;
   refresh: () => void;
-  restartDemo: () => void;
   toggleMatch: (id: string) => void;
   toggleTeam: (team: FollowedTeam) => void;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
@@ -254,19 +245,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const run = async () => {
       const current = stateRef.current;
       try {
-        const demoBoard = () =>
-          projectDemo({
-            t0: current.t0,
-            now: Date.now(),
-            selectedDate: current.date,
-            todayDate: current.today,
-          });
-        if (current.settings.dataSource === 'demo') {
-          if (!cancelled) {
-            dispatch({ type: 'snapshot', matches: demoBoard(), now: Date.now(), usingDemo: true, feedNote: null });
-          }
-          return;
-        }
         try {
           const matches = await fetchSportyBoard(current.date);
           if (!cancelled) dispatch({ type: 'snapshot', matches, now: Date.now(), usingDemo: false, feedNote: null });
@@ -275,10 +253,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (!cancelled) {
             dispatch({
               type: 'snapshot',
-              matches: demoBoard(),
+              matches: [],
               now: Date.now(),
-              usingDemo: true,
-              feedNote: `Fixture feed is unreachable (${message}). Showing the simulated matchday.`,
+              usingDemo: false,
+              feedNote: `Fixture feed is unreachable (${message}).`,
             });
           }
         }
@@ -290,13 +268,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       void run();
     };
     void run();
-    const pollMs = state.settings.dataSource === 'demo' ? DEMO_POLL_MS : state.config.pollMs;
+    const pollMs = state.config.pollMs;
     const timer = window.setInterval(() => void run(), pollMs);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [state.ready, state.config.pollMs, state.date, state.t0, state.settings.dataSource]);
+  }, [state.ready, state.config.pollMs, state.date, state.t0]);
 
   useEffect(() => {
     saveFollows(state.follows);
@@ -338,11 +316,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setDate = useCallback((date: string) => dispatch({ type: 'set-date', date }), []);
   const refresh = useCallback(() => refreshRef.current(), []);
-  const restartDemo = useCallback(() => {
-    const t0 = Date.now();
-    saveDemoStart(t0);
-    dispatch({ type: 'restart', t0 });
-  }, []);
   const toggleMatch = useCallback((id: string) => dispatch({ type: 'toggle-match', id }), []);
   const toggleTeam = useCallback((team: FollowedTeam) => dispatch({ type: 'toggle-team', team }), []);
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => dispatch({ type: 'setting', key, value }), []);
@@ -361,9 +334,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Store>(() => {
     const findMatch = (id: string) => {
       const onBoard = state.matches.find((match) => match.id === id);
-      if (onBoard) return onBoard;
-      if (state.config.mode !== 'demo') return null;
-      return findDemoMatch(id, state.t0, Date.now(), state.today);
+      return onBoard ?? null;
     };
     return {
       mode: state.config.mode,
@@ -389,7 +360,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unread: state.inbox.filter((item) => !item.read).length,
       setDate,
       refresh,
-      restartDemo,
       toggleMatch,
       toggleTeam,
       setSetting,
@@ -406,7 +376,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     state,
     setDate,
     refresh,
-    restartDemo,
     toggleMatch,
     toggleTeam,
     setSetting,

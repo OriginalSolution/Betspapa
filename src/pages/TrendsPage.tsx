@@ -10,11 +10,13 @@ export function TrendsPage() {
   const rest = trends.filter((trend) => !trend.bookmarked && !trend.developing);
   return (
     <div className="stack">
-      <p className="page-lead">
-        {trends.some((trend) => trend.sample === 0)
-          ? 'Rates on this board come from the price. Anything above 80% is bookmarked, tipped, and booked.'
-          : 'Occurrence rate is hits divided by the sample. Anything above 80% is bookmarked and tipped automatically.'}
-      </p>
+      <p className="page-lead">Rates on this board come from the price. Anything above 80% is bookmarked, tipped, and booked.</p>
+      {trends.length === 0 && (
+        <div className="empty">
+          <h2>No trends yet</h2>
+          <p>Trends appear when today’s fixtures and prices load.</p>
+        </div>
+      )}
       <TrendBlock title="Bookmarked · above 80%" rows={tipped} />
       <TrendBlock title="Developing" detail="Recent form is turning before the rate clears 80%." rows={developing} />
       <TrendBlock title="Watching" detail="Tracked, and not tipped yet." rows={rest} />

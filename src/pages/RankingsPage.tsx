@@ -16,7 +16,7 @@ export function RankingsPage() {
   const rows = rankLedger(ledger, period, Date.now(), field);
   return (
     <div className="stack">
-      <p className="page-lead">Ranked from your settled tips. The demo starts with a record book, then today’s wins and busts join it.</p>
+      <p className="page-lead">Ranked from tips settled on this device. Week, month, and year only count those results.</p>
       <div className="chips">
         {periods.map((item) => (
           <button key={item} type="button" className={period === item ? 'chip is-on' : 'chip'} onClick={() => setPeriod(item)}>

@@ -2,23 +2,11 @@
 
 Football matchday board. Today’s fixtures are grouped by competition, with Live and Following views, a match timeline, and alerts for kick-off, goals, red cards, half-time and full-time.
 
-Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club names identify fixtures. Demo mode does not call an external sports API. With a key, scores come from football-data.org. There is no other scores feed.
+Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club names identify fixtures. The board is today’s real kickoffs and prices. There is no simulated matchday.
 
 ## Fixtures
 
-The default board is today’s real upcoming football from the Betspapa fixtures API, proxied at `/api/fixtures`. Kickoff times, competitions, and prices come from that feed. The site does not name a bookmaker as the source of those prices. In-play scores are not on a working endpoint, so Live stays empty until a match can be scored. Settings → Simulated matchday turns on the labeled demo, which is also the fallback if the feed is unreachable.
-
-## Demo mode
-
-The simulated matchday is not the default. Turn it on to watch a clock that moves one match minute every 8 seconds.
-
-| Clock | What happens |
-| --- | --- |
-| 8s | Chelsea vs Man City kicks off |
-| 16s | Havertz goal goes to VAR. Arsenal stay 2–1. No goal cheer and Over 3.5 stays open |
-| 24s | Chelsea score. Chelsea to score wins. Havertz is still under review |
-| 32s | Havertz is confirmed, the cheer plays, Over 3.5 wins, and the Ajax clean sheet busts |
-| 72s | Liverpool red card and Barcelona half-time |
+The default board is today’s real upcoming football from the Betspapa fixtures API, proxied at `/api/fixtures`. Kickoff times, competitions, and prices come from that feed. The site does not name a bookmaker as the source of those prices. In-play scores are not on a working endpoint, so Live stays empty until a match can be scored. If that feed is unreachable, the board stays empty and says so. There is no simulated matchday.
 
 ## Screens
 
@@ -32,9 +20,7 @@ The simulated matchday is not the default. Turn it on to watch a clock that move
 
 Suggestions sit on Picks and follow the markets you slip or greenlist. Form is the last five results beside each trend and pick.
 
-Follow Arsenal vs Liverpool, then wait. The goal arrives in Alerts and, if you allow notifications, as a browser notification. **Restart** in the header or Settings replays the clock. Alerts begin from the moment you follow. Yesterday and tomorrow use a fixed demo slate.
-
-Follows, alert settings and the inbox are stored in `localStorage` on this device.
+Alerts begin from the moment you follow a real fixture. Follows, alert settings and the inbox are stored in `localStorage` on this device.
 
 ## Setup
 
@@ -75,7 +61,7 @@ Vite, React, TypeScript, and a small Node server that proxies football-data.org 
 
 ## Android APK
 
-The sideload APK is Betspapa (`com.betspapa.scores`). It does not include the scores server, so it opens in demo mode: follows, the goal cheer, and simulated live events all run on the device. Android 13 and newer will ask for notification permission when you enable browser alerts.
+The sideload APK is Betspapa (`com.betspapa.scores`), version 0.2.0. It packages the same boards as the site. Fixtures load from the Betspapa fixtures API when the device is online. Share codes are requested from the site’s booking service (`/api/book`); the APK does not include that server. Android 13 and newer will ask for notification permission when you enable browser alerts.
 
 This environment assembled and checked the signed release APK. It was not installed on a phone or emulator here.
 

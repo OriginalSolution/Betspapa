@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { DEMO_GUIDE } from '../data/catalog';
 import { playGoalSound } from '../lib/cheer';
 import type { GoalSound } from '../types';
 import { useStore } from '../state/store';
@@ -20,11 +19,9 @@ export function SettingsPage() {
     setSetting,
     permission,
     requestPermission,
-    mode,
     provider,
     pollMs,
     reason,
-    restartDemo,
     clearInbox,
     clearFollows,
   } = useStore();
@@ -50,13 +47,7 @@ export function SettingsPage() {
 
       <section className="panel">
         <h2>Fixtures</h2>
-        <div className="setting">
-          <div>
-            <strong>Simulated matchday</strong>
-            <span>Off uses today’s real kickoffs and prices. On is the labeled demo, including VAR.</span>
-          </div>
-          <Switch on={settings.dataSource === 'demo'} label="Simulated matchday" onChange={(value) => setSetting('dataSource', value ? 'demo' : 'sporty')} />
-        </div>
+        <p className="lede">Today’s board is real kickoffs and prices. There is no simulated matchday.</p>
         <h2>Scores</h2>
         <div className="stat">
           <span>Source</span>
@@ -67,22 +58,6 @@ export function SettingsPage() {
           <strong>Every {Math.round(pollMs / 1000)} seconds</strong>
         </div>
         {reason && <p className="lede">{reason}</p>}
-        {mode === 'demo' && (
-          <>
-            <p className="lede">The clock starts when you open the tab. Restart it to play the scripted events again.</p>
-            <ol className="guide guide-block">
-              {DEMO_GUIDE.map((item) => (
-                <li key={item.after}>
-                  <b>{item.after}</b>
-                  <span>{item.text}</span>
-                </li>
-              ))}
-            </ol>
-            <button type="button" className="btn" onClick={restartDemo}>
-              Restart demo clock
-            </button>
-          </>
-        )}
       </section>
 
       <section className="panel">
@@ -119,7 +94,7 @@ export function SettingsPage() {
       <section className="panel about">
         <h2>Betspapa</h2>
         <p>
-          A matchday board for scores, trends, picks, and slips. Club names identify fixtures. Demo scores and booking codes are simulated. A football-data.org key switches the live score feed.
+          A matchday board for scores, trends, picks, and slips. Club names identify fixtures. Fixtures and prices come from Betspapa. Share codes are issued only when a bookmaker accepts the slip.
         </p>
       </section>
     </div>

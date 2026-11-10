@@ -1,9 +1,24 @@
+import { useMemo } from 'react';
 import { MARKETS } from '../data/board';
-import { competitions, teams } from '../data/catalog';
 import { useProduct } from '../state/product';
+import { useStore } from '../state/store';
 
 export function ListsPage() {
   const { lists, ledger, toggleList, clearList } = useProduct();
+  const { matches } = useStore();
+  const boardTeams = useMemo(() => {
+    const teams = new Map<string, { id: string; shortName: string; abbr: string }>();
+    for (const match of matches) {
+      teams.set(match.home.id, match.home);
+      teams.set(match.away.id, match.away);
+    }
+    return [...teams.values()].slice(0, 8);
+  }, [matches]);
+  const boardCompetitions = useMemo(() => {
+    const competitions = new Map<string, { id: string; name: string; code: string }>();
+    for (const match of matches) competitions.set(match.competition.id, match.competition);
+    return [...competitions.values()].slice(0, 4);
+  }, [matches]);
   const record = (scope: 'team' | 'competition' | 'market', id: string) => {
     const rows = ledger.filter((entry) => (scope === 'team' ? entry.teamId === id : scope === 'competition' ? entry.competitionId === id : entry.market === id));
     const won = rows.filter((entry) => entry.result === 'won').length;
@@ -43,7 +58,7 @@ export function ListsPage() {
       <section className="stack-block">
         <h2>Add</h2>
         <div className="add-grid">
-          {teams.slice(0, 8).map((team) => (
+          {boardTeams.map((team) => (
             <span key={team.id}>
               <button type="button" onClick={() => toggleList({ scope: 'team', id: team.id, name: team.shortName }, 'green')}>
                 Green {team.abbr}
@@ -53,7 +68,7 @@ export function ListsPage() {
               </button>
             </span>
           ))}
-          {competitions.slice(0, 4).map((competition) => (
+          {boardCompetitions.map((competition) => (
             <span key={competition.id}>
               <button type="button" onClick={() => toggleList({ scope: 'competition', id: competition.id, name: competition.name }, 'black')}>
                 Hide {competition.code}

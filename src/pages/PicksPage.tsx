@@ -23,9 +23,7 @@ export function PicksPage() {
   return (
     <div className="stack">
       <p className="page-lead">
-        {visiblePicks.some((pick) => pick.trendId.startsWith('price:'))
-          ? 'Tips are prices that imply more than 80%. Odds sort low to high or high to low. Qualifying tips are booked on Slips.'
-          : 'Tips are trends above 80%. Confidence moves with the opponent. Odds on the simulated board are generated for sorting.'}
+        Tips are prices that imply more than 80%. Odds sort low to high or high to low. Qualifying tips are booked on Slips.
       </p>
       <div className="chips" role="tablist" aria-label="Market">
         <button type="button" className={market === 'all' ? 'chip is-on' : 'chip'} onClick={() => setMarket('all')}>
@@ -80,7 +78,7 @@ export function PicksPage() {
       {ordered.length === 0 && soft.length === 0 && (
         <div className="empty">
           <h2>No tips on this board</h2>
-          <p>Demo trends are tied to the simulated matchday. A live football-data.org board uses different team ids, so these research tips stay on the demo slate.</p>
+          <p>Tips appear when today’s fixtures and prices load. Nothing on this board is above 80%.</p>
         </div>
       )}
     </div>

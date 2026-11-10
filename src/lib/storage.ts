@@ -52,7 +52,7 @@ export function loadSettings(): Settings {
   });
   if (raw.goalSound === 'cheer' || raw.goalSound === 'chant' || raw.goalSound === 'off') next.goalSound = raw.goalSound;
   else if (raw.cheer === false) next.goalSound = 'off';
-  if (raw.dataSource === 'sporty' || raw.dataSource === 'demo') next.dataSource = raw.dataSource;
+  next.dataSource = 'sporty';
   return next;
 }
 

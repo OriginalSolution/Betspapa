@@ -5,7 +5,7 @@ import { isFollowed } from '../lib/group';
 import { useStore } from '../state/store';
 
 export function FollowingPage() {
-  const { matches, follows, toggleTeam, ready, loading, mode } = useStore();
+  const { matches, follows, toggleTeam, ready, loading } = useStore();
   const shown = matches.filter((match) => isFollowed(match, follows));
   const waiting = !ready || (loading && matches.length === 0);
   const hasFollows = follows.matches.length + follows.teams.length > 0;
@@ -30,11 +30,7 @@ export function FollowingPage() {
       ) : !hasFollows ? (
         <EmptyState
           title="Follow a match"
-          body={
-            mode === 'demo'
-              ? 'Star Arsenal vs Liverpool on Today. A goal is scripted about 24 seconds after the demo clock starts. Restart the clock if you missed it.'
-              : 'Star a match or follow a team. Kick-off, goals, red cards, half-time and full-time land in Alerts.'
-          }
+          body="Star a match or follow a team. Kick-off, goals, red cards, half-time and full-time land in Alerts."
           action={
             <Link to="/" className="btn">
               Browse today

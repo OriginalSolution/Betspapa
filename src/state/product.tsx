@@ -5,11 +5,9 @@ import {
   buildPicks,
   isBlacklisted,
   isGreenlisted,
-  listTrends,
   qualifying,
   trendsFromPicks,
   profile,
-  seedLedger,
   suggestPicks,
   type BookingCode,
   type LedgerEntry,
@@ -85,8 +83,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const baseline = useRef<{ t0: number; status: Map<string, LegStatus>; codes: Map<string, LegStatus> } | null>(null);
 
   const picks = useMemo(() => buildPicks(matches), [matches]);
-  const trends = useMemo(() => (picks.some((pick) => pick.trendId.startsWith('price:')) ? trendsFromPicks(picks) : listTrends()), [picks]);
-  const ledger = useMemo(() => [...seedLedger(), ...extra], [extra]);
+  const trends = useMemo(() => trendsFromPicks(picks), [picks]);
+  const ledger = extra;
   const greenMarkets = lists.filter((item) => item.list === 'green' && item.scope === 'market').map((item) => item.id);
   const autoIds = useMemo(
     () => qualifying(picks).filter((pick) => !isBlacklisted(pick, lists)).map((pick) => pick.id),

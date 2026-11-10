@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { DEMO_GUIDE } from '../data/catalog';
 import { addDays } from '../lib/dates';
 import { ago, cx, dayWord, formatDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
@@ -71,7 +70,7 @@ export function TabBar() {
 }
 
 export function TopBar({ title }: { title: string }) {
-  const { usingDemo, unread, refresh, restartDemo, feedNote } = useStore();
+  const { unread, refresh } = useStore();
   return (
     <header className="topbar">
       <NavLink to="/" className="brand mobile-brand" end aria-label="Betspapa home">
@@ -79,14 +78,9 @@ export function TopBar({ title }: { title: string }) {
       </NavLink>
       <div className="top-title">
         <h1>{title}</h1>
-        <p>{usingDemo ? (feedNote ? 'Simulated fallback' : 'Simulated matchday') : 'Today’s fixtures'}</p>
+        <p>Today’s fixtures</p>
       </div>
       <div className="top-actions">
-        {usingDemo && (
-          <button type="button" className="ghost" onClick={restartDemo} title="Restart the simulated clock">
-            Restart
-          </button>
-        )}
         <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh scores">
           <IconRefresh />
         </button>
@@ -100,8 +94,8 @@ export function TopBar({ title }: { title: string }) {
 }
 
 export function DateBar() {
-  const { date, today, usingDemo, setDate, updatedAt, pollMs } = useStore();
-  const span = usingDemo ? 1 : 21;
+  const { date, today, setDate, updatedAt, pollMs } = useStore();
+  const span = 21;
   const min = addDays(today, -span);
   const max = addDays(today, span);
   const word = dayWord(date, today);
@@ -178,7 +172,7 @@ export function ErrorBanner() {
 }
 
 export function Rail() {
-  const { inbox, follows, matches, usingDemo } = useStore();
+  const { inbox, follows, matches } = useStore();
   const latest = inbox.slice(0, 4);
   const followedMatches = matches.filter((match) => follows.matches.includes(match.id));
   const count = follows.matches.length + follows.teams.length;
@@ -234,19 +228,6 @@ export function Rail() {
           </ul>
         )}
       </div>
-      {usingDemo && (
-        <div className="rail-block">
-          <h2>Demo clock</h2>
-          <ol className="guide">
-            {DEMO_GUIDE.map((item) => (
-              <li key={item.after}>
-                <b>{item.after}</b>
-                <span>{item.text}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
     </aside>
   );
 }
