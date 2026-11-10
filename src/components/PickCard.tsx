@@ -1,0 +1,66 @@
+import { Link } from 'react-router-dom';
+import type { PickView } from '../data/board';
+import { squadLabel } from '../data/board';
+import { cx } from '../lib/format';
+import { useProduct } from '../state/product';
+
+export function FormPips({ form }: { form: PickView['form'] }) {
+  return (
+    <span className="form" aria-label={`Form ${form.join(' ')}`}>
+      {form.map((mark, index) => (
+        <i key={`${mark}-${index}`} className={`fm-${mark}`}>
+          {mark}
+        </i>
+      ))}
+    </span>
+  );
+}
+
+export function PickCard({ pick }: { pick: PickView }) {
+  const { slip, addLeg, removeLeg, toggleList, pickListed } = useProduct();
+  const saved = slip.includes(pick.id);
+  const black = pickListed(pick, 'black');
+  const green = pickListed(pick, 'green');
+  return (
+    <article className={cx('pick', pick.status !== 'open' && `pick-${pick.status}`, green && 'pick-green')}>
+      <div className="pick-top">
+        <span className={cx('grade', pick.grade && `grade-${pick.grade}`)}>{pick.grade ?? '–'}</span>
+        <div className="pick-title">
+          <strong>{pick.label}</strong>
+          <p>
+            <Link to={`/match/${pick.matchId}`}>
+              {pick.teamName} vs {pick.opponentName}
+            </Link>
+            <span> · {pick.competitionName}</span>
+          </p>
+        </div>
+        <b className="odds">{pick.odds.toFixed(2)}</b>
+      </div>
+      <p className="pick-support">{pick.supportText}</p>
+      <div className="pick-meta">
+        {pick.form.length > 0 && <FormPips form={pick.form} />}
+        {pick.form.length > 0 && <span className={cx('squad', pick.squad !== 'full' && 'squad-alert')}>{squadLabel(pick.squad)}</span>}
+        <span className={cx('leg', `leg-${pick.status}`)}>{pick.status === 'open' ? `${Math.round(pick.confidence * 100)}%` : pick.status}</span>
+      </div>
+      <div className="pick-actions">
+        <button type="button" className={cx('btn', 'btn-tiny', saved && 'btn-quiet')} onClick={() => (saved ? removeLeg(pick.id) : addLeg(pick.id))}>
+          {saved ? 'On slip' : 'Add to slip'}
+        </button>
+        <button
+          type="button"
+          className={cx('btn', 'btn-quiet', 'btn-tiny', green && 'is-on')}
+          onClick={() => toggleList({ scope: 'team', id: pick.teamId, name: pick.teamName }, 'green')}
+        >
+          {green ? 'Greenlisted' : 'Greenlist'}
+        </button>
+        <button
+          type="button"
+          className={cx('btn', 'btn-quiet', 'btn-tiny', black && 'is-on')}
+          onClick={() => toggleList({ scope: 'team', id: pick.teamId, name: pick.teamName }, 'black')}
+        >
+          {black ? 'Blacklisted' : 'Blacklist'}
+        </button>
+      </div>
+    </article>
+  );
+}

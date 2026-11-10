@@ -38,12 +38,25 @@ describe('demo clock', () => {
     expect(arsenal.events.some((event) => event.player === 'Havertz')).toBe(false);
   });
 
-  it('scores the scripted Arsenal goal 24 seconds later', () => {
-    const arsenal = match(24_000, 'ars-liv');
-    expect(arsenal.minute).toBe(67);
-    expect(arsenal.homeScore).toBe(3);
-    expect(arsenal.awayScore).toBe(1);
-    expect(arsenal.events.some((event) => event.player === 'Havertz')).toBe(true);
+  it('holds the Arsenal goal at VAR before confirming it', () => {
+    const checking = match(16_000, 'ars-liv');
+    expect(checking.minute).toBe(66);
+    expect(checking.homeScore).toBe(2);
+    expect(checking.awayScore).toBe(1);
+    expect(checking.varReview?.player).toBe('Havertz');
+    expect(checking.events.some((event) => event.type === 'goal' && event.player === 'Havertz')).toBe(false);
+
+    const still = match(24_000, 'ars-liv');
+    expect(still.minute).toBe(67);
+    expect(still.homeScore).toBe(2);
+    expect(still.varReview?.player).toBe('Havertz');
+
+    const confirmed = match(32_000, 'ars-liv');
+    expect(confirmed.minute).toBe(68);
+    expect(confirmed.homeScore).toBe(3);
+    expect(confirmed.awayScore).toBe(1);
+    expect(confirmed.varReview).toBeNull();
+    expect(confirmed.events.some((event) => event.type === 'goal' && event.player === 'Havertz')).toBe(true);
   });
 
   it('ticks one minute at a time before that goal', () => {
@@ -101,13 +114,20 @@ describe('demo alerts', () => {
     settings: defaultSettings,
   };
 
-  it('notifies a follower when the scripted Arsenal goal arrives', () => {
-    const alerts = diffAlerts(board(0), board(24_000), ctx);
+  it('sends VAR before the Arsenal goal, then the goal only after confirmation', () => {
+    const review = diffAlerts(board(0), board(16_000), ctx);
+    expect(review.some((alert) => alert.kind === 'goal')).toBe(false);
+    expect(review.find((alert) => alert.kind === 'var')?.title).toBe('VAR');
+    expect(review.find((alert) => alert.kind === 'var')?.body).toContain('under review');
+
+    const waiting = diffAlerts(board(16_000), board(24_000), ctx);
+    expect(waiting.some((alert) => alert.kind === 'goal' || alert.kind === 'var')).toBe(false);
+
+    const alerts = diffAlerts(board(24_000), board(32_000), ctx);
     const goal = alerts.find((alert) => alert.kind === 'goal');
     expect(goal?.title).toBe('Goal · Arsenal');
     expect(goal?.body).toContain('Havertz');
     expect(goal?.body).toContain('3–1');
-    expect(alerts.some((alert) => alert.kind === 'kickoff')).toBe(false);
   });
 
   it('stays quiet for the same goal when the match is not followed', () => {

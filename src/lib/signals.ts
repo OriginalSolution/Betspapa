@@ -1,9 +1,11 @@
-import type { AlertKind, Match, MatchEvent, Settings } from '../types';
+import type { Match, MatchEvent, Settings } from '../types';
+
+type ScoreKind = 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var';
 
 export type AlertSignal = {
   key: string;
   matchId: string;
-  kind: AlertKind;
+  kind: ScoreKind;
   title: string;
   body: string;
 };
@@ -42,6 +44,17 @@ export function signalsFor(match: Match, generation: number): AlertSignal[] {
     title: 'Kick-off',
     body: `${versus} is underway`,
   });
+
+  if (match.varReview) {
+    const team = match.varReview.teamId === match.home.id ? match.home : match.away;
+    out.push({
+      key: `${generation}:${match.id}:var:${match.varReview.minute}:${match.varReview.player}`,
+      matchId: match.id,
+      kind: 'var',
+      title: 'VAR',
+      body: `${match.varReview.player} ${match.varReview.minute}′ · ${team.shortName} goal under review`,
+    });
+  }
 
   const homeGoals = match.events.filter((event) => event.type === 'goal' && event.teamId === match.home.id);
   const awayGoals = match.events.filter((event) => event.type === 'goal' && event.teamId === match.away.id);

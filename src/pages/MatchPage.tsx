@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Crest } from '../components/Crest';
 import { IconBall, IconCard } from '../components/Icons';
+import { profile, squadLabel } from '../data/board';
 import { fetchLiveMatch } from '../data/remote';
+import { FormPips } from '../components/PickCard';
 import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/format';
 import type { EventType, Match, MatchEvent } from '../types';
 import { useStore } from '../state/store';
 
-const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, ht: 2, ft: 3 };
+const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, var: 2, ht: 3, ft: 4 };
 
 export function MatchPage() {
   const { id = '' } = useParams();
@@ -65,6 +67,8 @@ export function MatchPage() {
           <div className="side">
             <Crest team={match.home} size={56} followed={homeOn} />
             <span className="side-name">{match.home.shortName}</span>
+            {match.feed !== 'sporty' && <FormPips form={profile(match.home.id).form} />}
+            {match.feed !== 'sporty' && <span className={cx('squad', profile(match.home.id).squad !== 'full' && 'squad-alert')}>{squadLabel(profile(match.home.id).squad)}</span>}
           </div>
           <div className="result">
             {match.homeScore == null ? (
@@ -80,11 +84,14 @@ export function MatchPage() {
               {(match.status === 'live' || match.status === 'halftime') && <i />}
               {statusLine(match)}
             </p>
+            {match.varReview && <p className="var-banner">VAR · {match.varReview.player} is under review</p>}
             {showHt && <p className="ht-line">HT {scoreDash(match.htHome, match.htAway)}</p>}
           </div>
           <div className="side">
             <Crest team={match.away} size={56} followed={awayOn} />
             <span className="side-name">{match.away.shortName}</span>
+            {match.feed !== 'sporty' && <FormPips form={profile(match.away.id).form} />}
+            {match.feed !== 'sporty' && <span className={cx('squad', profile(match.away.id).squad !== 'full' && 'squad-alert')}>{squadLabel(profile(match.away.id).squad)}</span>}
           </div>
         </div>
         <div className="actions">
@@ -116,6 +123,13 @@ export function MatchPage() {
 }
 
 function EventRow({ event, match }: { event: MatchEvent; match: Match }) {
+  if (event.type === 'var') {
+    return (
+      <li className="event event-marker">
+        <span>VAR · {event.player} under review</span>
+      </li>
+    );
+  }
   if (event.type === 'kickoff' || event.type === 'ht' || event.type === 'ft') {
     const label = event.type === 'kickoff' ? 'Kick-off' : event.type === 'ht' ? `Half-time ${event.homeScore ?? 0}–${event.awayScore ?? 0}` : `Full-time ${event.homeScore ?? 0}–${event.awayScore ?? 0}`;
     return (

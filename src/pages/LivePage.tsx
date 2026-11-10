@@ -6,7 +6,7 @@ import { isLiveStatus } from '../lib/group';
 import { useStore } from '../state/store';
 
 export function LivePage() {
-  const { matches, date, today, setDate, loading, ready, mode, restartDemo } = useStore();
+  const { matches, date, today, setDate, loading, ready, mode, usingDemo, restartDemo } = useStore();
   useEffect(() => {
     if (date !== today) setDate(today);
   }, [date, today, setDate]);
@@ -23,7 +23,7 @@ export function LivePage() {
       ) : live.length === 0 ? (
         <EmptyState
           title="No live matches"
-          body={mode === 'demo' ? 'The simulated clock has no match in play. Restart it and the evening board comes back.' : 'Nothing is in play for today.'}
+          body={mode === 'demo' || usingDemo ? 'The simulated clock has no match in play. Restart it and the evening board comes back.' : 'The live feed lists upcoming kickoffs. In-play scores are not on the working endpoint yet.'}
           action={
             mode === 'demo' ? (
               <button type="button" className="btn" onClick={restartDemo}>

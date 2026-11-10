@@ -7,14 +7,15 @@ export const DEMO_POLL_MS = 8000;
 export const DEMO_GUIDE = [
   { after: '8s', text: 'Chelsea vs Man City kicks off' },
   { after: '16s', text: 'Atletico vs Sevilla kicks off' },
-  { after: '24s', text: 'Arsenal goal, Chelsea goal, Barcelona goal, PSG goal, Bayern full-time' },
-  { after: '32s', text: 'Inter and Ajax goals' },
+  { after: '16s', text: 'Arsenal goal goes to VAR. The score stays 2–1' },
+  { after: '24s', text: 'Chelsea goal. VAR is still checking Havertz' },
+  { after: '32s', text: 'Havertz goal confirmed, Inter and Ajax goals' },
   { after: '72s', text: 'Liverpool red card and Barcelona half-time' },
 ] as const;
 
 export type ScriptEvent = {
   minute: number;
-  type: 'goal' | 'yellow' | 'red' | 'ht' | 'ft';
+  type: 'goal' | 'yellow' | 'red' | 'ht' | 'ft' | 'var';
   side?: 'home' | 'away';
   player?: string;
   detail?: 'Penalty' | 'Own goal';
@@ -52,6 +53,12 @@ const yellow = (minute: number, side: 'home' | 'away', player: string): ScriptEv
 const red = (minute: number, side: 'home' | 'away', player: string): ScriptEvent => ({
   minute,
   type: 'red',
+  side,
+  player,
+});
+const review = (minute: number, side: 'home' | 'away', player: string): ScriptEvent => ({
+  minute,
+  type: 'var',
   side,
   player,
 });
@@ -146,7 +153,8 @@ export const fixtures: FixtureScript[] = [
       ht(),
       yellow(53, 'away', 'Diaz'),
       goal(58, 'home', 'Martinelli'),
-      goal(67, 'home', 'Havertz'),
+      review(66, 'home', 'Havertz'),
+      goal(68, 'home', 'Havertz'),
       red(73, 'away', 'Van Dijk'),
       ft(),
     ],

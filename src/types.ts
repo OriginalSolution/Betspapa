@@ -1,8 +1,14 @@
 export type MatchStatus = 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed';
 
-export type EventType = 'kickoff' | 'goal' | 'yellow' | 'red' | 'ht' | 'ft';
+export type EventType = 'kickoff' | 'goal' | 'yellow' | 'red' | 'ht' | 'ft' | 'var';
 
-export type AlertKind = 'kickoff' | 'goal' | 'red' | 'ht' | 'ft';
+export type AlertKind = 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'win' | 'bust' | 'squad';
+
+export type VarReview = {
+  teamId: string;
+  player: string;
+  minute: number;
+};
 
 export type Team = {
   id: string;
@@ -49,7 +55,15 @@ export type Match = {
   htAway: number | null;
   events: MatchEvent[];
   venue: string | null;
+  /** Set while a goal is under review and not yet confirmed. */
+  varReview?: VarReview | null;
+  /** Decimal prices from the Betspapa SportyBet feed. */
+  odds?: Record<string, number> | null;
+  feed?: 'sporty' | 'demo';
 };
+
+export type GoalSound = 'cheer' | 'chant' | 'off';
+export type DataSource = 'sporty' | 'demo';
 
 export type Settings = {
   kickoff: boolean;
@@ -58,7 +72,9 @@ export type Settings = {
   ht: boolean;
   ft: boolean;
   browser: boolean;
-  cheer: boolean;
+  var: boolean;
+  goalSound: GoalSound;
+  dataSource: DataSource;
 };
 
 export type Follows = {
@@ -77,7 +93,7 @@ export type InboxItem = {
 };
 
 export type AppConfig = {
-  mode: 'demo' | 'live';
+  mode: 'demo' | 'live' | 'sporty';
   provider: string;
   pollMs: number;
   reason: string | null;
@@ -90,5 +106,7 @@ export const defaultSettings: Settings = {
   ht: true,
   ft: true,
   browser: true,
-  cheer: true,
+  var: true,
+  goalSound: 'cheer',
+  dataSource: 'sporty',
 };

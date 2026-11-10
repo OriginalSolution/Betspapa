@@ -5,14 +5,27 @@ import { addDays } from '../lib/dates';
 import { ago, cx, dayWord, formatDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
-import { IconBell, IconLive, IconRefresh, IconSettings, IconStar, IconToday, Mark } from './Icons';
+import { IconBell, IconLive, IconPicks, IconRank, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
 
-const links = [
+const sideLinks = [
   { to: '/', label: 'Today', icon: <IconToday />, end: true },
   { to: '/live', label: 'Live', icon: <IconLive />, end: false },
+  { to: '/picks', label: 'Picks', icon: <IconPicks />, end: false },
+  { to: '/trends', label: 'Trends', icon: <IconTrends />, end: false },
+  { to: '/slips', label: 'Slips', icon: <IconSlip />, end: false },
+  { to: '/rankings', label: 'Rankings', icon: <IconRank />, end: false },
   { to: '/following', label: 'Following', icon: <IconStar />, end: false },
   { to: '/inbox', label: 'Alerts', icon: <IconBell />, end: false },
+  { to: '/lists', label: 'Lists', icon: <IconStar />, end: false },
   { to: '/settings', label: 'Settings', icon: <IconSettings />, end: false },
+];
+
+const tabLinks = [
+  { to: '/', label: 'Today', icon: <IconToday />, end: true },
+  { to: '/picks', label: 'Picks', icon: <IconPicks />, end: false },
+  { to: '/slips', label: 'Slips', icon: <IconSlip />, end: false },
+  { to: '/inbox', label: 'Alerts', icon: <IconBell />, end: false },
+  { to: '/more', label: 'More', icon: <IconSettings />, end: false },
 ];
 
 export function SideNav() {
@@ -24,7 +37,7 @@ export function SideNav() {
         <Mark />
         <span>Betspapa</span>
       </NavLink>
-      {links.map((link) => (
+      {sideLinks.map((link) => (
         <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => cx('side-link', isActive && 'is-active')}>
           <span className="tab-icon">
             {link.icon}
@@ -43,7 +56,7 @@ export function TabBar() {
   const live = matches.filter((match) => isLiveStatus(match.status)).length;
   return (
     <nav className="tabbar" aria-label="Primary">
-      {links.map((link) => (
+      {tabLinks.map((link) => (
         <NavLink key={link.to} to={link.to} end={link.end} className={({ isActive }) => cx('tab', isActive && 'is-active')}>
           <span className="tab-icon">
             {link.icon}
@@ -58,7 +71,7 @@ export function TabBar() {
 }
 
 export function TopBar({ title }: { title: string }) {
-  const { mode, unread, refresh, restartDemo, provider } = useStore();
+  const { usingDemo, unread, refresh, restartDemo, feedNote } = useStore();
   return (
     <header className="topbar">
       <NavLink to="/" className="brand mobile-brand" end aria-label="Betspapa home">
@@ -66,10 +79,10 @@ export function TopBar({ title }: { title: string }) {
       </NavLink>
       <div className="top-title">
         <h1>{title}</h1>
-        <p>{mode === 'demo' ? 'Simulated matchday' : provider}</p>
+        <p>{usingDemo ? (feedNote ? 'Simulated fallback' : 'Simulated matchday') : 'Today’s fixtures'}</p>
       </div>
       <div className="top-actions">
-        {mode === 'demo' && (
+        {usingDemo && (
           <button type="button" className="ghost" onClick={restartDemo} title="Restart the simulated clock">
             Restart
           </button>
@@ -87,8 +100,8 @@ export function TopBar({ title }: { title: string }) {
 }
 
 export function DateBar() {
-  const { date, today, mode, setDate, updatedAt, pollMs } = useStore();
-  const span = mode === 'demo' ? 1 : 7;
+  const { date, today, usingDemo, setDate, updatedAt, pollMs } = useStore();
+  const span = usingDemo ? 1 : 21;
   const min = addDays(today, -span);
   const max = addDays(today, span);
   const word = dayWord(date, today);
@@ -165,7 +178,7 @@ export function ErrorBanner() {
 }
 
 export function Rail() {
-  const { inbox, follows, matches, mode } = useStore();
+  const { inbox, follows, matches, usingDemo } = useStore();
   const latest = inbox.slice(0, 4);
   const followedMatches = matches.filter((match) => follows.matches.includes(match.id));
   const count = follows.matches.length + follows.teams.length;
@@ -221,7 +234,7 @@ export function Rail() {
           </ul>
         )}
       </div>
-      {mode === 'demo' && (
+      {usingDemo && (
         <div className="rail-block">
           <h2>Demo clock</h2>
           <ol className="guide">

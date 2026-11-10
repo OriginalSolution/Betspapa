@@ -61,10 +61,19 @@ export function synthesizeGoalCheer() {
     const pitch = 148 + 16 * Math.sin(2 * Math.PI * 2.1 * time);
     roar += 0.18 * (Math.sin(2 * Math.PI * pitch * time) - roar);
     const mixed = a.low * 0.72 + a.band * 0.95 + b.band * 0.42 + b.high * 0.05 + roar * 0.22;
-    const shaped = Math.tanh(mixed * 1.35) * env * 0.42;
-    samples[index] = shaped;
+    samples[index] = mixed * env;
   }
+  makeLoud(samples);
   return { samples, sampleRate: SAMPLE_RATE };
+}
+
+function makeLoud(samples) {
+  let peak = 0;
+  for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+  const gain = peak > 0.0001 ? 1 / peak : 1;
+  for (let index = 0; index < samples.length; index += 1) {
+    samples[index] = Math.tanh(samples[index] * gain * 1.35);
+  }
 }
 
 function encodeWav(samples, sampleRate) {

@@ -45,11 +45,14 @@ export function saveFollows(follows: Follows) {
 }
 
 export function loadSettings(): Settings {
-  const raw = read<Partial<Settings>>(KEYS.settings) ?? {};
+  const raw = read<Partial<Settings> & { cheer?: boolean }>(KEYS.settings) ?? {};
   const next = { ...defaultSettings };
   (Object.keys(defaultSettings) as Array<keyof Settings>).forEach((key) => {
-    if (typeof raw[key] === 'boolean') next[key] = raw[key];
+    if (typeof raw[key] === 'boolean') next[key] = raw[key] as never;
   });
+  if (raw.goalSound === 'cheer' || raw.goalSound === 'chant' || raw.goalSound === 'off') next.goalSound = raw.goalSound;
+  else if (raw.cheer === false) next.goalSound = 'off';
+  if (raw.dataSource === 'sporty' || raw.dataSource === 'demo') next.dataSource = raw.dataSource;
   return next;
 }
 

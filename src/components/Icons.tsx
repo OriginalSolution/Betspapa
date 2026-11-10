@@ -95,6 +95,38 @@ export function IconCard({ tone }: { tone: 'yellow' | 'red' }) {
   );
 }
 
+export function IconPicks() {
+  return (
+    <Svg>
+      <path d="M6 7h12M6 12h12M6 17h8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconTrends() {
+  return (
+    <Svg>
+      <path d="M4 16l5-5 3 3 7-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconSlip() {
+  return (
+    <Svg>
+      <path d="M7 4h10v16l-2.2-1.4L12 20l-2.8-1.4L7 20V4Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconRank() {
+  return (
+    <Svg>
+      <path d="M5 18V11M12 18V6M19 18v-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconRefresh() {
   return (
     <Svg>

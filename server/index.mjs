@@ -54,11 +54,37 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/config') {
     send(res, 200, {
-      mode: config.mode,
-      provider: config.provider,
-      pollMs: config.pollMs,
-      reason: config.reason,
+      mode: 'sporty',
+      provider: 'Betspapa fixtures',
+      pollMs: 30000,
+      reason: null,
     });
+    return;
+  }
+  if (url.pathname === '/api/fixtures') {
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    if (!from || !to || Number.isNaN(new Date(from).getTime()) || Number.isNaN(new Date(to).getTime())) {
+      send(res, 400, { error: 'from and to must be ISO timestamps.' });
+      return;
+    }
+    try {
+      const events = await cached('sporty-upcoming', 20_000, async () => {
+        const response = await fetch('https://api.betspapa.com/api/sportybet/upcoming', { signal: AbortSignal.timeout(12_000) });
+        if (!response.ok) throw new Error(`Betspapa fixtures returned ${response.status}`);
+        const body = await response.json();
+        return Array.isArray(body.events) ? body.events : [];
+      });
+      const fromMs = new Date(from).getTime();
+      const toMs = new Date(to).getTime();
+      const filtered = events.filter((event) => {
+        const kick = new Date(event.kickoff).getTime();
+        return kick >= fromMs && kick <= toMs;
+      });
+      send(res, 200, { source: 'sportybet', events: filtered });
+    } catch (error) {
+      send(res, 502, { error: error.message || 'Fixture feed failed' });
+    }
     return;
   }
   if (config.mode !== 'live') {

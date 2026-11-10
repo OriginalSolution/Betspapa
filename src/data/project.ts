@@ -120,6 +120,21 @@ function materialize(script: FixtureScript, clock: Clock, utcDate: string): Matc
     });
   });
 
+  let varReview: Match['varReview'] = null;
+  if (clock.status !== 'finished') {
+    for (const event of script.events) {
+      if (!eventVisible(event, clock) || !event.player || !event.side) continue;
+      if (event.type === 'var') {
+        varReview = {
+          teamId: event.side === 'home' ? home.id : away.id,
+          player: event.player,
+          minute: event.minute,
+        };
+      }
+      if (event.type === 'goal' && varReview?.player === event.player) varReview = null;
+    }
+  }
+
   const started = clock.status !== 'scheduled' && clock.status !== 'postponed';
   return {
     id: script.id,
@@ -136,6 +151,7 @@ function materialize(script: FixtureScript, clock: Clock, utcDate: string): Matc
     htAway,
     events,
     venue: script.venue,
+    varReview,
   };
 }
 

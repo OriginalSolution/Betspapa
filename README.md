@@ -2,19 +2,35 @@
 
 Football matchday board. Today’s fixtures are grouped by competition, with Live and Following views, a match timeline, and alerts for kick-off, goals, red cards, half-time and full-time.
 
-Betspapa is an original product. It is not affiliated with SofaScore, the clubs, or the competitions. Club names identify fixtures. Demo mode does not call an external sports API.
+Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club names identify fixtures. Demo mode does not call an external sports API. With a key, scores come from football-data.org. There is no other scores feed.
+
+## Fixtures
+
+The default board is today’s real upcoming football from `GET https://api.betspapa.com/api/sportybet/upcoming`, proxied at `/api/fixtures`. Kickoff times, competitions, and SportyBet odds are from that feed. In-play scores are not on a working endpoint, so Live stays empty until a match can be scored. Settings → Simulated matchday turns on the labeled demo, which is also the fallback if the feed is unreachable.
 
 ## Demo mode
 
-With no API key, the app runs a simulated matchday in the browser. The clock starts when the tab opens and moves one match minute every 8 seconds. The board refreshes on that same 8 second poll.
+The simulated matchday is not the default. Turn it on to watch a clock that moves one match minute every 8 seconds.
 
 | Clock | What happens |
 | --- | --- |
 | 8s | Chelsea vs Man City kicks off |
-| 16s | Atletico vs Sevilla kicks off |
-| 24s | Arsenal goal, Chelsea goal, Barcelona goal, PSG goal, Bayern full-time |
-| 32s | Inter and Ajax goals |
+| 16s | Havertz goal goes to VAR. Arsenal stay 2–1. No goal cheer and Over 3.5 stays open |
+| 24s | Chelsea score. Chelsea to score wins. Havertz is still under review |
+| 32s | Havertz is confirmed, the cheer plays, Over 3.5 wins, and the Ajax clean sheet busts |
 | 72s | Liverpool red card and Barcelona half-time |
+
+## Screens
+
+- **Today / Live / Following** — scores, VAR on the minute, and squad tags when a side is weakened or heavily rotated.
+- **Picks** — tips above 80%, grouped Elite / Strong / Qualified after the opponent check. Odds sort low-to-high or high-to-low. Softened tips are the ones an opponent dragged back through 80%.
+- **Trends** — every tracked rate. Above 80% is bookmarked and tipped. Developing rows are form that is turning before the rate qualifies.
+- **Slips** — demo booking codes for PapaSlip, Northline, and Kiosk Demo. Codes are labeled demo. No bookmaker API is connected.
+- **Rankings** — your settled tips by market, team, and competition for the week, month, and year.
+- **Lists** — blacklist and greenlist teams, competitions, and markets. Blacklisted tips leave the board. Greenlisted markets shape suggestions.
+- **Alerts** — kick-off, VAR, confirmed goals, cards, half-time, full-time, squad flags, and win/bust on tips and booking codes.
+
+Suggestions sit on Picks and follow the markets you slip or greenlist. Form is the last five results beside each trend and pick.
 
 Follow Arsenal vs Liverpool, then wait. The goal arrives in Alerts and, if you allow notifications, as a browser notification. **Restart** in the header or Settings replays the clock. Alerts begin from the moment you follow. Yesterday and tomorrow use a fixed demo slate.
 

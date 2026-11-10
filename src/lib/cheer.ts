@@ -1,19 +1,25 @@
-const CHEER_URL = '/sounds/goal-cheer.wav';
+import type { GoalSound } from '../types';
 
-let cheer: HTMLAudioElement | null = null;
+const URLS: Record<Exclude<GoalSound, 'off'>, string> = {
+  cheer: '/sounds/goal-cheer.wav',
+  chant: '/sounds/goal-chant.wav',
+};
 
-function element(): HTMLAudioElement {
-  if (!cheer) {
-    cheer = new Audio(CHEER_URL);
-    cheer.preload = 'auto';
-    cheer.volume = 0.55;
-  }
-  return cheer;
+const players = new Map<string, HTMLAudioElement>();
+
+function element(sound: Exclude<GoalSound, 'off'>): HTMLAudioElement {
+  const existing = players.get(sound);
+  if (existing) return existing;
+  const audio = new Audio(URLS[sound]);
+  audio.preload = 'auto';
+  audio.volume = 1;
+  players.set(sound, audio);
+  return audio;
 }
 
 /** Lets a later goal alert play after the first tap, without waiting on that tap. */
 export function unlockGoalCheer() {
-  const audio = element();
+  const audio = element('cheer');
   audio.muted = true;
   const attempt = audio.play();
   if (!attempt) return;
@@ -30,17 +36,21 @@ export function unlockGoalCheer() {
 
 export function installCheerUnlock() {
   if (typeof window === 'undefined') return;
-  const unlock = () => unlockGoalCheer();
-  window.addEventListener('pointerdown', unlock, { passive: true });
+  window.addEventListener('pointerdown', () => unlockGoalCheer(), { passive: true });
 }
 
-/** Plays the bundled roar from the start. Safe to call when a goal alert is delivered. */
-export function playGoalCheer() {
-  const audio = element();
+/** Plays the selected bundled goal sound from the start. */
+export function playGoalSound(sound: GoalSound = 'cheer') {
+  if (sound === 'off') return;
+  const audio = element(sound);
   audio.muted = false;
-  audio.volume = 0.55;
+  audio.volume = 1;
   audio.currentTime = 0;
   void audio.play().catch(() => {
     /* autoplay can block until the page has been tapped */
   });
+}
+
+export function playGoalCheer() {
+  playGoalSound('cheer');
 }

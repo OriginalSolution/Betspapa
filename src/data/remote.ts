@@ -1,28 +1,52 @@
 import type { AppConfig, Follows, Match } from '../types';
+import { mapSportyEvents, type SportyEvent } from './sporty';
 import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
-import { DEMO_POLL_MS } from './catalog';
 
 export async function fetchConfig(): Promise<AppConfig> {
   try {
     const response = await fetch('/api/config');
     if (!response.ok) throw new Error('config');
     const body = (await response.json()) as Partial<AppConfig>;
-    if (body.mode !== 'live' && body.mode !== 'demo') throw new Error('config');
+    if (body.mode !== 'live' && body.mode !== 'demo' && body.mode !== 'sporty') throw new Error('config');
     return {
       mode: body.mode,
-      provider: body.provider || (body.mode === 'live' ? 'football-data.org' : 'Simulated matchday'),
-      pollMs: typeof body.pollMs === 'number' ? body.pollMs : body.mode === 'live' ? 20_000 : DEMO_POLL_MS,
+      provider: body.provider || 'Betspapa fixtures',
+      pollMs: typeof body.pollMs === 'number' ? body.pollMs : 30_000,
       reason: body.reason ?? null,
     };
   } catch {
     return {
-      mode: 'demo',
-      provider: 'Simulated matchday',
-      pollMs: DEMO_POLL_MS,
-      reason: 'Demo scores are on because the scores API is not configured.',
+      mode: 'sporty',
+      provider: 'Betspapa fixtures',
+      pollMs: 30_000,
+      reason: null,
     };
   }
+}
+
+export async function fetchSportyBoard(date: string): Promise<Match[]> {
+  const { from, to } = dayRangeIso(date);
+  const urls = [
+    `/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    'https://api.betspapa.com/api/sportybet/upcoming',
+  ];
+  let lastError = 'Fixture feed failed';
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        lastError = await readError(response);
+        continue;
+      }
+      const body = (await response.json()) as { events?: SportyEvent[] };
+      const events = body.events ?? [];
+      return mapSportyEvents(url.startsWith('https://') ? events : events, from, to);
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : lastError;
+    }
+  }
+  throw new Error(lastError);
 }
 
 export function detailIds(matches: Match[], follows: Follows, activeId: string | null): string[] {

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { profile } from '../data/board';
 import type { Match } from '../types';
 import { cx, minuteLabel } from '../lib/format';
 import { useStore } from '../state/store';
@@ -19,10 +20,12 @@ export function MatchRow({ match }: { match: Match }) {
   return (
     <article className={cx('match', `st-${match.status}`)}>
       <Link to={`/match/${match.id}`} className="match-main">
-        <span className={cx('when', live && 'is-live', match.status === 'finished' && 'is-final')}>{minuteLabel(match)}</span>
+        <span className={cx('when', live && 'is-live', match.status === 'finished' && 'is-final', match.varReview && 'is-var')}>
+          {match.varReview ? 'VAR' : minuteLabel(match)}
+        </span>
         <span className="teams">
-          <TeamLine name={match.home.shortName} team={match.home} score={showScore ? match.homeScore : null} win={homeWin} lose={awayWin && match.status === 'finished'} followed={homeFollow} flash={flashing} />
-          <TeamLine name={match.away.shortName} team={match.away} score={showScore ? match.awayScore : null} win={awayWin} lose={homeWin && match.status === 'finished'} followed={awayFollow} flash={flashing} />
+          <TeamLine name={match.home.shortName} team={match.home} score={showScore ? match.homeScore : null} win={homeWin} lose={awayWin && match.status === 'finished'} followed={homeFollow} flash={flashing} showSquad={match.feed !== 'sporty'} />
+          <TeamLine name={match.away.shortName} team={match.away} score={showScore ? match.awayScore : null} win={awayWin} lose={homeWin && match.status === 'finished'} followed={awayFollow} flash={flashing} showSquad={match.feed !== 'sporty'} />
         </span>
       </Link>
       <button
@@ -46,6 +49,7 @@ function TeamLine({
   lose,
   followed,
   flash,
+  showSquad,
 }: {
   name: string;
   team: Match['home'];
@@ -54,11 +58,15 @@ function TeamLine({
   lose: boolean;
   followed: boolean;
   flash: boolean;
+  showSquad: boolean;
 }) {
   return (
     <span className="team">
       <Crest team={team} followed={followed} />
-      <span className={cx('name', win && 'is-win', lose && 'is-lose')}>{name}</span>
+      <span className={cx('name', win && 'is-win', lose && 'is-lose')}>
+        {name}
+        {showSquad && profile(team.id).squad !== 'full' && <em className="squad-tag">{profile(team.id).squad === 'rotated' ? 'Rotated' : 'Weak'}</em>}
+      </span>
       {score != null && <span className={cx('goals', win && 'is-win', lose && 'is-lose', flash && 'flash')}>{score}</span>}
     </span>
   );
