@@ -57,7 +57,7 @@ export type Match = {
   venue: string | null;
   /** Set while a goal is under review and not yet confirmed. */
   varReview?: VarReview | null;
-  /** Decimal prices from the Betspapa SportyBet feed. */
+  /** Decimal prices supplied with the fixture. */
   odds?: Record<string, number> | null;
   feed?: 'sporty' | 'demo';
 };

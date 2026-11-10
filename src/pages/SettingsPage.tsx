@@ -53,7 +53,7 @@ export function SettingsPage() {
         <div className="setting">
           <div>
             <strong>Simulated matchday</strong>
-            <span>Off uses today’s real kickoffs and SportyBet odds. On is the labeled demo, including VAR.</span>
+            <span>Off uses today’s real kickoffs and prices. On is the labeled demo, including VAR.</span>
           </div>
           <Switch on={settings.dataSource === 'demo'} label="Simulated matchday" onChange={(value) => setSetting('dataSource', value ? 'demo' : 'sporty')} />
         </div>

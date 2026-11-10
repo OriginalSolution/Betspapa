@@ -6,7 +6,7 @@ Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club name
 
 ## Fixtures
 
-The default board is today’s real upcoming football from `GET https://api.betspapa.com/api/sportybet/upcoming`, proxied at `/api/fixtures`. Kickoff times, competitions, and SportyBet odds are from that feed. In-play scores are not on a working endpoint, so Live stays empty until a match can be scored. Settings → Simulated matchday turns on the labeled demo, which is also the fallback if the feed is unreachable.
+The default board is today’s real upcoming football from the Betspapa fixtures API, proxied at `/api/fixtures`. Kickoff times, competitions, and prices come from that feed. The site does not name a bookmaker as the source of those prices. In-play scores are not on a working endpoint, so Live stays empty until a match can be scored. Settings → Simulated matchday turns on the labeled demo, which is also the fallback if the feed is unreachable.
 
 ## Demo mode
 
@@ -25,10 +25,10 @@ The simulated matchday is not the default. Turn it on to watch a clock that move
 - **Today / Live / Following** — scores, VAR on the minute, and squad tags when a side is weakened or heavily rotated.
 - **Picks** — tips above 80%, grouped Elite / Strong / Qualified after the opponent check. Odds sort low-to-high or high-to-low. Softened tips are the ones an opponent dragged back through 80%.
 - **Trends** — every tracked rate. Above 80% is bookmarked and tipped. Developing rows are form that is turning before the rate qualifies.
-- **Slips** — demo booking codes for PapaSlip, Northline, and Kiosk Demo. Codes are labeled demo. No bookmaker API is connected.
+- **Slips** — every tip above 80% is booked here and tracked to a win or a bust. SportyBet and Betway cards show the same slip. Their booking codes stay unavailable because Betspapa has no live booking connection and this app does not invent codes.
 - **Rankings** — your settled tips by market, team, and competition for the week, month, and year.
 - **Lists** — blacklist and greenlist teams, competitions, and markets. Blacklisted tips leave the board. Greenlisted markets shape suggestions.
-- **Alerts** — kick-off, VAR, confirmed goals, cards, half-time, full-time, squad flags, and win/bust on tips and booking codes.
+- **Alerts** — kick-off, VAR, confirmed goals, cards, half-time, full-time, squad flags, and win/bust on booked tips and the on-site slip.
 
 Suggestions sit on Picks and follow the markets you slip or greenlist. Form is the last five results beside each trend and pick.
 

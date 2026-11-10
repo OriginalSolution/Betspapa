@@ -12,7 +12,7 @@ export function TrendsPage() {
     <div className="stack">
       <p className="page-lead">
         {trends.some((trend) => trend.sample === 0)
-          ? 'Rates on this board are implied by the SportyBet price. Anything above 80% is bookmarked and tipped.'
+          ? 'Rates on this board come from the price. Anything above 80% is bookmarked, tipped, and booked.'
           : 'Occurrence rate is hits divided by the sample. Anything above 80% is bookmarked and tipped automatically.'}
       </p>
       <TrendBlock title="Bookmarked · above 80%" rows={tipped} />

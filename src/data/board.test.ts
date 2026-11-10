@@ -56,17 +56,17 @@ describe('VAR settlement', () => {
     expect(buildPicks(board(24_000)).find((pick) => pick.id === 'che-mci:che-score')?.status).toBe('won');
   });
 
-  it('builds demo booking codes from the slip markets each desk can take', () => {
+  it('books the same won legs at each bookmaker and leaves the code unavailable', () => {
     const picks = qualifying(buildPicks(board(32_000)));
     const slip = picks.filter((pick) => pick.id === 'ars-liv:ars-over35' || pick.id === 'che-mci:che-score');
     const codes = bookingCodes(slip);
-    const papa = codes.find((code) => code.id === 'papaslip');
-    const north = codes.find((code) => code.id === 'northline');
-    expect(papa?.code.startsWith('PAPA-')).toBe(true);
-    expect(papa?.legs.map((leg) => leg.market)).toEqual(['over35']);
-    expect(papa?.status).toBe('won');
-    expect(north?.legs.map((leg) => leg.market)).toEqual(['home-score']);
-    expect(north?.status).toBe('won');
+    expect(codes.map((code) => code.name)).toEqual(['SportyBet', 'Betway']);
+    for (const code of codes) {
+      expect(code.bookingState).toBe('unavailable');
+      expect(code.code).toBe('');
+      expect(code.status).toBe('won');
+      expect(code.legs.map((leg) => leg.market).sort()).toEqual(['home-score', 'over35']);
+    }
     expect(settle('over35', board(24_000).find((match) => match.id === 'ars-liv')!, true)).toBe('open');
   });
 });

@@ -5,6 +5,7 @@ import {
   isBlacklisted,
   isGreenlisted,
   listTrends,
+  qualifying,
   trendsFromPicks,
   profile,
   seedLedger,
@@ -75,7 +76,8 @@ function notice(id: string, matchId: string, kind: InboxItem['kind'], title: str
 
 export function ProductProvider({ children }: { children: ReactNode }) {
   const { matches, t0, pushNotices } = useStore();
-  const [slip, setSlip] = useState<string[]>(() => read<string[]>(SLIP_KEY, []));
+  const [manual, setManual] = useState<string[]>(() => read<string[]>(SLIP_KEY, []));
+  const [dismissed, setDismissed] = useState<string[]>(() => read<string[]>('betspapa.dismissed.v1', []));
   const [lists, setLists] = useState<ListItem[]>(() => read<ListItem[]>(LIST_KEY, []));
   const [extra, setExtra] = useState<LedgerEntry[]>(() => read<LedgerEntry[]>(LEDGER_KEY, []));
   const baseline = useRef<{ t0: number; status: Map<string, LegStatus>; codes: Map<string, LegStatus> } | null>(null);
@@ -84,13 +86,22 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const trends = useMemo(() => (picks.some((pick) => pick.trendId.startsWith('price:')) ? trendsFromPicks(picks) : listTrends()), [picks]);
   const ledger = useMemo(() => [...seedLedger(), ...extra], [extra]);
   const greenMarkets = lists.filter((item) => item.list === 'green' && item.scope === 'market').map((item) => item.id);
+  const autoIds = useMemo(
+    () => qualifying(picks).filter((pick) => !isBlacklisted(pick, lists)).map((pick) => pick.id),
+    [picks, lists],
+  );
+  const slip = useMemo(
+    () => [...new Set([...autoIds.filter((id) => !dismissed.includes(id)), ...manual.filter((id) => !dismissed.includes(id))])],
+    [autoIds, manual, dismissed],
+  );
   const suggestions = useMemo(() => suggestPicks(picks, slip, greenMarkets).filter((pick) => !isBlacklisted(pick, lists)), [picks, slip, greenMarkets, lists]);
   const slipPicks = useMemo(() => picks.filter((pick) => slip.includes(pick.id)), [picks, slip]);
   const codes = useMemo(() => bookingCodes(slipPicks), [slipPicks]);
   const visiblePicks = useMemo(() => picks.filter((pick) => !isBlacklisted(pick, lists)), [picks, lists]);
   const hiddenCount = picks.length - visiblePicks.length;
 
-  useEffect(() => write(SLIP_KEY, slip), [slip]);
+  useEffect(() => write(SLIP_KEY, manual), [manual]);
+  useEffect(() => write('betspapa.dismissed.v1', dismissed), [dismissed]);
   useEffect(() => write(LIST_KEY, lists), [lists]);
   useEffect(() => write(LEDGER_KEY, extra), [extra]);
 
@@ -131,24 +142,30 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         result: pick.status,
       });
     }
-    for (const code of codes) {
-      if (!code.legs.length || code.status === 'open') continue;
-      const before = baseline.current.codes.get(code.id) ?? 'open';
-      if (before === code.status) continue;
+    const slipStatus: LegStatus = !slipPicks.length
+      ? 'open'
+      : slipPicks.some((pick) => pick.status === 'bust')
+        ? 'bust'
+        : slipPicks.every((pick) => pick.status === 'won')
+          ? 'won'
+          : 'open';
+    const beforeSlip = baseline.current.codes.get('slip') ?? 'open';
+    if (slipPicks.length && beforeSlip !== slipStatus && slipStatus !== 'open') {
       notes.push(
         notice(
-          `code:${t0}:${code.id}:${code.status}:${code.code}`,
-          code.legs[0]?.matchId ?? '',
-          code.status === 'won' ? 'win' : 'bust',
-          code.status === 'won' ? `Booking won · ${code.name}` : `Booking bust · ${code.name}`,
-          `${code.code} · demo code`,
+          `slip:${t0}:${slipStatus}`,
+          slipPicks[0]?.matchId ?? '',
+          slipStatus === 'won' ? 'win' : 'bust',
+          slipStatus === 'won' ? 'Slip won' : 'Slip bust',
+          'Booked trends settled on Betspapa. Bookmaker codes are still unavailable.',
         ),
       );
     }
+    codeStatus.set('slip', slipStatus);
     baseline.current = { t0, status, codes: codeStatus };
     if (rows.length) setExtra((current) => [...rows, ...current].slice(0, 200));
     if (notes.length) pushNotices(notes);
-  }, [picks, codes, matches, t0, pushNotices]);
+  }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
   const value = useMemo<Product>(
     () => ({
@@ -161,8 +178,14 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       ledger,
       codes,
       hiddenCount,
-      addLeg: (id) => setSlip((current) => (current.includes(id) ? current : [...current, id])),
-      removeLeg: (id) => setSlip((current) => current.filter((item) => item !== id)),
+      addLeg: (id) => {
+        setDismissed((current) => current.filter((item) => item !== id));
+        setManual((current) => (current.includes(id) ? current : [...current, id]));
+      },
+      removeLeg: (id) => {
+        setDismissed((current) => (current.includes(id) ? current : [...current, id]));
+        setManual((current) => current.filter((item) => item !== id));
+      },
       toggleList: (item, list) =>
         setLists((current) => {
           const existing = current.find((entry) => entry.scope === item.scope && entry.id === item.id && entry.list === list);

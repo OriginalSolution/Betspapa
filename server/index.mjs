@@ -81,7 +81,7 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
-      send(res, 200, { source: 'sportybet', events: filtered });
+      send(res, 200, { source: 'betspapa', events: filtered });
     } catch (error) {
       send(res, 502, { error: error.message || 'Fixture feed failed' });
     }

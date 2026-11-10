@@ -24,7 +24,7 @@ export function PicksPage() {
     <div className="stack">
       <p className="page-lead">
         {visiblePicks.some((pick) => pick.trendId.startsWith('price:'))
-          ? 'Tips are SportyBet prices that imply more than 80%. Odds sort low to high or high to low.'
+          ? 'Tips are prices that imply more than 80%. Odds sort low to high or high to low. Qualifying tips are booked on Slips.'
           : 'Tips are trends above 80%. Confidence moves with the opponent. Odds on the simulated board are generated for sorting.'}
       </p>
       <div className="chips" role="tablist" aria-label="Market">

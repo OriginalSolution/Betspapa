@@ -178,25 +178,18 @@ export type Bookmaker = {
 
 export const bookmakers: Bookmaker[] = [
   {
-    id: 'papaslip',
-    name: 'PapaSlip',
-    prefix: 'PAPA',
-    markets: ['over15', 'over25', 'over35', 'under25', 'btts', 'btts-no', 'home', 'away', 'draw'],
-    note: 'Demo desk',
+    id: 'sportybet',
+    name: 'SportyBet',
+    prefix: '',
+    markets: MARKETS.map((market) => market.id),
+    note: 'Code unavailable. No live booking connection.',
   },
   {
-    id: 'northline',
-    name: 'Northline',
-    prefix: 'NTH',
-    markets: ['home', 'away', 'draw', 'home-score', 'away-score', 'clean'],
-    note: 'Demo desk',
-  },
-  {
-    id: 'kiosk',
-    name: 'Kiosk Demo',
-    prefix: 'KIOSK',
-    markets: ['over25', 'over35', 'btts', 'btts-no', 'clean', 'home-score', 'away-score'],
-    note: 'Demo desk',
+    id: 'betway',
+    name: 'Betway',
+    prefix: '',
+    markets: MARKETS.map((market) => market.id),
+    note: 'Code unavailable. No live booking connection.',
   },
 ];
 
@@ -376,7 +369,7 @@ function picksFromOdds(match: Match): PickView[] {
       marketLabel: marketInfo(market).label,
       rate: implied,
       support,
-      supportText: `SportyBet ${price.toFixed(2)}. ${oneXTwo ? supportText(support, opposed.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`,
+      supportText: `Price ${price.toFixed(2)}. ${oneXTwo ? supportText(support, opposed.shortName, market) : support > 0 ? 'Short price, so this is stronger.' : support < 0 ? 'Longer price, so this is softer.' : 'The price sits in the middle.'}`,
       confidence,
       grade: gradeFor(confidence),
       bookmarked: implied > TIP_RATE,
@@ -445,18 +438,11 @@ export type BookingCode = {
   name: string;
   note: string;
   code: string;
+  bookingState: 'unavailable' | 'ready';
   legs: PickView[];
   skipped: PickView[];
   status: LegStatus;
 };
-
-export function bookingCode(prefix: string, legIds: string[]): string {
-  const source = [...legIds].sort().join('.');
-  let hash = 2166136261;
-  for (const char of source) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  const body = (hash >>> 0).toString(36).toUpperCase().padStart(4, '0').slice(-4);
-  return `${prefix}-${body}`;
-}
 
 export function bookingCodes(slip: PickView[]): BookingCode[] {
   return bookmakers.map((book) => {
@@ -471,7 +457,8 @@ export function bookingCodes(slip: PickView[]): BookingCode[] {
       id: book.id,
       name: book.name,
       note: book.note,
-      code: legs.length ? bookingCode(book.prefix, legs.map((leg) => leg.id)) : '',
+      code: '',
+      bookingState: 'unavailable',
       legs,
       skipped,
       status,
