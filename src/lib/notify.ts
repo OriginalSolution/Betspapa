@@ -1,3 +1,4 @@
+import { isNativeApp } from './nativeHttp';
 import type { InboxItem } from '../types';
 
 export type BrowserPermission = NotificationPermission | 'unsupported';
@@ -7,7 +8,22 @@ export function readPermission(): BrowserPermission {
   return Notification.permission;
 }
 
+function notificationId(value: string): number {
+  let hash = 0;
+  for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return (hash % 2_000_000_000) + 1;
+}
+
 export async function requestBrowserPermission(): Promise<BrowserPermission> {
+  if (isNativeApp()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const result = await LocalNotifications.requestPermissions();
+      return result.display === 'granted' ? 'granted' : 'denied';
+    } catch {
+      return 'unsupported';
+    }
+  }
   if (typeof Notification === 'undefined') return 'unsupported';
   try {
     return await Notification.requestPermission();
@@ -24,6 +40,26 @@ export function registerServiceWorker() {
 }
 
 export async function pushBrowserNotification(item: InboxItem) {
+  if (isNativeApp()) {
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const permission = await LocalNotifications.checkPermissions();
+      if (permission.display !== 'granted') return;
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: notificationId(item.id),
+            title: item.title,
+            body: item.body,
+            schedule: { at: new Date(Date.now() + 250), allowWhileIdle: true },
+          },
+        ],
+      });
+    } catch {
+      /* the in-app alert still stands */
+    }
+    return;
+  }
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const url = `/match/${item.matchId}`;
   const options: NotificationOptions = {

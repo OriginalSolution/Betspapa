@@ -1,8 +1,12 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { PickView } from '../data/board';
 import { squadLabel } from '../data/board';
+import { Crest } from './Crest';
 import { cx } from '../lib/format';
+import type { Team } from '../types';
 import { useProduct } from '../state/product';
+import { useStore } from '../state/store';
 
 export function FormPips({ form }: { form: PickView['form'] }) {
   return (
@@ -16,8 +20,19 @@ export function FormPips({ form }: { form: PickView['form'] }) {
   );
 }
 
+function teamFromBoard(matches: ReturnType<typeof useStore>['matches'], name: string): Team {
+  for (const match of matches) {
+    if (match.home.name === name || match.home.shortName === name) return match.home;
+    if (match.away.name === name || match.away.shortName === name) return match.away;
+  }
+  return { id: name, name, shortName: name, abbr: name.slice(0, 3).toUpperCase(), color: '#2a303c' };
+}
+
 export function PickCard({ pick }: { pick: PickView }) {
   const { slip, addLeg, removeLeg, toggleList, pickListed } = useProduct();
+  const { matches } = useStore();
+  const side = useMemo(() => teamFromBoard(matches, pick.teamName), [matches, pick.teamName]);
+  const opponent = useMemo(() => teamFromBoard(matches, pick.opponentName), [matches, pick.opponentName]);
   const saved = slip.includes(pick.id);
   const black = pickListed(pick, 'black');
   const green = pickListed(pick, 'green');
@@ -27,10 +42,12 @@ export function PickCard({ pick }: { pick: PickView }) {
         <span className={cx('grade', pick.grade && `grade-${pick.grade}`)}>{pick.grade ?? '–'}</span>
         <div className="pick-title">
           <strong>{pick.label}</strong>
-          <p>
-            <Link to={`/match/${pick.matchId}`}>
-              {pick.teamName} vs {pick.opponentName}
-            </Link>
+          <p className="pick-sides">
+            <Crest team={side} size={18} />
+            <Link to={`/match/${pick.matchId}`}>{pick.teamName}</Link>
+            <span>vs</span>
+            <Crest team={opponent} size={18} />
+            <Link to={`/match/${pick.matchId}`}>{pick.opponentName}</Link>
             <span> · {pick.competitionName}</span>
           </p>
         </div>

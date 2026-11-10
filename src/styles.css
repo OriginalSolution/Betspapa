@@ -313,9 +313,12 @@ button:disabled { cursor: default; opacity: 0.35; }
   letter-spacing: -0.04em;
   line-height: 1;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-  object-fit: cover;
+  object-fit: contain;
   flex: none;
+  background: #fff;
 }
+img.crest { padding: 1px; }
+.pick-sides { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .crest.team-on { box-shadow: 0 0 0 2px var(--gold); }
 
 .tabbar {
