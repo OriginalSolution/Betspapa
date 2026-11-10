@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crestUrlFromSummary, pickCrestPage, rememberCrest, cachedCrest, setCrestStore, type WikiPage } from './crests';
+import { crestSearches, crestUrlFromSummary, pickCrestPage, rememberCrest, cachedCrest, setCrestStore, titleFitsClub, type WikiPage } from './crests';
 
 describe('crest choice', () => {
   it('picks the football club badge and skips the city page', () => {
@@ -28,5 +28,28 @@ describe('crest choice', () => {
     rememberCrest('CD Pamplona', null, 1_000);
     expect(cachedCrest('CD Pamplona', 1_000 + 1000)).toBeNull();
     setCrestStore(null);
+  });
+
+  it('accepts a club jpeg and a short local name, and keeps a women side off the men page', () => {
+    expect(
+      crestUrlFromSummary(
+        { title: 'CF Trival Valderas', description: 'Association football club in Spain', thumbnail: { source: 'https://upload.wikimedia.org/wikipedia/en/3/3f/Trival_Valderas.jpg' } },
+        'CF Trival Valderas Alcoron',
+      ),
+    ).toContain('Trival_Valderas.jpg');
+    expect(titleFitsClub('UE Tavernes', 'CF UE Tavernes de la Valldigna')).toBe(true);
+    expect(titleFitsClub('Olimpico EC SE', 'Olímpico Esporte Clube')).toBe(true);
+    expect(titleFitsClub('Olimpico EC SE', 'Esporte Clube Olímpico')).toBe(false);
+    expect(titleFitsClub('AD Carmopolis SE', 'Associação Desportiva Carmópolis')).toBe(true);
+    expect(titleFitsClub('Eibar', 'Sociedad Deportiva Eibar')).toBe(true);
+    expect(titleFitsClub('Hacken Gothenburg W', 'BK Häcken FF')).toBe(true);
+    const pages: WikiPage[] = [
+      { title: 'Real Madrid CF', description: "Men's association football club in Spain", thumbnail: { source: 'https://upload.wikimedia.org/men.svg' } },
+      { title: 'Real Madrid Femenino', description: "Women's association football club in Madrid", thumbnail: { source: 'https://upload.wikimedia.org/en/thumb/5/56/Real_Madrid_CF.svg/330px-Real_Madrid_CF.svg.png' } },
+    ];
+    expect(pickCrestPage('Real Madrid W', pages)?.title).toBe('Real Madrid Femenino');
+    expect(pickCrestPage('Odense Q', [{ title: 'Odense Boldklub Q', description: "Danish women's association football team in Odense, Denmark", thumbnail: { source: 'https://upload.wikimedia.org/commons/thumb/0/0b/Odense_Boldklub.svg/120px-Odense_Boldklub.svg.png' } }])?.title).toBe('Odense Boldklub Q');
+    expect(crestSearches('AD Carmopolis SE', { area: 'Brazil', competition: 'Sergipano' }).some((item) => item.lang === 'pt' && /Carmopolis/i.test(item.query))).toBe(true);
+    expect(crestSearches('Real Madrid W').some((item) => /femenino|women/i.test(item.query))).toBe(true);
   });
 });
