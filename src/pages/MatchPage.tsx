@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { CountryBadge } from '../components/CountryBadge';
 import { Crest } from '../components/Crest';
 import { IconBall, IconCard } from '../components/Icons';
 import { profile, squadLabel } from '../data/board';
@@ -58,7 +59,7 @@ export function MatchPage() {
   return (
     <article className="detail">
       <p className="detail-comp">
-        <span className="code">{match.competition.code}</span>
+        <CountryBadge area={match.competition.area} />
         {match.competition.name}
       </p>
       {match.venue && <p className="venue">{match.venue}</p>}

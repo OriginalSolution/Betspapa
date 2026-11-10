@@ -200,6 +200,10 @@ button:disabled { cursor: default; opacity: 0.35; }
 }
 .code {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-width: 34px;
   text-align: center;
   font-size: 10px;
@@ -209,6 +213,14 @@ button:disabled { cursor: default; opacity: 0.35; }
   border-radius: 5px;
   background: var(--red-dim);
   color: #ffc1c7;
+}
+.flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 1px;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 .comp-names { flex: 1; min-width: 0; }
 .comp-names h2, .comp-head h2 { margin: 0; font-size: 14px; font-weight: 680; letter-spacing: -0.02em; }

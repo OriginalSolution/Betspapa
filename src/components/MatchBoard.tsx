@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Match } from '../types';
 import { groupMatches } from '../lib/group';
+import { CountryBadge } from './CountryBadge';
 import { MatchRow } from './MatchRow';
 
 export function MatchBoard({ matches }: { matches: Match[] }) {
@@ -10,7 +11,7 @@ export function MatchBoard({ matches }: { matches: Match[] }) {
       {groups.map((group) => (
         <section key={group.competition.id} className="group" aria-labelledby={`comp-${group.competition.id}`}>
           <header className="comp-head">
-            <span className="code">{group.competition.code}</span>
+            <CountryBadge area={group.competition.area} />
             <div className="comp-names">
               <h2 id={`comp-${group.competition.id}`}>{group.competition.name}</h2>
               <p>{group.competition.area}</p>

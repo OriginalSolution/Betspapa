@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { CountryBadge } from '../components/CountryBadge';
 import { MARKETS } from '../data/board';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
@@ -15,7 +16,7 @@ export function ListsPage() {
     return [...teams.values()].slice(0, 8);
   }, [matches]);
   const boardCompetitions = useMemo(() => {
-    const competitions = new Map<string, { id: string; name: string; code: string }>();
+    const competitions = new Map<string, { id: string; name: string; area: string; code: string }>();
     for (const match of matches) competitions.set(match.competition.id, match.competition);
     return [...competitions.values()].slice(0, 4);
   }, [matches]);
@@ -71,7 +72,7 @@ export function ListsPage() {
           {boardCompetitions.map((competition) => (
             <span key={competition.id}>
               <button type="button" onClick={() => toggleList({ scope: 'competition', id: competition.id, name: competition.name }, 'black')}>
-                Hide {competition.code}
+                Hide <CountryBadge area={competition.area} />
               </button>
             </span>
           ))}

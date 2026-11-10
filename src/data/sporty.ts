@@ -1,3 +1,4 @@
+import { countryMark } from '../lib/country';
 import type { Match, Team } from '../types';
 
 export type SportyEvent = {
@@ -47,8 +48,7 @@ function priority(tournament: string, country: string): number {
 }
 
 function code(country: string): string {
-  const letters = country.replace(/[^A-Za-z]/g, '');
-  return (letters.slice(0, 3) || 'INT').toUpperCase();
+  return countryMark(country).code;
 }
 
 export function mapSportyEvent(event: SportyEvent): Match {
