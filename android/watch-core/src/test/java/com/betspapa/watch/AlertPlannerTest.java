@@ -393,6 +393,96 @@ public class AlertPlannerTest {
         assertEquals("ARS", WatchMatch.label("", "Arsenal"));
     }
 
+    @Test
+    public void scoreChangesKeepTheirMinuteThroughLaterPolls() throws Exception {
+        WatchState state = new WatchState();
+        state.matchIds.add("sr:match:gha");
+        WatchMatch prior = ghana();
+        prior.status = "live";
+        prior.minute = 22;
+        prior.homeScore = 0;
+        prior.awayScore = 0;
+        state.matches.add(prior);
+        WatchMatch scored = ghana();
+        scored.status = "live";
+        scored.minute = 23;
+        scored.homeScore = 1;
+        scored.awayScore = 0;
+        state.overlayLive(java.util.Collections.singletonList(scored), KICK);
+        assertEquals(23, state.matches.get(0).markers.get(0).minute);
+        assertEquals("GHA", state.matches.get(0).markers.get(0).abbr);
+        assertEquals("home", state.matches.get(0).markers.get(0).side);
+        WatchMatch later = ghana();
+        later.status = "live";
+        later.minute = 57;
+        later.homeScore = 1;
+        later.awayScore = 0;
+        state.overlayLive(java.util.Collections.singletonList(later), KICK + 30_000L);
+        assertEquals(1, state.matches.get(0).markers.size());
+        assertEquals(23, state.matches.get(0).markers.get(0).minute);
+        WatchState loaded = WatchState.fromJson(new JSONObject(state.toJson().toString()));
+        assertEquals(23, loaded.matches.get(0).markers.get(0).minute);
+        assertEquals("GHA", loaded.matches.get(0).markers.get(0).abbr);
+    }
+
+    @Test
+    public void aScoreAlreadyOnTheBoardStillGetsTheCurrentMinute() {
+        WatchState state = new WatchState();
+        state.matchIds.add("sr:match:gha");
+        WatchMatch live = ghana();
+        live.status = "live";
+        live.minute = 57;
+        live.homeScore = 1;
+        live.awayScore = 0;
+        state.overlayLive(java.util.Collections.singletonList(live), KICK);
+        assertEquals(57, state.matches.get(0).markers.get(0).minute);
+        assertTrue(state.matches.get(0).markers.get(0).estimated);
+        String feed = "{\"data\":[{\"events\":[{\"eventId\":\"sr:match:gha\",\"homeTeamName\":\"Ghana\",\"awayTeamName\":\"Somalia\",\"matchStatus\":\"H2\",\"playedSeconds\":\"57:00\",\"setScore\":\"1:0\",\"timeline\":[{\"type\":\"goal\",\"minute\":23,\"side\":\"home\",\"player\":\"Kudus\"}]}]}]}";
+        WatchMatch parsed = MatchParser.parseLive(feed).get(0);
+        assertEquals(23, parsed.markers.get(0).minute);
+        assertEquals("Kudus", parsed.markers.get(0).player);
+        assertFalse(parsed.markers.get(0).estimated);
+    }
+
+    @Test
+    public void trendHitsUnderOnePointTwoAreDropped() {
+        assertTrue(AlertPlanner.belowFloor("1.19"));
+        assertFalse(AlertPlanner.belowFloor("1.20"));
+        assertFalse(AlertPlanner.belowFloor(""));
+        WatchState state = new WatchState();
+        state.browser = true;
+        state.matchIds.add("sr:match:gha");
+        state.trends.add("sr:match:gha:over25");
+        WatchMatch done = ghana();
+        done.status = "finished";
+        done.minute = 90;
+        done.homeScore = 2;
+        done.awayScore = 1;
+        state.matches.add(done);
+        JSONObject shortPrice = new JSONObject();
+        shortPrice.put("id", "sr:match:gha:over25");
+        shortPrice.put("odds", "1.15");
+        state.merge(new JSONObject().put("bookings", new JSONArray().put(shortPrice)));
+        assertEquals("", kinds(AlertPlanner.notices(state.matches, state, KICK + 1000L)).replace("kickoff", "").replace("ht", "").replace("ft", "").replace("goal", "").trim());
+        JSONObject priced = new JSONObject();
+        priced.put("id", "sr:match:gha:over25");
+        priced.put("odds", "1.20");
+        state.merge(new JSONObject().put("bookings", new JSONArray().put(priced)));
+        assertTrue(kinds(AlertPlanner.notices(state.matches, state, KICK + 1000L)).contains("win"));
+    }
+
+    private static WatchMatch ghana() {
+        WatchMatch match = new WatchMatch();
+        match.id = "sr:match:gha";
+        match.home = "Ghana";
+        match.away = "Somalia";
+        match.homeId = "ghana";
+        match.awayId = "somalia";
+        match.kickoffMs = KICK;
+        match.status = "scheduled";
+        return match;
+    }
+
     private static WatchState followed() {
         WatchState state = new WatchState();
         state.browser = true;

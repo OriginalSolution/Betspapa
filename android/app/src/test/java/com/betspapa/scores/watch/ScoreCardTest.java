@@ -8,6 +8,7 @@ import static org.robolectric.Shadows.shadowOf;
 import android.app.Application;
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -24,6 +25,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
+import org.robolectric.shadows.ShadowPendingIntent;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34)
@@ -149,6 +151,40 @@ public class ScoreCardTest {
         assertTrue(live != null);
         assertTrue((live.flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0);
         assertEquals(AlertPoster.SCORECARD, live.getChannelId());
+    }
+
+    @Test
+    public void eachMatchKeepsItsOwnOpenTarget() {
+        Context context = granted();
+        WatchMatch arsenal = sample();
+        WatchMatch ghana = sample();
+        ghana.id = "sr:match:gha";
+        ghana.home = "Ghana";
+        ghana.away = "Somalia";
+        AlertPoster.postLive(context, arsenal, false);
+        AlertPoster.postLive(context, ghana, false);
+        PendingIntent first = null;
+        PendingIntent second = null;
+        for (Notification note : shadowOf(manager(context)).getAllNotifications()) {
+            String title = String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE));
+            if (title.contains("Arsenal")) first = note.contentIntent;
+            if (title.contains("Ghana")) second = note.contentIntent;
+        }
+        assertTrue(first != null && second != null);
+        Intent arsenalIntent = shadowOf(first).getSavedIntent();
+        Intent ghanaIntent = shadowOf(second).getSavedIntent();
+        assertEquals("sr:match:ars", arsenalIntent.getStringExtra(OpenMatch.EXTRA_MATCH));
+        assertEquals("match", arsenalIntent.getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("sr:match:gha", ghanaIntent.getStringExtra(OpenMatch.EXTRA_MATCH));
+        assertTrue(shadowOf(first).getRequestCode() != shadowOf(second).getRequestCode());
+        assertTrue((shadowOf(first).getFlags() & PendingIntent.FLAG_IMMUTABLE) != 0);
+        assertTrue((shadowOf(first).getFlags() & PendingIntent.FLAG_UPDATE_CURRENT) != 0);
+        WatchNote trend = new WatchNote("trend:sr:match:gha:over25:hit", ghana.id, "win", "Trend hit · Over 2.5 goals", "Ghana");
+        trend.bookCode = "N7KQ2X";
+        PendingIntent slip = OpenMatch.forNote(context, trend);
+        assertEquals("slip", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("sr:match:gha:over25", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_TREND));
+        assertTrue(shadowOf(slip).getRequestCode() != shadowOf(second).getRequestCode());
     }
 
     private static Context granted() {

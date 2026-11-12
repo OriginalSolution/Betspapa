@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { MarketId, TrendView } from '../data/board';
 import { FormPips } from '../components/PickCard';
 import { squadLabel } from '../data/board';
@@ -24,6 +25,12 @@ const EXTRA = new Set<MarketId>([
 
 export function TrendsPage() {
   const { trends } = useProduct();
+  const [params] = useSearchParams();
+  const focus = params.get('trend');
+  useEffect(() => {
+    if (!focus) return;
+    document.getElementById(`trend-${focus}`)?.scrollIntoView({ block: 'center' });
+  }, [focus, trends]);
   const hit = trends.filter((trend) => trend.status === 'won');
   const tipped = trends.filter((trend) => trend.bookmarked && trend.status !== 'won');
   const developing = trends.filter((trend) => trend.developing && trend.status !== 'won');
@@ -41,20 +48,21 @@ export function TrendsPage() {
           <p>Trends appear when today’s fixtures and prices load.</p>
         </div>
       )}
-      <TrendBlock title="Popped off" detail="These markets have already hit. Follow one and it stays on Alerts." rows={hit} />
-      <TrendBlock title="Bookmarked · above 80%" rows={tipped} />
-      <TrendBlock title="Developing" detail="Recent form is turning before the rate clears 80%." rows={developing} />
+      <TrendBlock title="Popped off" detail="These markets have already hit. Follow one and it stays on Alerts." rows={hit} focus={focus} />
+      <TrendBlock title="Bookmarked · above 80%" rows={tipped} focus={focus} />
+      <TrendBlock title="Developing" detail="Recent form is turning before the rate clears 80%." rows={developing} focus={focus} />
       <TrendBlock
         title="Major markets"
         detail="Full-time and first-half results, double chance, draw no bet, both teams to score, and goal lines."
         rows={major}
+        focus={focus}
       />
-      <TrendBlock title="Watching" detail="Tracked, and not tipped yet." rows={rest} />
+      <TrendBlock title="Watching" detail="Tracked, and not tipped yet." rows={rest} focus={focus} />
     </div>
   );
 }
 
-function TrendBlock({ title, detail, rows }: { title: string; detail?: string; rows: TrendView[] }) {
+function TrendBlock({ title, detail, rows, focus }: { title: string; detail?: string; rows: TrendView[]; focus?: string | null }) {
   const { trendFollows, toggleTrend } = useProduct();
   if (!rows.length) return null;
   return (
@@ -64,7 +72,7 @@ function TrendBlock({ title, detail, rows }: { title: string; detail?: string; r
       {rows.map((trend) => {
         const on = trendFollows.includes(trend.id);
         return (
-          <article key={trend.id} className={cx('trend', trend.bookmarked && 'trend-hot', trend.status === 'won' && 'trend-hit')}>
+          <article id={`trend-${trend.id}`} key={trend.id} className={cx('trend', trend.bookmarked && 'trend-hot', trend.status === 'won' && 'trend-hit', focus === trend.id && 'trend-focus')}>
             <div>
               <strong>{trend.label || `${trend.teamName} · ${trend.marketLabel}`}</strong>
               <p>{trend.note}</p>

@@ -102,22 +102,64 @@ public final class MatchParser {
             match.varReview = varReview;
         }
         readMarks(match, event.optJSONArray("timeline"));
-        if (match.markers.isEmpty()) readMarks(match, event.optJSONArray("incidents"));
+        if (!hasGoal(match)) readMarks(match, event.optJSONArray("incidents"));
+        if (!hasGoal(match)) readMarks(match, event.optJSONArray("comments"));
+        match.stampMissingGoals(match.minute == null ? -1 : match.minute);
         return match;
+    }
+
+    private static boolean hasGoal(WatchMatch match) {
+        for (WatchMatch.Marker marker : match.markers) {
+            if ("goal".equals(marker.type) && !marker.estimated) return true;
+        }
+        return false;
     }
 
     private static void readMarks(WatchMatch match, JSONArray rows) {
         if (rows == null) return;
+        int home = 0;
+        int away = 0;
         for (int i = 0; i < rows.length(); i++) {
             JSONObject row = rows.optJSONObject(i);
             if (row == null) continue;
-            String type = row.optString("type", "").toLowerCase(Locale.US);
+            String type = row.optString("type", row.optString("incidentType", "")).toLowerCase(Locale.US);
+            if (type.contains("goal")) type = "goal";
             if (!"goal".equals(type) && !"yellow".equals(type) && !"red".equals(type) && !"var".equals(type)) continue;
-            String side = row.optString("side", row.optString("team", "")).toLowerCase(Locale.US);
+            String side = row.optString("side", row.optString("team", row.optString("homeOrAway", ""))).toLowerCase(Locale.US);
+            if (side.startsWith("away") || "2".equals(side)) side = "away";
+            else if (side.startsWith("home") || "1".equals(side)) side = "home";
+            else side = "";
             String abbr = row.optString("abbr", "");
             if (abbr.isEmpty()) abbr = "away".equals(side) ? match.abbrAway() : match.abbrHome();
-            match.addMarker(type, row.optInt("minute", match.minute == null ? 0 : match.minute), abbr);
+            if (side.isEmpty()) side = abbr.equals(match.abbrAway()) ? "away" : "home";
+            Integer at = incidentMinute(row);
+            if (at == null) continue;
+            if ("goal".equals(type)) {
+                int index = "away".equals(side) ? ++away : ++home;
+                String player = row.optString("player", row.optString("playerName", row.optString("scorer", ""))).trim();
+                match.setGoal(side, index, at, abbr, player, true);
+            } else {
+                match.addMarker(type, at, abbr, side);
+            }
         }
+    }
+
+    private static Integer incidentMinute(JSONObject row) {
+        if (row.has("minute") && !row.isNull("minute")) return row.optInt("minute", 0);
+        for (String key : new String[] {"time", "matchTime", "played"}) {
+            if (!row.has(key) || row.isNull(key)) continue;
+            String raw = row.optString(key, "").trim();
+            if (raw.isEmpty()) continue;
+            int cut = 0;
+            while (cut < raw.length() && Character.isDigit(raw.charAt(cut))) cut++;
+            if (cut == 0) continue;
+            try {
+                return Integer.parseInt(raw.substring(0, cut));
+            } catch (NumberFormatException error) {
+                return null;
+            }
+        }
+        return null;
     }
 
     static String liveStatus(String matchStatus, Integer numeric) {

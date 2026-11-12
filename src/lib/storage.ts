@@ -4,6 +4,7 @@ const KEYS = {
   follows: 'betspapa.follows.v1',
   settings: 'betspapa.settings.v1',
   inbox: 'betspapa.inbox.v1',
+  deleted: 'betspapa.deletedAlerts.v1',
   alerted: 'betspapa.alerted.v1',
   t0: 'betspapa.demo.t0',
   sent: 'betspapa.browserSent.v1',
@@ -83,10 +84,29 @@ export function saveSettings(settings: Settings) {
   write(KEYS.settings, settings);
 }
 
+export function loadDeletedAlerts(): Set<string> {
+  const raw = read<string[]>(KEYS.deleted);
+  return new Set(Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string') : []);
+}
+
+export function rememberDeletedAlert(id: string) {
+  if (!id) return;
+  const next = loadDeletedAlerts();
+  next.add(id);
+  write(KEYS.deleted, [...next].slice(-400));
+}
+
+export function forgetDeletedAlert(id: string) {
+  const next = loadDeletedAlerts();
+  if (!next.delete(id)) return;
+  write(KEYS.deleted, [...next]);
+}
+
 export function loadInbox(): InboxItem[] {
   const raw = read<InboxItem[]>(KEYS.inbox);
   if (!Array.isArray(raw)) return [];
-  return raw.filter((item) => item && typeof item.id === 'string' && typeof item.title === 'string').slice(0, 80);
+  const deleted = loadDeletedAlerts();
+  return raw.filter((item) => item && typeof item.id === 'string' && typeof item.title === 'string' && !deleted.has(item.id)).slice(0, 80);
 }
 
 export function saveInbox(inbox: InboxItem[]) {

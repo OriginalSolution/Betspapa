@@ -24,7 +24,12 @@ type LiveEvent = {
   sport?: { category?: { name?: string; tournament?: { name?: string } } };
   fixtureVenue?: { name?: string };
   varReview?: { teamId?: string; player?: string; minute?: number } | null;
+  timeline?: unknown;
+  incidents?: unknown;
+  comments?: unknown;
 };
+
+type FeedIncident = { type: 'goal' | 'yellow' | 'red' | 'var'; minute: number; side: 'home' | 'away'; player: string | null };
 type LiveTournament = { name?: string; categoryName?: string; events?: LiveEvent[] };
 
 const SCORE = /^(\d+)\s*[:\-]\s*(\d+)$/;
@@ -106,9 +111,58 @@ export function oddsFromMarkets(markets: LiveMarket[] | null | undefined): Recor
   return odds;
 }
 
-function timeline(match: Match): MatchEvent[] {
+function incidentMinute(row: Record<string, unknown>): number | null {
+  if (typeof row.minute === 'number' && Number.isFinite(row.minute)) return row.minute;
+  for (const key of ['minute', 'time', 'matchTime', 'played']) {
+    const raw = row[key];
+    if (raw == null) continue;
+    const text = String(raw).trim();
+    const digits = text.match(/^\d+/);
+    if (!digits) continue;
+    const minute = Number(digits[0]);
+    if (Number.isFinite(minute)) return minute;
+  }
+  return null;
+}
+
+function readIncidents(value: unknown, awayName: string): FeedIncident[] {
+  if (!Array.isArray(value)) return [];
+  const out: FeedIncident[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    let type = String(row.type || row.incidentType || '').toLowerCase();
+    if (type.includes('goal')) type = 'goal';
+    if (type !== 'goal' && type !== 'yellow' && type !== 'red' && type !== 'var') continue;
+    const minute = incidentMinute(row);
+    if (minute == null) continue;
+    const label = String(row.side || row.team || row.homeOrAway || '').toLowerCase();
+    const side: 'home' | 'away' =
+      label.startsWith('away') || label === '2' || (awayName && label.includes(awayName.toLowerCase()))
+        ? 'away'
+        : 'home';
+    const player = String(row.player || row.playerName || row.scorer || '').trim() || null;
+    out.push({ type, minute, side, player });
+  }
+  return out;
+}
+
+function timeline(match: Match, incidents: FeedIncident[] = []): MatchEvent[] {
   if (match.status === 'scheduled' || match.status === 'postponed') return match.events;
   const events = match.events.filter((event) => event.type === 'yellow' || event.type === 'red' || event.type === 'var');
+  for (const incident of incidents) {
+    if (incident.type === 'goal') continue;
+    events.push({
+      id: `${match.id}:${incident.type}:${incident.side}:${incident.minute}`,
+      type: incident.type,
+      minute: incident.minute,
+      teamId: incident.side === 'home' ? match.home.id : match.away.id,
+      player: incident.player,
+      detail: null,
+      homeScore: null,
+      awayScore: null,
+    });
+  }
   events.push({
     id: `${match.id}:kickoff`,
     type: 'kickoff',
@@ -120,13 +174,15 @@ function timeline(match: Match): MatchEvent[] {
     awayScore: 0,
   });
   const pushGoals = (side: 'home' | 'away', count: number) => {
+    const scored = incidents.filter((incident) => incident.type === 'goal' && incident.side === side);
     for (let index = 1; index <= count; index += 1) {
+      const incident = scored[index - 1];
       events.push({
         id: `${match.id}:goal:${side}:${index}`,
         type: 'goal',
-        minute: null,
+        minute: incident?.minute ?? null,
         teamId: side === 'home' ? match.home.id : match.away.id,
-        player: null,
+        player: incident?.player ?? null,
         detail: null,
         homeScore: match.homeScore,
         awayScore: match.awayScore,
@@ -212,7 +268,12 @@ export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): M
     events: [],
     varReview: reviewFrom(event),
   };
-  next.events = timeline(next);
+  const incidents = [
+    ...readIncidents(event.timeline, event.awayTeamName || ''),
+    ...readIncidents(event.incidents, event.awayTeamName || ''),
+    ...readIncidents(event.comments, event.awayTeamName || ''),
+  ];
+  next.events = timeline(next, incidents);
   return next;
 }
 

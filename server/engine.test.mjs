@@ -12,7 +12,7 @@ const events = [
     home: 'Alpha',
     away: 'Beta',
     kickoff: '2026-11-10T18:00:00.000Z',
-    odds: { home: 1.9, draw: 3.4, away: 4.2, 'over-15': 1.08 },
+    odds: { home: 1.9, draw: 3.4, away: 4.2, 'over-15': 1.22, 'over-25': 1.08 },
   },
 ];
 

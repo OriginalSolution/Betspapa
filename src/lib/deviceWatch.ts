@@ -1,5 +1,6 @@
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { Follows, InboxItem, Match, Settings } from '../types';
+import { loadGoalBook, markersFor } from './goalMinutes';
 import { isFollowed } from './group';
 import { isNativeApp } from './nativeHttp';
 
@@ -28,6 +29,7 @@ export type ScheduleRow = {
   homeCrest?: string;
   awayCrest?: string;
   competition?: string;
+  markers?: ReturnType<typeof markersFor>;
 };
 
 export type WatchBooking = {
@@ -95,10 +97,11 @@ const draft: {
   bookings?: WatchBooking[];
 } = {};
 
-export function mergeInbox(local: InboxItem[], remote: InboxItem[]): InboxItem[] {
+export function mergeInbox(local: InboxItem[], remote: InboxItem[], deleted?: Iterable<string>): InboxItem[] {
+  const drop = new Set(deleted || []);
   const known = new Set(local.map((item) => item.id));
-  const extra = (remote || []).filter((item) => item && typeof item.id === 'string' && item.id && !known.has(item.id));
-  return [...extra, ...local].slice(0, 120);
+  const extra = (remote || []).filter((item) => item && typeof item.id === 'string' && item.id && !known.has(item.id) && !drop.has(item.id));
+  return [...extra, ...local].filter((item) => !drop.has(item.id)).slice(0, 120);
 }
 
 export function trendMatchId(trendId: string): string {
@@ -109,6 +112,7 @@ export function trendMatchId(trendId: string): string {
 /** Followed matches, plus any match a followed trend is tied to. */
 export function scheduleRows(matches: Match[], follows: Follows, trends: string[]): ScheduleRow[] {
   const wanted = new Set(trends.map(trendMatchId).filter(Boolean));
+  const book = loadGoalBook();
   return matches
     .filter((match) => isFollowed(match, follows) || wanted.has(match.id))
     .map((match) => ({
@@ -134,6 +138,7 @@ export function scheduleRows(matches: Match[], follows: Follows, trends: string[
       homeCrest: match.home.crest || '',
       awayCrest: match.away.crest || '',
       competition: match.competition?.name || '',
+      markers: markersFor(match, book),
     }));
 }
 

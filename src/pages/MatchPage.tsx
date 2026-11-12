@@ -107,6 +107,7 @@ export function MatchPage() {
           </button>
         </div>
       </section>
+      {(match.status === 'live' || match.status === 'halftime' || match.status === 'finished') && <PitchLine match={match} />}
       <section className="timeline-wrap">
         <h2>Events</h2>
         {timeline.length === 0 ? (
@@ -120,6 +121,33 @@ export function MatchPage() {
         )}
       </section>
     </article>
+  );
+}
+
+function PitchLine({ match }: { match: Match }) {
+  const goals = match.events.filter((event) => event.type === 'goal' && event.minute != null);
+  const at = match.status === 'finished' ? 90 : Math.max(0, Math.min(90, match.minute ?? 0));
+  return (
+    <div className="pitch" aria-hidden="true">
+      <div className="pitch-track">
+        <i style={{ width: `${(at / 90) * 100}%` }} />
+        {goals.map((event) => {
+          const side = event.teamId === match.away.id ? match.away : match.home;
+          const minute = Math.max(0, Math.min(90, event.minute ?? 0));
+          return (
+            <span key={event.id} className="pitch-goal" style={{ left: `${(minute / 90) * 100}%` }}>
+              <b>
+                {minute}′ {side.abbr}
+              </b>
+            </span>
+          );
+        })}
+      </div>
+      <div className="pitch-scale">
+        <span>0′</span>
+        <span>90′</span>
+      </div>
+    </div>
   );
 }
 

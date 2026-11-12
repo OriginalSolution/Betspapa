@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
 import { followedNotices, staleAlertIds } from '../lib/alerts';
+import { decorateMatches, goalEventMinute, loadGoalBook, mergeNativeMarkers, paintGoals, saveGoalBook } from '../lib/goalMinutes';
 import { flushWatch, mergeInbox, pullWatch, stageWatch } from '../lib/deviceWatch';
 import { resolveCrests } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
@@ -18,8 +19,11 @@ import {
   loadSettings,
   markNotificationSent,
   loadAlerted,
+  loadDeletedAlerts,
   loadSent,
   rememberAlerted,
+  rememberDeletedAlert,
+  forgetDeletedAlert,
   saveFollows,
   saveInbox,
   saveSettings,
@@ -62,6 +66,8 @@ type Action =
   | { type: 'read-all' }
   | { type: 'clear-inbox' }
   | { type: 'drop-inbox'; ids: string[] }
+  | { type: 'restore-inbox'; item: InboxItem }
+  | { type: 'repaint-goals' }
   | { type: 'clear-follows' }
   | { type: 'dismiss-toast'; id: string }
   | { type: 'clear-toasts' }
@@ -95,7 +101,11 @@ function changedScores(prev: Match[] | null, next: Match[]): string[] {
     .map((match) => match.id);
 }
 
-function applySnapshot(state: State, matches: Match[], now: number, usingDemo = state.usingDemo, feedNote = state.feedNote): State {
+function applySnapshot(state: State, incoming: Match[], now: number, usingDemo = state.usingDemo, feedNote = state.feedNote): State {
+  const decorated = decorateMatches(state.matches, incoming);
+  saveGoalBook(decorated.book);
+  const matches = decorated.matches;
+  const deleted = loadDeletedAlerts();
   const alerts = diffAlerts(state.baseline, matches, {
     generation: state.t0,
     followedMatchIds: new Set(state.follows.matches),
@@ -103,7 +113,7 @@ function applySnapshot(state: State, matches: Match[], now: number, usingDemo = 
     settings: state.settings,
   });
   const known = new Set(state.inbox.map((item) => item.id));
-  const fresh = alerts.filter((alert) => !known.has(alert.key)).map((alert) => toItem(alert, now));
+  const fresh = alerts.filter((alert) => !known.has(alert.key) && !deleted.has(alert.key)).map((alert) => toItem(alert, now));
   const flash = changedScores(state.baseline, matches);
   return {
     ...state,
@@ -192,6 +202,13 @@ function reducer(state: State, action: Action): State {
         toasts: state.toasts.filter((item) => !drop.has(item.id)),
       };
     }
+    case 'restore-inbox':
+      if (state.inbox.some((item) => item.id === action.item.id)) return state;
+      return { ...state, inbox: [action.item, ...state.inbox].slice(0, 80) };
+    case 'repaint-goals': {
+      const book = loadGoalBook();
+      return { ...state, matches: state.matches.map((match) => paintGoals(match, book)) };
+    }
     case 'clear-follows':
       return { ...state, follows: { matches: [], teams: [] } };
     case 'dismiss-toast':
@@ -214,7 +231,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, inbox: [...fresh, ...state.inbox].slice(0, 120), toasts: fresh };
     }
     case 'hydrate-watch':
-      return { ...state, inbox: mergeInbox(state.inbox, action.inbox), watchReady: true };
+      return { ...state, inbox: mergeInbox(state.inbox, action.inbox, loadDeletedAlerts()), watchReady: true };
     default:
       return state;
   }
@@ -251,6 +268,8 @@ type Store = {
   markAllRead: () => void;
   clearInbox: () => void;
   clearStaleAlerts: () => number;
+  deleteAlert: (id: string) => void;
+  restoreAlert: (item: InboxItem) => void;
   clearFollows: () => void;
   dismissToast: (id: string) => void;
   requestPermission: () => Promise<void>;
@@ -297,7 +316,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       for (const id of remote.sent || []) markNotificationSent(id);
       if (Array.isArray(remote.seen)) rememberAlerted(remote.seen);
       const inbox = Array.isArray(remote.inbox) ? remote.inbox.filter((item) => item && typeof item.id === 'string' && typeof item.title === 'string') : [];
-      dispatch({ type: 'hydrate-watch', inbox });
+      const deleted = loadDeletedAlerts();
+      const rows = (remote as { matches?: Array<{ id?: string; homeAbbr?: string; awayAbbr?: string; markers?: Array<Record<string, unknown>> }> }).matches;
+      if (Array.isArray(rows) && rows.length) {
+        saveGoalBook(mergeNativeMarkers(loadGoalBook(), rows));
+        dispatch({ type: 'repaint-goals' });
+      }
+      dispatch({ type: 'hydrate-watch', inbox: inbox.filter((item) => !deleted.has(item.id)) });
     })();
     return () => {
       cancel = true;
@@ -496,7 +521,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (!state.settings.browser || state.permission !== 'granted' || wasNotificationSent(toast.id)) continue;
       markNotificationSent(toast.id);
       const match = state.matches.find((item) => item.id === toast.matchId) ?? null;
-      void pushBrowserNotification(toast, state.settings.goalSound, match);
+      const spot = goalEventMinute(match, toast.id);
+      const notified = match && spot.player ? { ...match, events: match.events.map((event) => (event.id === toast.id ? { ...event, player: spot.player } : event)) } : match;
+      void pushBrowserNotification(toast, state.settings.goalSound, notified);
     }
     if (goalSound) playGoalSound(goalSound, state.settings.goalVolume);
   }, [state.toasts, state.settings.browser, state.settings.goalSound, state.settings.goalVolume, state.permission]);
@@ -519,6 +546,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     replaceInbox.current = true;
     dispatch({ type: 'drop-inbox', ids });
     return ids.length;
+  }, []);
+  const deleteAlert = useCallback((id: string) => {
+    rememberDeletedAlert(id);
+    rememberAlerted([id]);
+    replaceInbox.current = true;
+    dispatch({ type: 'drop-inbox', ids: [id] });
+  }, []);
+  const restoreAlert = useCallback((item: InboxItem) => {
+    forgetDeletedAlert(item.id);
+    replaceInbox.current = true;
+    dispatch({ type: 'restore-inbox', item });
   }, []);
   const clearFollows = useCallback(() => dispatch({ type: 'clear-follows' }), []);
   const dismissToast = useCallback((id: string) => dispatch({ type: 'dismiss-toast', id }), []);
@@ -566,6 +604,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       markAllRead,
       clearInbox,
       clearStaleAlerts,
+      deleteAlert,
+      restoreAlert,
       clearFollows,
       dismissToast,
       requestPermission,
@@ -583,6 +623,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markAllRead,
     clearInbox,
     clearStaleAlerts,
+    deleteAlert,
+    restoreAlert,
     clearFollows,
     dismissToast,
     requestPermission,
