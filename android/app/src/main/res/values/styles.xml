@@ -20,6 +20,11 @@
     </style>
 
 
+    <style name="NotifToastTheme" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splashBlack</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>

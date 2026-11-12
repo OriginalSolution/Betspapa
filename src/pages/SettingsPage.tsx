@@ -4,7 +4,7 @@ import { playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION } from '../lib/alertSetup';
 import { requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
-import type { GoalSound } from '../types';
+import type { GoalSound, NotificationStyle } from '../types';
 import { useStore } from '../state/store';
 
 const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'browser'; label: string; detail: string }> = [
@@ -37,6 +37,10 @@ export function SettingsPage() {
         <h2>Notifications</h2>
         <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team. With browser alerts on, the phone posts them on the home screen, in another app, and with the screen off.</p>
         <p className="lede">While a followed match is about to kick off or in play, Android keeps a low-priority notice: Betspapa is watching N live matches. That notice stays up with the app closed, and it stops when the match ends.</p>
+        <NotificationStyleSetting
+          value={settings.notificationStyle}
+          onChange={(value) => setSetting('notificationStyle', value)}
+        />
         {isNativeApp() ? <AndroidWatchStatus /> : <Permission permission={permission} onEnable={() => void requestPermission()} />}
         <GoalSoundSetting
           sound={settings.goalSound}
@@ -122,6 +126,7 @@ const goalSounds: Array<{ id: GoalSound; label: string }> = [
   { id: 'crowd', label: 'Crowd' },
   { id: 'afro', label: 'Afrobeats' },
   { id: 'chant', label: 'Chant' },
+  { id: 'papa', label: 'Papa Shout' },
   { id: 'off', label: 'Off' },
 ];
 
@@ -141,7 +146,7 @@ function GoalSoundSetting({
     <div className="setting cheer-setting">
       <div>
         <strong>Goal sound</strong>
-        <span>Crowd is the stadium roar. Afrobeats is the Ghana celebration. Chant is the GOAL! call. Off keeps the cheer silent. The slider is the in-app level. A phone notification uses the same sound at the system volume.</span>
+        <span>Crowd is the stadium roar. Afrobeats is the Ghana celebration. Chant is the GOAL! call. Papa Shout is the owner’s own shout. Off keeps the cheer silent. The slider is the in-app level. A phone notification uses the same sound at the system volume.</span>
       </div>
       <div className="setting-controls">
         <div className="chips sound-choices" role="radiogroup" aria-label="Goal sound">
@@ -187,6 +192,52 @@ function GoalSoundSetting({
         <strong>{volume}%</strong>
       </div>
     </div>
+  );
+}
+
+const notificationStyles: Array<{ id: NotificationStyle; label: string }> = [
+  { id: 'auto', label: 'Auto' },
+  { id: 'dark', label: 'Dark' },
+  { id: 'light', label: 'Light' },
+];
+
+function NotificationStyleSetting({ value, onChange }: { value: NotificationStyle; onChange: (value: NotificationStyle) => void }) {
+  return (
+    <div className="setting notif-style">
+      <div>
+        <strong>Notification style</strong>
+        <span>Auto follows the phone’s dark or light mode. Dark is the red ticker. Light uses the white score panel. The phone keeps this choice when Betspapa is closed.</span>
+      </div>
+      <div className="notif-style-options" role="radiogroup" aria-label="Notification style">
+        {notificationStyles.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={value === option.id}
+            className={value === option.id ? 'notif-style-option is-on' : 'notif-style-option'}
+            onClick={() => onChange(option.id)}
+          >
+            <StylePreview mode={option.id === 'light' ? 'light' : 'dark'} />
+            <span>{option.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StylePreview({ mode }: { mode: 'dark' | 'light' }) {
+  const dark = mode === 'dark';
+  return (
+    <span className={dark ? 'notif-preview is-dark' : 'notif-preview is-light'} aria-hidden="true">
+      <span className="notif-preview-strip">
+        <b>B</b>
+        <span>BETSPAPA</span>
+        <em>LIVE 67′</em>
+      </span>
+      <span className="notif-preview-line">{dark ? 'HO 1–0 AK' : 'Hearts  1–0  Kotoko'}</span>
+    </span>
   );
 }
 

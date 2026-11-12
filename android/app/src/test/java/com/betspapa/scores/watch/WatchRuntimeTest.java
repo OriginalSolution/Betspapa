@@ -57,19 +57,22 @@ public class WatchRuntimeTest {
 
         WatchRuntime.PollResult quiet = WatchRuntime.pollOnce(context);
         assertTrue(quiet.hot);
-        assertEquals(0, notifications(context).size());
+        assertEquals(0, goalCount(context));
+        assertEquals(1, liveCount(context));
 
         score.set("1:0");
         WatchRuntime.PollResult scored = WatchRuntime.pollOnce(context);
         assertTrue(scored.hot);
-        List<Notification> notes = notifications(context);
-        assertEquals(1, notes.size());
-        assertEquals("Goal · Hearts", notes.get(0).extras.getCharSequence(Notification.EXTRA_TITLE).toString());
-        assertTrue(notes.get(0).extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Kotoko"));
-        assertEquals(AlertPoster.GOAL_CROWD, notes.get(0).getChannelId());
+        Notification goal = goalNamed(context);
+        assertTrue(goal != null);
+        assertEquals("Goal · Hearts", goal.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertTrue(goal.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Kotoko"));
+        assertEquals(AlertPoster.GOAL_CROWD, goal.getChannelId());
+        assertEquals(1, liveCount(context));
 
         WatchRuntime.pollOnce(context);
-        assertEquals(1, notifications(context).size());
+        assertEquals(1, goalCount(context));
+        assertEquals(1, liveCount(context));
     }
 
     @Test
@@ -158,5 +161,21 @@ public class WatchRuntimeTest {
             if ("Goal · Hearts".equals(String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)))) goals++;
         }
         return goals;
+    }
+
+    private static Notification goalNamed(Context context) {
+        for (Notification note : notifications(context)) {
+            if ("Goal · Hearts".equals(String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)))) return note;
+        }
+        return null;
+    }
+
+    private static int liveCount(Context context) {
+        int live = 0;
+        for (Notification note : notifications(context)) {
+            String title = String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE));
+            if (title.startsWith("LIVE")) live++;
+        }
+        return live;
     }
 }

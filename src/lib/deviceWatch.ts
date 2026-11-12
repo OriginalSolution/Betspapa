@@ -3,7 +3,7 @@ import type { Follows, InboxItem, Match, Settings } from '../types';
 import { isFollowed } from './group';
 import { isNativeApp } from './nativeHttp';
 
-export type WatchSettings = Pick<Settings, 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'goalSound'>;
+export type WatchSettings = Pick<Settings, 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'goalSound' | 'notificationStyle'>;
 
 export type ScheduleRow = {
   id: string;
@@ -19,6 +19,26 @@ export type ScheduleRow = {
   htHome: number | null;
   htAway: number | null;
   varReview: Match['varReview'];
+  homeFull?: string;
+  awayFull?: string;
+  homeAbbr?: string;
+  awayAbbr?: string;
+  homeColor?: string;
+  awayColor?: string;
+  homeCrest?: string;
+  awayCrest?: string;
+  competition?: string;
+};
+
+export type WatchBooking = {
+  id: string;
+  matchId: string;
+  market: string;
+  marketLabel: string;
+  odds: string;
+  fixture: string;
+  bookId?: string;
+  code?: string;
 };
 
 export type WatchPatch = {
@@ -31,6 +51,7 @@ export type WatchPatch = {
   inbox?: InboxItem[];
   replaceInbox?: boolean;
   schedule?: ScheduleRow[];
+  bookings?: WatchBooking[];
 };
 
 export type WatchDeviceStatus = {
@@ -54,6 +75,7 @@ type WatchPlugin = {
   openAutostart(): Promise<WatchDeviceStatus & { opened?: string }>;
   markSetup(options: { version: number; finished: boolean }): Promise<WatchDeviceStatus>;
   scheduleTest(): Promise<void>;
+  present(options: { payload: string }): Promise<void>;
   addListener(eventName: 'resume', listenerFunc: (status: WatchDeviceStatus) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'pause', listenerFunc: () => void): Promise<PluginListenerHandle>;
 };
@@ -70,6 +92,7 @@ const draft: {
   inbox?: InboxItem[];
   replaceInbox?: boolean;
   matches?: Match[];
+  bookings?: WatchBooking[];
 } = {};
 
 export function mergeInbox(local: InboxItem[], remote: InboxItem[]): InboxItem[] {
@@ -102,6 +125,15 @@ export function scheduleRows(matches: Match[], follows: Follows, trends: string[
       htHome: match.htHome,
       htAway: match.htAway,
       varReview: match.varReview ?? null,
+      homeFull: match.home.name,
+      awayFull: match.away.name,
+      homeAbbr: match.home.abbr,
+      awayAbbr: match.away.abbr,
+      homeColor: match.home.color,
+      awayColor: match.away.color,
+      homeCrest: match.home.crest || '',
+      awayCrest: match.away.crest || '',
+      competition: match.competition?.name || '',
     }));
 }
 
@@ -115,6 +147,7 @@ export function stageWatch(partial: {
   inbox?: InboxItem[];
   replaceInbox?: boolean;
   matches?: Match[];
+  bookings?: WatchBooking[];
 }) {
   if (partial.browser !== undefined) draft.browser = partial.browser;
   if (partial.settings) draft.settings = partial.settings;
@@ -125,6 +158,7 @@ export function stageWatch(partial: {
   if (partial.inbox) draft.inbox = partial.inbox;
   if (partial.replaceInbox) draft.replaceInbox = true;
   if (partial.matches) draft.matches = partial.matches;
+  if (partial.bookings) draft.bookings = partial.bookings;
   void flushWatch();
 }
 
@@ -145,6 +179,7 @@ function buildPatch(): WatchPatch {
   }
   draft.replaceInbox = false;
   if (draft.matches && draft.follows) patch.schedule = scheduleRows(draft.matches, draft.follows, draft.trends || []);
+  if (draft.bookings) patch.bookings = draft.bookings;
   return patch;
 }
 

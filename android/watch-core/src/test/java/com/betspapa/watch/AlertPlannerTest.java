@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
@@ -26,7 +27,9 @@ public class AlertPlannerTest {
         assertEquals("afro", state.goalSound);
         state.merge(settingsSound("latin"));
         assertEquals("afro", state.goalSound);
-        assertEquals("afro", state.toJson().getJSONObject("settings").getString("goalSound"));
+        state.merge(settingsSound("papa"));
+        assertEquals("papa", state.goalSound);
+        assertEquals("papa", state.toJson().getJSONObject("settings").getString("goalSound"));
     }
 
     private static JSONObject settingsSound(String sound) {
@@ -339,6 +342,55 @@ public class AlertPlannerTest {
         followedMatch.overlayLive(java.util.Collections.singletonList(feed), KICK + 1000L);
         assertEquals("live", followedMatch.matches.get(0).status);
         assertEquals(Integer.valueOf(2), followedMatch.matches.get(0).homeScore);
+    }
+
+    @Test
+    public void styleBookingAndGoalMarksSurvive() throws Exception {
+        WatchState state = followed();
+        assertEquals("auto", state.notificationStyle);
+        JSONObject settings = new JSONObject();
+        settings.put("notificationStyle", "light");
+        JSONObject patch = new JSONObject();
+        patch.put("settings", settings);
+        JSONObject booked = new JSONObject();
+        booked.put("id", "sr:match:1:over25");
+        booked.put("marketLabel", "Over 2.5 goals");
+        booked.put("odds", "1.72");
+        booked.put("fixture", "AA vs NA");
+        booked.put("bookId", "sportybet");
+        booked.put("code", "N7KQ2X");
+        patch.put("bookings", new JSONArray().put(booked));
+        state.merge(patch);
+        assertEquals("light", state.notificationStyle);
+        state.trends.add("sr:match:1:over25");
+        WatchMatch prior = match();
+        prior.status = "live";
+        prior.minute = 10;
+        prior.homeScore = 0;
+        prior.awayScore = 0;
+        state.matches.add(prior);
+        WatchMatch update = match();
+        update.status = "finished";
+        update.minute = 90;
+        update.homeScore = 2;
+        update.awayScore = 1;
+        state.overlayLive(java.util.Collections.singletonList(update), KICK + 1000L);
+        assertEquals("goal", state.matches.get(0).markers.get(0).type);
+        assertEquals(90, state.matches.get(0).markers.get(0).minute);
+        List<WatchNote> notes = AlertPlanner.notices(state.matches, state, KICK + 1000L);
+        WatchNote hit = null;
+        for (WatchNote note : notes) {
+            if ("win".equals(note.kind)) hit = note;
+        }
+        assertTrue(hit != null);
+        assertEquals("N7KQ2X", hit.bookCode);
+        assertEquals("1.72", hit.oddsText);
+        assertEquals("sportybet", hit.bookId);
+        WatchState loaded = WatchState.fromJson(new JSONObject(state.toJson().toString()));
+        assertEquals("light", loaded.notificationStyle);
+        assertEquals("N7KQ2X", loaded.bookingFor("sr:match:1:over25").optString("code"));
+        assertEquals("AA", WatchMatch.label("", "Al Astiklal"));
+        assertEquals("ARS", WatchMatch.label("", "Arsenal"));
     }
 
     private static WatchState followed() {

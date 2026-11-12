@@ -51,6 +51,7 @@ describe('goal cheer playback', () => {
     playGoalSound('crowd', 60);
     playGoalSound('afro', 60);
     playGoalSound('chant', 60);
+    playGoalSound('papa', 60);
     playGoalSound('off', 100);
 
     const played = FakeAudio.made.map((audio) => ({
@@ -63,6 +64,7 @@ describe('goal cheer playback', () => {
       { src: GOAL_SOUND_URL.crowd, volume: 0.6, played: 1, muted: false },
       { src: GOAL_SOUND_URL.afro, volume: 0.6, played: 1, muted: false },
       { src: GOAL_SOUND_URL.chant, volume: 0.6, played: 1, muted: false },
+      { src: GOAL_SOUND_URL.papa, volume: 0.6, played: 1, muted: false },
     ]);
 
     playGoalSound('afro', 25);
@@ -74,6 +76,7 @@ describe('goal cheer playback', () => {
         `preview crowd ${GOAL_SOUND_URL.crowd} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.crowd} channel ${goalNotificationChannel('crowd')}`,
         `preview afro ${GOAL_SOUND_URL.afro} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.afro} channel ${goalNotificationChannel('afro')}`,
         `preview chant ${GOAL_SOUND_URL.chant} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.chant} channel ${goalNotificationChannel('chant')}`,
+        `preview papa ${GOAL_SOUND_URL.papa} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.papa} channel ${goalNotificationChannel('papa')}`,
         `preview off channel ${goalNotificationChannel('off')} (no file, gain not applied)`,
       ].join('\n'),
     );

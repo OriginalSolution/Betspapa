@@ -251,15 +251,33 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
   useEffect(() => {
+    const byMatch = new Map(matches.map((match) => [match.id, match]));
+    const bookings = picks
+      .filter((pick) => trendFollows.includes(pick.id))
+      .map((pick) => {
+        const match = byMatch.get(pick.matchId);
+        const booked = codes.find((code) => code.bookingState === 'ready' && code.code && code.legs.some((leg) => leg.id === pick.id));
+        const odds = Number.isFinite(pick.odds) && pick.odds > 1 ? pick.odds.toFixed(2).replace(/0$/, '').replace(/\.0$/, '') : '';
+        return {
+          id: pick.id,
+          matchId: pick.matchId,
+          market: pick.market,
+          marketLabel: pick.marketLabel,
+          odds,
+          fixture: match ? `${match.home.abbr} vs ${match.away.abbr}` : `${pick.teamName} vs ${pick.opponentName}`,
+          bookId: booked?.id || '',
+          code: booked?.code || '',
+        };
+      });
+    stageWatch({ trends: trendFollows, matches, bookings });
+  }, [trendFollows, matches, picks, codes]);
+
+  useEffect(() => {
     if (!watchReady || !trendFollows.length) return;
     const seen = loadAlerted();
     const notes = trendHitNotices(picks, trendFollows, seen, Date.now());
     if (notes.length) pushNotices(notes);
   }, [picks, trendFollows, pushNotices, watchReady]);
-
-  useEffect(() => {
-    stageWatch({ trends: trendFollows, matches });
-  }, [trendFollows, matches]);
 
   const value = useMemo<Product>(
     () => ({

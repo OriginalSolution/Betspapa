@@ -62,7 +62,8 @@ export type Match = {
   feed?: 'sporty' | 'demo';
 };
 
-export type GoalSound = 'crowd' | 'afro' | 'chant' | 'off';
+export type GoalSound = 'crowd' | 'afro' | 'chant' | 'papa' | 'off';
+export type NotificationStyle = 'auto' | 'dark' | 'light';
 export type DataSource = 'sporty' | 'demo';
 
 export type Settings = {
@@ -76,6 +77,8 @@ export type Settings = {
   goalSound: GoalSound;
   /** In-app cheer loudness, 0–100. 60 is a gain of 0.6. */
   goalVolume: number;
+  /** Auto follows the phone. Dark is the Red Ticker. Light is the white score panel. */
+  notificationStyle: NotificationStyle;
   dataSource: DataSource;
 };
 
@@ -111,5 +114,6 @@ export const defaultSettings: Settings = {
   var: true,
   goalSound: 'crowd',
   goalVolume: 60,
+  notificationStyle: 'auto',
   dataSource: 'sporty',
 };

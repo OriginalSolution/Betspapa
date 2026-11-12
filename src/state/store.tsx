@@ -460,6 +460,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ft: state.settings.ft,
         var: state.settings.var,
         goalSound: state.settings.goalSound,
+        notificationStyle: state.settings.notificationStyle,
       },
       follows: state.follows,
       matches: state.matches,
@@ -494,7 +495,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       if (!state.settings.browser || state.permission !== 'granted' || wasNotificationSent(toast.id)) continue;
       markNotificationSent(toast.id);
-      void pushBrowserNotification(toast, state.settings.goalSound);
+      const match = state.matches.find((item) => item.id === toast.matchId) ?? null;
+      void pushBrowserNotification(toast, state.settings.goalSound, match);
     }
     if (goalSound) playGoalSound(goalSound, state.settings.goalVolume);
   }, [state.toasts, state.settings.browser, state.settings.goalSound, state.settings.goalVolume, state.permission]);

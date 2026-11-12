@@ -7,6 +7,7 @@ const sounds = [
   { file: 'cheer-crowd.mp3', min: 5.0, max: 5.5 },
   { file: 'cheer-afro.mp3', min: 4.7, max: 5.2 },
   { file: 'cheer-chant.mp3', min: 4.0, max: 4.5 },
+  { file: 'cheer-papa.mp3', min: 2.7, max: 3.3 },
 ];
 
 function measure(name) {
@@ -32,6 +33,7 @@ test('bundled goal cheers peak near -8 dBFS and are not the old files', () => {
   assert.match(credits, /cheer-crowd/);
   assert.match(credits, /cheer-afro/);
   assert.match(credits, /eSpeak NG/);
+  assert.match(credits, /Papa Shout recorded by the Betspapa owner, used with permission/);
 
   const gain = 60 / 100;
   assert.equal(gain, 0.6);

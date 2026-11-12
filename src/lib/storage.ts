@@ -1,4 +1,4 @@
-import { defaultSettings, type FollowedTeam, type Follows, type InboxItem, type Settings } from '../types';
+import { defaultSettings, type FollowedTeam, type Follows, type InboxItem, type NotificationStyle, type Settings } from '../types';
 
 const KEYS = {
   follows: 'betspapa.follows.v1',
@@ -48,10 +48,16 @@ export function saveFollows(follows: Follows) {
 /** Old Cheer becomes Crowd. Old Latin chant stays Chant. Off stays Off. */
 export function migrateGoalSound(raw: { goalSound?: unknown; cheer?: unknown }): Settings['goalSound'] {
   const sound = raw.goalSound;
-  if (sound === 'crowd' || sound === 'afro' || sound === 'chant' || sound === 'off') return sound;
+  if (sound === 'crowd' || sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'off') return sound;
   if (sound === 'cheer') return 'crowd';
   if (raw.cheer === false) return 'off';
   return 'crowd';
+}
+
+/** Auto follows the phone. Anything else lands on Auto. */
+export function migrateNotificationStyle(value: unknown): NotificationStyle {
+  if (value === 'dark' || value === 'light' || value === 'auto') return value;
+  return 'auto';
 }
 
 /** Slider percent. Missing values land on 60, which plays at gain 0.6. */
@@ -68,6 +74,7 @@ export function loadSettings(): Settings {
   });
   next.goalSound = migrateGoalSound(raw);
   next.goalVolume = migrateGoalVolume(raw.goalVolume);
+  next.notificationStyle = migrateNotificationStyle(raw.notificationStyle);
   next.dataSource = 'sporty';
   return next;
 }

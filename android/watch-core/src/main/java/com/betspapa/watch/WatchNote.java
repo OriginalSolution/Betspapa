@@ -6,6 +6,16 @@ public final class WatchNote {
     public final String kind;
     public final String title;
     public final String body;
+    /** Goal or review minute. Null when the feed has not said. */
+    public Integer minute;
+    public String player;
+    public boolean varCheck;
+    public boolean disallowed;
+    public String marketLabel;
+    public String oddsText;
+    public String bookId;
+    public String bookCode;
+    public String fixture;
 
     public WatchNote(String id, String matchId, String kind, String title, String body) {
         this.id = id;

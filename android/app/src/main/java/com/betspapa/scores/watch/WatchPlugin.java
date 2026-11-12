@@ -8,6 +8,8 @@ import android.os.Build;
 import android.provider.Settings;
 import androidx.core.app.NotificationManagerCompat;
 import com.betspapa.watch.AlertPlanner;
+import com.betspapa.watch.WatchMatch;
+import com.betspapa.watch.WatchNote;
 import com.betspapa.watch.WatchState;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
@@ -177,6 +179,78 @@ public class WatchPlugin extends Plugin {
     protected void handleOnPause() {
         super.handleOnPause();
         notifyListeners("pause", new JSObject());
+    }
+
+    @PluginMethod
+    public void present(PluginCall call) {
+        if (getContext() == null) {
+            call.reject("Watch is not ready");
+            return;
+        }
+        String payload = call.getString("payload", "{}");
+        try {
+            JSONObject json = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
+            WatchNote note = new WatchNote(
+                json.optString("id", ""),
+                json.optString("matchId", ""),
+                json.optString("kind", ""),
+                json.optString("title", ""),
+                json.optString("body", "")
+            );
+            if (json.has("minute") && !json.isNull("minute")) note.minute = json.optInt("minute");
+            note.player = json.optString("player", "");
+            note.varCheck = json.optBoolean("varCheck", "var".equals(note.kind));
+            note.marketLabel = json.optString("marketLabel", "");
+            note.oddsText = json.optString("odds", "");
+            note.bookId = json.optString("bookId", "");
+            note.bookCode = json.optString("code", "");
+            note.fixture = json.optString("fixture", "");
+            rememberMatch(json);
+            String sound = json.optString("goalSound", "crowd");
+            AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            call.resolve();
+        } catch (Exception error) {
+            call.reject("Could not post the alert", error);
+        }
+    }
+
+    private void rememberMatch(JSONObject json) throws java.io.IOException {
+        String id = json.optString("matchId", "");
+        if (id.isEmpty() || getContext() == null) return;
+        synchronized (WatchState.FILE_LOCK) {
+            WatchState state = WatchState.load(WatchFiles.file(getContext()));
+            WatchMatch match = null;
+            for (WatchMatch row : state.matches) {
+                if (id.equals(row.id)) match = row;
+            }
+            if (match == null) {
+                match = new WatchMatch();
+                match.id = id;
+                state.matches.add(match);
+            }
+            fillMatch(json, match);
+            state.save(WatchFiles.file(getContext()));
+        }
+    }
+
+    private static void fillMatch(JSONObject json, WatchMatch match) {
+        if (!json.optString("home", "").isEmpty()) match.home = json.optString("home");
+        if (!json.optString("away", "").isEmpty()) match.away = json.optString("away");
+        if (!json.optString("homeFull", "").isEmpty()) match.homeFull = json.optString("homeFull");
+        if (!json.optString("awayFull", "").isEmpty()) match.awayFull = json.optString("awayFull");
+        if (!json.optString("homeAbbr", "").isEmpty()) match.homeAbbr = json.optString("homeAbbr");
+        if (!json.optString("awayAbbr", "").isEmpty()) match.awayAbbr = json.optString("awayAbbr");
+        if (!json.optString("homeColor", "").isEmpty()) match.homeColor = json.optString("homeColor");
+        if (!json.optString("awayColor", "").isEmpty()) match.awayColor = json.optString("awayColor");
+        if (!json.optString("homeCrest", "").isEmpty()) match.homeCrest = json.optString("homeCrest");
+        if (!json.optString("awayCrest", "").isEmpty()) match.awayCrest = json.optString("awayCrest");
+        if (!json.optString("competition", "").isEmpty()) match.competition = json.optString("competition");
+        if (json.has("homeScore") && !json.isNull("homeScore")) match.homeScore = json.optInt("homeScore");
+        if (json.has("awayScore") && !json.isNull("awayScore")) match.awayScore = json.optInt("awayScore");
+        if (json.has("minute") && !json.isNull("minute")) match.minute = json.optInt("minute");
+        if (match.status == null || match.status.isEmpty() || "scheduled".equals(match.status)) match.status = "live";
+        if (match.seenHome == null) match.seenHome = match.homeScore;
+        if (match.seenAway == null) match.seenAway = match.awayScore;
     }
 
     @PluginMethod

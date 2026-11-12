@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadSettings, saveSettings } from './storage';
+import { loadSettings, migrateNotificationStyle, saveSettings } from './storage';
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -30,6 +30,8 @@ describe('goal sound migration', () => {
 
     localStorage.setItem('betspapa.settings.v1', JSON.stringify({ goalSound: 'off' }));
     expect(loadSettings().goalSound).toBe('off');
+    localStorage.setItem('betspapa.settings.v1', JSON.stringify({ goalSound: 'papa' }));
+    expect(loadSettings().goalSound).toBe('papa');
 
     localStorage.setItem('betspapa.settings.v1', JSON.stringify({ cheer: false }));
     expect(loadSettings().goalSound).toBe('off');
@@ -56,5 +58,19 @@ describe('goal sound migration', () => {
     saveSettings(next);
     expect(loadSettings().goalSound).toBe('crowd');
     expect(loadSettings().goalVolume).toBe(60);
+  });
+
+  it('keeps Auto, Dark, and Light and falls back to Auto', () => {
+    expect(migrateNotificationStyle(undefined)).toBe('auto');
+    expect(migrateNotificationStyle('system')).toBe('auto');
+    expect(loadSettings().notificationStyle).toBe('auto');
+    localStorage.setItem('betspapa.settings.v1', JSON.stringify({ notificationStyle: 'dark' }));
+    expect(loadSettings().notificationStyle).toBe('dark');
+    localStorage.setItem('betspapa.settings.v1', JSON.stringify({ notificationStyle: 'light' }));
+    expect(loadSettings().notificationStyle).toBe('light');
+    const next = loadSettings();
+    next.notificationStyle = 'auto';
+    saveSettings(next);
+    expect(loadSettings().notificationStyle).toBe('auto');
   });
 });

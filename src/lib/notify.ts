@@ -1,5 +1,4 @@
-import type { GoalSound, InboxItem } from '../types';
-import { GOAL_NOTIFICATION_FILE, goalNotificationChannel } from './cheer';
+import type { GoalSound, InboxItem, Match } from '../types';
 import { isNativeApp } from './nativeHttp';
 
 export type BrowserPermission = NotificationPermission | 'unsupported';
@@ -7,12 +6,6 @@ export type BrowserPermission = NotificationPermission | 'unsupported';
 export function readPermission(): BrowserPermission {
   if (typeof Notification === 'undefined') return 'unsupported';
   return Notification.permission;
-}
-
-function notificationId(value: string): number {
-  let hash = 0;
-  for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return (hash % 2_000_000_000) + 1;
 }
 
 /** Creates the goal channels before any post. A missing channel drops the notification on Android 8+. */
@@ -24,6 +17,7 @@ export async function ensureGoalChannels(): Promise<void> {
       { id: 'betspapa.goal.crowd', name: 'Goal · Crowd', sound: 'cheer_crowd.mp3' },
       { id: 'betspapa.goal.afro', name: 'Goal · Afrobeats', sound: 'cheer_afro.mp3' },
       { id: 'betspapa.goal.chant', name: 'Goal · Chant', sound: 'cheer_chant.mp3' },
+      { id: 'betspapa.goal.papa', name: 'Goal · Papa Shout', sound: 'cheer_papa.ogg' },
       { id: 'betspapa.goal.off', name: 'Goal · Silent' },
       { id: 'betspapa.alerts', name: 'Match alerts' },
     ];
@@ -82,27 +76,35 @@ export function registerServiceWorker() {
   });
 }
 
-export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSound = 'crowd') {
+export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSound = 'crowd', match?: Match | null) {
   if (isNativeApp()) {
     try {
-      const { LocalNotifications } = await import('@capacitor/local-notifications');
-      const permission = await LocalNotifications.checkPermissions();
-      if (permission.display !== 'granted') return;
-      const goal = item.kind === 'goal';
-      const channelId = goal ? goalNotificationChannel(goalSound) : undefined;
-      const sound = goal && goalSound !== 'off' ? GOAL_NOTIFICATION_FILE[goalSound] : undefined;
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            id: notificationId(item.id),
-            title: item.title,
-            body: item.body,
-            schedule: { at: new Date(Date.now() + 250), allowWhileIdle: true },
-            ...(channelId ? { channelId } : {}),
-            ...(sound ? { sound } : {}),
-          },
-        ],
-      });
+      const { registerPlugin } = await import('@capacitor/core');
+      const Watch = registerPlugin<{ present(options: { payload: string }): Promise<void> }>('Watch');
+      const payload = {
+        id: item.id,
+        matchId: item.matchId,
+        kind: item.kind,
+        title: item.title,
+        body: item.body,
+        goalSound,
+        varCheck: item.kind === 'var',
+        minute: match?.minute ?? null,
+        home: match?.home.shortName,
+        away: match?.away.shortName,
+        homeFull: match?.home.name,
+        awayFull: match?.away.name,
+        homeAbbr: match?.home.abbr,
+        awayAbbr: match?.away.abbr,
+        homeColor: match?.home.color,
+        awayColor: match?.away.color,
+        homeCrest: match?.home.crest || '',
+        awayCrest: match?.away.crest || '',
+        competition: match?.competition?.name || '',
+        homeScore: match?.homeScore,
+        awayScore: match?.awayScore,
+      };
+      await Watch.present({ payload: JSON.stringify(payload) });
     } catch {
       /* the in-app alert still stands */
     }
