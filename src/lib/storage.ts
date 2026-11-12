@@ -45,14 +45,29 @@ export function saveFollows(follows: Follows) {
   write(KEYS.follows, follows);
 }
 
+/** Old Cheer becomes Crowd. Old Latin chant stays Chant. Off stays Off. */
+export function migrateGoalSound(raw: { goalSound?: unknown; cheer?: unknown }): Settings['goalSound'] {
+  const sound = raw.goalSound;
+  if (sound === 'crowd' || sound === 'afro' || sound === 'chant' || sound === 'off') return sound;
+  if (sound === 'cheer') return 'crowd';
+  if (raw.cheer === false) return 'off';
+  return 'crowd';
+}
+
+/** Slider percent. Missing values land on 60, which plays at gain 0.6. */
+export function migrateGoalVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return defaultSettings.goalVolume;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 export function loadSettings(): Settings {
   const raw = read<Partial<Settings> & { cheer?: boolean }>(KEYS.settings) ?? {};
   const next = { ...defaultSettings };
   (Object.keys(defaultSettings) as Array<keyof Settings>).forEach((key) => {
     if (typeof raw[key] === 'boolean') next[key] = raw[key] as never;
   });
-  if (raw.goalSound === 'cheer' || raw.goalSound === 'chant' || raw.goalSound === 'off') next.goalSound = raw.goalSound;
-  else if (raw.cheer === false) next.goalSound = 'off';
+  next.goalSound = migrateGoalSound(raw);
+  next.goalVolume = migrateGoalVolume(raw.goalVolume);
   next.dataSource = 'sporty';
   return next;
 }

@@ -544,12 +544,49 @@ img.crest { padding: 1px; }
   border-top: 1px solid var(--line);
 }
 .cheer-setting {
+  flex-direction: column;
+  align-items: stretch;
   margin: 0 0 12px;
   padding: 12px 12px 12px 14px;
   border: 1px solid var(--line-strong);
   border-left: 3px solid var(--gold);
   border-radius: 14px;
   background: var(--surface-2);
+}
+.cheer-setting .setting-controls {
+  flex: 1 1 auto;
+  width: 100%;
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+.cheer-setting .sound-choices {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.volume-row {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.volume-row label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+.volume-row strong {
+  min-width: 3.2em;
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.volume-row input[type='range'] {
+  flex: 1;
+  min-width: 96px;
+  height: 28px;
+  accent-color: #e11d2e;
 }
 .setting-controls { display: flex; align-items: center; gap: 10px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
 .sound-choices { padding: 0; }

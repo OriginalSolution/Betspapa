@@ -10,7 +10,8 @@ const settings: Settings = {
   ft: true,
   browser: true,
   var: true,
-  goalSound: 'cheer',
+  goalSound: 'crowd',
+  goalVolume: 60,
   dataSource: 'sporty',
 };
 

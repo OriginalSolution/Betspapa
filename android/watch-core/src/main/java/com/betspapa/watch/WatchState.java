@@ -22,6 +22,7 @@ public final class WatchState {
     public boolean ht = true;
     public boolean ft = true;
     public boolean varOn = true;
+    public String goalSound = "crowd";
     public final List<String> matchIds = new ArrayList<String>();
     public final List<String> teamIds = new ArrayList<String>();
     public final List<String> trends = new ArrayList<String>();
@@ -103,6 +104,10 @@ public final class WatchState {
             if (settings.has("ht")) ht = settings.optBoolean("ht", true);
             if (settings.has("ft")) ft = settings.optBoolean("ft", true);
             if (settings.has("var")) varOn = settings.optBoolean("var", true);
+            if (settings.has("goalSound")) {
+                String normalized = normalizeGoalSound(settings.optString("goalSound", ""));
+                if (normalized != null) goalSound = normalized;
+            }
         }
         JSONObject follows = patch.optJSONObject("follows");
         if (follows != null) {
@@ -192,6 +197,7 @@ public final class WatchState {
         settings.put("ht", ht);
         settings.put("ft", ft);
         settings.put("var", varOn);
+        settings.put("goalSound", goalSound == null ? "crowd" : goalSound);
         json.put("settings", settings);
         JSONObject follows = new JSONObject();
         follows.put("matches", new JSONArray(matchIds));
@@ -348,6 +354,12 @@ public final class WatchState {
             if (id.equals(row.optString("id", ""))) return true;
         }
         return false;
+    }
+
+    static String normalizeGoalSound(String value) {
+        if ("crowd".equals(value) || "afro".equals(value) || "chant".equals(value) || "off".equals(value)) return value;
+        if ("cheer".equals(value)) return "crowd";
+        return null;
     }
 
     private static void addStrings(List<String> into, JSONArray incoming) {

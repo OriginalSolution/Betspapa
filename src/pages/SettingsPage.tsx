@@ -33,7 +33,12 @@ export function SettingsPage() {
         <h2>Notifications</h2>
         <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team. With browser alerts on, the phone posts them on the home screen, in another app, and with the screen off.</p>
         <p className="lede">While a followed match is about to kick off or in play, Android shows Watching live scores. That notice stops when the match ends.</p>
-        <GoalSoundSetting sound={settings.goalSound} onChange={(value) => setSetting('goalSound', value)} />
+        <GoalSoundSetting
+          sound={settings.goalSound}
+          volume={settings.goalVolume}
+          onChange={(value) => setSetting('goalSound', value)}
+          onVolume={(value) => setSetting('goalVolume', value)}
+        />
         <Permission permission={permission} onEnable={() => void requestPermission()} />
         {toggles.map((toggle) => (
           <div className="setting" key={toggle.key}>
@@ -103,18 +108,29 @@ export function SettingsPage() {
 }
 
 const goalSounds: Array<{ id: GoalSound; label: string }> = [
-  { id: 'cheer', label: 'Cheer' },
-  { id: 'chant', label: 'Latin chant' },
+  { id: 'crowd', label: 'Crowd' },
+  { id: 'afro', label: 'Afrobeats' },
+  { id: 'chant', label: 'Chant' },
   { id: 'off', label: 'Off' },
 ];
 
-function GoalSoundSetting({ sound, onChange }: { sound: GoalSound; onChange: (value: GoalSound) => void }) {
+function GoalSoundSetting({
+  sound,
+  volume,
+  onChange,
+  onVolume,
+}: {
+  sound: GoalSound;
+  volume: number;
+  onChange: (value: GoalSound) => void;
+  onVolume: (value: number) => void;
+}) {
   const [playing, setPlaying] = useState(false);
   return (
     <div className="setting cheer-setting">
       <div>
         <strong>Goal sound</strong>
-        <span>Cheer is the roar. Latin chant is a short festive gol / olé. Off keeps alerts silent.</span>
+        <span>Crowd is the stadium roar. Afrobeats is the Ghana celebration. Chant is the GOAL! call. Off keeps the cheer silent. The slider is the in-app level. A phone notification uses the same sound at the system volume.</span>
       </div>
       <div className="setting-controls">
         <div className="chips sound-choices" role="radiogroup" aria-label="Goal sound">
@@ -137,13 +153,27 @@ function GoalSoundSetting({ sound, onChange }: { sound: GoalSound; onChange: (va
           disabled={sound === 'off'}
           onClick={() => {
             if (sound === 'off') return;
-            playGoalSound(sound);
+            playGoalSound(sound, volume);
             setPlaying(true);
-            window.setTimeout(() => setPlaying(false), 2200);
+            window.setTimeout(() => setPlaying(false), 5200);
           }}
         >
           {playing ? 'Playing' : 'Preview'}
         </button>
+      </div>
+      <div className="volume-row">
+        <label htmlFor="goal-volume">Volume</label>
+        <input
+          id="goal-volume"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={volume}
+          aria-valuetext={`${volume}%`}
+          onChange={(event) => onVolume(Number(event.target.value))}
+        />
+        <strong>{volume}%</strong>
       </div>
     </div>
   );

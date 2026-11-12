@@ -1,0 +1,49 @@
+Betspapa goal-cheer SFX — origin and licences
+=============================================
+
+All three files were synthesized on this machine. No third-party
+audio samples or copyrighted loops were used. Safe for commercial
+use in the Betspapa score app.
+
+Shared tools
+------------
+- NumPy / SciPy (synthesis, filtering, WAV I/O)
+- ffmpeg / libmp3lame (true-peak / LUFS metering, 48 kHz 192 kb/s MP3)
+- Masters: 48 kHz, stereo, 32-bit float WAV; sample peak ~-8.0 dBFS;
+  true peak no hotter than -7.9 dBTP.
+
+cheer-crowd
+-----------
+Fully original procedural synthesis (Python). Layered brown/pink
+noise, ~36 detuned formant-filtered "voice" layers, a shared open
+vowel "YAAAH" wall, rising whoops, sine-vibrato whistles, and
+scattered clap transients, plus a short stadium-style synthetic
+reverb IR. No TTS and no sampled recordings.
+
+cheer-afro
+----------
+Fully original procedural synthesis (Python) at 118 BPM. Synthesized
+kick, talking-drum (pitch-bend toms), shaker grains, claps, gankogui-
+style iron-bell partials, and a short C-mixolydian synth-brass riff
+(band-limited saws + filter envelope). No sampled drums or horns.
+
+cheer-chant
+-----------
+Shouted "GOAL!" voice:
+  - eSpeak NG 1.52.0, voices en-us+m3 (lead) and en-us+m2 (double).
+  - Text: "Gooaal!" plus a phoneme-held [[g'oUuuul]] body take.
+  - Software / voice data licence: GNU GPL v3 (or later), Debian
+    packages espeak-ng and espeak-ng-data 1.52.0+dfsg-5+b2.
+    Copyright: Jonathan Duddington, Reece H. Dunn and contributors.
+    The GPL covers the TTS engine and its voice data, not a recorded
+    human performance. The rendered speech was further processed
+    (resample to 48 kHz, mild time-compress, EQ, saturation, pitch
+    layering) and is used here as an original game sting.
+  - Additionally, an original Klatt-style formant-synthesized /ɡoʊl/
+    shout (Python, no third-party voice) is layered under the TTS.
+
+Bed: original synthesized kick + talking drum, formant crowd swell,
+slapback echoes, and a synthetic stadium reverb IR.
+
+Not used (explicitly avoided): Microsoft Edge TTS, Abena, F5-TTS Kafui,
+or any other third-party recorded / neural voice.
