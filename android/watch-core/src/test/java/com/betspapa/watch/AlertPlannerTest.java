@@ -13,6 +13,31 @@ public class AlertPlannerTest {
     private static final long KICK = 1794326400000L;
 
     @Test
+    public void goalSoundKeepsCrowdChantAndOff() {
+        WatchState state = new WatchState();
+        assertEquals("crowd", state.goalSound);
+        state.merge(settingsSound("cheer"));
+        assertEquals("crowd", state.goalSound);
+        state.merge(settingsSound("chant"));
+        assertEquals("chant", state.goalSound);
+        state.merge(settingsSound("off"));
+        assertEquals("off", state.goalSound);
+        state.merge(settingsSound("afro"));
+        assertEquals("afro", state.goalSound);
+        state.merge(settingsSound("latin"));
+        assertEquals("afro", state.goalSound);
+        assertEquals("afro", state.toJson().getJSONObject("settings").getString("goalSound"));
+    }
+
+    private static JSONObject settingsSound(String sound) {
+        JSONObject settings = new JSONObject();
+        settings.put("goalSound", sound);
+        JSONObject patch = new JSONObject();
+        patch.put("settings", settings);
+        return patch;
+    }
+
+    @Test
     public void slugAndNotificationIdMatchTheWebView() {
         assertEquals("al-astiklal", AlertPlanner.slug("Al Astiklal"));
         assertEquals("nashama-al-mustaqbal", AlertPlanner.slug("Nashama Al-Mustaqbal"));

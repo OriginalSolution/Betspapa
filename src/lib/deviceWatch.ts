@@ -3,7 +3,7 @@ import type { Follows, InboxItem, Match, Settings } from '../types';
 import { isFollowed } from './group';
 import { isNativeApp } from './nativeHttp';
 
-export type WatchSettings = Pick<Settings, 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var'>;
+export type WatchSettings = Pick<Settings, 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'goalSound'>;
 
 export type ScheduleRow = {
   id: string;

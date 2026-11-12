@@ -50,6 +50,7 @@ final class WatchRuntime {
             if (hot || (fixtures != null && mightWatch(snapshot, fixtures, now))) live = readLive();
             List<WatchNote> pending;
             boolean aboutToStart;
+            String goalSound = "crowd";
             synchronized (WatchState.FILE_LOCK) {
                 WatchState state = WatchState.load(WatchFiles.file(app));
                 now = System.currentTimeMillis();
@@ -61,9 +62,10 @@ final class WatchRuntime {
                 pending = new ArrayList<WatchNote>(state.pendingNotifications());
                 hot = AlertPlanner.shouldWatch(state.matches, state, now);
                 aboutToStart = hot && !inPlay(state, now);
+                goalSound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
             }
             for (WatchNote note : pending) {
-                if (!AlertPoster.post(app, note)) continue;
+                if (!AlertPoster.post(app, note, goalSound)) continue;
                 synchronized (WatchState.FILE_LOCK) {
                     WatchState state = WatchState.load(WatchFiles.file(app));
                     state.markSent(note.id);

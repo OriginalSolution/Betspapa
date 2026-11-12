@@ -80,6 +80,22 @@ function paint(maskable) {
   };
 }
 
+/** The splash mark: red rounded square, white block-B, square counters. Outside is transparent. */
+function splashMark(x, y, size) {
+  const radius = size * 0.22;
+  if (!insideRound(x, y, size, radius)) return [0, 0, 0, 0];
+  const nx = x / Math.max(1, size - 1);
+  const ny = y / Math.max(1, size - 1);
+  const box = (rx, ry, rw, rh) => nx >= rx && nx < rx + rw && ny >= ry && ny < ry + rh;
+  const upper = box(0.3, 0.22, 0.36, 0.25);
+  const stem = box(0.3, 0.22, 0.1, 0.56);
+  const lower = box(0.3, 0.5, 0.4, 0.28);
+  const holeU = box(0.5, 0.32, 0.08, 0.08);
+  const holeL = box(0.51, 0.6, 0.09, 0.09);
+  if ((upper || stem || lower) && !holeU && !holeL) return [255, 255, 255, 255];
+  return [225, 29, 46, 255];
+}
+
 mkdirSync(root, { recursive: true });
 writeFileSync(join(root, 'icon-192.png'), png(192, paint(false)));
 writeFileSync(join(root, 'icon-512.png'), png(512, paint(false)));
@@ -102,12 +118,12 @@ if (existsSync(androidRes)) {
         let image;
         if (file.startsWith('splash')) {
           image = pngRect(width, height, (x, y) => {
-            const mark = Math.round(Math.min(width, height) * 0.28);
+            const mark = Math.round(Math.min(width, height) * 0.3);
             const left = Math.round((width - mark) / 2);
             const top = Math.round((height - mark) / 2);
-            if (x < left || y < top || x >= left + mark || y >= top + mark) return [7, 8, 12, 255];
-            const color = paint(false)(x - left, y - top, mark);
-            return color[3] === 0 ? [7, 8, 12, 255] : color;
+            if (x < left || y < top || x >= left + mark || y >= top + mark) return [0, 0, 0, 255];
+            const color = splashMark(x - left, y - top, mark);
+            return color[3] === 0 ? [0, 0, 0, 255] : color;
           });
         } else if (file.includes('foreground') && square) {
           image = png(width, paint(true));

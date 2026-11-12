@@ -62,7 +62,7 @@ export type Match = {
   feed?: 'sporty' | 'demo';
 };
 
-export type GoalSound = 'cheer' | 'chant' | 'off';
+export type GoalSound = 'crowd' | 'afro' | 'chant' | 'off';
 export type DataSource = 'sporty' | 'demo';
 
 export type Settings = {
@@ -74,6 +74,8 @@ export type Settings = {
   browser: boolean;
   var: boolean;
   goalSound: GoalSound;
+  /** In-app cheer loudness, 0–100. 60 is a gain of 0.6. */
+  goalVolume: number;
   dataSource: DataSource;
 };
 
@@ -107,6 +109,7 @@ export const defaultSettings: Settings = {
   ft: true,
   browser: true,
   var: true,
-  goalSound: 'cheer',
+  goalSound: 'crowd',
+  goalVolume: 60,
   dataSource: 'sporty',
 };

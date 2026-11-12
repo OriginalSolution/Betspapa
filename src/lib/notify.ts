@@ -1,5 +1,6 @@
+import type { GoalSound, InboxItem } from '../types';
+import { GOAL_NOTIFICATION_FILE, goalNotificationChannel } from './cheer';
 import { isNativeApp } from './nativeHttp';
-import type { InboxItem } from '../types';
 
 export type BrowserPermission = NotificationPermission | 'unsupported';
 
@@ -39,12 +40,15 @@ export function registerServiceWorker() {
   });
 }
 
-export async function pushBrowserNotification(item: InboxItem) {
+export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSound = 'crowd') {
   if (isNativeApp()) {
     try {
       const { LocalNotifications } = await import('@capacitor/local-notifications');
       const permission = await LocalNotifications.checkPermissions();
       if (permission.display !== 'granted') return;
+      const goal = item.kind === 'goal';
+      const channelId = goal ? goalNotificationChannel(goalSound) : undefined;
+      const sound = goal && goalSound !== 'off' ? GOAL_NOTIFICATION_FILE[goalSound] : undefined;
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -52,6 +56,8 @@ export async function pushBrowserNotification(item: InboxItem) {
             title: item.title,
             body: item.body,
             schedule: { at: new Date(Date.now() + 250), allowWhileIdle: true },
+            ...(channelId ? { channelId } : {}),
+            ...(sound ? { sound } : {}),
           },
         ],
       });

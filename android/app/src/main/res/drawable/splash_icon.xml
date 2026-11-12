@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Betspapa splash mark, redrawn as a vector (not an upscale of the JPG).
+  Viewport 288 matches the Android 12 splash icon. The circular mask shows
+  the center 192, so the rounded square sits inside that circle on black.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <path
+        android:fillColor="#E11D2E"
+        android:pathData="M105,74 H183 A31,31 0 0 1 214,105 V183 A31,31 0 0 1 183,214 H105 A31,31 0 0 1 74,183 V105 A31,31 0 0 1 105,74 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M116,105 H166 V140 H116 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M116,105 H130 V183 H116 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M116,144 H172 V183 H116 Z" />
+    <path
+        android:fillColor="#E11D2E"
+        android:pathData="M144,119 H155 V130 H144 Z" />
+    <path
+        android:fillColor="#E11D2E"
+        android:pathData="M146,158 H158 V170 H146 Z" />
+</vector>

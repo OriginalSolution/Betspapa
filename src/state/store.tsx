@@ -440,6 +440,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ht: state.settings.ht,
         ft: state.settings.ft,
         var: state.settings.var,
+        goalSound: state.settings.goalSound,
       },
       follows: state.follows,
       matches: state.matches,
@@ -465,7 +466,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const seenToast = useRef(new Set<string>());
   useEffect(() => {
-    let goalSound: 'cheer' | 'chant' | null = null;
+    let goalSound: Exclude<Settings['goalSound'], 'off'> | null = null;
     for (const toast of state.toasts) {
       if (!seenToast.current.has(toast.id)) {
         seenToast.current.add(toast.id);
@@ -474,10 +475,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       if (!state.settings.browser || state.permission !== 'granted' || wasNotificationSent(toast.id)) continue;
       markNotificationSent(toast.id);
-      void pushBrowserNotification(toast);
+      void pushBrowserNotification(toast, state.settings.goalSound);
     }
-    if (goalSound) playGoalSound(goalSound);
-  }, [state.toasts, state.settings.browser, state.settings.goalSound, state.permission]);
+    if (goalSound) playGoalSound(goalSound, state.settings.goalVolume);
+  }, [state.toasts, state.settings.browser, state.settings.goalSound, state.settings.goalVolume, state.permission]);
 
   const setDate = useCallback((date: string) => dispatch({ type: 'set-date', date }), []);
   const refresh = useCallback(() => refreshRef.current(), []);

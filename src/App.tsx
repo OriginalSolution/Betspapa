@@ -13,6 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { SlipsPage } from './pages/SlipsPage';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
+import { isNativeApp } from './lib/nativeHttp';
 import { useStore } from './state/store';
 
 const titles: Record<string, string> = {
@@ -40,6 +41,18 @@ export function App() {
   useEffect(() => {
     document.title = `${title} · Betspapa`;
   }, [title]);
+
+  useEffect(() => {
+    const splash = document.getElementById('boot-splash');
+    if (!splash) return;
+    const started = Number(document.documentElement.dataset.boot || Date.now());
+    const hold = isNativeApp() ? 0 : Math.max(0, 1100 - (Date.now() - started));
+    const timer = window.setTimeout(() => {
+      splash.classList.add('is-gone');
+      window.setTimeout(() => splash.remove(), 450);
+    }, hold);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   return (
     <div className="shell">
