@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DateBar, ErrorBanner } from '../components/Chrome';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
+import { staleTrendIds } from '../lib/alerts';
 import { isFollowed } from '../lib/group';
+import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 
 export function FollowingPage() {
@@ -24,6 +27,7 @@ export function FollowingPage() {
           ))}
         </div>
       )}
+      <FollowedTrends />
       <ErrorBanner />
       {waiting ? (
         <MatchSkeleton />
@@ -43,5 +47,61 @@ export function FollowingPage() {
         <MatchBoard matches={shown} />
       )}
     </>
+  );
+}
+
+export function FollowedTrends() {
+  const { matches } = useStore();
+  const { picks, trendFollows, clearStaleTrends } = useProduct();
+  const [confirm, setConfirm] = useState(false);
+  const followed = picks.filter((pick) => trendFollows.includes(pick.id));
+  const other = trendFollows.filter((id) => !picks.some((pick) => pick.id === id));
+  const stale = staleTrendIds(trendFollows, picks, matches, Date.now());
+  if (!trendFollows.length) return null;
+  return (
+    <section className="panel follow-trends">
+      <h2>Followed trends</h2>
+      <div className="inbox-tools">
+        <button
+          type="button"
+          className="btn btn-quiet"
+          disabled={!stale.length && !confirm}
+          onClick={() => {
+            if (!stale.length) {
+              setConfirm(false);
+              return;
+            }
+            if (!confirm) {
+              setConfirm(true);
+              return;
+            }
+            clearStaleTrends();
+            setConfirm(false);
+          }}
+        >
+          {confirm ? `Confirm clear ${stale.length}` : 'Clear old trends'}
+        </button>
+        {confirm && (
+          <button type="button" className="btn btn-quiet" onClick={() => setConfirm(false)}>
+            Cancel
+          </button>
+        )}
+        <p>{confirm ? 'Hit, bust, and finished trends will be unfollowed. Upcoming and live follows stay.' : 'Settled and past trends can leave this list.'}</p>
+      </div>
+      <ul className="trend-monitor">
+        {followed.map((pick) => (
+          <li key={pick.id}>
+            <strong>{pick.label}</strong>
+            <span>{pick.status === 'won' ? 'Hit' : pick.status === 'bust' ? 'Bust' : 'Open'}</span>
+          </li>
+        ))}
+        {other.map((id) => (
+          <li key={id}>
+            <strong>{id}</strong>
+            <span>Another day</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

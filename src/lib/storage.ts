@@ -110,24 +110,17 @@ export function saveDemoStart(t0: number) {
   }
 }
 
+export function loadSent(): string[] {
+  const raw = read<string[]>(KEYS.sent);
+  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string').slice(-400) : [];
+}
+
 export function wasNotificationSent(id: string): boolean {
-  try {
-    const raw = sessionStorage.getItem(KEYS.sent);
-    const ids = raw ? (JSON.parse(raw) as string[]) : [];
-    return Array.isArray(ids) && ids.includes(id);
-  } catch {
-    return false;
-  }
+  return loadSent().includes(id);
 }
 
 export function markNotificationSent(id: string) {
-  try {
-    const raw = sessionStorage.getItem(KEYS.sent);
-    const ids = raw ? (JSON.parse(raw) as string[]) : [];
-    const next = Array.isArray(ids) ? ids : [];
-    if (!next.includes(id)) next.push(id);
-    sessionStorage.setItem(KEYS.sent, JSON.stringify(next.slice(-200)));
-  } catch {
-    /* ignore */
-  }
+  const next = loadSent();
+  if (!next.includes(id)) next.push(id);
+  write(KEYS.sent, next.slice(-400));
 }

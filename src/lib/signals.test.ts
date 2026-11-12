@@ -128,6 +128,18 @@ describe('diffAlerts', () => {
     expect(quiet).toEqual([]);
   });
 
+  it('emits VAR only when a review is present and does not invent one for a goal', () => {
+    const prev = [match({})];
+    const reviewed = [match({ minute: 22, varReview: { teamId: 'h', player: 'Striker', minute: 22 } })];
+    const during = diffAlerts(prev, reviewed, ctx());
+    expect(during.map((alert) => alert.kind)).toEqual(['var']);
+    expect(during[0]?.body).toContain('Striker');
+    expect(during[0]?.body).toContain('under review');
+
+    const plain = diffAlerts(prev, [match({ homeScore: 1, minute: 22 })], ctx());
+    expect(plain.map((alert) => alert.kind)).toEqual(['goal']);
+  });
+
   it('labels penalties and own goals', () => {
     const prev = [match({})];
     const next = [

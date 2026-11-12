@@ -23,6 +23,7 @@ type LiveEvent = {
   markets?: LiveMarket[];
   sport?: { category?: { name?: string; tournament?: { name?: string } } };
   fixtureVenue?: { name?: string };
+  varReview?: { teamId?: string; player?: string; minute?: number } | null;
 };
 type LiveTournament = { name?: string; categoryName?: string; events?: LiveEvent[] };
 
@@ -167,6 +168,19 @@ function timeline(match: Match): MatchEvent[] {
   return events;
 }
 
+function reviewFrom(event: LiveEvent): Match['varReview'] {
+  const raw = event.varReview;
+  if (!raw || typeof raw !== 'object') return null;
+  const teamId = String(raw.teamId || '').trim();
+  if (!teamId) return null;
+  const minute = Number(raw.minute);
+  return {
+    teamId,
+    player: String(raw.player || 'Goal').trim() || 'Goal',
+    minute: Number.isFinite(minute) ? minute : 0,
+  };
+}
+
 export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): Match | null {
   if (!event.eventId || !event.homeTeamName || !event.awayTeamName) return null;
   const status = liveStatus(event.matchStatus, event.status);
@@ -196,6 +210,7 @@ export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): M
     htAway: inSecond && half ? half[1] : null,
     venue: event.fixtureVenue?.name || null,
     events: [],
+    varReview: reviewFrom(event),
   };
   next.events = timeline(next);
   return next;
