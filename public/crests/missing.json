@@ -1,0 +1,1125 @@
+{
+  "generatedAt": "2026-11-12T20:54:02.936Z",
+  "teams": [
+    {
+      "name": "US St Philbert de Grandlieu",
+      "id": "us-st-philbert-de-grandlieu",
+      "area": "France",
+      "competition": "Coupe de France",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Nancy-Lorraine",
+      "id": "nancy-lorraine",
+      "area": "France",
+      "competition": "Coupe de France",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "USL Dunkerque",
+      "id": "usl-dunkerque",
+      "area": "France",
+      "competition": "Coupe de France",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Quevilly-Rouen Metropole",
+      "id": "quevilly-rouen-metropole",
+      "area": "France",
+      "competition": "Coupe de France",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CDA Navalcarnero",
+      "id": "cda-navalcarnero",
+      "area": "Spain",
+      "competition": "Segunda Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Betis",
+      "id": "betis",
+      "area": "Spain",
+      "competition": "Copa del Rey",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Real Sociedad San Sebastian B",
+      "id": "real-sociedad-san-sebastian-b",
+      "area": "Spain",
+      "competition": "LALIGA HYPERMOTION",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "SL Benfica Lisbon W",
+      "id": "sl-benfica-lisbon-w",
+      "area": "International Clubs",
+      "competition": "UEFA Champions League Women",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Athletic Club Sjdr MG",
+      "id": "athletic-club-sjdr-mg",
+      "area": "Brazil",
+      "competition": "Brasileiro Serie B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Queens Park FC",
+      "id": "queens-park-fc",
+      "area": "Scotland",
+      "competition": "Championship",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "AD Pasto",
+      "id": "ad-pasto",
+      "area": "Colombia",
+      "competition": "Liga DIMAYOR",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CA Bucaramanga",
+      "id": "ca-bucaramanga",
+      "area": "Colombia",
+      "competition": "Liga DIMAYOR",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Bedford Town Football Club",
+      "id": "bedford-town-football-club",
+      "area": "England Amateur",
+      "competition": "FA Trophy",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Kings Lynn FC",
+      "id": "kings-lynn-fc",
+      "area": "England Amateur",
+      "competition": "FA Trophy",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Merthyr Town",
+      "id": "merthyr-town",
+      "area": "England Amateur",
+      "competition": "FA Trophy",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Weston-super-Mare",
+      "id": "weston-super-mare",
+      "area": "England Amateur",
+      "competition": "FA Trophy",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Mio Biwako Shiga",
+      "id": "mio-biwako-shiga",
+      "area": "Japan",
+      "competition": "J3 League",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Spartans FC",
+      "id": "spartans-fc",
+      "area": "Scotland",
+      "competition": "League 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "AC Trento",
+      "id": "ac-trento",
+      "area": "Italy",
+      "competition": "Serie C, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Calcio Lecco 1912",
+      "id": "calcio-lecco-1912",
+      "area": "Italy",
+      "competition": "Serie C, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Treviso FBC 1993",
+      "id": "treviso-fbc-1993",
+      "area": "Italy",
+      "competition": "Serie C, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Pergolettese Crema",
+      "id": "us-pergolettese-crema",
+      "area": "Italy",
+      "competition": "Serie C, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Pro Vercelli 1892",
+      "id": "pro-vercelli-1892",
+      "area": "Italy",
+      "competition": "Serie C, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "AC Saluzzo Calcio",
+      "id": "ac-saluzzo-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Gsd Lascaris",
+      "id": "gsd-lascaris",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Millesimo",
+      "id": "asd-millesimo",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Chisola Calcio",
+      "id": "chisola-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Derthona FBC 1908 ASD",
+      "id": "derthona-fbc-1908-asd",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "USD Sestri Levante 1919",
+      "id": "usd-sestri-levante-1919",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Imperia 1923",
+      "id": "asd-imperia-1923",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Fezzanese 1930",
+      "id": "us-fezzanese-1930",
+      "area": "Italy",
+      "competition": "Serie D, Group A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Calcio Brusaporto",
+      "id": "asd-calcio-brusaporto",
+      "area": "Italy",
+      "competition": "Serie D, Group B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Club Milano SSD",
+      "id": "club-milano-ssd",
+      "area": "Italy",
+      "competition": "Serie D, Group B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Nibbiano And Valtidone",
+      "id": "nibbiano-and-valtidone",
+      "area": "Italy",
+      "competition": "Serie D, Group B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Villa Dalme Valle Brembana",
+      "id": "villa-dalme-valle-brembana",
+      "area": "Italy",
+      "competition": "Serie D, Group B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Ssd Real Calepina FC",
+      "id": "ssd-real-calepina-fc",
+      "area": "Italy",
+      "competition": "Serie D, Group B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Brian Lignano Calcio",
+      "id": "brian-lignano-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Fcd Conegliano 1907",
+      "id": "fcd-conegliano-1907",
+      "area": "Italy",
+      "competition": "Serie D, Group C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Lavarian Mortean Esperia",
+      "id": "asd-lavarian-mortean-esperia",
+      "area": "Italy",
+      "competition": "Serie D, Group C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Triestina Calcio 1918",
+      "id": "us-triestina-calcio-1918",
+      "area": "Italy",
+      "competition": "Serie D, Group C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Union Clodiense Chioggia SSD",
+      "id": "union-clodiense-chioggia-ssd",
+      "area": "Italy",
+      "competition": "Serie D, Group C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Varesina Calcio",
+      "id": "asd-varesina-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Citta Di Pontedera",
+      "id": "us-citta-di-pontedera",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "GS Arconatese 1926",
+      "id": "gs-arconatese-1926",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Pavia Calcio 1911",
+      "id": "pavia-calcio-1911",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Pro Patria Busto Arsizio",
+      "id": "pro-patria-busto-arsizio",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "USD Castellanzese 1921",
+      "id": "usd-castellanzese-1921",
+      "area": "Italy",
+      "competition": "Serie D, Group D",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "AC Prato 1908",
+      "id": "ac-prato-1908",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Grassina",
+      "id": "asd-grassina",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Seravezza Pozzi Calcio",
+      "id": "asd-seravezza-pozzi-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Sasso Marconi 1924",
+      "id": "asd-sasso-marconi-1924",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Rondinella Marzocco Ssd",
+      "id": "rondinella-marzocco-ssd",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Gsd Ghivizzano Borgoamozzano",
+      "id": "gsd-ghivizzano-borgoamozzano",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Terranuova Traiana",
+      "id": "asd-terranuova-traiana",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Mezzolara Calcio",
+      "id": "mezzolara-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group E",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "AC Foligno 1928",
+      "id": "ac-foligno-1928",
+      "area": "Italy",
+      "competition": "Serie D, Group F",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "L’Aquila Calcio 1927",
+      "id": "l-aquila-calcio-1927",
+      "area": "Italy",
+      "competition": "Serie D, Group F",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "SC Trestina",
+      "id": "sc-trestina",
+      "area": "Italy",
+      "competition": "Serie D, Group F",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Teramo Calcio",
+      "id": "teramo-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group F",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Forsempronese 1949 SD ARL",
+      "id": "forsempronese-1949-sd-arl",
+      "area": "Italy",
+      "competition": "Serie D, Group F",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Sarnese 1926",
+      "id": "asd-sarnese-1926",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Gelbison",
+      "id": "asd-gelbison",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Aranova",
+      "id": "asd-aranova",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Anzio Calcio 1924",
+      "id": "asd-anzio-calcio-1924",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Trastevere Calcio",
+      "id": "asd-trastevere-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Paganese Calcio",
+      "id": "paganese-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Cynthia",
+      "id": "cynthia",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Unipomezia 1938",
+      "id": "unipomezia-1938",
+      "area": "Italy",
+      "competition": "Serie D, Group G",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASC Ebolitana 1925",
+      "id": "asc-ebolitana-1925",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Martina Calcio 1947",
+      "id": "asd-martina-calcio-1947",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "SSD Ischia Calcio",
+      "id": "ssd-ischia-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Nocerina 1910",
+      "id": "asd-nocerina-1910",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "SS Manfredonia Calcio",
+      "id": "ss-manfredonia-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Palmese 1914",
+      "id": "us-palmese-1914",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Virtus Francavilla Calcio",
+      "id": "virtus-francavilla-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Real Normanna",
+      "id": "asd-real-normanna",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Asd Digiesse Praiatortora",
+      "id": "asd-digiesse-praiatortora",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FC Francavilla 1931",
+      "id": "fc-francavilla-1931",
+      "area": "Italy",
+      "competition": "Serie D, Group H",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Trapani Calcio",
+      "id": "trapani-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Igea Virtus Barcellona",
+      "id": "igea-virtus-barcellona",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "US Vibonese Calcio",
+      "id": "us-vibonese-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASD Polisportiva Modica Calcio",
+      "id": "asd-polisportiva-modica-calcio",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Ssd Athletic Club Palermo",
+      "id": "ssd-athletic-club-palermo",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Gela",
+      "id": "gela",
+      "area": "Italy",
+      "competition": "Serie D, Group I",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Newport County",
+      "id": "newport-county",
+      "area": "England",
+      "competition": "League Two",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Hoek",
+      "id": "hoek",
+      "area": "Netherlands",
+      "competition": "Tweede Divisie",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Kozakken Boys Werkendam",
+      "id": "kozakken-boys-werkendam",
+      "area": "Netherlands",
+      "competition": "Tweede Divisie",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "GVVV Veenendaal",
+      "id": "gvvv-veenendaal",
+      "area": "Netherlands",
+      "competition": "Tweede Divisie",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "De Treffers Groesbeek",
+      "id": "de-treffers-groesbeek",
+      "area": "Netherlands",
+      "competition": "Tweede Divisie",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Team FC Cairo",
+      "id": "team-fc-cairo",
+      "area": "Egypt",
+      "competition": "2. Division A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Maleyat Kafr El Zayat",
+      "id": "maleyat-kafr-el-zayat",
+      "area": "Egypt",
+      "competition": "2. Division A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "We SC",
+      "id": "we-sc",
+      "area": "Egypt",
+      "competition": "2. Division A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "La Viena FC",
+      "id": "la-viena-fc",
+      "area": "Egypt",
+      "competition": "2. Division A",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Nykoebing FC",
+      "id": "nykoebing-fc",
+      "area": "Denmark",
+      "competition": "2nd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FC Helsingoer",
+      "id": "fc-helsingoer",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Ishoej IF",
+      "id": "ishoej-if",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Hoersholm-Usseroed IK",
+      "id": "hoersholm-usseroed-ik",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Bronshoj BK",
+      "id": "bronshoj-bk",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Vanloese IF",
+      "id": "vanloese-if",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Naesby BK",
+      "id": "naesby-bk",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ASA Aarhus",
+      "id": "asa-aarhus",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Holbaek B&I",
+      "id": "holbaek-b-i",
+      "area": "Denmark",
+      "competition": "3rd Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CD Armenio",
+      "id": "cd-armenio",
+      "area": "Argentina",
+      "competition": "Primera B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CS Italiano",
+      "id": "cs-italiano",
+      "area": "Argentina",
+      "competition": "Primera B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "RSD Alcala SAD",
+      "id": "rsd-alcala-sad",
+      "area": "Spain",
+      "competition": "Segunda Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "UD San Sebastian Reyes",
+      "id": "ud-san-sebastian-reyes",
+      "area": "Spain",
+      "competition": "Segunda Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "SDA Tordesillas",
+      "id": "sda-tordesillas",
+      "area": "Spain",
+      "competition": "Segunda Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CA Antoniano",
+      "id": "ca-antoniano",
+      "area": "Spain",
+      "competition": "Segunda Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "The New Saints FC",
+      "id": "the-new-saints-fc",
+      "area": "Wales",
+      "competition": "FAW Welsh Cup",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Briton Ferry",
+      "id": "briton-ferry",
+      "area": "Wales",
+      "competition": "FAW Welsh Cup",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Briobecca Urayasu",
+      "id": "briobecca-urayasu",
+      "area": "Japan",
+      "competition": "Japan Football League",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "J-Lease FC",
+      "id": "j-lease-fc",
+      "area": "Japan",
+      "competition": "Japan Football League",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FC Felgueiras 1932",
+      "id": "fc-felgueiras-1932",
+      "area": "Portugal",
+      "competition": "Liga Portugal 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Agrobiznes Volochisk",
+      "id": "agrobiznes-volochisk",
+      "area": "Ukraine",
+      "competition": "Persha Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Warrington Rylands 1906 FC",
+      "id": "warrington-rylands-1906-fc",
+      "area": "England Amateur",
+      "competition": "Northern Premier League Premier",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FSK Mariupol",
+      "id": "fsk-mariupol",
+      "area": "Ukraine",
+      "competition": "Persha Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CP Cacereno SAD",
+      "id": "cp-cacereno-sad",
+      "area": "Spain",
+      "competition": "Primera Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Real Aviles CF",
+      "id": "real-aviles-cf",
+      "area": "Spain",
+      "competition": "Primera Federacion",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FK Borac Cacak",
+      "id": "fk-borac-cacak",
+      "area": "Serbia",
+      "competition": "Prva Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Backa Topola",
+      "id": "backa-topola",
+      "area": "Serbia",
+      "competition": "Prva Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Hellas Syrou",
+      "id": "hellas-syrou",
+      "area": "Greece",
+      "competition": "Super League 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Anagennisi Karditsas 1904",
+      "id": "anagennisi-karditsas-1904",
+      "area": "Greece",
+      "competition": "Super League 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Kallithea FC",
+      "id": "kallithea-fc",
+      "area": "Greece",
+      "competition": "Super League 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CSDC Espanol",
+      "id": "csdc-espanol",
+      "area": "Argentina",
+      "competition": "Primera C",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CA Arteixo",
+      "id": "ca-arteixo",
+      "area": "Spain Amateur",
+      "competition": "Tercera Federacion, Group 1",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CF Vilanova I LA Geltru",
+      "id": "cf-vilanova-i-la-geltru",
+      "area": "Spain Amateur",
+      "competition": "Tercera Federacion, Group 5",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Siello Nuevo Boadilla FC",
+      "id": "siello-nuevo-boadilla-fc",
+      "area": "Spain Amateur",
+      "competition": "Tercera Federacion, Group 7",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CF Trival Valderas Alcoron",
+      "id": "cf-trival-valderas-alcoron",
+      "area": "Spain Amateur",
+      "competition": "Tercera Federacion, Group 7",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Leningradets",
+      "id": "leningradets",
+      "area": "Russia",
+      "competition": "1. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "MFk Bytca",
+      "id": "mfk-bytca",
+      "area": "Slovakia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "MSK Povazska Bystrica",
+      "id": "msk-povazska-bystrica",
+      "area": "Slovakia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "N. Byskovice",
+      "id": "n-byskovice",
+      "area": "Czechia",
+      "competition": "CFL",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Slask II Wroclaw",
+      "id": "slask-ii-wroclaw",
+      "area": "Poland",
+      "competition": "II Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "KS Hutnik Krakow SSA",
+      "id": "ks-hutnik-krakow-ssa",
+      "area": "Poland",
+      "competition": "II Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Rekord Bielsko Biala",
+      "id": "rekord-bielsko-biala",
+      "area": "Poland",
+      "competition": "II Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "LKS Lodz II",
+      "id": "lks-lodz-ii",
+      "area": "Poland",
+      "competition": "III Liga, Group 1",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "ZKS Olimpia Elblag",
+      "id": "zks-olimpia-elblag",
+      "area": "Poland",
+      "competition": "III Liga, Group 1",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "LKS 1926 Lomza",
+      "id": "lks-1926-lomza",
+      "area": "Poland",
+      "competition": "III Liga, Group 1",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Kts Weszlo",
+      "id": "kts-weszlo",
+      "area": "Poland",
+      "competition": "III Liga, Group 1",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "KTS-K Luzino",
+      "id": "kts-k-luzino",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Sks Unia Swarzedz",
+      "id": "sks-unia-swarzedz",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Blekitni Stargard",
+      "id": "blekitni-stargard",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Zks Kluczevia Stargard",
+      "id": "zks-kluczevia-stargard",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "MKS Viktoria Wrzesnia",
+      "id": "mks-viktoria-wrzesnia",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Kss Kotwica Kornik",
+      "id": "kss-kotwica-kornik",
+      "area": "Poland",
+      "competition": "III Liga, Group 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "KS Stilon Gorzow Wlkp",
+      "id": "ks-stilon-gorzow-wlkp",
+      "area": "Poland",
+      "competition": "III Liga, Group 3",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Mkp Carina Gubin",
+      "id": "mkp-carina-gubin",
+      "area": "Poland",
+      "competition": "III Liga, Group 3",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CD Arabe Unido",
+      "id": "cd-arabe-unido",
+      "area": "Panama",
+      "competition": "Liga Panamena",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CD Universitario Penonome",
+      "id": "cd-universitario-penonome",
+      "area": "Panama",
+      "competition": "Liga Panamena",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Zamora FC Barinas II",
+      "id": "zamora-fc-barinas-ii",
+      "area": "Venezuela",
+      "competition": "Segunda Division",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "FK Buducnost",
+      "id": "fk-buducnost",
+      "area": "Montenegro",
+      "competition": "1. CFL",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Krka Novo Mesto",
+      "id": "krka-novo-mesto",
+      "area": "Slovenia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "NK Bistrica Slovenska Bistrica",
+      "id": "nk-bistrica-slovenska-bistrica",
+      "area": "Slovenia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "NK Vrhnika",
+      "id": "nk-vrhnika",
+      "area": "Slovenia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Nd Slovan",
+      "id": "nd-slovan",
+      "area": "Slovenia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "NK Krsko Posavje",
+      "id": "nk-krsko-posavje",
+      "area": "Slovenia",
+      "competition": "2. Liga",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CD Cobreloa Calama",
+      "id": "cd-cobreloa-calama",
+      "area": "Chile",
+      "competition": "Primera B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CD Santa Cruz",
+      "id": "cd-santa-cruz",
+      "area": "Chile",
+      "competition": "Primera B",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "CDU San Martin",
+      "id": "cdu-san-martin",
+      "area": "Peru",
+      "competition": "Liga 2",
+      "reason": "no confident crest"
+    },
+    {
+      "name": "Cocle FC",
+      "id": "cocle-fc",
+      "area": "Panama",
+      "competition": "Liga Panamena",
+      "reason": "no confident crest"
+    }
+  ]
+}

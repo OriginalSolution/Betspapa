@@ -1,0 +1,11 @@
+Crests are resolved in this order and saved in this folder:
+
+1. A logo URL on the fixture, when the feed actually sends one. The public source label stays Betspapa fixtures.
+2. TheSportsDB team badge (free API key 123, searchteams.php and lookupteam.php). https://www.thesportsdb.com/
+3. Wikidata P154 logo image, served from Wikimedia Commons.
+4. The Wikipedia football-club page image.
+5. For a national team with no badge: the federation crest from Wikidata, or the country flag. Bundled flags are flag-icons (MIT). Missing flags come from https://flagcdn.com/.
+
+Manual fixes go in overrides.json under byName (normalized team name) or byId (team slug), pointing at a file in this folder or an https image URL. Teams that still have no confident badge are listed in missing.json.
+
+SofaScore is not used. A bookmaker is not shown as the source of a crest.

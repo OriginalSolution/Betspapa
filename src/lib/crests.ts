@@ -1,6 +1,6 @@
 /** Club badges from Wikipedia page images. A miss stays an initials mark. */
 
-const KEY = 'betspapa.crests.v4';
+const KEY = 'betspapa.crests.v5';
 const HIT_MS = 14 * 86_400_000;
 const MISS_MS = 12 * 60 * 60 * 1000;
 
@@ -340,6 +340,7 @@ export async function resolveCrests(
   input: Array<string | CrestRequest>,
   onBatch: (found: Record<string, string>) => void,
   fetchImpl: typeof fetch = fetch,
+  lookup: (name: string, fetchImpl: typeof fetch, context: CrestContext) => Promise<string | null> = lookupCrest,
 ) {
   const requests: CrestRequest[] = [];
   for (const item of input) {
@@ -360,7 +361,7 @@ export async function resolveCrests(
       const index = cursor;
       cursor += 1;
       const request = pending[index];
-      const url = await lookupCrest(request.name, fetchImpl, request);
+      const url = await lookup(request.name, fetchImpl, request);
       if (!url) continue;
       found[crestKey(request.name)] = url;
       onBatch({ ...found });
@@ -369,7 +370,7 @@ export async function resolveCrests(
   await Promise.all(workers);
   for (const request of pending) {
     if (cachedCrest(request.name) !== undefined) continue;
-    const url = await lookupCrest(request.name, fetchImpl, request);
+    const url = await lookup(request.name, fetchImpl, request);
     if (!url) continue;
     found[crestKey(request.name)] = url;
     onBatch({ ...found });
