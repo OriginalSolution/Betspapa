@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useAlertSetup } from '../components/AlertSetup';
 import { playGoalSound } from '../lib/cheer';
-import {
-  requestBatteryExemption,
-  requestWatchNotifications,
-  scheduleBackgroundTest,
-  watchStatus,
-  type WatchDeviceStatus,
-} from '../lib/deviceWatch';
+import { OEM_INSTRUCTION } from '../lib/alertSetup';
+import { requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound } from '../types';
 import { useStore } from '../state/store';
@@ -195,25 +191,12 @@ function GoalSoundSetting({
 }
 
 function AndroidWatchStatus() {
-  const [status, setStatus] = useState<WatchDeviceStatus | null>(null);
+  const { status, applyStatus, refresh, startAgain } = useAlertSetup();
   const [testNote, setTestNote] = useState(false);
-  const refresh = useCallback(() => {
-    void watchStatus().then((next) => {
-      if (next) setStatus(next);
-    });
-  }, []);
-  useEffect(() => {
-    refresh();
-    const onFocus = () => refresh();
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onFocus);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onFocus);
-    };
-  }, [refresh]);
-  const allowed = status?.notifications === 'granted';
-  const unrestricted = Boolean(status?.batteryUnrestricted);
+  if (!status) return <p className="lede">Checking notification access.</p>;
+  const allowed = status.notifications === 'granted';
+  const unrestricted = status.batteryUnrestricted;
+  const exact = status.exactAlarms;
   return (
     <div className="watch-status">
       <div className="stat">
@@ -225,9 +208,7 @@ function AndroidWatchStatus() {
           type="button"
           className="btn"
           onClick={() => {
-            void requestWatchNotifications().then((next) => {
-              if (next) setStatus(next);
-            });
+            void requestWatchNotifications().then(applyStatus);
           }}
         >
           Allow notifications
@@ -242,15 +223,33 @@ function AndroidWatchStatus() {
           type="button"
           className="btn"
           onClick={() => {
-            void requestBatteryExemption().then(() => window.setTimeout(refresh, 600));
+            void requestBatteryExemption().then(() => window.setTimeout(() => void refresh(), 600));
           }}
         >
           Allow background activity
         </button>
       )}
+      <div className="stat">
+        <span>Exact alarms</span>
+        <strong className={exact === 'denied' ? 'is-bad' : exact === 'granted' ? 'is-good' : undefined}>
+          {exact === 'granted' ? 'Allowed' : exact === 'denied' ? 'Not allowed' : 'Not required'}
+        </strong>
+      </div>
+      {exact === 'denied' && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            void requestExactAlarm().then(applyStatus);
+          }}
+        >
+          Allow exact alarms
+        </button>
+      )}
       <p className="lede">
-        On Tecno, Infinix, Xiaomi, and Samsung, also turn on Autostart for Betspapa and take it off the battery saver list. Those phones can still stop a watcher after Android’s battery prompt.
+        On Tecno, Infinix, itel, Xiaomi, Oppo, Realme, Vivo, Huawei, and Samsung, also turn on Autostart for Betspapa and take it off the battery saver list. Those phones can still stop a watcher after Android’s battery prompt.
       </p>
+      {status.oem && <p className="lede">{OEM_INSTRUCTION[status.oem]}</p>}
       <button
         type="button"
         className="btn"
@@ -261,6 +260,9 @@ function AndroidWatchStatus() {
         Send test background notification
       </button>
       {testNote && <p className="status-ok">Close Betspapa. A test alert should arrive in about 10 seconds.</p>}
+      <button type="button" className="btn" data-setup-again onClick={startAgain}>
+        Run alert setup again
+      </button>
     </div>
   );
 }

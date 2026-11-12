@@ -1,4 +1,4 @@
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { Follows, InboxItem, Match, Settings } from '../types';
 import { isFollowed } from './group';
 import { isNativeApp } from './nativeHttp';
@@ -38,6 +38,10 @@ export type WatchDeviceStatus = {
   batteryUnrestricted: boolean;
   watching: boolean;
   liveCount: number;
+  exactAlarms?: 'granted' | 'denied' | 'unsupported';
+  oem?: string;
+  setupVersion?: number;
+  setupFinished?: boolean;
 };
 
 type WatchPlugin = {
@@ -46,7 +50,12 @@ type WatchPlugin = {
   status(): Promise<WatchDeviceStatus>;
   requestNotifications(): Promise<WatchDeviceStatus>;
   requestBattery(): Promise<WatchDeviceStatus>;
+  requestExactAlarm(): Promise<WatchDeviceStatus>;
+  openAutostart(): Promise<WatchDeviceStatus & { opened?: string }>;
+  markSetup(options: { version: number; finished: boolean }): Promise<WatchDeviceStatus>;
   scheduleTest(): Promise<void>;
+  addListener(eventName: 'resume', listenerFunc: (status: WatchDeviceStatus) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: 'pause', listenerFunc: () => void): Promise<PluginListenerHandle>;
 };
 
 const Watch = registerPlugin<WatchPlugin>('Watch');
@@ -180,6 +189,59 @@ export async function requestBatteryExemption(): Promise<WatchDeviceStatus | nul
   } catch {
     return watchStatus();
   }
+}
+
+export async function requestExactAlarm(): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.requestExactAlarm();
+  } catch {
+    return watchStatus();
+  }
+}
+
+export async function openAutostartSettings(): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  try {
+    await Watch.openAutostart();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function markAlertSetup(version: number, finished: boolean): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.markSetup({ version, finished });
+  } catch {
+    return null;
+  }
+}
+
+export function watchNativeEvents(handlers: {
+  resume?: (status: WatchDeviceStatus) => void;
+  pause?: () => void;
+}): () => void {
+  if (!isNativeApp()) return () => {};
+  let alive = true;
+  const handles: PluginListenerHandle[] = [];
+  void (async () => {
+    if (handlers.resume) {
+      const handle = await Watch.addListener('resume', handlers.resume);
+      if (!alive) void handle.remove();
+      else handles.push(handle);
+    }
+    if (handlers.pause) {
+      const handle = await Watch.addListener('pause', handlers.pause);
+      if (!alive) void handle.remove();
+      else handles.push(handle);
+    }
+  })();
+  return () => {
+    alive = false;
+    handles.forEach((handle) => void handle.remove());
+  };
 }
 
 /** Schedules a native notification about 10 seconds later. Closing the app does not cancel it. */

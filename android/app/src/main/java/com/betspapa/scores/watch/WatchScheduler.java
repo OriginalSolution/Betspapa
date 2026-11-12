@@ -4,6 +4,7 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
@@ -25,6 +26,12 @@ import java.util.concurrent.TimeUnit;
 public final class WatchScheduler {
     public static final String PREFS = "betspapa-watch";
     public static final String ASKED_NOTIFICATIONS = "asked_notifications";
+    public static final String SETUP_VERSION = "alert_setup_version";
+    public static final String SETUP_FINISHED = "alert_setup_finished";
+    /** Debug builds only. Lets an emulator show the exact-alarm and Autostart steps. */
+    public static final String QC_EXACT = "qc_exact";
+    public static final String QC_MANUFACTURER = "qc_manufacturer";
+    public static final String QC_BRAND = "qc_brand";
 
     private static final String PERIODIC = "betspapa-watch";
     private static final String ONCE = "betspapa-watch-now";
@@ -152,6 +159,43 @@ public final class WatchScheduler {
     public static boolean batteryUnrestricted(Context context) {
         PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         return power != null && power.isIgnoringBatteryOptimizations(context.getPackageName());
+    }
+
+    public static boolean canScheduleExactAlarms(Context context) {
+        if (Build.VERSION.SDK_INT < 31) return true;
+        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        return alarms != null && alarms.canScheduleExactAlarms();
+    }
+
+    /** "unsupported" before Android 12. A debug override can force granted or denied. */
+    public static String exactAlarmState(Context context, String override) {
+        if (Build.VERSION.SDK_INT < 31) return "unsupported";
+        if ("denied".equals(override)) return "denied";
+        if ("granted".equals(override)) return "granted";
+        return canScheduleExactAlarms(context) ? "granted" : "denied";
+    }
+
+    public static void requestExactAlarm(Context context) {
+        if (Build.VERSION.SDK_INT < 31) return;
+        if (canScheduleExactAlarms(context)) return;
+        Intent scoped = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+        scoped.setData(Uri.parse("package:" + context.getPackageName()));
+        Intent plain = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+        if (!launch(context, scoped)) launch(context, plain);
+    }
+
+    public static boolean isDebuggable(Context context) {
+        return context != null && (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+    }
+
+    private static boolean launch(Context context, Intent intent) {
+        if (!(context instanceof android.app.Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(intent);
+            return true;
+        } catch (RuntimeException error) {
+            return false;
+        }
     }
 
     static boolean ready(Context context, WatchState state) {

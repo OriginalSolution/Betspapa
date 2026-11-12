@@ -2,17 +2,12 @@ package com.betspapa.scores;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.View;
 import android.webkit.WebView;
-import androidx.core.app.ActivityCompat;
-import androidx.core.app.NotificationManagerCompat;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.splashscreen.SplashScreenViewProvider;
 import com.betspapa.scores.watch.AlertPoster;
@@ -22,7 +17,6 @@ import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
-    private static final int NOTIFICATION_REQUEST = 4401;
     private volatile boolean webReady;
     private long splashStarted;
 
@@ -86,36 +80,11 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         WatchScheduler.setUiForeground(this, true);
-        maybeAskNotifications();
     }
 
     @Override
     public void onPause() {
         super.onPause();
         WatchScheduler.setUiForeground(this, false);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != NOTIFICATION_REQUEST) return;
-        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            AlertPoster.ensure(this);
-            WatchScheduler.ensureWatching(this);
-            WatchScheduler.arm(this);
-        }
-    }
-
-    /**
-     * Android 13+ drops every notification until POST_NOTIFICATIONS is granted.
-     * The WebView Notification API does not show that dialog, so ask here once.
-     */
-    private void maybeAskNotifications() {
-        if (Build.VERSION.SDK_INT < 33) return;
-        if (NotificationManagerCompat.from(this).areNotificationsEnabled()) return;
-        SharedPreferences prefs = getSharedPreferences(WatchScheduler.PREFS, MODE_PRIVATE);
-        if (prefs.getBoolean(WatchScheduler.ASKED_NOTIFICATIONS, false)) return;
-        prefs.edit().putBoolean(WatchScheduler.ASKED_NOTIFICATIONS, true).apply();
-        ActivityCompat.requestPermissions(this, new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_REQUEST);
     }
 }

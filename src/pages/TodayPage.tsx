@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
 import { DateBar, ErrorBanner, FilterChips } from '../components/Chrome';
 import { applyFilter, type BoardFilter } from '../lib/group';
@@ -12,6 +13,7 @@ export function TodayPage() {
 
   return (
     <>
+      <LiveAlertsBanner />
       <DateBar />
       <FilterChips value={filter} onChange={setFilter} />
       {feedNote && (

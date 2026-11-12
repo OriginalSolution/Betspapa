@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
+import { AlertSetupProvider } from './components/AlertSetup';
 import { Rail, SideNav, TabBar, Toasts, TopBar } from './components/Chrome';
 import { FollowingPage } from './pages/FollowingPage';
 import { InboxPage } from './pages/InboxPage';
@@ -55,30 +56,32 @@ export function App() {
   }, []);
 
   return (
-    <div className="shell">
-      <SideNav />
-      <div className="center">
-        <TopBar title={title} />
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<TodayPage />} />
-            <Route path="/live" element={<LivePage />} />
-            <Route path="/picks" element={<PicksPage />} />
-            <Route path="/trends" element={<TrendsPage />} />
-            <Route path="/slips" element={<SlipsPage />} />
-            <Route path="/rankings" element={<RankingsPage />} />
-            <Route path="/lists" element={<ListsPage />} />
-            <Route path="/more" element={<MorePage />} />
-            <Route path="/following" element={<FollowingPage />} />
-            <Route path="/inbox" element={<InboxPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/match/:id" element={<MatchPage />} />
-          </Routes>
-        </main>
+    <AlertSetupProvider>
+      <div className="shell">
+        <SideNav />
+        <div className="center">
+          <TopBar title={title} />
+          <main className="main">
+            <Routes>
+              <Route path="/" element={<TodayPage />} />
+              <Route path="/live" element={<LivePage />} />
+              <Route path="/picks" element={<PicksPage />} />
+              <Route path="/trends" element={<TrendsPage />} />
+              <Route path="/slips" element={<SlipsPage />} />
+              <Route path="/rankings" element={<RankingsPage />} />
+              <Route path="/lists" element={<ListsPage />} />
+              <Route path="/more" element={<MorePage />} />
+              <Route path="/following" element={<FollowingPage />} />
+              <Route path="/inbox" element={<InboxPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/match/:id" element={<MatchPage />} />
+            </Routes>
+          </main>
+        </div>
+        <Rail />
+        <TabBar />
+        <Toasts />
       </div>
-      <Rail />
-      <TabBar />
-      <Toasts />
-    </div>
+    </AlertSetupProvider>
   );
 }
