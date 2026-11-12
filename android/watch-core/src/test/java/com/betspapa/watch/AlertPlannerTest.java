@@ -96,6 +96,75 @@ public class AlertPlannerTest {
     }
 
     @Test
+    public void goalsDiffAgainstTheLastConfirmedScore() {
+        WatchState state = followed();
+        WatchMatch live = match();
+        live.status = "live";
+        live.minute = 20;
+        live.homeScore = 1;
+        live.awayScore = 0;
+        live.seenHome = 0;
+        live.seenAway = 0;
+        List<WatchNote> first = AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 20 * 60_000L);
+        assertTrue(kinds(first).contains("goal"));
+        assertFalse(kinds(first).contains("var"));
+        for (WatchNote note : first) state.record(note, KICK);
+        state.commitScores();
+        live.seenHome = 1;
+        assertFalse(kinds(AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 21 * 60_000L)).contains("goal"));
+
+        live.homeScore = 2;
+        List<WatchNote> next = AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 30 * 60_000L);
+        int goals = 0;
+        boolean second = false;
+        for (WatchNote note : next) {
+            if (!"goal".equals(note.kind)) continue;
+            goals++;
+            if (note.id.endsWith(":goal:home:2")) second = true;
+        }
+        assertEquals(1, goals);
+        assertTrue(second);
+    }
+
+    @Test
+    public void varHoldsTheGoalOnThatSideUntilTheReviewClears() {
+        WatchState state = followed();
+        WatchMatch live = match();
+        live.status = "live";
+        live.minute = 22;
+        live.homeScore = 1;
+        live.awayScore = 0;
+        live.seenHome = 0;
+        live.seenAway = 0;
+        WatchMatch.VarReview review = new WatchMatch.VarReview();
+        review.teamId = live.homeId;
+        review.player = "Striker";
+        review.minute = 22;
+        live.varReview = review;
+        String during = kinds(AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 22 * 60_000L));
+        assertTrue(during.contains("var"));
+        assertFalse(during.contains("goal"));
+        state.matches.add(live);
+        state.commitScores();
+        assertEquals(Integer.valueOf(0), live.seenHome);
+
+        live.varReview = null;
+        List<WatchNote> after = AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 24 * 60_000L);
+        assertTrue(kinds(after).contains("goal"));
+        assertFalse(kinds(after).contains("var"));
+    }
+
+    @Test
+    public void liveCountIgnoresMatchesThatAreNotInPlay() {
+        WatchState state = followed();
+        WatchMatch soon = match();
+        assertEquals(0, AlertPlanner.liveCount(java.util.Collections.singletonList(soon), state));
+        WatchMatch live = match();
+        live.status = "live";
+        assertEquals(1, AlertPlanner.liveCount(java.util.Collections.singletonList(live), state));
+    }
+
+    @Test
     public void varIsSentOnlyWhenAReviewIsPresent() {
         WatchState state = followed();
         WatchMatch quiet = match();

@@ -42,6 +42,16 @@ public final class AlertPlanner {
         return false;
     }
 
+    /** Followed matches that are actually in play, including half-time. */
+    public static int liveCount(List<WatchMatch> matches, WatchState state) {
+        int count = 0;
+        for (WatchMatch match : matches) {
+            if (!state.relevant(match)) continue;
+            if ("live".equals(match.status) || "halftime".equals(match.status)) count++;
+        }
+        return count;
+    }
+
     /**
      * When a kickoff is already known, wake at the start of its watch window.
      * Otherwise check the fixture list on the slow refresh, not every few seconds.
@@ -165,9 +175,12 @@ public final class AlertPlanner {
         String versus = match.home + " vs " + match.away;
         String current = scoreText(match.homeScore, match.awayScore);
         out.add(new WatchNote(match.id + ":kickoff", match.id, "kickoff", "Kick-off", versus + " is underway"));
+        boolean holdHome = false;
+        boolean holdAway = false;
         if (match.varReview != null) {
-            boolean home = match.homeId.equals(match.varReview.teamId);
-            String team = home ? match.home : match.away;
+            holdHome = match.homeId != null && match.homeId.equals(match.varReview.teamId);
+            holdAway = match.awayId != null && match.awayId.equals(match.varReview.teamId);
+            String team = holdHome ? match.home : match.away;
             String player = match.varReview.player == null || match.varReview.player.isEmpty() ? "Goal" : match.varReview.player;
             out.add(new WatchNote(
                 match.id + ":var:" + match.varReview.minute + ":" + player,
@@ -177,8 +190,16 @@ public final class AlertPlanner {
                 player + " " + match.varReview.minute + "′ · " + team + " goal under review"
             ));
         }
-        for (int index = 1; index <= count(match.homeScore); index++) out.add(goal(match, true, index));
-        for (int index = 1; index <= count(match.awayScore); index++) out.add(goal(match, false, index));
+        // Scores are diffed against the last confirmed tally. A goal on the side
+        // currently under VAR stays uncounted until that review leaves the feed.
+        int homeFloor = match.seenHome == null ? 0 : match.seenHome;
+        int awayFloor = match.seenAway == null ? 0 : match.seenAway;
+        if (!holdHome) {
+            for (int index = homeFloor + 1; index <= count(match.homeScore); index++) out.add(goal(match, true, index));
+        }
+        if (!holdAway) {
+            for (int index = awayFloor + 1; index <= count(match.awayScore); index++) out.add(goal(match, false, index));
+        }
         boolean pastHalf = "halftime".equals(match.status)
             || "finished".equals(match.status)
             || ("live".equals(match.status) && match.minute != null && match.minute >= 45);

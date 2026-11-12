@@ -62,6 +62,28 @@ public final class WatchState {
         return seen.contains(id);
     }
 
+    /** Move the confirmed score up to what the native feed just showed, unless that side is still under VAR. */
+    public void commitScores() {
+        for (WatchMatch match : matches) {
+            boolean holdHome = holding(match, true);
+            boolean holdAway = holding(match, false);
+            if (!holdHome) match.seenHome = score(match.homeScore);
+            else if (match.seenHome == null) match.seenHome = Math.max(0, score(match.homeScore) - 1);
+            if (!holdAway) match.seenAway = score(match.awayScore);
+            else if (match.seenAway == null) match.seenAway = Math.max(0, score(match.awayScore) - 1);
+        }
+    }
+
+    private static boolean holding(WatchMatch match, boolean home) {
+        if (match.varReview == null) return false;
+        String id = home ? match.homeId : match.awayId;
+        return id != null && id.equals(match.varReview.teamId);
+    }
+
+    private static int score(Integer value) {
+        return value == null ? 0 : value;
+    }
+
     public void record(WatchNote note, long now) {
         if (note == null || seen.contains(note.id)) return;
         JSONObject row = new JSONObject();
@@ -301,7 +323,29 @@ public final class WatchState {
             if (ids.contains(prior.id)) continue;
             if (keepWithoutFixture(prior, now)) matches.add(prior);
         }
+        for (WatchMatch match : matches) acknowledgeDisplayed(match);
         if (fixturesAt == 0L) fixturesAt = now;
+    }
+
+    /**
+     * The open app already shows this score, so a later background poll must not
+     * replay those goals. A lower stale sync does not rewind a higher confirmed tally.
+     */
+    private void acknowledgeDisplayed(WatchMatch match) {
+        int home = score(match.homeScore);
+        int away = score(match.awayScore);
+        int floorHome = match.seenHome == null ? 0 : match.seenHome;
+        int floorAway = match.seenAway == null ? 0 : match.seenAway;
+        for (int index = floorHome + 1; index <= home; index++) rememberSeen(match.id + ":goal:home:" + index);
+        for (int index = floorAway + 1; index <= away; index++) rememberSeen(match.id + ":goal:away:" + index);
+        match.seenHome = Math.max(floorHome, home);
+        match.seenAway = Math.max(floorAway, away);
+    }
+
+    private void rememberSeen(String id) {
+        if (id == null || id.isEmpty() || seen.contains(id)) return;
+        seen.add(id);
+        trim(seen, 400);
     }
 
     private static WatchMatch prefer(WatchMatch prior, WatchMatch incoming) {
@@ -316,6 +360,10 @@ public final class WatchState {
             if (incoming.kickoffMs > 0) prior.kickoffMs = incoming.kickoffMs;
             return prior;
         }
+        if (incoming.seenHome == null) incoming.seenHome = prior.seenHome;
+        else if (prior.seenHome != null) incoming.seenHome = Math.max(incoming.seenHome, prior.seenHome);
+        if (incoming.seenAway == null) incoming.seenAway = prior.seenAway;
+        else if (prior.seenAway != null) incoming.seenAway = Math.max(incoming.seenAway, prior.seenAway);
         return incoming;
     }
 
