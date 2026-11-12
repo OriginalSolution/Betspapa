@@ -72,6 +72,9 @@ public final class MatchParser {
         long kick = event.optLong("estimateStartTime", 0L);
         if (kick > 0 && kick < 10_000_000_000L) kick *= 1000L;
         WatchMatch match = scheduled(id, home, away, kick);
+        match.homeFull = home;
+        match.awayFull = away;
+        match.competition = competition == null ? "" : competition.trim();
         match.status = status;
         match.minute = liveMinute(event.optString("playedSeconds", ""), event.optString("matchStatus", ""));
         int[] score = pair(event.optString("setScore", ""));
@@ -98,7 +101,23 @@ public final class MatchParser {
             varReview.minute = review.optInt("minute", match.minute == null ? 0 : match.minute);
             match.varReview = varReview;
         }
+        readMarks(match, event.optJSONArray("timeline"));
+        if (match.markers.isEmpty()) readMarks(match, event.optJSONArray("incidents"));
         return match;
+    }
+
+    private static void readMarks(WatchMatch match, JSONArray rows) {
+        if (rows == null) return;
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) continue;
+            String type = row.optString("type", "").toLowerCase(Locale.US);
+            if (!"goal".equals(type) && !"yellow".equals(type) && !"red".equals(type) && !"var".equals(type)) continue;
+            String side = row.optString("side", row.optString("team", "")).toLowerCase(Locale.US);
+            String abbr = row.optString("abbr", "");
+            if (abbr.isEmpty()) abbr = "away".equals(side) ? match.abbrAway() : match.abbrHome();
+            match.addMarker(type, row.optInt("minute", match.minute == null ? 0 : match.minute), abbr);
+        }
     }
 
     static String liveStatus(String matchStatus, Integer numeric) {

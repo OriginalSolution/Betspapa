@@ -7,6 +7,7 @@ export const GOAL_SOUND_URL: Record<PlayableGoalSound, string> = {
   crowd: '/sounds/cheer-crowd.mp3',
   afro: '/sounds/cheer-afro.mp3',
   chant: '/sounds/cheer-chant.mp3',
+  papa: '/sounds/cheer-papa.mp3',
 };
 
 /** Android res/raw file, including the extension Capacitor expects on API 24–25. */
@@ -14,12 +15,14 @@ export const GOAL_NOTIFICATION_FILE: Record<PlayableGoalSound, string> = {
   crowd: 'cheer_crowd.mp3',
   afro: 'cheer_afro.mp3',
   chant: 'cheer_chant.mp3',
+  papa: 'cheer_papa.ogg',
 };
 
 /** One notification channel per cheer. Keep these ids in step with AlertPoster. */
 export function goalNotificationChannel(sound: GoalSound): string {
   if (sound === 'afro') return 'betspapa.goal.afro';
   if (sound === 'chant') return 'betspapa.goal.chant';
+  if (sound === 'papa') return 'betspapa.goal.papa';
   if (sound === 'off') return 'betspapa.goal.off';
   return 'betspapa.goal.crowd';
 }

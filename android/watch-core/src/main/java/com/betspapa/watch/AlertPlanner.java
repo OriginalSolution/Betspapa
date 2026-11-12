@@ -87,7 +87,23 @@ public final class AlertPlanner {
             String id = "trend:" + trend + ":hit";
             if (state.seen(id)) continue;
             String label = LABELS.get(parts[1]);
-            notes.add(new WatchNote(id, match.id, "win", "Trend hit · " + label, match.home + " vs " + match.away + " · " + label));
+            WatchNote note = new WatchNote(id, match.id, "win", "Trend hit · " + label, match.home + " vs " + match.away + " · " + label);
+            note.marketLabel = label;
+            note.fixture = match.abbrHome() + " vs " + match.abbrAway();
+            org.json.JSONObject booking = state.bookingFor(trend);
+            if (booking != null) {
+                String bookedLabel = booking.optString("marketLabel", "");
+                if (!bookedLabel.isEmpty()) note.marketLabel = bookedLabel;
+                String fixture = booking.optString("fixture", "");
+                if (!fixture.isEmpty()) note.fixture = fixture;
+                note.oddsText = booking.optString("odds", "");
+                String code = booking.optString("code", "");
+                if (!code.isEmpty()) {
+                    note.bookId = booking.optString("bookId", "");
+                    note.bookCode = code;
+                }
+            }
+            notes.add(note);
         }
         return notes;
     }
@@ -182,13 +198,17 @@ public final class AlertPlanner {
             holdAway = match.awayId != null && match.awayId.equals(match.varReview.teamId);
             String team = holdHome ? match.home : match.away;
             String player = match.varReview.player == null || match.varReview.player.isEmpty() ? "Goal" : match.varReview.player;
-            out.add(new WatchNote(
+            WatchNote review = new WatchNote(
                 match.id + ":var:" + match.varReview.minute + ":" + player,
                 match.id,
                 "var",
                 "VAR",
                 player + " " + match.varReview.minute + "′ · " + team + " goal under review"
-            ));
+            );
+            review.minute = match.varReview.minute;
+            review.player = player;
+            review.varCheck = true;
+            out.add(review);
         }
         // Scores are diffed against the last confirmed tally. A goal on the side
         // currently under VAR stays uncounted until that review leaves the feed.
@@ -220,13 +240,16 @@ public final class AlertPlanner {
     private static WatchNote goal(WatchMatch match, boolean home, int index) {
         String team = home ? match.home : match.away;
         String side = home ? "home" : "away";
-        return new WatchNote(
+        WatchNote note = new WatchNote(
             match.id + ":goal:" + side + ":" + index,
             match.id,
             "goal",
             "Goal · " + team,
             team + " score · " + match.home + " " + scoreText(match.homeScore, match.awayScore) + " " + match.away
         );
+        note.minute = match.minute;
+        note.player = team;
+        return note;
     }
 
     private static String scoreText(Integer home, Integer away) {

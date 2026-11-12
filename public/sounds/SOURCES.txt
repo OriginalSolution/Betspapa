@@ -47,3 +47,10 @@ slapback echoes, and a synthetic stadium reverb IR.
 
 Not used (explicitly avoided): Microsoft Edge TTS, Abena, F5-TTS Kafui,
 or any other third-party recorded / neural voice.
+
+cheer-papa
+----------
+Papa Shout recorded by the Betspapa owner, used with permission.
+About 3.0 s, 48 kHz stereo, peak near −8 dBFS, loudness-matched to
+the other cheers. The phone notification uses the Ogg file. In-app
+Preview plays the MP3 at the volume slider.

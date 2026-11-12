@@ -15,15 +15,21 @@ import androidx.core.app.NotificationManagerCompat;
 import com.betspapa.scores.MainActivity;
 import com.betspapa.scores.R;
 import com.betspapa.watch.AlertPlanner;
+import com.betspapa.watch.WatchMatch;
 import com.betspapa.watch.WatchNote;
 import com.betspapa.watch.WatchState;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class AlertPoster {
     static final String ALERTS = "betspapa.alerts";
     static final String WATCH = "betspapa.watch";
+    /** Ongoing score cards. Default importance, no sound, so they stay in the main shade. */
+    static final String SCORECARD = "betspapa.scorecard";
     static final String GOAL_CROWD = "betspapa.goal.crowd";
     static final String GOAL_AFRO = "betspapa.goal.afro";
     static final String GOAL_CHANT = "betspapa.goal.chant";
+    static final String GOAL_PAPA = "betspapa.goal.papa";
     static final String GOAL_OFF = "betspapa.goal.off";
 
     private AlertPoster() {}
@@ -40,6 +46,11 @@ public final class AlertPoster {
         watch.enableVibration(false);
         manager.createNotificationChannel(alerts);
         manager.createNotificationChannel(watch);
+        NotificationChannel scorecard = new NotificationChannel(SCORECARD, context.getString(R.string.scorecard_channel), NotificationManager.IMPORTANCE_DEFAULT);
+        scorecard.setDescription(context.getString(R.string.scorecard_channel_desc));
+        scorecard.setSound(null, null);
+        scorecard.enableVibration(false);
+        manager.createNotificationChannel(scorecard);
         // v0.3.0 moved goals off betspapa.alerts. A channel created without its cheer,
         // or deleted by the user, drops the post with no error. Refresh the four goal
         // channels once on this version, then recreate any that are missing.
@@ -54,6 +65,7 @@ public final class AlertPoster {
         goalChannel(manager, context, GOAL_CROWD, R.string.goal_channel_crowd, R.raw.cheer_crowd);
         goalChannel(manager, context, GOAL_AFRO, R.string.goal_channel_afro, R.raw.cheer_afro);
         goalChannel(manager, context, GOAL_CHANT, R.string.goal_channel_chant, R.raw.cheer_chant);
+        goalChannel(manager, context, GOAL_PAPA, R.string.goal_channel_papa, R.raw.cheer_papa);
         NotificationChannel silent = manager.getNotificationChannel(GOAL_OFF);
         if (silent != null && silent.getSound() != null) manager.deleteNotificationChannel(GOAL_OFF);
         silent = new NotificationChannel(GOAL_OFF, context.getString(R.string.goal_channel_off), NotificationManager.IMPORTANCE_HIGH);
@@ -87,6 +99,7 @@ public final class AlertPoster {
         if (!"goal".equals(kind)) return ALERTS;
         if ("afro".equals(goalSound)) return GOAL_AFRO;
         if ("chant".equals(goalSound)) return GOAL_CHANT;
+        if ("papa".equals(goalSound)) return GOAL_PAPA;
         if ("off".equals(goalSound)) return GOAL_OFF;
         return GOAL_CROWD;
     }
@@ -95,6 +108,7 @@ public final class AlertPoster {
         if (!"goal".equals(kind) || "off".equals(goalSound)) return null;
         if ("afro".equals(goalSound)) return rawUri(context, R.raw.cheer_afro);
         if ("chant".equals(goalSound)) return rawUri(context, R.raw.cheer_chant);
+        if ("papa".equals(goalSound)) return rawUri(context, R.raw.cheer_papa);
         return rawUri(context, R.raw.cheer_crowd);
     }
 
@@ -140,28 +154,166 @@ public final class AlertPoster {
     }
 
     static boolean post(Context context, WatchNote note, String goalSound) {
+        return post(context, note, goalSound, 0, false);
+    }
+
+    /**
+     * @param replaceId when non-zero, updates that notification instead of hashing the note id
+     */
+    static boolean post(Context context, WatchNote note, String goalSound, int replaceId, boolean onlyOnce) {
         ensure(context);
+        if (note == null) return false;
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
-        String channel = channelFor(note.kind, goalSound);
-        Uri sound = soundFor(context, note.kind, goalSound);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_stat_score)
-            .setContentTitle(note.title)
-            .setContentText(note.body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(note.body))
+        boolean goalChannel = "goal".equals(note.kind) || "var".equals(note.kind) || note.disallowed;
+        String channel = goalChannel ? channelFor("goal", goalSound) : channelFor(note.kind, goalSound);
+        int id = replaceId != 0 ? replaceId : AlertPlanner.notificationId(note.id);
+        if ("goal".equals(note.kind) && replaceId == 0) {
+            VarSlots.Slot slot = VarSlots.take(context, note.matchId);
+            if (slot != null) {
+                id = slot.id;
+                if (slot.player != null && !slot.player.isEmpty()) note.player = slot.player;
+                if (note.minute == null) note.minute = slot.minute;
+            }
+        }
+        if ("var".equals(note.kind) && !note.disallowed && replaceId == 0) {
+            VarSlots.remember(context, note.matchId, id, note.player, note.minute == null ? 0 : note.minute, note.id);
+        }
+        boolean silent = note.disallowed || "var".equals(note.kind) || ("goal".equals(note.kind) && "off".equals(goalSound));
+        WatchMatch match = findMatch(context, note.matchId);
+        boolean dark = NotifTheme.dark(context, styleOf(context));
+        NotificationCompat.Builder builder = base(context, channel, note.title, note.body)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
+            .setAutoCancel(!note.disallowed)
             .setCategory(Notification.CATEGORY_EVENT)
+            .setOnlyAlertOnce(onlyOnce || note.disallowed || "var".equals(note.kind))
+            .setGroup("betspapa-" + id)
             .setContentIntent(openApp(context));
-        if (sound != null) builder.setSound(sound);
-        else if ("goal".equals(note.kind)) builder.setSilent(true);
-        Notification notification = builder.build();
+        Uri sound = soundFor(context, "goal".equals(note.kind) ? "goal" : note.kind, goalSound);
+        if (silent || (sound == null && "goal".equals(note.kind))) builder.setSilent(true);
+        else if (sound != null && "goal".equals(note.kind)) builder.setSound(sound);
         try {
-            NotificationManagerCompat.from(context).notify(AlertPlanner.notificationId(note.id), notification);
+            ScoreCards.attach(context, builder, note, match, dark);
+        } catch (RuntimeException error) {
+            builder.setStyle(new NotificationCompat.BigTextStyle().bigText(note.body));
+        }
+        return notify(context, id, builder.build());
+    }
+
+    /** Ongoing score card. Same id per match. Score-unchanged updates do not alert again. */
+    static void postLive(Context context, WatchMatch match, boolean onlyAlertOnce) {
+        if (match == null || match.id == null || match.id.isEmpty()) return;
+        ensure(context);
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
+        WatchNote note = new WatchNote("live:" + match.id, match.id, "live", liveTitle(match), liveBody(match));
+        note.minute = match.minute;
+        boolean dark = NotifTheme.dark(context, styleOf(context));
+        NotificationCompat.Builder builder = base(context, SCORECARD, note.title, note.body)
+            .setOngoing(true)
+            .setOnlyAlertOnce(onlyAlertOnce)
+            .setGroup("betspapa-live-" + match.id)
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(openApp(context));
+        try {
+            ScoreCards.attach(context, builder, note, match, dark);
+        } catch (RuntimeException error) {
+            builder.setStyle(new NotificationCompat.BigTextStyle().bigText(note.body));
+        }
+        notify(context, AlertPlanner.notificationId("live:" + match.id), builder.build());
+    }
+
+    static void refreshLive(Context context) {
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        SharedPreferences prefs = context.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE);
+        Set<String> liveIds = new HashSet<String>();
+        if (state.browser && NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            for (WatchMatch match : state.matches) {
+                if (!state.relevant(match)) continue;
+                boolean live = "live".equals(match.status) || "halftime".equals(match.status);
+                if (!live) continue;
+                liveIds.add(match.id);
+                String sig = score(match.homeScore) + "-" + score(match.awayScore);
+                String key = "live-sig-" + match.id;
+                boolean changed = !sig.equals(prefs.getString(key, ""));
+                postLive(context, match, !changed);
+                prefs.edit().putString(key, sig).apply();
+            }
+        }
+        String previous = prefs.getString("live-ids", "");
+        for (String id : previous.split(",")) {
+            if (id.isEmpty() || liveIds.contains(id)) continue;
+            NotificationManagerCompat.from(context).cancel(AlertPlanner.notificationId("live:" + id));
+            prefs.edit().remove("live-sig-" + id).apply();
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String id : liveIds) {
+            if (joined.length() > 0) joined.append(',');
+            joined.append(id);
+        }
+        prefs.edit().putString("live-ids", joined.toString()).apply();
+    }
+
+    /** A VAR review that did not become a goal updates the same notification. */
+    static void settleDisallowed(Context context) {
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        String sound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
+        for (WatchMatch match : state.matches) {
+            if (match.varReview != null) continue;
+            VarSlots.Slot slot = VarSlots.peek(context, match.id);
+            if (slot == null) continue;
+            VarSlots.take(context, match.id);
+            WatchNote note = new WatchNote(slot.noteId.isEmpty() ? match.id + ":var:disallowed" : slot.noteId, match.id, "var", "VAR", "Disallowed");
+            note.player = slot.player;
+            note.minute = slot.minute;
+            note.disallowed = true;
+            post(context, note, sound, slot.id, true);
+        }
+    }
+
+    private static NotificationCompat.Builder base(Context context, String channel, String title, String body) {
+        return new NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.ic_stat_score)
+            .setColor(0xFFE11D2E)
+            .setContentTitle(title == null ? "" : title)
+            .setContentText(body == null ? "" : body);
+    }
+
+    private static boolean notify(Context context, int id, Notification notification) {
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification);
             return true;
         } catch (SecurityException error) {
             return false;
         }
+    }
+
+    private static WatchMatch findMatch(Context context, String id) {
+        if (id == null || id.isEmpty()) return null;
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        for (WatchMatch match : state.matches) {
+            if (id.equals(match.id)) return match;
+        }
+        return null;
+    }
+
+    private static String styleOf(Context context) {
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        return state.notificationStyle == null ? "auto" : state.notificationStyle;
+    }
+
+    private static String liveTitle(WatchMatch match) {
+        int home = score(match.homeScore);
+        int away = score(match.awayScore);
+        return "LIVE · " + match.home + " " + home + "\u2013" + away + " " + match.away;
+    }
+
+    private static String liveBody(WatchMatch match) {
+        if (match.competition != null && !match.competition.isEmpty()) return match.competition;
+        return "Live score";
+    }
+
+    private static int score(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private static PendingIntent openApp(Context context) {

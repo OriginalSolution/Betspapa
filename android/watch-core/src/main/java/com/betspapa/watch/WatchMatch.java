@@ -1,5 +1,9 @@
 package com.betspapa.watch;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** A fixture the watcher can score. Names are the public labels from Betspapa fixtures. */
@@ -9,6 +13,15 @@ public final class WatchMatch {
     public String home = "";
     public String awayId = "";
     public String away = "";
+    public String homeFull = "";
+    public String awayFull = "";
+    public String homeAbbr = "";
+    public String awayAbbr = "";
+    public String homeColor = "";
+    public String awayColor = "";
+    public String homeCrest = "";
+    public String awayCrest = "";
+    public String competition = "";
     public long kickoffMs;
     public String status = "scheduled";
     public Integer minute;
@@ -20,6 +33,7 @@ public final class WatchMatch {
     /** Last confirmed score. Null means this match has not been diffed yet. */
     public Integer seenHome;
     public Integer seenAway;
+    public final List<Marker> markers = new ArrayList<Marker>();
 
     public static final class VarReview {
         public String teamId = "";
@@ -31,6 +45,21 @@ public final class WatchMatch {
             next.teamId = teamId;
             next.player = player;
             next.minute = minute;
+            return next;
+        }
+    }
+
+    /** A goal, card, or VAR mark on the 0′–90′ pitch line. */
+    public static final class Marker {
+        public String type = "";
+        public int minute;
+        public String abbr = "";
+
+        Marker copy() {
+            Marker next = new Marker();
+            next.type = type;
+            next.minute = minute;
+            next.abbr = abbr;
             return next;
         }
     }
@@ -52,7 +81,93 @@ public final class WatchMatch {
         next.varReview = varReview == null ? null : varReview.copy();
         next.seenHome = seenHome;
         next.seenAway = seenAway;
+        next.homeFull = homeFull;
+        next.awayFull = awayFull;
+        next.homeAbbr = homeAbbr;
+        next.awayAbbr = awayAbbr;
+        next.homeColor = homeColor;
+        next.awayColor = awayColor;
+        next.homeCrest = homeCrest;
+        next.awayCrest = awayCrest;
+        next.competition = competition;
+        for (Marker marker : markers) next.markers.add(marker.copy());
         return next;
+    }
+
+    public String abbrHome() {
+        return label(homeAbbr, homeFull.isEmpty() ? home : homeFull);
+    }
+
+    public String abbrAway() {
+        return label(awayAbbr, awayFull.isEmpty() ? away : awayFull);
+    }
+
+    public String fullHome() {
+        if (homeFull != null && !homeFull.isEmpty()) return homeFull;
+        return home == null ? "" : home;
+    }
+
+    public String fullAway() {
+        if (awayFull != null && !awayFull.isEmpty()) return awayFull;
+        return away == null ? "" : away;
+    }
+
+    /** Same two-letter rule the board uses: first letters, or the first three of a single word. */
+    public static String label(String abbr, String name) {
+        if (abbr != null && !abbr.trim().isEmpty()) return clip(abbr);
+        String source = name == null ? "" : name.replaceAll("[^A-Za-z ]", "").trim();
+        String[] parts = source.split("\\s+");
+        int words = 0;
+        for (String part : parts) if (!part.isEmpty()) words++;
+        if (words >= 2) {
+            StringBuilder built = new StringBuilder();
+            for (String part : parts) {
+                if (part.isEmpty()) continue;
+                built.append(Character.toUpperCase(part.charAt(0)));
+                if (built.length() == 2) break;
+            }
+            return built.toString();
+        }
+        return clip(source);
+    }
+
+    public void addMarker(String type, int minute, String abbr) {
+        if (type == null || type.isEmpty()) return;
+        int at = Math.max(0, Math.min(130, minute));
+        String tag = abbr == null ? "" : abbr;
+        for (Marker marker : markers) {
+            if (type.equals(marker.type) && marker.minute == at && tag.equals(marker.abbr)) return;
+        }
+        Marker marker = new Marker();
+        marker.type = type;
+        marker.minute = at;
+        marker.abbr = tag;
+        markers.add(marker);
+    }
+
+    /** Keep crest, names, and pitch marks when a newer row only has the score. */
+    public void keepDisplayFrom(WatchMatch prior) {
+        if (prior == null) return;
+        if (homeFull.isEmpty()) homeFull = prior.homeFull;
+        if (awayFull.isEmpty()) awayFull = prior.awayFull;
+        if (homeAbbr.isEmpty()) homeAbbr = prior.homeAbbr;
+        if (awayAbbr.isEmpty()) awayAbbr = prior.awayAbbr;
+        if (homeColor.isEmpty()) homeColor = prior.homeColor;
+        if (awayColor.isEmpty()) awayColor = prior.awayColor;
+        if (homeCrest.isEmpty()) homeCrest = prior.homeCrest;
+        if (awayCrest.isEmpty()) awayCrest = prior.awayCrest;
+        if (competition.isEmpty()) competition = prior.competition;
+        if (markers.isEmpty()) {
+            for (Marker marker : prior.markers) markers.add(marker.copy());
+        } else {
+            for (Marker marker : prior.markers) addMarker(marker.type, marker.minute, marker.abbr);
+        }
+    }
+
+    private static String clip(String value) {
+        String clean = value == null ? "" : value.trim().toUpperCase(Locale.US);
+        if (clean.isEmpty()) return "TM";
+        return clean.length() <= 3 ? clean : clean.substring(0, 3);
     }
 
     JSONObject toJson() {
@@ -71,6 +186,24 @@ public final class WatchMatch {
         json.put("htAway", htAway);
         json.put("seenHome", seenHome);
         json.put("seenAway", seenAway);
+        json.put("homeFull", homeFull);
+        json.put("awayFull", awayFull);
+        json.put("homeAbbr", homeAbbr);
+        json.put("awayAbbr", awayAbbr);
+        json.put("homeColor", homeColor);
+        json.put("awayColor", awayColor);
+        json.put("homeCrest", homeCrest);
+        json.put("awayCrest", awayCrest);
+        json.put("competition", competition);
+        JSONArray marks = new JSONArray();
+        for (Marker marker : markers) {
+            JSONObject row = new JSONObject();
+            row.put("type", marker.type);
+            row.put("minute", marker.minute);
+            row.put("abbr", marker.abbr);
+            marks.put(row);
+        }
+        json.put("markers", marks);
         if (varReview != null) {
             JSONObject review = new JSONObject();
             review.put("teamId", varReview.teamId);
@@ -91,6 +224,15 @@ public final class WatchMatch {
         match.home = json.optString("home", "");
         match.awayId = json.optString("awayId", "");
         match.away = json.optString("away", "");
+        match.homeFull = json.optString("homeFull", "");
+        match.awayFull = json.optString("awayFull", "");
+        match.homeAbbr = json.optString("homeAbbr", "");
+        match.awayAbbr = json.optString("awayAbbr", "");
+        match.homeColor = json.optString("homeColor", "");
+        match.awayColor = json.optString("awayColor", "");
+        match.homeCrest = json.optString("homeCrest", "");
+        match.awayCrest = json.optString("awayCrest", "");
+        match.competition = json.optString("competition", "");
         match.kickoffMs = json.optLong("kickoffMs", 0L);
         if (match.kickoffMs == 0L && json.has("kickoff")) match.kickoffMs = WatchClock.parseIso(json.optString("kickoff", ""));
         match.status = json.optString("status", "scheduled");
@@ -109,6 +251,14 @@ public final class WatchMatch {
             varReview.player = review.optString("player", "Goal");
             varReview.minute = review.optInt("minute", 0);
             match.varReview = varReview;
+        }
+        JSONArray marks = json.optJSONArray("markers");
+        if (marks != null) {
+            for (int i = 0; i < marks.length(); i++) {
+                JSONObject row = marks.optJSONObject(i);
+                if (row == null) continue;
+                match.addMarker(row.optString("type", ""), row.optInt("minute", 0), row.optString("abbr", ""));
+            }
         }
         return match;
     }

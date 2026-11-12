@@ -70,6 +70,16 @@
             android:exported="false" />
 
         <receiver
+            android:name=".watch.NotificationActionReceiver"
+            android:exported="false" />
+
+        <activity
+            android:name=".watch.NotifToastActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/NotifToastTheme" />
+
+        <receiver
             android:name=".watch.BootReceiver"
             android:exported="true">
             <intent-filter>

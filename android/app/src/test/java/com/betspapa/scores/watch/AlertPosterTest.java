@@ -65,6 +65,7 @@ public class AlertPosterTest {
 
         assertTrue(AlertPoster.post(context, new WatchNote("qc:afro", "sr:match:1", "goal", "Goal", "Afrobeats"), "afro"));
         assertTrue(AlertPoster.post(context, new WatchNote("qc:chant", "sr:match:1", "goal", "Goal", "Chant"), "chant"));
+        assertTrue(AlertPoster.post(context, new WatchNote("qc:papa", "sr:match:1", "goal", "Goal", "Papa"), "papa"));
         assertTrue(AlertPoster.post(context, new WatchNote("qc:off", "sr:match:1", "goal", "Goal", "Silent"), "off"));
         assertTrue(AlertPoster.post(context, new WatchNote("qc:kick", "sr:match:1", "kickoff", "Kick-off", "Hearts"), "chant"));
 
@@ -76,6 +77,10 @@ public class AlertPosterTest {
             "android.resource://" + context.getPackageName() + "/" + com.betspapa.scores.R.raw.cheer_chant,
             AlertPoster.soundFor(context, "goal", "chant").toString()
         );
+        assertEquals(
+            "android.resource://" + context.getPackageName() + "/" + com.betspapa.scores.R.raw.cheer_papa,
+            AlertPoster.soundFor(context, "goal", "papa").toString()
+        );
         assertEquals(null, AlertPoster.soundFor(context, "goal", "off"));
         assertEquals(null, AlertPoster.soundFor(context, "kickoff", "chant"));
         NotificationChannel silent = manager.getNotificationChannel(AlertPoster.GOAL_OFF);
@@ -83,17 +88,20 @@ public class AlertPosterTest {
 
         String afroId = null;
         String chantId = null;
+        String papaId = null;
         String offId = null;
         String kickId = null;
         for (Notification note : shadowOf(manager).getAllNotifications()) {
             String title = String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TEXT));
             if ("Afrobeats".equals(title)) afroId = note.getChannelId();
             if ("Chant".equals(title)) chantId = note.getChannelId();
+            if ("Papa".equals(title)) papaId = note.getChannelId();
             if ("Silent".equals(title)) offId = note.getChannelId();
             if ("Hearts".equals(title)) kickId = note.getChannelId();
         }
         assertEquals(AlertPoster.GOAL_AFRO, afroId);
         assertEquals(AlertPoster.GOAL_CHANT, chantId);
+        assertEquals(AlertPoster.GOAL_PAPA, papaId);
         assertEquals(AlertPoster.GOAL_OFF, offId);
         assertEquals(AlertPoster.ALERTS, kickId);
     }

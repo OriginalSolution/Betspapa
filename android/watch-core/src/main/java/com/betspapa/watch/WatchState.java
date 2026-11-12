@@ -23,6 +23,8 @@ public final class WatchState {
     public boolean ft = true;
     public boolean varOn = true;
     public String goalSound = "crowd";
+    /** auto follows the phone night mode. dark is the Red Ticker. light is the white score panel. */
+    public String notificationStyle = "auto";
     public final List<String> matchIds = new ArrayList<String>();
     public final List<String> teamIds = new ArrayList<String>();
     public final List<String> trends = new ArrayList<String>();
@@ -30,7 +32,29 @@ public final class WatchState {
     public final List<String> sent = new ArrayList<String>();
     public final List<JSONObject> inbox = new ArrayList<JSONObject>();
     public final List<WatchMatch> matches = new ArrayList<WatchMatch>();
+    public final List<String> muted = new ArrayList<String>();
+    public final List<JSONObject> bookings = new ArrayList<JSONObject>();
     public long fixturesAt;
+
+    public boolean muted(String matchId) {
+        return matchId != null && !matchId.isEmpty() && muted.contains(matchId);
+    }
+
+    public void mute(String matchId) {
+        if (matchId == null || matchId.isEmpty() || muted.contains(matchId)) return;
+        muted.add(matchId);
+    }
+
+    public JSONObject bookingFor(String trendId) {
+        if (trendId == null || trendId.isEmpty()) return null;
+        JSONObject fallback = null;
+        for (JSONObject row : bookings) {
+            if (!trendId.equals(row.optString("id", ""))) continue;
+            if (!row.optString("code", "").isEmpty()) return row;
+            fallback = row;
+        }
+        return fallback;
+    }
 
     public boolean hasInterest() {
         return !matchIds.isEmpty() || !teamIds.isEmpty() || !trends.isEmpty();
@@ -94,6 +118,15 @@ public final class WatchState {
         row.put("body", note.body);
         row.put("createdAt", now);
         row.put("read", false);
+        if (note.minute != null) row.put("minute", note.minute);
+        if (note.player != null && !note.player.isEmpty()) row.put("player", note.player);
+        if (note.varCheck) row.put("varCheck", true);
+        if (note.disallowed) row.put("disallowed", true);
+        if (note.marketLabel != null) row.put("marketLabel", note.marketLabel);
+        if (note.oddsText != null) row.put("oddsText", note.oddsText);
+        if (note.bookId != null) row.put("bookId", note.bookId);
+        if (note.bookCode != null) row.put("bookCode", note.bookCode);
+        if (note.fixture != null) row.put("fixture", note.fixture);
         inbox.add(0, row);
         seen.add(note.id);
         while (inbox.size() > 120) inbox.remove(inbox.size() - 1);
@@ -105,7 +138,17 @@ public final class WatchState {
         for (JSONObject row : inbox) {
             String id = row.optString("id", "");
             if (id.isEmpty() || sent.contains(id)) continue;
-            pending.add(new WatchNote(id, row.optString("matchId", ""), row.optString("kind", ""), row.optString("title", ""), row.optString("body", "")));
+            WatchNote note = new WatchNote(id, row.optString("matchId", ""), row.optString("kind", ""), row.optString("title", ""), row.optString("body", ""));
+            if (row.has("minute") && !row.isNull("minute")) note.minute = row.optInt("minute");
+            note.player = row.optString("player", "");
+            note.varCheck = row.optBoolean("varCheck", false);
+            note.disallowed = row.optBoolean("disallowed", false);
+            note.marketLabel = row.optString("marketLabel", "");
+            note.oddsText = row.optString("oddsText", "");
+            note.bookId = row.optString("bookId", "");
+            note.bookCode = row.optString("bookCode", "");
+            note.fixture = row.optString("fixture", "");
+            pending.add(note);
         }
         return pending;
     }
@@ -130,6 +173,7 @@ public final class WatchState {
                 String normalized = normalizeGoalSound(settings.optString("goalSound", ""));
                 if (normalized != null) goalSound = normalized;
             }
+            if (settings.has("notificationStyle")) notificationStyle = normalizeStyle(settings.optString("notificationStyle", "auto"));
         }
         JSONObject follows = patch.optJSONObject("follows");
         if (follows != null) {
@@ -154,6 +198,11 @@ public final class WatchState {
         union(sent, patch.optJSONArray("sent"), 400);
         if (patch.has("inbox")) mergeInbox(patch.optJSONArray("inbox"), patch.optBoolean("replaceInbox", false));
         if (patch.has("schedule")) replaceSchedule(patch.optJSONArray("schedule"), System.currentTimeMillis());
+        if (patch.has("muted")) {
+            muted.clear();
+            addStrings(muted, patch.optJSONArray("muted"));
+        }
+        if (patch.has("bookings")) replaceBookings(patch.optJSONArray("bookings"));
     }
 
     public void replaceFromFeed(List<WatchMatch> upcoming, long now) {
@@ -188,6 +237,7 @@ public final class WatchState {
                 matches.add(update);
                 continue;
             }
+            noteMarkers(prior, update);
             prior.status = update.status;
             prior.minute = update.minute;
             prior.homeScore = update.homeScore;
@@ -196,10 +246,24 @@ public final class WatchState {
             prior.htAway = update.htAway;
             prior.varReview = update.varReview;
             if (update.kickoffMs > 0) prior.kickoffMs = update.kickoffMs;
-            if (!update.home.isEmpty()) prior.home = update.home;
-            if (!update.away.isEmpty()) prior.away = update.away;
+            if (!update.home.isEmpty() && (prior.home.isEmpty() || update.home.length() <= prior.home.length() + 1)) prior.home = update.home;
+            if (!update.away.isEmpty() && (prior.away.isEmpty() || update.away.length() <= prior.away.length() + 1)) prior.away = update.away;
+            if (prior.homeFull.isEmpty() || update.homeFull.length() > prior.homeFull.length()) {
+                prior.homeFull = update.homeFull.isEmpty() ? update.home : update.homeFull;
+            }
+            if (prior.awayFull.isEmpty() || update.awayFull.length() > prior.awayFull.length()) {
+                prior.awayFull = update.awayFull.isEmpty() ? update.away : update.awayFull;
+            }
+            if (!update.homeAbbr.isEmpty()) prior.homeAbbr = update.homeAbbr;
+            if (!update.awayAbbr.isEmpty()) prior.awayAbbr = update.awayAbbr;
+            if (!update.homeColor.isEmpty()) prior.homeColor = update.homeColor;
+            if (!update.awayColor.isEmpty()) prior.awayColor = update.awayColor;
+            if (!update.homeCrest.isEmpty()) prior.homeCrest = update.homeCrest;
+            if (!update.awayCrest.isEmpty()) prior.awayCrest = update.awayCrest;
+            if (!update.competition.isEmpty()) prior.competition = update.competition;
             if (!update.homeId.isEmpty()) prior.homeId = update.homeId;
             if (!update.awayId.isEmpty()) prior.awayId = update.awayId;
+            for (WatchMatch.Marker marker : update.markers) prior.addMarker(marker.type, marker.minute, marker.abbr);
         }
         if (!live.isEmpty()) {
             for (WatchMatch match : matches) {
@@ -220,6 +284,7 @@ public final class WatchState {
         settings.put("ft", ft);
         settings.put("var", varOn);
         settings.put("goalSound", goalSound == null ? "crowd" : goalSound);
+        settings.put("notificationStyle", notificationStyle == null ? "auto" : notificationStyle);
         json.put("settings", settings);
         JSONObject follows = new JSONObject();
         follows.put("matches", new JSONArray(matchIds));
@@ -238,6 +303,8 @@ public final class WatchState {
         JSONArray listed = new JSONArray();
         for (WatchMatch match : matches) listed.put(match.toJson());
         json.put("matches", listed);
+        json.put("muted", new JSONArray(muted));
+        json.put("bookings", new JSONArray(bookings));
         json.put("fixturesAt", fixturesAt);
         json.put("source", MatchFeeds.SOURCE_LABEL);
         return json;
@@ -364,7 +431,35 @@ public final class WatchState {
         else if (prior.seenHome != null) incoming.seenHome = Math.max(incoming.seenHome, prior.seenHome);
         if (incoming.seenAway == null) incoming.seenAway = prior.seenAway;
         else if (prior.seenAway != null) incoming.seenAway = Math.max(incoming.seenAway, prior.seenAway);
+        noteMarkers(prior, incoming);
+        incoming.keepDisplayFrom(prior);
         return incoming;
+    }
+
+    /** Goals the watcher actually sees get a minute mark. A repeated score does not add another. */
+    private static void noteMarkers(WatchMatch prior, WatchMatch update) {
+        if (prior == null || update == null) return;
+        int minute = update.minute == null ? (prior.minute == null ? 0 : prior.minute) : update.minute;
+        int prevHome = prior.homeScore == null ? 0 : prior.homeScore;
+        int prevAway = prior.awayScore == null ? 0 : prior.awayScore;
+        int nextHome = update.homeScore == null ? prevHome : update.homeScore;
+        int nextAway = update.awayScore == null ? prevAway : update.awayScore;
+        for (int index = prevHome; index < nextHome; index++) prior.addMarker("goal", minute, prior.abbrHome());
+        for (int index = prevAway; index < nextAway; index++) prior.addMarker("goal", minute, prior.abbrAway());
+        if (update.varReview != null) {
+            boolean home = prior.homeId != null && prior.homeId.equals(update.varReview.teamId);
+            prior.addMarker("var", update.varReview.minute, home ? prior.abbrHome() : prior.abbrAway());
+        }
+    }
+
+    private void replaceBookings(JSONArray incoming) {
+        bookings.clear();
+        if (incoming == null) return;
+        for (int i = 0; i < incoming.length(); i++) {
+            JSONObject row = incoming.optJSONObject(i);
+            if (row == null || row.optString("id", "").isEmpty()) continue;
+            bookings.add(row);
+        }
     }
 
     private static boolean keepWithoutFixture(WatchMatch match, long now) {
@@ -405,9 +500,14 @@ public final class WatchState {
     }
 
     static String normalizeGoalSound(String value) {
-        if ("crowd".equals(value) || "afro".equals(value) || "chant".equals(value) || "off".equals(value)) return value;
+        if ("crowd".equals(value) || "afro".equals(value) || "chant".equals(value) || "papa".equals(value) || "off".equals(value)) return value;
         if ("cheer".equals(value)) return "crowd";
         return null;
+    }
+
+    public static String normalizeStyle(String value) {
+        if ("dark".equals(value) || "light".equals(value) || "auto".equals(value)) return value;
+        return "auto";
     }
 
     private static void addStrings(List<String> into, JSONArray incoming) {

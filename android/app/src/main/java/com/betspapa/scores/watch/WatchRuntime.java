@@ -60,7 +60,14 @@ final class WatchRuntime {
                 for (WatchNote note : AlertPlanner.notices(state.matches, state, now)) state.record(note, now);
                 state.commitScores();
                 state.save(WatchFiles.file(app));
-                pending = new ArrayList<WatchNote>(state.pendingNotifications());
+                pending = new ArrayList<WatchNote>();
+                for (WatchNote note : state.pendingNotifications()) {
+                    if (state.muted(note.matchId)) {
+                        state.markSent(note.id);
+                        continue;
+                    }
+                    pending.add(note);
+                }
                 hot = AlertPlanner.shouldWatch(state.matches, state, now);
                 aboutToStart = hot && !inPlay(state, now);
                 goalSound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
@@ -84,6 +91,12 @@ final class WatchRuntime {
             boolean hot = state.browser && state.hasInterest() && AlertPlanner.shouldWatch(state.matches, state, System.currentTimeMillis());
             return new PollResult(hot, false, 60_000L);
         } finally {
+            try {
+                AlertPoster.settleDisallowed(app);
+                AlertPoster.refreshLive(app);
+            } catch (RuntimeException ignored) {
+                /* a card failure must not stop the next poll */
+            }
             if (lock != null && lock.isHeld()) lock.release();
             BUSY.set(false);
         }

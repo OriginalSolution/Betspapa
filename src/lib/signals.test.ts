@@ -12,6 +12,7 @@ const settings: Settings = {
   var: true,
   goalSound: 'crowd',
   goalVolume: 60,
+  notificationStyle: 'auto',
   dataSource: 'sporty',
 };
 
