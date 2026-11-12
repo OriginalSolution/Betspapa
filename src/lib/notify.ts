@@ -90,6 +90,7 @@ export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSo
         goalSound,
         varCheck: item.kind === 'var',
         minute: match?.minute ?? null,
+        player: match?.events.find((event) => event.id === item.id)?.player || '',
         home: match?.home.shortName,
         away: match?.away.shortName,
         homeFull: match?.home.name,

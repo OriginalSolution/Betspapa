@@ -8,7 +8,6 @@ import android.os.Build;
 import android.view.View;
 import android.widget.RemoteViews;
 import androidx.core.app.NotificationCompat;
-import com.betspapa.scores.MainActivity;
 import com.betspapa.scores.R;
 import com.betspapa.watch.WatchMatch;
 import com.betspapa.watch.WatchNote;
@@ -27,6 +26,7 @@ final class ScoreCards {
     static RemoteViews collapsed(Context context, WatchNote note, WatchMatch match) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.notif_collapsed);
         views.setFloat(R.id.collapsed_brand, "setLetterSpacing", 0.08f);
+        views.setOnClickPendingIntent(R.id.notif_collapsed, OpenMatch.forNote(context, note));
         boolean trend = trend(note);
         if (trend) {
             views.setTextViewText(R.id.collapsed_score, "TREND HIT");
@@ -53,6 +53,10 @@ final class ScoreCards {
         int muted = dark ? 0xFFA7ACB8 : 0xFF5E6573;
         int secondary = dark ? R.drawable.notif_btn_secondary_dark : R.drawable.notif_btn_secondary_light;
         views.setInt(R.id.panel, "setBackgroundResource", panel);
+        PendingIntent open = OpenMatch.forNote(context, note);
+        views.setOnClickPendingIntent(R.id.card_root, open);
+        views.setOnClickPendingIntent(R.id.strip, open);
+        views.setOnClickPendingIntent(R.id.panel, open);
         views.setTextViewText(R.id.strip_status, strip(note, match));
         if (trend(note)) views.setViewVisibility(R.id.strip_dot, View.GONE);
 
@@ -79,7 +83,7 @@ final class ScoreCards {
             views.setImageViewBitmap(R.id.crest_home_lg, crest(context, match, true, dp(context, 36)));
             views.setImageViewBitmap(R.id.crest_away_lg, crest(context, match, false, dp(context, 36)));
         }
-        String scorer = scorer(note);
+        String scorer = scorer(note, match);
         boolean chip = note.varCheck || note.disallowed;
         if (scorer.isEmpty() && !chip) {
             views.setViewVisibility(R.id.scorer_row, View.GONE);
@@ -132,7 +136,6 @@ final class ScoreCards {
         views.setInt(R.id.action_tertiary, "setBackgroundResource", secondary);
         views.setTextColor(R.id.action_secondary, text);
         views.setTextColor(R.id.action_tertiary, text);
-        PendingIntent open = openApp(context, note.matchId);
         if (showTrend && note.bookCode != null && !note.bookCode.isEmpty()) {
             views.setTextViewText(R.id.action_primary, "Copy code");
             views.setTextViewText(R.id.action_secondary, "Open");
@@ -207,9 +210,23 @@ final class ScoreCards {
         return -1;
     }
 
-    private static String scorer(WatchNote note) {
-        if (note == null || note.player == null || note.player.isEmpty()) return "";
-        return note.minute == null ? note.player : note.player + " " + note.minute + "′";
+    private static String scorer(WatchNote note, WatchMatch match) {
+        if (note != null && !"live".equals(note.kind) && note.player != null && !note.player.isEmpty()) {
+            return note.minute == null ? note.player : note.player + " " + note.minute + "′";
+        }
+        WatchMatch.Marker latest = null;
+        if (match != null) {
+            for (WatchMatch.Marker marker : match.markers) {
+                if (!"goal".equals(marker.type)) continue;
+                if (latest == null || marker.minute > latest.minute || (marker.minute == latest.minute && marker.index >= latest.index)) {
+                    latest = marker;
+                }
+            }
+        }
+        if (latest == null) return "";
+        if (latest.player != null && !latest.player.isEmpty()) return latest.player + " " + latest.minute + "′";
+        String abbr = latest.abbr == null ? "" : latest.abbr;
+        return abbr.isEmpty() ? latest.minute + "′" : latest.minute + "′ " + abbr;
     }
 
     private static String name(WatchMatch match, boolean home) {
@@ -295,13 +312,6 @@ final class ScoreCards {
         if ("betika".equals(id)) return "Betika";
         if ("betpawa".equals(id)) return "BetPawa";
         return "Booked";
-    }
-
-    private static PendingIntent openApp(Context context, String matchId) {
-        Intent open = new Intent(context, MainActivity.class);
-        open.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        if (matchId != null) open.putExtra("matchId", matchId);
-        return PendingIntent.getActivity(context, request("open:" + matchId), open, immutable());
     }
 
     private static PendingIntent mute(Context context, String matchId) {

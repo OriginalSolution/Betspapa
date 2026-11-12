@@ -234,6 +234,7 @@ public final class WatchState {
             if (prior == null && !relevant(update)) continue;
             liveIds.add(update.id);
             if (prior == null) {
+                update.stampMissingGoals(update.minute == null ? -1 : update.minute);
                 matches.add(update);
                 continue;
             }
@@ -263,7 +264,8 @@ public final class WatchState {
             if (!update.competition.isEmpty()) prior.competition = update.competition;
             if (!update.homeId.isEmpty()) prior.homeId = update.homeId;
             if (!update.awayId.isEmpty()) prior.awayId = update.awayId;
-            for (WatchMatch.Marker marker : update.markers) prior.addMarker(marker.type, marker.minute, marker.abbr);
+            for (WatchMatch.Marker marker : update.markers) prior.mergeMarker(marker);
+            prior.stampMissingGoals(prior.minute == null ? -1 : prior.minute);
         }
         if (!live.isEmpty()) {
             for (WatchMatch match : matches) {
@@ -416,7 +418,10 @@ public final class WatchState {
     }
 
     private static WatchMatch prefer(WatchMatch prior, WatchMatch incoming) {
-        if (prior == null) return incoming;
+        if (prior == null) {
+            incoming.stampMissingGoals(incoming.minute == null ? -1 : incoming.minute);
+            return incoming;
+        }
         boolean incomingBlank = "scheduled".equals(incoming.status) && incoming.homeScore == null;
         boolean priorActive = "live".equals(prior.status) || "halftime".equals(prior.status) || "finished".equals(prior.status);
         if (incomingBlank && priorActive) {
@@ -433,22 +438,26 @@ public final class WatchState {
         else if (prior.seenAway != null) incoming.seenAway = Math.max(incoming.seenAway, prior.seenAway);
         noteMarkers(prior, incoming);
         incoming.keepDisplayFrom(prior);
+        int minute = incoming.minute == null ? (prior.minute == null ? -1 : prior.minute) : incoming.minute;
+        incoming.stampMissingGoals(minute);
         return incoming;
     }
 
     /** Goals the watcher actually sees get a minute mark. A repeated score does not add another. */
     private static void noteMarkers(WatchMatch prior, WatchMatch update) {
         if (prior == null || update == null) return;
-        int minute = update.minute == null ? (prior.minute == null ? 0 : prior.minute) : update.minute;
+        int minute = update.minute == null ? (prior.minute == null ? -1 : prior.minute) : update.minute;
         int prevHome = prior.homeScore == null ? 0 : prior.homeScore;
         int prevAway = prior.awayScore == null ? 0 : prior.awayScore;
         int nextHome = update.homeScore == null ? prevHome : update.homeScore;
         int nextAway = update.awayScore == null ? prevAway : update.awayScore;
-        for (int index = prevHome; index < nextHome; index++) prior.addMarker("goal", minute, prior.abbrHome());
-        for (int index = prevAway; index < nextAway; index++) prior.addMarker("goal", minute, prior.abbrAway());
+        if (minute >= 0) {
+            for (int index = prevHome + 1; index <= nextHome; index++) prior.setGoal("home", index, minute, prior.abbrHome(), "", false);
+            for (int index = prevAway + 1; index <= nextAway; index++) prior.setGoal("away", index, minute, prior.abbrAway(), "", false);
+        }
         if (update.varReview != null) {
             boolean home = prior.homeId != null && prior.homeId.equals(update.varReview.teamId);
-            prior.addMarker("var", update.varReview.minute, home ? prior.abbrHome() : prior.abbrAway());
+            prior.addMarker("var", update.varReview.minute, home ? prior.abbrHome() : prior.abbrAway(), home ? "home" : "away");
         }
     }
 

@@ -1,4 +1,5 @@
 import type { PickView } from '../data/board';
+import { publishableOdds } from './oddsFloor';
 import { signalsFor } from './signals';
 import type { Follows, InboxItem, Match, Settings } from '../types';
 
@@ -100,7 +101,7 @@ export function trendHitNotices(picks: PickView[], followedIds: string[], seen: 
   const want = new Set(followedIds);
   const notes: InboxItem[] = [];
   for (const pick of picks) {
-    if (!want.has(pick.id) || pick.status !== 'won') continue;
+    if (!want.has(pick.id) || pick.status !== 'won' || !publishableOdds(pick.odds)) continue;
     const id = `trend:${pick.id}:hit`;
     if (seen.has(id)) continue;
     notes.push({

@@ -1,6 +1,7 @@
 /** Same 80% price rule the app uses for a qualifying tip. Closed kickoffs are left out. */
 
 const TIP = 0.8;
+const MIN_ODDS = 1.2;
 const MARKETS = [
   ['home', 'home'],
   ['draw', 'draw'],
@@ -37,7 +38,7 @@ export function qualifyEvents(events, now = new Date()) {
     const book = homeImp + drawImp + awayImp || 1;
     for (const [key, market] of MARKETS) {
       const price = Number(odds[key]);
-      if (!Number.isFinite(price) || price <= 1) continue;
+      if (!Number.isFinite(price) || price < MIN_ODDS) continue;
       const raw = 1 / price;
       const implied = market === 'home' ? homeImp / book : market === 'draw' ? drawImp / book : market === 'away' ? awayImp / book : raw;
       const oneXTwo = market === 'home' || market === 'away' || market === 'draw';

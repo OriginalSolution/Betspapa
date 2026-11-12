@@ -54,12 +54,23 @@ public final class WatchMatch {
         public String type = "";
         public int minute;
         public String abbr = "";
+        /** home or away. Empty on older rows that only stored the abbreviation. */
+        public String side = "";
+        /** 1-based goal count for that side. 0 for cards and VAR. */
+        public int index;
+        public String player = "";
+        /** True when the minute is the match minute at which the score change was first seen. */
+        public boolean estimated;
 
         Marker copy() {
             Marker next = new Marker();
             next.type = type;
             next.minute = minute;
             next.abbr = abbr;
+            next.side = side;
+            next.index = index;
+            next.player = player;
+            next.estimated = estimated;
             return next;
         }
     }
@@ -132,9 +143,14 @@ public final class WatchMatch {
     }
 
     public void addMarker(String type, int minute, String abbr) {
-        if (type == null || type.isEmpty()) return;
+        addMarker(type, minute, abbr, "");
+    }
+
+    public void addMarker(String type, int minute, String abbr, String side) {
+        if (type == null || type.isEmpty() || "goal".equals(type)) return;
         int at = Math.max(0, Math.min(130, minute));
         String tag = abbr == null ? "" : abbr;
+        String team = side == null ? "" : side;
         for (Marker marker : markers) {
             if (type.equals(marker.type) && marker.minute == at && tag.equals(marker.abbr)) return;
         }
@@ -142,7 +158,59 @@ public final class WatchMatch {
         marker.type = type;
         marker.minute = at;
         marker.abbr = tag;
+        marker.side = team;
         markers.add(marker);
+    }
+
+    /**
+     * One goal on a side. The first minute sticks. A feed minute replaces an estimate.
+     * Two goals in the same minute stay as two marks because the index differs.
+     */
+    public void setGoal(String side, int index, int minute, String abbr, String player, boolean fromFeed) {
+        if (index <= 0 || minute < 0) return;
+        String team = "away".equals(side) ? "away" : "home";
+        int at = Math.max(0, Math.min(130, minute));
+        String tag = abbr == null ? "" : abbr;
+        String name = player == null ? "" : player.trim();
+        for (Marker marker : markers) {
+            if (!"goal".equals(marker.type) || marker.index != index || !team.equals(marker.side)) continue;
+            if (fromFeed) {
+                marker.minute = at;
+                marker.estimated = false;
+            }
+            if (!tag.isEmpty()) marker.abbr = tag;
+            if (!name.isEmpty()) marker.player = name;
+            return;
+        }
+        Marker marker = new Marker();
+        marker.type = "goal";
+        marker.side = team;
+        marker.index = index;
+        marker.minute = at;
+        marker.abbr = tag;
+        marker.player = name;
+        marker.estimated = !fromFeed;
+        markers.add(marker);
+    }
+
+    /** Goals already on the scoreboard with no incident minute take the current match minute. */
+    public void stampMissingGoals(int minute) {
+        if (minute < 0 || "scheduled".equals(status) || "postponed".equals(status)) return;
+        int home = homeScore == null ? 0 : Math.max(0, homeScore);
+        int away = awayScore == null ? 0 : Math.max(0, awayScore);
+        for (int index = countGoals("home") + 1; index <= home; index++) setGoal("home", index, minute, abbrHome(), "", false);
+        for (int index = countGoals("away") + 1; index <= away; index++) setGoal("away", index, minute, abbrAway(), "", false);
+    }
+
+    private int countGoals(String side) {
+        String team = "away".equals(side) ? "away" : "home";
+        String abbr = "away".equals(team) ? abbrAway() : abbrHome();
+        int count = 0;
+        for (Marker marker : markers) {
+            if (!"goal".equals(marker.type)) continue;
+            if (team.equals(marker.side) || (marker.side.isEmpty() && abbr.equals(marker.abbr))) count++;
+        }
+        return count;
     }
 
     /** Keep crest, names, and pitch marks when a newer row only has the score. */
@@ -160,8 +228,17 @@ public final class WatchMatch {
         if (markers.isEmpty()) {
             for (Marker marker : prior.markers) markers.add(marker.copy());
         } else {
-            for (Marker marker : prior.markers) addMarker(marker.type, marker.minute, marker.abbr);
+            for (Marker marker : prior.markers) mergeMarker(marker);
         }
+    }
+
+    void mergeMarker(Marker prior) {
+        if (prior == null) return;
+        if ("goal".equals(prior.type)) {
+            setGoal(prior.side.isEmpty() ? "home" : prior.side, prior.index > 0 ? prior.index : countGoals(prior.side.isEmpty() ? "home" : prior.side) + 1, prior.minute, prior.abbr, prior.player, !prior.estimated);
+            return;
+        }
+        addMarker(prior.type, prior.minute, prior.abbr, prior.side);
     }
 
     private static String clip(String value) {
@@ -201,6 +278,10 @@ public final class WatchMatch {
             row.put("type", marker.type);
             row.put("minute", marker.minute);
             row.put("abbr", marker.abbr);
+            row.put("side", marker.side);
+            row.put("index", marker.index);
+            row.put("player", marker.player);
+            row.put("estimated", marker.estimated);
             marks.put(row);
         }
         json.put("markers", marks);
@@ -257,7 +338,19 @@ public final class WatchMatch {
             for (int i = 0; i < marks.length(); i++) {
                 JSONObject row = marks.optJSONObject(i);
                 if (row == null) continue;
-                match.addMarker(row.optString("type", ""), row.optInt("minute", 0), row.optString("abbr", ""));
+                String type = row.optString("type", "");
+                int at = row.optInt("minute", 0);
+                String abbr = row.optString("abbr", "");
+                if ("goal".equals(type)) {
+                    String side = row.optString("side", "");
+                    if (side.isEmpty()) side = abbr.equals(match.abbrAway()) ? "away" : "home";
+                    int index = row.optInt("index", 0);
+                    if (index <= 0) index = match.countGoals(side) + 1;
+                    boolean estimated = !row.has("estimated") || row.optBoolean("estimated", true);
+                    match.setGoal(side, index, at, abbr, row.optString("player", ""), !estimated);
+                } else {
+                    match.addMarker(type, at, abbr, row.optString("side", ""));
+                }
             }
         }
         return match;

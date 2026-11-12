@@ -118,7 +118,7 @@ export function createEngine(options = {}) {
       for (const issue of settled.issues) log('error', `Settlement repair: ${issue}`);
     }
 
-    const legs = settled.legs.filter((leg) => new Date(leg.kickoff).getTime() >= now.getTime());
+    const legs = settled.legs.filter((leg) => new Date(leg.kickoff).getTime() >= now.getTime() && Number(leg.odds) >= 1.2);
     const key = selectionKey(legs);
     const sameSlip = state.slipKey === key;
     const checked = inspectBooks(sameSlip ? state.books : {});

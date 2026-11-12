@@ -187,7 +187,7 @@ public final class AlertPoster {
             .setCategory(Notification.CATEGORY_EVENT)
             .setOnlyAlertOnce(onlyOnce || note.disallowed || "var".equals(note.kind))
             .setGroup("betspapa-" + id)
-            .setContentIntent(openApp(context));
+            .setContentIntent(OpenMatch.forNote(context, note));
         Uri sound = soundFor(context, "goal".equals(note.kind) ? "goal" : note.kind, goalSound);
         if (silent || (sound == null && "goal".equals(note.kind))) builder.setSilent(true);
         else if (sound != null && "goal".equals(note.kind)) builder.setSound(sound);
@@ -213,7 +213,7 @@ public final class AlertPoster {
             .setGroup("betspapa-live-" + match.id)
             .setCategory(Notification.CATEGORY_STATUS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(openApp(context));
+            .setContentIntent(OpenMatch.forNote(context, note));
         try {
             ScoreCards.attach(context, builder, note, match, dark);
         } catch (RuntimeException error) {

@@ -86,6 +86,8 @@ public final class AlertPlanner {
             if (!"won".equals(settle(parts[1], viewOf(match, now)))) continue;
             String id = "trend:" + trend + ":hit";
             if (state.seen(id)) continue;
+            org.json.JSONObject priced = state.bookingFor(trend);
+            if (priced != null && belowFloor(priced.optString("odds", ""))) continue;
             String label = LABELS.get(parts[1]);
             WatchNote note = new WatchNote(id, match.id, "win", "Trend hit · " + label, match.home + " vs " + match.away + " · " + label);
             note.marketLabel = label;
@@ -262,6 +264,17 @@ public final class AlertPlanner {
         if (match.htHome == null || match.htAway == null) return false;
         if ("halftime".equals(match.status) || "finished".equals(match.status)) return true;
         return "live".equals(match.status) && match.minute != null && match.minute >= 45;
+    }
+
+    static boolean belowFloor(String oddsText) {
+        if (oddsText == null) return false;
+        String clean = oddsText.trim();
+        if (clean.isEmpty()) return false;
+        try {
+            return Double.parseDouble(clean) < 1.2d;
+        } catch (NumberFormatException error) {
+            return false;
+        }
     }
 
     private static boolean teamIsHome(String market) {

@@ -18,6 +18,7 @@ import {
   type TrendView,
 } from '../data/board';
 import { staleTrendIds, trendHitNotices } from '../lib/alerts';
+import { publishableOdds } from '../lib/oddsFloor';
 import { stageWatch } from '../lib/deviceWatch';
 import { bookOnDevice } from '../lib/deviceBook';
 import { isNativeApp } from '../lib/nativeHttp';
@@ -138,7 +139,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     }
     const byId = new Map(bookMatches.current.map((match) => [match.id, match]));
     const legs = bookLegs.current
-      .filter((pick) => pick.matchId.startsWith('sr:match:'))
+      .filter((pick) => pick.matchId.startsWith('sr:match:') && publishableOdds(pick.odds))
       .map((pick) => {
         const match = byId.get(pick.matchId);
         return {

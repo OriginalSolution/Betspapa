@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { AlertSetupProvider } from './components/AlertSetup';
 import { Rail, SideNav, TabBar, Toasts, TopBar } from './components/Chrome';
 import { FollowingPage } from './pages/FollowingPage';
@@ -31,8 +32,11 @@ const titles: Record<string, string> = {
   '/settings': 'Settings',
 };
 
+type OpenTarget = { route?: string; matchId?: string; trendId?: string };
+
 export function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { matches } = useStore();
   const match = location.pathname.startsWith('/match/')
     ? matches.find((item) => location.pathname === `/match/${item.id}`)
@@ -42,6 +46,40 @@ export function App() {
   useEffect(() => {
     document.title = `${title} · Betspapa`;
   }, [title]);
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let alive = true;
+    let handle: PluginListenerHandle | undefined;
+    const Watch = registerPlugin<{
+      pendingOpen(): Promise<OpenTarget>;
+      addListener(eventName: 'open', listener: (open: OpenTarget) => void): Promise<PluginListenerHandle>;
+    }>('Watch');
+    const follow = (open: OpenTarget | null | undefined) => {
+      if (!alive || !open) return;
+      if (open.route === 'slip') {
+        navigate('/slips');
+        return;
+      }
+      if (open.route === 'trend') {
+        navigate(open.trendId ? `/trends?trend=${encodeURIComponent(open.trendId)}` : '/trends');
+        return;
+      }
+      if (open.route === 'match' && open.matchId) navigate(`/match/${open.matchId}`);
+    };
+    void (async () => {
+      handle = await Watch.addListener('open', follow);
+      try {
+        follow(await Watch.pendingOpen());
+      } catch {
+        /* the card still opens the app */
+      }
+    })();
+    return () => {
+      alive = false;
+      void handle?.remove();
+    };
+  }, [navigate]);
 
   useEffect(() => {
     const splash = document.getElementById('boot-splash');

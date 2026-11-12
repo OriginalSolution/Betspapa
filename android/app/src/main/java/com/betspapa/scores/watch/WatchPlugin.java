@@ -28,6 +28,25 @@ import org.json.JSONObject;
     }
 )
 public class WatchPlugin extends Plugin {
+    private static volatile JSObject pendingOpen;
+
+    /** Cold start reads this once the web view is listening. A later tap also emits `open`. */
+    public void emitOpen(String route, String matchId, String trendId) {
+        JSObject data = new JSObject();
+        data.put("route", route == null ? "" : route);
+        data.put("matchId", matchId == null ? "" : matchId);
+        data.put("trendId", trendId == null ? "" : trendId);
+        pendingOpen = data;
+        notifyListeners("open", data);
+    }
+
+    @PluginMethod
+    public void pendingOpen(PluginCall call) {
+        JSObject data = pendingOpen;
+        pendingOpen = null;
+        call.resolve(data == null ? new JSObject() : data);
+    }
+
     @PluginMethod
     public void sync(PluginCall call) {
         String patch = call.getString("patch", "{}");
@@ -245,10 +264,25 @@ public class WatchPlugin extends Plugin {
         if (!json.optString("homeCrest", "").isEmpty()) match.homeCrest = json.optString("homeCrest");
         if (!json.optString("awayCrest", "").isEmpty()) match.awayCrest = json.optString("awayCrest");
         if (!json.optString("competition", "").isEmpty()) match.competition = json.optString("competition");
+        int beforeHome = match.homeScore == null ? 0 : match.homeScore;
+        int beforeAway = match.awayScore == null ? 0 : match.awayScore;
         if (json.has("homeScore") && !json.isNull("homeScore")) match.homeScore = json.optInt("homeScore");
         if (json.has("awayScore") && !json.isNull("awayScore")) match.awayScore = json.optInt("awayScore");
         if (json.has("minute") && !json.isNull("minute")) match.minute = json.optInt("minute");
         if (match.status == null || match.status.isEmpty() || "scheduled".equals(match.status)) match.status = "live";
+        int minute = match.minute == null ? -1 : match.minute;
+        String player = json.optString("player", "");
+        if (minute >= 0 && match.homeScore != null) {
+            for (int index = beforeHome + 1; index <= match.homeScore; index++) {
+                match.setGoal("home", index, minute, match.abbrHome(), player, false);
+            }
+        }
+        if (minute >= 0 && match.awayScore != null) {
+            for (int index = beforeAway + 1; index <= match.awayScore; index++) {
+                match.setGoal("away", index, minute, match.abbrAway(), player, false);
+            }
+        }
+        match.stampMissingGoals(minute);
         if (match.seenHome == null) match.seenHome = match.homeScore;
         if (match.seenAway == null) match.seenAway = match.awayScore;
     }

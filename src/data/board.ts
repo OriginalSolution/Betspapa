@@ -1,3 +1,4 @@
+import { publishableOdds } from '../lib/oddsFloor';
 import type { Match } from '../types';
 import { teams } from './catalog';
 
@@ -469,7 +470,7 @@ function picksFromOdds(match: Match): PickView[] {
   const picks: PickView[] = [];
   for (const [key, market] of ODDS_MARKETS) {
     const price = odds[key];
-    if (typeof price !== 'number' || price <= 1) continue;
+    if (typeof price !== 'number' || !publishableOdds(price)) continue;
     const raw = Math.min(0.99, 1 / price);
     const implied = market === 'home' ? homeImp / book : market === 'draw' ? drawImp / book : market === 'away' ? awayImp / book : raw;
     const oneXTwo = market === 'home' || market === 'away' || market === 'draw';
@@ -496,7 +497,7 @@ function picksFromOdds(match: Match): PickView[] {
     ['dc-x2', combinePrice(odds.draw, odds.away)],
   ];
   for (const [market, price] of doubles) {
-    if (price == null) continue;
+    if (price == null || !publishableOdds(price)) continue;
     picks.push(pricePick(match, market, price, 'Combined from the full-time 1X2 prices.'));
   }
   if (match.status === 'live' || match.status === 'halftime' || match.status === 'finished') {
@@ -509,7 +510,11 @@ function picksFromOdds(match: Match): PickView[] {
 
 export function buildPicks(matches: Match[]): PickView[] {
   if (matches.some((match) => match.feed === 'sporty')) {
-    return matches.filter((match) => match.feed === 'sporty').flatMap(picksFromOdds).sort((a, b) => b.confidence - a.confidence || a.odds - b.odds);
+    return matches
+      .filter((match) => match.feed === 'sporty')
+      .flatMap(picksFromOdds)
+      .filter((pick) => publishableOdds(pick.odds))
+      .sort((a, b) => b.confidence - a.confidence || a.odds - b.odds);
   }
   const picks: PickView[] = [];
   for (const match of matches) {
@@ -549,11 +554,11 @@ export function buildPicks(matches: Match[]): PickView[] {
       });
     }
   }
-  return picks.sort((a, b) => b.confidence - a.confidence || a.odds - b.odds);
+  return picks.filter((pick) => publishableOdds(pick.odds)).sort((a, b) => b.confidence - a.confidence || a.odds - b.odds);
 }
 
 export function qualifying(picks: PickView[]): PickView[] {
-  return picks.filter((pick) => SLIP_MARKETS.has(pick.market) && pick.bookmarked && pick.confidence > TIP_RATE);
+  return picks.filter((pick) => publishableOdds(pick.odds) && SLIP_MARKETS.has(pick.market) && pick.bookmarked && pick.confidence > TIP_RATE);
 }
 
 export type SharePart = {

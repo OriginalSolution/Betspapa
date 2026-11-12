@@ -42,7 +42,7 @@ test('qualifies a short total and drops a started match', () => {
         home: 'Alpha',
         away: 'Beta',
         kickoff: '2026-11-10T18:00:00.000Z',
-        odds: { home: 1.9, draw: 3.4, away: 4.2, 'over-15': 1.08 },
+        odds: { home: 1.9, draw: 3.4, away: 4.2, 'over-15': 1.22, 'over-25': 1.08, 'over-35': 1.2 },
       },
       {
         eventId: 'sr:match:11',
@@ -54,7 +54,9 @@ test('qualifies a short total and drops a started match', () => {
     ],
     now,
   );
-  assert.deepEqual(legs.map((leg) => leg.market), ['over15']);
+  assert.deepEqual(legs.map((leg) => leg.market), ['over15', 'over35']);
   assert.equal(legs[0].eventId, 'sr:match:10');
-  assert.equal(legs[0].odds, 1.08);
+  assert.equal(legs[0].odds, 1.22);
+  assert.equal(legs[1].odds, 1.2);
+  assert.equal(legs.some((leg) => leg.odds < 1.2), false);
 });

@@ -6,14 +6,17 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.content.Intent;
 import android.view.View;
 import android.webkit.WebView;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.splashscreen.SplashScreenViewProvider;
 import com.betspapa.scores.watch.AlertPoster;
+import com.betspapa.scores.watch.OpenMatch;
 import com.betspapa.scores.watch.WatchPlugin;
 import com.betspapa.scores.watch.WatchScheduler;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.PluginHandle;
 import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
@@ -50,6 +53,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         paintBlack();
         AlertPoster.ensure(this);
+        deliverOpen(getIntent());
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().setBackgroundColor(Color.BLACK);
             getBridge().addWebViewListener(new WebViewListener() {
@@ -74,6 +78,29 @@ public class MainActivity extends BridgeActivity {
         if (decor != null) decor.setBackgroundColor(Color.BLACK);
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        deliverOpen(intent);
+    }
+
+    private void deliverOpen(Intent intent) {
+        if (intent == null || getBridge() == null) return;
+        String route = intent.getStringExtra(OpenMatch.EXTRA_ROUTE);
+        String matchId = intent.getStringExtra(OpenMatch.EXTRA_MATCH);
+        String trendId = intent.getStringExtra(OpenMatch.EXTRA_TREND);
+        if ((matchId == null || matchId.isEmpty()) && (trendId == null || trendId.isEmpty())) return;
+        if (route == null || route.isEmpty() || "home".equals(route)) return;
+        PluginHandle handle = getBridge().getPlugin("Watch");
+        if (handle == null || !(handle.getInstance() instanceof WatchPlugin)) return;
+        ((WatchPlugin) handle.getInstance()).emitOpen(route, matchId, trendId);
+        intent.removeExtra(OpenMatch.EXTRA_ROUTE);
+        intent.removeExtra(OpenMatch.EXTRA_MATCH);
+        intent.removeExtra(OpenMatch.EXTRA_TREND);
+        setIntent(intent);
     }
 
     @Override
