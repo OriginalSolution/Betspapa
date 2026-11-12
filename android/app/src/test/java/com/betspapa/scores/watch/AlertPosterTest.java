@@ -48,10 +48,13 @@ public class AlertPosterTest {
             AlertPoster.soundFor(context, "goal", "crowd").toString()
         );
 
-        Notification watching = AlertPoster.watching(context, false);
-        assertEquals("Watching live scores", watching.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
-        assertTrue(watching.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Betspapa"));
+        Notification watching = AlertPoster.watching(context, 2, false);
+        assertEquals("Betspapa is watching 2 live matches", watching.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertTrue(watching.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("closed"));
         assertEquals(AlertPoster.WATCH, watching.getChannelId());
+        Notification soon = AlertPoster.watching(context, 0, true);
+        assertEquals("Watching live scores", soon.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertTrue(soon.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("kick off"));
     }
 
     @Test

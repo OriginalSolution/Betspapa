@@ -15,8 +15,8 @@ public class FixtureRefreshWorker extends Worker {
     @Override
     public Result doWork() {
         Context context = getApplicationContext();
+        WatchScheduler.ensureWatching(context);
         if (!WatchRuntime.serviceRunning) WatchRuntime.pollOnce(context);
-        if (!WatchScheduler.isUiForeground()) WatchScheduler.ensureWatching(context);
         WatchScheduler.arm(context);
         return Result.success();
     }

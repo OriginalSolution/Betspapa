@@ -595,6 +595,10 @@ img.crest { padding: 1px; }
 .setting span, .stat strong { color: var(--muted); font-size: 12px; font-weight: 550; }
 .stat strong { color: var(--text); font-size: 14px; }
 .status-ok { margin: 0 0 8px; color: var(--green); font-size: 13px; font-weight: 700; }
+.watch-status { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+.watch-status .btn { align-self: flex-start; margin: 0 0 6px; }
+.stat strong.is-good { color: var(--green); }
+.stat strong.is-bad { color: var(--red-2); }
 .switch {
   width: 46px;
   height: 28px;

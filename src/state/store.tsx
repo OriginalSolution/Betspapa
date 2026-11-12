@@ -9,7 +9,7 @@ import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate } from '../lib/dates';
 import { isNativeApp } from '../lib/nativeHttp';
 import { playGoalSound } from '../lib/cheer';
-import { pushBrowserNotification, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
+import { pushBrowserNotification, readNativePermission, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
 import { diffAlerts, type AlertSignal } from '../lib/signals';
 import {
   loadDemoStart,
@@ -268,6 +268,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refreshRef = useRef<() => void>(() => {});
 
   const replaceInbox = useRef(false);
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let cancel = false;
+    const read = () => {
+      void readNativePermission().then((permission) => {
+        if (!cancel) dispatch({ type: 'permission', permission });
+      });
+    };
+    read();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') read();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancel = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isNativeApp()) return;

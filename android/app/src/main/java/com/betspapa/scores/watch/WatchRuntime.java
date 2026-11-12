@@ -44,10 +44,10 @@ final class WatchRuntime {
             long now = System.currentTimeMillis();
             boolean stale = snapshot.fixturesAt == 0L || now - snapshot.fixturesAt >= AlertPlanner.FIXTURE_REFRESH_MS;
             List<WatchMatch> fixtures = null;
-            if (stale) fixtures = readFixtures();
+            if (stale) fixtures = readFixtures(app);
             boolean hot = AlertPlanner.shouldWatch(snapshot.matches, snapshot, now);
             List<WatchMatch> live = null;
-            if (hot || (fixtures != null && mightWatch(snapshot, fixtures, now))) live = readLive();
+            if (hot || (fixtures != null && mightWatch(snapshot, fixtures, now))) live = readLive(app);
             List<WatchNote> pending;
             boolean aboutToStart;
             String goalSound = "crowd";
@@ -58,14 +58,19 @@ final class WatchRuntime {
                 if (fixtures != null && !fixtures.isEmpty()) state.replaceFromFeed(fixtures, now);
                 if (live != null) state.overlayLive(live, now);
                 for (WatchNote note : AlertPlanner.notices(state.matches, state, now)) state.record(note, now);
+                state.commitScores();
                 state.save(WatchFiles.file(app));
                 pending = new ArrayList<WatchNote>(state.pendingNotifications());
                 hot = AlertPlanner.shouldWatch(state.matches, state, now);
                 aboutToStart = hot && !inPlay(state, now);
                 goalSound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
             }
+            // The open app already raises the toast and the system notification.
+            // Posting again from here would double it. Once the activity leaves,
+            // this loop is the only thing that can still reach the shade.
+            boolean deliver = !WatchScheduler.isUiForeground();
             for (WatchNote note : pending) {
-                if (!AlertPoster.post(app, note, goalSound)) continue;
+                if (deliver && !AlertPoster.post(app, note, goalSound)) continue;
                 synchronized (WatchState.FILE_LOCK) {
                     WatchState state = WatchState.load(WatchFiles.file(app));
                     state.markSent(note.id);
@@ -106,17 +111,17 @@ final class WatchRuntime {
         return inPlay(state, System.currentTimeMillis());
     }
 
-    private static List<WatchMatch> readFixtures() {
+    private static List<WatchMatch> readFixtures(Context context) {
         try {
-            return MatchParser.parseUpcoming(FeedClient.get(MatchFeeds.FIXTURES));
+            return MatchParser.parseUpcoming(FeedClient.get(context, MatchFeeds.FIXTURES));
         } catch (IOException error) {
             return null;
         }
     }
 
-    private static List<WatchMatch> readLive() {
+    private static List<WatchMatch> readLive(Context context) {
         try {
-            return MatchParser.parseLive(FeedClient.get(MatchFeeds.LIVE));
+            return MatchParser.parseLive(FeedClient.get(context, MatchFeeds.LIVE));
         } catch (IOException error) {
             return null;
         }

@@ -17,6 +17,9 @@ public final class WatchMatch {
     public Integer htHome;
     public Integer htAway;
     public VarReview varReview;
+    /** Last confirmed score. Null means this match has not been diffed yet. */
+    public Integer seenHome;
+    public Integer seenAway;
 
     public static final class VarReview {
         public String teamId = "";
@@ -47,6 +50,8 @@ public final class WatchMatch {
         next.htHome = htHome;
         next.htAway = htAway;
         next.varReview = varReview == null ? null : varReview.copy();
+        next.seenHome = seenHome;
+        next.seenAway = seenAway;
         return next;
     }
 
@@ -64,6 +69,8 @@ public final class WatchMatch {
         json.put("awayScore", awayScore);
         json.put("htHome", htHome);
         json.put("htAway", htAway);
+        json.put("seenHome", seenHome);
+        json.put("seenAway", seenAway);
         if (varReview != null) {
             JSONObject review = new JSONObject();
             review.put("teamId", varReview.teamId);
@@ -93,6 +100,8 @@ public final class WatchMatch {
         match.awayScore = integerOrNull(json, "awayScore");
         match.htHome = integerOrNull(json, "htHome");
         match.htAway = integerOrNull(json, "htAway");
+        match.seenHome = integerOrNull(json, "seenHome");
+        match.seenAway = integerOrNull(json, "seenAway");
         JSONObject review = json.optJSONObject("varReview");
         if (review != null && !review.optString("teamId", "").isEmpty()) {
             VarReview varReview = new VarReview();

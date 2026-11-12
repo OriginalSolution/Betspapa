@@ -1,5 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { playGoalSound } from '../lib/cheer';
+import {
+  requestBatteryExemption,
+  requestWatchNotifications,
+  scheduleBackgroundTest,
+  watchStatus,
+  type WatchDeviceStatus,
+} from '../lib/deviceWatch';
+import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound } from '../types';
 import { useStore } from '../state/store';
 
@@ -32,21 +40,28 @@ export function SettingsPage() {
       <section className="panel">
         <h2>Notifications</h2>
         <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team. With browser alerts on, the phone posts them on the home screen, in another app, and with the screen off.</p>
-        <p className="lede">While a followed match is about to kick off or in play, Android shows Watching live scores. That notice stops when the match ends.</p>
+        <p className="lede">While a followed match is about to kick off or in play, Android keeps a low-priority notice: Betspapa is watching N live matches. That notice stays up with the app closed, and it stops when the match ends.</p>
+        {isNativeApp() ? <AndroidWatchStatus /> : <Permission permission={permission} onEnable={() => void requestPermission()} />}
         <GoalSoundSetting
           sound={settings.goalSound}
           volume={settings.goalVolume}
           onChange={(value) => setSetting('goalSound', value)}
           onVolume={(value) => setSetting('goalVolume', value)}
         />
-        <Permission permission={permission} onEnable={() => void requestPermission()} />
         {toggles.map((toggle) => (
           <div className="setting" key={toggle.key}>
             <div>
               <strong>{toggle.label}</strong>
               <span>{toggle.detail}</span>
             </div>
-            <Switch on={settings[toggle.key]} label={toggle.label} onChange={(value) => setSetting(toggle.key, value)} />
+            <Switch
+              on={settings[toggle.key]}
+              label={toggle.label}
+              onChange={(value) => {
+                setSetting(toggle.key, value);
+                if (toggle.key === 'browser' && value && isNativeApp()) void requestWatchNotifications();
+              }}
+            />
           </div>
         ))}
       </section>
@@ -175,6 +190,77 @@ function GoalSoundSetting({
         />
         <strong>{volume}%</strong>
       </div>
+    </div>
+  );
+}
+
+function AndroidWatchStatus() {
+  const [status, setStatus] = useState<WatchDeviceStatus | null>(null);
+  const [testNote, setTestNote] = useState(false);
+  const refresh = useCallback(() => {
+    void watchStatus().then((next) => {
+      if (next) setStatus(next);
+    });
+  }, []);
+  useEffect(() => {
+    refresh();
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [refresh]);
+  const allowed = status?.notifications === 'granted';
+  const unrestricted = Boolean(status?.batteryUnrestricted);
+  return (
+    <div className="watch-status">
+      <div className="stat">
+        <span>Notification permission</span>
+        <strong className={allowed ? 'is-good' : 'is-bad'}>{allowed ? 'Allowed' : 'Not allowed'}</strong>
+      </div>
+      {!allowed && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            void requestWatchNotifications().then((next) => {
+              if (next) setStatus(next);
+            });
+          }}
+        >
+          Allow notifications
+        </button>
+      )}
+      <div className="stat">
+        <span>Battery optimization</span>
+        <strong className={unrestricted ? 'is-good' : 'is-bad'}>{unrestricted ? 'Unrestricted' : 'Optimized'}</strong>
+      </div>
+      {!unrestricted && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            void requestBatteryExemption().then(() => window.setTimeout(refresh, 600));
+          }}
+        >
+          Allow background activity
+        </button>
+      )}
+      <p className="lede">
+        On Tecno, Infinix, Xiaomi, and Samsung, also turn on Autostart for Betspapa and take it off the battery saver list. Those phones can still stop a watcher after Android’s battery prompt.
+      </p>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          void scheduleBackgroundTest().then((ok) => setTestNote(ok));
+        }}
+      >
+        Send test background notification
+      </button>
+      {testNote && <p className="status-ok">Close Betspapa. A test alert should arrive in about 10 seconds.</p>}
     </div>
   );
 }

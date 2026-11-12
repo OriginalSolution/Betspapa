@@ -33,9 +33,20 @@ export type WatchPatch = {
   schedule?: ScheduleRow[];
 };
 
+export type WatchDeviceStatus = {
+  notifications: 'granted' | 'denied' | 'prompt';
+  batteryUnrestricted: boolean;
+  watching: boolean;
+  liveCount: number;
+};
+
 type WatchPlugin = {
   sync(options: { patch: string }): Promise<void>;
   pull(): Promise<{ state: string }>;
+  status(): Promise<WatchDeviceStatus>;
+  requestNotifications(): Promise<WatchDeviceStatus>;
+  requestBattery(): Promise<WatchDeviceStatus>;
+  scheduleTest(): Promise<void>;
 };
 
 const Watch = registerPlugin<WatchPlugin>('Watch');
@@ -142,6 +153,44 @@ export function flushWatch(): Promise<void> {
     }
   });
   return running;
+}
+
+export async function watchStatus(): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.status();
+  } catch {
+    return null;
+  }
+}
+
+export async function requestWatchNotifications(): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.requestNotifications();
+  } catch {
+    return watchStatus();
+  }
+}
+
+export async function requestBatteryExemption(): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.requestBattery();
+  } catch {
+    return watchStatus();
+  }
+}
+
+/** Schedules a native notification about 10 seconds later. Closing the app does not cancel it. */
+export async function scheduleBackgroundTest(): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  try {
+    await Watch.scheduleTest();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function pullWatch(): Promise<WatchPatch> {
