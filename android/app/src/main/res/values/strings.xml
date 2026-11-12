@@ -4,4 +4,11 @@
     <string name="title_activity_main">Betspapa</string>
     <string name="package_name">com.betspapa.scores</string>
     <string name="custom_url_scheme">com.betspapa.scores</string>
+    <string name="watch_title">Watching live scores</string>
+    <string name="watch_body">Betspapa is watching followed matches</string>
+    <string name="watch_body_soon">A followed match is about to kick off</string>
+    <string name="watch_channel">Live watch</string>
+    <string name="watch_channel_desc">Shown while a followed match is about to start or in play</string>
+    <string name="alert_channel">Match alerts</string>
+    <string name="alert_channel_desc">Kick-off, goals, half-time, full-time, and trend hits</string>
 </resources>

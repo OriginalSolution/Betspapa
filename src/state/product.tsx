@@ -17,7 +17,8 @@ import {
   type PickView,
   type TrendView,
 } from '../data/board';
-import { trendHitNotices } from '../lib/alerts';
+import { staleTrendIds, trendHitNotices } from '../lib/alerts';
+import { stageWatch } from '../lib/deviceWatch';
 import { bookOnDevice } from '../lib/deviceBook';
 import { isNativeApp } from '../lib/nativeHttp';
 import { loadAlerted } from '../lib/storage';
@@ -41,6 +42,7 @@ type Product = {
   pickListed: (pick: PickView, list: 'black' | 'green') => boolean;
   trendFollows: string[];
   toggleTrend: (id: string) => void;
+  clearStaleTrends: () => number;
 };
 
 const ProductContext = createContext<Product | null>(null);
@@ -82,7 +84,7 @@ function notice(id: string, matchId: string, kind: InboxItem['kind'], title: str
 }
 
 export function ProductProvider({ children }: { children: ReactNode }) {
-  const { matches, t0, pushNotices } = useStore();
+  const { matches, t0, pushNotices, watchReady } = useStore();
   const [manual, setManual] = useState<string[]>(() => read<string[]>(SLIP_KEY, []));
   const [dismissed, setDismissed] = useState<string[]>(() => read<string[]>('betspapa.dismissed.v1', []));
   const [lists, setLists] = useState<ListItem[]>(() => read<ListItem[]>(LIST_KEY, []));
@@ -249,11 +251,15 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
   useEffect(() => {
-    if (!trendFollows.length) return;
+    if (!watchReady || !trendFollows.length) return;
     const seen = loadAlerted();
     const notes = trendHitNotices(picks, trendFollows, seen, Date.now());
     if (notes.length) pushNotices(notes);
-  }, [picks, trendFollows, pushNotices]);
+  }, [picks, trendFollows, pushNotices, watchReady]);
+
+  useEffect(() => {
+    stageWatch({ trends: trendFollows, matches });
+  }, [trendFollows, matches]);
 
   const value = useMemo<Product>(
     () => ({
@@ -284,8 +290,14 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       pickListed: (pick, list) => (list === 'black' ? isBlacklisted(pick, lists) : isGreenlisted(pick, lists)),
       trendFollows,
       toggleTrend: (id) => setTrendFollows((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id])),
+      clearStaleTrends: () => {
+        const drop = new Set(staleTrendIds(trendFollows, picks, matches, Date.now()));
+        if (!drop.size) return 0;
+        setTrendFollows((current) => current.filter((id) => !drop.has(id)));
+        return drop.size;
+      },
     }),
-    [picks, visiblePicks, trends, suggestions, slip, lists, ledger, codes, hiddenCount, trendFollows],
+    [picks, visiblePicks, trends, suggestions, slip, lists, ledger, codes, hiddenCount, trendFollows, matches],
   );
 
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;

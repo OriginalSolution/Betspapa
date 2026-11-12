@@ -3,6 +3,7 @@ import type { MarketId, TrendView } from '../data/board';
 import { FormPips } from '../components/PickCard';
 import { squadLabel } from '../data/board';
 import { cx } from '../lib/format';
+import { FollowedTrends } from './FollowingPage';
 import { useProduct } from '../state/product';
 
 const EXTRA = new Set<MarketId>([
@@ -31,8 +32,9 @@ export function TrendsPage() {
   return (
     <div className="stack">
       <p className="page-lead">
-        Follow a trend and the Alerts page records it when that market hits. Rates above 80% on the main lines are still tipped and booked.
+        Follow a trend and the Alerts page records it when that market hits. Rates above 80% on the main lines are still tipped and booked. Settled follows can be cleared here or on Following.
       </p>
+      <FollowedTrends />
       {trends.length === 0 && (
         <div className="empty">
           <h2>No trends yet</h2>

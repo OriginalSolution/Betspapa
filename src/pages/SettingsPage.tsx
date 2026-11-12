@@ -10,7 +10,7 @@ const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | '
   { key: 'ht', label: 'Half-time', detail: 'The break, and the score at the break' },
   { key: 'ft', label: 'Full-time', detail: 'The final score' },
   { key: 'var', label: 'VAR reviews', detail: 'Tell me a goal is being checked, before it counts' },
-  { key: 'browser', label: 'Browser alerts', detail: 'Also show a system notification' },
+  { key: 'browser', label: 'Browser alerts', detail: 'Also show a system notification, including when Betspapa is not on screen' },
 ];
 
 export function SettingsPage() {
@@ -31,7 +31,8 @@ export function SettingsPage() {
     <div className="settings">
       <section className="panel">
         <h2>Notifications</h2>
-        <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team.</p>
+        <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team. With browser alerts on, the phone posts them on the home screen, in another app, and with the screen off.</p>
+        <p className="lede">While a followed match is about to kick off or in play, Android shows Watching live scores. That notice stops when the match ends.</p>
         <GoalSoundSetting sound={settings.goalSound} onChange={(value) => setSetting('goalSound', value)} />
         <Permission permission={permission} onEnable={() => void requestPermission()} />
         {toggles.map((toggle) => (

@@ -1,11 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
-import { followedNotices } from '../lib/alerts';
+import { followedNotices, staleAlertIds } from '../lib/alerts';
+import { flushWatch, mergeInbox, pullWatch, stageWatch } from '../lib/deviceWatch';
 import { resolveCrests } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
 import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate } from '../lib/dates';
+import { isNativeApp } from '../lib/nativeHttp';
 import { playGoalSound } from '../lib/cheer';
 import { pushBrowserNotification, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
 import { diffAlerts, type AlertSignal } from '../lib/signals';
@@ -16,6 +18,7 @@ import {
   loadSettings,
   markNotificationSent,
   loadAlerted,
+  loadSent,
   rememberAlerted,
   saveFollows,
   saveInbox,
@@ -42,6 +45,7 @@ type State = {
   flash: string[];
   flashToken: number;
   permission: BrowserPermission;
+  watchReady: boolean;
   activeMatchId: string | null;
   usingDemo: boolean;
   feedNote: string | null;
@@ -57,6 +61,7 @@ type Action =
   | { type: 'setting'; key: keyof Settings; value: Settings[keyof Settings] }
   | { type: 'read-all' }
   | { type: 'clear-inbox' }
+  | { type: 'drop-inbox'; ids: string[] }
   | { type: 'clear-follows' }
   | { type: 'dismiss-toast'; id: string }
   | { type: 'clear-toasts' }
@@ -64,6 +69,7 @@ type Action =
   | { type: 'permission'; permission: BrowserPermission }
   | { type: 'active'; id: string | null }
   | { type: 'notices'; items: InboxItem[] }
+  | { type: 'hydrate-watch'; inbox: InboxItem[] }
   | { type: 'crests'; crests: Record<string, string> };
 
 function toItem(signal: AlertSignal, now: number): InboxItem {
@@ -138,6 +144,7 @@ function init(): State {
     flash: [],
     flashToken: 0,
     permission: readPermission(),
+    watchReady: !isNativeApp(),
     activeMatchId: null,
   };
 }
@@ -177,6 +184,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, inbox: state.inbox.map((item) => ({ ...item, read: true })) };
     case 'clear-inbox':
       return { ...state, inbox: [], toasts: [] };
+    case 'drop-inbox': {
+      const drop = new Set(action.ids);
+      return {
+        ...state,
+        inbox: state.inbox.filter((item) => !drop.has(item.id)),
+        toasts: state.toasts.filter((item) => !drop.has(item.id)),
+      };
+    }
     case 'clear-follows':
       return { ...state, follows: { matches: [], teams: [] } };
     case 'dismiss-toast':
@@ -198,6 +213,8 @@ function reducer(state: State, action: Action): State {
       if (!fresh.length) return state;
       return { ...state, inbox: [...fresh, ...state.inbox].slice(0, 120), toasts: fresh };
     }
+    case 'hydrate-watch':
+      return { ...state, inbox: mergeInbox(state.inbox, action.inbox), watchReady: true };
     default:
       return state;
   }
@@ -224,6 +241,7 @@ type Store = {
   toasts: InboxItem[];
   flash: string[];
   permission: BrowserPermission;
+  watchReady: boolean;
   unread: number;
   setDate: (date: string) => void;
   refresh: () => void;
@@ -232,6 +250,7 @@ type Store = {
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   markAllRead: () => void;
   clearInbox: () => void;
+  clearStaleAlerts: () => number;
   clearFollows: () => void;
   dismissToast: (id: string) => void;
   requestPermission: () => Promise<void>;
@@ -247,6 +266,32 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const refreshRef = useRef<() => void>(() => {});
+
+  const replaceInbox = useRef(false);
+
+  useEffect(() => {
+    if (!isNativeApp()) return;
+    let cancel = false;
+    void (async () => {
+      const remote = await pullWatch();
+      if (cancel) return;
+      for (const id of remote.sent || []) markNotificationSent(id);
+      if (Array.isArray(remote.seen)) rememberAlerted(remote.seen);
+      const inbox = Array.isArray(remote.inbox) ? remote.inbox.filter((item) => item && typeof item.id === 'string' && typeof item.title === 'string') : [];
+      dispatch({ type: 'hydrate-watch', inbox });
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void flushWatch();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => document.removeEventListener('visibilitychange', onHide);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -337,13 +382,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.date]);
 
   useEffect(() => {
-    if (!state.ready) return;
+    if (!state.ready || !state.watchReady) return;
     const current = stateRef.current;
     const seen = loadAlerted();
     for (const item of current.inbox) seen.add(item.id);
     const notes = followedNotices(current.matches, current.follows, current.settings, seen, Date.now());
     if (notes.length) dispatch({ type: 'notices', items: notes });
-  }, [state.ready, boardKey, followKey, state.settings]);
+  }, [state.ready, state.watchReady, boardKey, followKey, state.settings]);
 
   useEffect(() => {
     if (!state.ready) return;
@@ -385,6 +430,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.inbox]);
 
   useEffect(() => {
+    if (!isNativeApp()) return;
+    stageWatch({
+      browser: state.settings.browser,
+      settings: {
+        kickoff: state.settings.kickoff,
+        goal: state.settings.goal,
+        red: state.settings.red,
+        ht: state.settings.ht,
+        ft: state.settings.ft,
+        var: state.settings.var,
+      },
+      follows: state.follows,
+      matches: state.matches,
+      inbox: state.inbox,
+      seen: [...loadAlerted()],
+      sent: loadSent(),
+      replaceInbox: replaceInbox.current,
+    });
+    replaceInbox.current = false;
+  }, [state.settings, state.follows, state.matches, state.inbox]);
+
+  useEffect(() => {
     if (!state.flash.length) return;
     const timer = window.setTimeout(() => dispatch({ type: 'clear-flash' }), 1400);
     return () => window.clearTimeout(timer);
@@ -418,7 +485,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const toggleTeam = useCallback((team: FollowedTeam) => dispatch({ type: 'toggle-team', team }), []);
   const setSetting = useCallback(<K extends keyof Settings>(key: K, value: Settings[K]) => dispatch({ type: 'setting', key, value }), []);
   const markAllRead = useCallback(() => dispatch({ type: 'read-all' }), []);
-  const clearInbox = useCallback(() => dispatch({ type: 'clear-inbox' }), []);
+  const clearInbox = useCallback(() => {
+    replaceInbox.current = true;
+    dispatch({ type: 'clear-inbox' });
+  }, []);
+  const clearStaleAlerts = useCallback(() => {
+    const current = stateRef.current;
+    const ids = staleAlertIds(current.inbox, current.matches, Date.now());
+    if (!ids.length) return 0;
+    rememberAlerted(ids);
+    replaceInbox.current = true;
+    dispatch({ type: 'drop-inbox', ids });
+    return ids.length;
+  }, []);
   const clearFollows = useCallback(() => dispatch({ type: 'clear-follows' }), []);
   const dismissToast = useCallback((id: string) => dispatch({ type: 'dismiss-toast', id }), []);
   const requestPermission = useCallback(async () => {
@@ -455,6 +534,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toasts: state.toasts,
       flash: state.flash,
       permission: state.permission,
+      watchReady: state.watchReady,
       unread: state.inbox.filter((item) => !item.read).length,
       setDate,
       refresh,
@@ -463,6 +543,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSetting,
       markAllRead,
       clearInbox,
+      clearStaleAlerts,
       clearFollows,
       dismissToast,
       requestPermission,
@@ -479,6 +560,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSetting,
     markAllRead,
     clearInbox,
+    clearStaleAlerts,
     clearFollows,
     dismissToast,
     requestPermission,

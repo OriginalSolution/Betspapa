@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPicks, settle } from '../data/board';
 import { defaultSettings, type Follows, type Match, type Settings } from '../types';
-import { followedNotices, trendHitNotices } from './alerts';
+import { followedNotices, staleAlertIds, staleTrendIds, trendHitNotices } from './alerts';
 
 function match(patch: Partial<Match> = {}): Match {
   return {
@@ -78,5 +78,46 @@ describe('trend hits', () => {
     expect(notes[0]?.body).toContain('Al Astiklal');
     expect(trendHitNotices(picks, [over!.id], new Set([notes[0]!.id]), Date.now())).toEqual([]);
     expect(picks.find((pick) => pick.market === 'dc-12')?.bookmarked).toBe(false);
+  });
+});
+
+describe('clearing old alerts and trends', () => {
+  const now = Date.parse('2026-11-10T18:00:00.000Z');
+  const yesterday = now - 26 * 60 * 60 * 1000;
+
+  it('drops finished, settled, and previous-day alerts and keeps a live one', () => {
+    const live = match({ status: 'live', minute: 20, homeScore: 1, awayScore: 0 });
+    const done = match({ id: 'sr:match:9', status: 'finished', homeScore: 2, awayScore: 1 });
+    const inbox = [
+      { id: 'old', matchId: live.id, kind: 'goal' as const, title: 'Goal', body: 'Yesterday', createdAt: yesterday, read: true },
+      { id: 'hit', matchId: live.id, kind: 'win' as const, title: 'Trend hit', body: 'Settled', createdAt: now, read: false },
+      { id: 'final', matchId: done.id, kind: 'goal' as const, title: 'Goal', body: 'Full time match', createdAt: now, read: false },
+      { id: `${live.id}:goal:home:1`, matchId: live.id, kind: 'goal' as const, title: 'Goal · Al Astiklal', body: 'Still live', createdAt: now, read: false },
+    ];
+    expect(staleAlertIds(inbox, [live, done], now)).toEqual(['old', 'hit', 'final']);
+    const kept = inbox.filter((item) => !staleAlertIds(inbox, [live, done], now).includes(item.id));
+    const seen = new Set(inbox.map((item) => item.id));
+    const again = followedNotices([live], follows, settings, seen, now);
+    expect(again.map((item) => item.id)).not.toContain(`${live.id}:goal:home:1`);
+    expect(again.map((item) => item.id)).not.toContain('old');
+    expect(kept.map((item) => item.id)).toEqual([`${live.id}:goal:home:1`]);
+  });
+
+  it('clears a hit or finished trend and keeps an open live follow', () => {
+    const live = match({ status: 'live', minute: 76, homeScore: 1, awayScore: 0, htHome: 0, htAway: 0 });
+    const later = match({
+      id: 'sr:match:2',
+      status: 'scheduled',
+      utcDate: '2026-11-10T20:00:00.000Z',
+      homeScore: null,
+      awayScore: null,
+    });
+    const picks = buildPicks([live, later]);
+    const hit = picks.find((pick) => pick.matchId === live.id && pick.market === 'over05')!;
+    const open = picks.find((pick) => pick.matchId === later.id && pick.market === 'over15')!;
+    const away = 'sr:match:other:over05';
+    expect(hit.status).toBe('won');
+    expect(open.status).toBe('open');
+    expect(staleTrendIds([hit.id, open.id, away], picks, [live, later], now)).toEqual([hit.id]);
   });
 });

@@ -86,8 +86,33 @@ describe('live board', () => {
     expect(parsed[0]?.homeScore).toBe(1);
     expect(parsed[0]?.htHome).toBe(0);
     expect(parsed[0]?.odds?.['over-05']).toBe(1.65);
+    expect(parsed[0]?.varReview).toBeNull();
     const board = mergeBoard([], [match({ id: 'sr:match:later', utcDate: '2026-11-10T20:00:00.000Z' })], parsed, Date.parse('2026-11-10T17:20:00.000Z'));
     expect(applyFilter(board, 'live').map((item) => item.home.shortName)).toEqual(['Al Astiklal']);
     expect(applyFilter(board, 'upcoming')).toHaveLength(1);
+  });
+
+  it('keeps a VAR review only when the in-play event actually has one', () => {
+    const parsed = parseLivePayload({
+      data: [
+        {
+          name: 'Cup',
+          events: [
+            {
+              eventId: 'sr:match:9',
+              homeTeamName: 'Home FC',
+              awayTeamName: 'Away FC',
+              estimateStartTime: Date.parse('2026-11-10T16:00:00.000Z'),
+              status: 1,
+              matchStatus: 'H1',
+              playedSeconds: '22:00',
+              setScore: '1:0',
+              varReview: { teamId: 'home-fc', player: 'Striker', minute: 22 },
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed[0]?.varReview).toEqual({ teamId: 'home-fc', player: 'Striker', minute: 22 });
   });
 });

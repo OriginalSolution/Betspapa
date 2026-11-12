@@ -49,6 +49,52 @@ export function followedNotices(
   return notes.reverse();
 }
 
+function startOfLocalDay(now: number): number {
+  const date = new Date(now);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+/**
+ * Old alerts are safe to remove from the list.
+ * The seen-id record is kept, so the next poll does not create them again.
+ * Today's alerts for a match that is still scheduled, live, or at half-time stay.
+ */
+export function staleAlertIds(inbox: InboxItem[], matches: Match[], now: number): string[] {
+  const byId = new Map(matches.map((match) => [match.id, match]));
+  const start = startOfLocalDay(now);
+  return inbox.filter((item) => isStaleAlert(item, byId.get(item.matchId), start)).map((item) => item.id);
+}
+
+function isStaleAlert(item: InboxItem, match: Match | undefined, start: number): boolean {
+  if (item.kind === 'win' || item.kind === 'bust') return true;
+  if (item.createdAt < start) return true;
+  if (item.kind === 'ft') return true;
+  if (!match) return false;
+  return match.status === 'finished' || match.status === 'postponed';
+}
+
+/**
+ * Followed trends that have hit, bust, or belong to a match that is over.
+ * A trend that is not on the current board is left alone. It may be for another day.
+ * Upcoming and live follows are kept.
+ */
+export function staleTrendIds(followedIds: string[], picks: PickView[], matches: Match[], now: number): string[] {
+  const start = startOfLocalDay(now);
+  const byPick = new Map(picks.map((pick) => [pick.id, pick]));
+  const byMatch = new Map(matches.map((match) => [match.id, match]));
+  return followedIds.filter((id) => {
+    const pick = byPick.get(id);
+    if (!pick) return false;
+    if (pick.status === 'won' || pick.status === 'bust') return true;
+    const match = byMatch.get(pick.matchId);
+    if (!match) return false;
+    if (match.status === 'finished' || match.status === 'postponed') return true;
+    const kick = Date.parse(match.utcDate);
+    return Number.isFinite(kick) && kick < start && match.status !== 'live' && match.status !== 'halftime';
+  });
+}
+
 /** A followed trend that has already landed. Checked again on the next open, and not repeated. */
 export function trendHitNotices(picks: PickView[], followedIds: string[], seen: Set<string>, now: number): InboxItem[] {
   const want = new Set(followedIds);
