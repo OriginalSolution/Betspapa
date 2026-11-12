@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import android.app.Activity;
 import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
@@ -11,7 +12,11 @@ import android.service.notification.StatusBarNotification;
 import android.webkit.WebView;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 import androidx.test.uiautomator.UiDevice;
+import androidx.test.uiautomator.UiObject;
+import androidx.test.uiautomator.UiSelector;
 import com.betspapa.scores.MainActivity;
 import com.betspapa.watch.WatchMatch;
 import com.betspapa.watch.WatchState;
@@ -24,7 +29,6 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -37,8 +41,7 @@ public class BackgroundAlertQcTest {
     private final MockWebServer server = new MockWebServer();
     private final AtomicReference<String> score = new AtomicReference<String>("0:0");
 
-    @Before
-    public void grantNotifications() throws Exception {
+    private static void grantNotifications() throws Exception {
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.executeShellCommand("pm grant com.betspapa.scores android.permission.POST_NOTIFICATIONS");
     }
@@ -53,6 +56,7 @@ public class BackgroundAlertQcTest {
 
     @Test
     public void goalArrivesAfterBackgroundAndSwipe() throws Exception {
+        grantNotifications();
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.wakeUp();
@@ -132,15 +136,24 @@ public class BackgroundAlertQcTest {
 
     @Test
     public void settingsStatusAndClosedAppTestAlert() throws Exception {
+        grantNotifications();
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
         device.wakeUp();
         MainActivity activity = launch();
         waitForWeb(activity);
+        target.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(WatchScheduler.SETUP_VERSION, 1)
+            .putBoolean(WatchScheduler.SETUP_FINISHED, true)
+            .commit();
+        js(activity, "(function(){localStorage.setItem('betspapa.alertSetup.v1', JSON.stringify({version:1,finished:true})); return true;})()");
+        js(activity, "window.location.reload()");
+        waitForWeb(activity);
         js(activity, "window.location.assign('/settings')");
         assertTrue(waitForPage(activity, "Notification permission", 20000));
         assertTrue(waitForPage(activity, "Battery optimization", 8000));
-        assertTrue("notification permission did not show as allowed", waitForJs(activity, "(function(){var text=document.body?document.body.innerText:''; return text.indexOf('Notification permission')>=0 && text.indexOf('Not allowed')<0 && text.indexOf('Allowed')>=0;})()", 15000));
+        assertTrue("notification permission did not show as allowed", waitForJs(activity, "(function(){var row=[].slice.call(document.querySelectorAll('.stat')).find(function(el){return el.textContent.indexOf('Notification permission')>=0;}); if(!row) return false; return row.textContent.indexOf('Not allowed')<0 && row.textContent.indexOf('Allowed')>=0;})()", 15000));
         assertTrue(waitForPage(activity, "Optimized", 8000));
         assertTrue(waitForPage(activity, "Allow background activity", 8000));
         assertTrue(waitForPage(activity, "Send test background notification", 8000));
@@ -159,11 +172,152 @@ public class BackgroundAlertQcTest {
         assertEquals(AlertPoster.GOAL_CROWD, test.getChannelId());
     }
 
-    private static MainActivity launch() {
+    /**
+     * Walks the guided setup on a device. Exact alarms and the OEM brand are forced
+     * only in a debuggable build, because a stock emulator grants USE_EXACT_ALARM
+     * and reports a Google manufacturer. The release build ignores those overrides.
+     */
+    @Test
+    public void guidedAlertSetupFlow() throws Exception {
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.wakeUp();
+        device.executeShellCommand("wm dismiss-keyguard");
+        device.executeShellCommand("settings put global window_animation_scale 0");
+        device.executeShellCommand("settings put global transition_animation_scale 0");
+        device.executeShellCommand("settings put global animator_duration_scale 0");
+        target.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .putString(WatchScheduler.QC_EXACT, "denied")
+            .putString(WatchScheduler.QC_MANUFACTURER, "Infinix")
+            .putString(WatchScheduler.QC_BRAND, "Infinix")
+            .commit();
+
+        MainActivity activity = launch();
+        waitForWeb(activity);
+        js(activity, "(function(){localStorage.removeItem('betspapa.alertSetup.v1'); return true;})()");
+        js(activity, "window.location.reload()");
+        waitForWeb(activity);
+        assertTrue(waitForPage(activity, "Allow notifications", 20000));
+        shot(device, target, "setup-notifications");
+
+        assertTrue(clickText(activity, "Allow notifications"));
+        if (!clickSystem(device, "Allow")) {
+            device.executeShellCommand("pm grant com.betspapa.scores android.permission.POST_NOTIFICATIONS");
+            device.pressBack();
+        }
+        if (!waitForPage(activity, "Allow background activity", 8000)) {
+            device.executeShellCommand("pm grant com.betspapa.scores android.permission.POST_NOTIFICATIONS");
+            activity = resume();
+            waitForWeb(activity);
+        }
+        assertTrue("granting notifications did not advance the setup", waitForPage(activity, "Allow background activity", 15000));
+        shot(device, target, "setup-battery-after-grant");
+        assertTrue(waitForPage(activity, "Skip for now", 4000));
+
+        assertTrue(clickText(activity, "Skip for now"));
+        assertTrue("skip did not leave the battery step", waitForPage(activity, "Allow exact alarms", 8000));
+        shot(device, target, "setup-exact-after-skip");
+
+        assertTrue(clickText(activity, "Skip for now"));
+        assertTrue(waitForPage(activity, "Turn on Autostart", 8000));
+        assertTrue(waitForPage(activity, "itel", 8000));
+        shot(device, target, "setup-autostart");
+
+        assertTrue(clickText(activity, "Skip for now"));
+        assertTrue(waitForPage(activity, "Test it", 8000));
+        shot(device, target, "setup-test");
+
+        assertTrue(clickText(activity, "Send test notification"));
+        assertTrue(waitForPage(activity, "Leave Betspapa", 8000));
+        shot(device, target, "setup-leave-app");
+        device.pressHome();
+        Thread.sleep(12000);
+        device.openNotification();
+        Thread.sleep(1200);
+        shot(device, target, "setup-notification-closed");
+        Notification test = waitForText(target, "Betspapa test", 8000);
+        assertNotNull("test notification missing after the app was closed", test);
+        device.pressBack();
+
+        activity = resume();
+        waitForWeb(activity);
+        assertTrue(waitForPage(activity, "Did you get it?", 12000));
+        shot(device, target, "setup-did-you-get-it");
+        assertTrue(clickText(activity, "Yes"));
+        assertTrue(waitForJs(activity, "(function(){return document.querySelector('[data-setup]')==null;})()", 8000));
+        js(activity, "window.location.assign('/settings')");
+        assertTrue(waitForPage(activity, "Run alert setup again", 8000));
+        js(activity, "(function(){var button=document.querySelector('[data-setup-again]'); if(button) button.scrollIntoView({block:'center'}); return true;})()");
+        Thread.sleep(600);
+        shot(device, target, "setup-settings-again");
+
+        // pm revoke kills this process, because instrumentation runs in the app.
+        // The banner check is a host-side revoke after the setup record is stored.
+        device.executeShellCommand("dumpsys deviceidle whitelist +com.betspapa.scores");
+        target.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(WatchScheduler.QC_EXACT)
+            .remove(WatchScheduler.QC_MANUFACTURER)
+            .remove(WatchScheduler.QC_BRAND)
+            .commit();
+    }
+
+    private static MainActivity launch() throws InterruptedException {
+        return start(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+    }
+
+    private static MainActivity resume() throws InterruptedException {
+        return start(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+
+    /**
+     * startActivitySync waits until the main looper is idle. The splash screen and
+     * the first WebView layout keep that looper busy on a cold emulator, so the
+     * wait expires even though the activity has already resumed.
+     */
+    private static MainActivity start(int flags) throws InterruptedException {
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
         Intent intent = new Intent(target, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        return (MainActivity) InstrumentationRegistry.getInstrumentation().startActivitySync(intent);
+        intent.addFlags(flags);
+        target.startActivity(intent);
+        long deadline = System.currentTimeMillis() + 20000L;
+        while (System.currentTimeMillis() < deadline) {
+            MainActivity found = resumedActivity();
+            if (found != null) return found;
+            Thread.sleep(200);
+        }
+        throw new AssertionError("MainActivity did not resume");
+    }
+
+    private static MainActivity resumedActivity() {
+        AtomicReference<MainActivity> ref = new AtomicReference<MainActivity>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(new Runnable() {
+            @Override
+            public void run() {
+                for (Activity activity : ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)) {
+                    if (activity instanceof MainActivity) ref.set((MainActivity) activity);
+                }
+            }
+        });
+        return ref.get();
+    }
+
+    private static boolean clickText(MainActivity activity, String label) {
+        String needle = label.replace("\\", "\\\\").replace("'", "\\'");
+        return js(activity, "(function(){var button=[].slice.call(document.querySelectorAll('button')).find(function(el){return (el.textContent||'').trim()==='" + needle + "';}); if(!button) return false; button.click(); return true;})()");
+    }
+
+    private static boolean clickSystem(UiDevice device, String label) {
+        try {
+            UiObject object = device.findObject(new UiSelector().text(label));
+            if (!object.waitForExists(4000)) return false;
+            object.click();
+            return true;
+        } catch (Exception error) {
+            return false;
+        }
     }
 
     private static void saveLive(Context target, int home, int away) throws Exception {

@@ -184,6 +184,14 @@ button:disabled { cursor: default; opacity: 0.35; }
   font-size: 12px;
   font-weight: 700;
 }
+button.banner.banner-alert {
+  width: calc(100% - 28px);
+  border: 0;
+  background: var(--red);
+  color: white;
+  font-weight: 750;
+  text-align: left;
+}
 
 .board { padding-bottom: 8px; }
 .group { margin: 0 0 8px; }
@@ -835,3 +843,53 @@ img.crest { padding: 1px; }
 .add-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .add-grid span { display: inline-flex; gap: 6px; }
 .add-grid button { border: 1px solid var(--line-strong); background: transparent; color: var(--text); border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 650; }
+
+.alert-setup {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 22px);
+  background:
+    radial-gradient(800px 380px at 50% -80px, rgba(225, 29, 46, 0.32), transparent 62%),
+    #07080c;
+  color: var(--text);
+}
+.alert-setup-kicker {
+  margin: 0;
+  color: var(--red-2);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.alert-setup-progress { display: flex; gap: 6px; margin-top: 18px; }
+.alert-setup-progress i {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.alert-setup-progress i.is-on { background: var(--red); }
+.alert-setup-count { margin: 10px 0 0; color: var(--faint); font-size: 12px; font-weight: 700; }
+.alert-setup h2 {
+  margin: 28px 0 0;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+.alert-setup-body { margin: 12px 0 0; color: var(--muted); font-size: 16px; line-height: 1.45; }
+.alert-setup-note { margin: 14px 0 0; color: var(--gold); font-size: 14px; font-weight: 650; }
+.alert-setup-spacer { flex: 1; min-height: 24px; }
+.alert-setup .btn { width: 100%; text-align: center; padding: 14px 16px; font-size: 16px; }
+.alert-setup .btn + .btn { margin-top: 10px; }
+.alert-setup-skip {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 12px;
+  font-weight: 650;
+}
+button.banner.banner-alert { font-size: 13px; line-height: 1.35; }

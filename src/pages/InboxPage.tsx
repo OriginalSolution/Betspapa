@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState } from '../components/MatchBoard';
 import { staleAlertIds } from '../lib/alerts';
 import { ago, cx } from '../lib/format';
@@ -45,7 +46,9 @@ export function InboxPage() {
 
   if (!inbox.length) {
     return (
-      <EmptyState
+      <>
+        <LiveAlertsBanner />
+        <EmptyState
         title="No alerts yet"
         body="Kick-off, goals, half-time and full-time for teams you follow, plus a trend you follow once that market hits, collect here and stay after you reopen the app."
         action={
@@ -54,11 +57,13 @@ export function InboxPage() {
           </Link>
         }
       />
+      </>
     );
   }
 
   return (
     <>
+      <LiveAlertsBanner />
       {tools}
       <ul className="inbox">
         {inbox.map((item) => (
