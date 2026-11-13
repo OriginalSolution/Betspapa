@@ -612,6 +612,23 @@ export async function sendMessage(account, payload) {
   return { dropped: false, ok: true, status: response.status, body };
 }
 
+/** One promo image to a single registered phone. A fresh id so a retry still shows. */
+export async function sendPromoToToken(book, note, token) {
+  const account = serviceAccount();
+  if (!fcmConfigured() || !account) return { ok: false, error: 'FCM is not configured.', sent: 0 };
+  const chosen = String(token || '').trim();
+  if (chosen.length < 20 || /\s/.test(chosen)) return { ok: false, error: 'Paste a device token, or register the phone first.', sent: 0 };
+  const known = (book?.list?.() || []).find((item) => item.token === chosen);
+  if (known?.settings?.promos === false) return { ok: false, error: 'That phone has Promos turned off.', sent: 0 };
+  try {
+    const result = await sendMessage(account, messageFor(note, known || { token: chosen, settings: { goalSound: 'crowd', promos: true } }));
+    if (result.dropped && known) book.drop(chosen);
+    return { ok: !result.dropped, sent: result.dropped ? 0 : 1, error: result.dropped ? 'That token is no longer registered with FCM.' : null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'FCM did not accept the promo.', sent: 0 };
+  }
+}
+
 /** One promo image to every device that still wants promos. A sent id is not posted again. */
 export async function broadcastPromo(book, note) {
   const account = serviceAccount();

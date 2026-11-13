@@ -20,7 +20,7 @@ import { loadOverview } from './adminData.mjs';
 import { consoleHtml, loginHtml, unavailableHtml } from './adminPage.mjs';
 import { runEngineCycle, getEngineState } from './engine.mjs';
 import { sendTestPush } from './push.mjs';
-import { deletePromo, listPromos, sendCurrentShare, sendPromo, setApproveFirst } from './promo/service.mjs';
+import { deletePromo, listPromos, sendCurrentShare, sendPromo, sendPromoToDevice, setApproveFirst } from './promo/service.mjs';
 
 function sendHtml(res, status, html, extra = {}) {
   const data = Buffer.from(html);
@@ -240,6 +240,20 @@ export async function handleAdminApi(req, res, url, ctx) {
   if (url.pathname === '/api/admin/promos/send-now' && req.method === 'POST') {
     const origin = `${requestIsSecure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
     const result = await sendCurrentShare(getEngineState(), ctx.book, origin);
+    sendJson(res, result.error ? 400 : 200, result.error ? { error: result.error } : { ok: true, ...result });
+    return true;
+  }
+  const promoMine = url.pathname.match(/^\/api\/admin\/promos\/([^/]+)\/send-device$/);
+  if (promoMine && req.method === 'POST') {
+    let token = '';
+    try {
+      token = JSON.parse((await readRaw(req, 8_000)) || '{}').token || '';
+    } catch {
+      sendJson(res, 400, { error: 'Device send must be JSON.' });
+      return true;
+    }
+    const origin = `${requestIsSecure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+    const result = await sendPromoToDevice(decodeURIComponent(promoMine[1]), ctx.book, token, origin);
     sendJson(res, result.error ? 400 : 200, result.error ? { error: result.error } : { ok: true, ...result });
     return true;
   }

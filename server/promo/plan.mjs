@@ -59,23 +59,68 @@ function legsOf(slip) {
     .filter(Boolean);
 }
 
+/** A booked part small enough to read on a card: 4 to 8 legs, combined price at most 20. */
+function cardParts(books) {
+  const rows = [];
+  for (const [id, name] of DESKS) {
+    const candidates = (books?.[id]?.parts || [])
+      .map((part) => {
+        const code = realCode(part?.code);
+        const odds = priced(part?.totalOdds);
+        const legs = Number(part?.legs) || 0;
+        if (!code || odds == null || legs < 4 || legs > 8 || odds > 20) return null;
+        return { id, name, code, odds, legs, matches: Array.isArray(part.matches) ? part.matches.map(String) : [] };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.legs - a.legs || a.odds - b.odds);
+    if (candidates[0]) rows.push(candidates[0]);
+  }
+  return rows;
+}
+
+function masterSize(master) {
+  const booked = Object.values(master?.books || {}).flatMap((book) => book?.parts || []).map((part) => Number(part?.legs) || 0);
+  const largestBooked = Math.max(...booked, 0);
+  return largestBooked || master?.legs?.length || 0;
+}
+
 export function shareCardFrom(state) {
-  const master = state?.master;
-  const codes = deskCodes(master?.books);
-  const legs = legsOf(master).slice(0, 8);
-  if (!codes.length || !legs.length) return null;
-  const key = `${master?.bookedAt || ''}:${codes.map((row) => row.code).join(',')}`;
+  const pools = [state?.master, ...(state?.trends || [])].filter(Boolean);
+  let chosen = null;
+  for (const slip of pools) {
+    const codes = cardParts(slip.books);
+    if (!codes.length) continue;
+    const lead = codes.slice().sort((a, b) => b.legs - a.legs || a.odds - b.odds)[0];
+    const ids = new Set(lead.matches);
+    let legs = legsOf(slip);
+    if (ids.size) {
+      const matched = legs.filter((leg) => ids.has(leg.eventId));
+      if (matched.length) legs = matched;
+    }
+    legs = legs.slice(0, 8);
+    if (!legs.length) continue;
+    const score = legs.reduce((sum, leg) => sum + leg.hit, 0) / legs.length + lead.legs * 3;
+    if (!chosen || score > chosen.score) chosen = { slip, codes, lead, legs, score };
+  }
+  if (!chosen) return null;
+  const fullLegs = masterSize(state?.master);
+  const sporty = chosen.codes.find((row) => row.id === 'sportybet');
+  const featured = sporty || chosen.lead;
+  const key = `${chosen.slip.bookedAt || state?.master?.bookedAt || ''}:${chosen.codes.map((row) => row.code).join(',')}`;
   return {
     kind: 'share',
     id: `share:${key}`,
     title: 'Master slip is booked',
-    body: `${codes[0].code} · ${legs.length} legs`,
+    body: `${featured.code} · ${featured.legs} legs`,
     route: 'slips',
     matchId: '',
-    code: codes[0].code,
-    codes,
-    legs,
-    bookedAt: master?.bookedAt || null,
+    code: featured.code,
+    codes: chosen.codes,
+    legs: chosen.legs,
+    legCount: featured.legs,
+    total: featured.odds,
+    fullNote: fullLegs > featured.legs ? `Full ${fullLegs}-leg master in the app` : '',
+    bookedAt: chosen.slip.bookedAt || state?.master?.bookedAt || null,
   };
 }
 

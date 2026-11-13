@@ -2,7 +2,7 @@ import { crestForName, logoData, posterSvg, shareSvg, weekendSvg } from './art.m
 import { posterFrom, shareCardFrom, weekendBankers } from './plan.mjs';
 import { svgToPng } from './raster.mjs';
 import { loadPromoState, promoDir, readPng, removeFile, savePromoState, writePng } from './store.mjs';
-import { broadcastPromo } from '../push.mjs';
+import { broadcastPromo, sendPromoToToken } from '../push.mjs';
 
 let memory = null;
 
@@ -113,6 +113,23 @@ export async function syncPromos({ engine, events = [], book, origin = '', now =
   }
   persist();
   return created;
+}
+
+export async function sendPromoToDevice(id, book, token, origin = '') {
+  const item = state().items.find((row) => row.id === id);
+  if (!item) return { error: 'That promo is not on the board.' };
+  const chosen = String(token || '').trim() || book?.list?.()?.[0]?.token || '';
+  const note = {
+    id: `promo-test:${item.id}:${Date.now()}`,
+    kind: 'promo',
+    title: item.title,
+    body: item.body,
+    matchId: item.matchId || '',
+    route: item.route || '',
+    code: item.code || '',
+    image: `${origin}/api/promos/${encodeURIComponent(item.id)}.png`,
+  };
+  return sendPromoToToken(book, note, chosen);
 }
 
 export async function sendPromo(id, book, origin = '') {
