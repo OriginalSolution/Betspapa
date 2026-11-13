@@ -202,9 +202,11 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       })
       .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
+    const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
     void syncPushDevice({
       follows,
       trends: trendFollows,
+      bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
       settings: {
         kickoff: settings.kickoff,
         goal: settings.goal,

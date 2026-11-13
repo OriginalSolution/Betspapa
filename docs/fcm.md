@@ -1,17 +1,17 @@
 # Push alerts (FCM)
 
-HiOS kills `ScoreWatchService`. The permanent path is a high-priority FCM notification that names the sound channel (`betspapa.goal.horn.v4`, `betspapa.redcard.v1`, and the others). The phone poller stays as a fallback and skips a note id the push already marked sent.
+HiOS kills `ScoreWatchService`. 0.4.2 turns the permanent path on. A high-priority FCM message names the sound channel (`betspapa.goal.horn.v4`, `betspapa.redcard.v1`, and the others). The phone poller stays as a fallback and skips a note id the push already marked sent.
 
-0.4.0 compiles and runs **without** Firebase files. Push is off until both artifacts below are added.
+`android/app/google-services.json` is the Firebase Android config for `com.betspapa.scores` in project `betspapa-app`. The Gradle build applies the Google services plugin and the messaging SDK because that file is present. The app reads the FCM token and posts it, with follows, followed trends, and prices, to `POST /api/devices`.
 
-## Needed from Firebase
+The server sends goal, kick-off, and followed-trend alerts through FCM HTTP v1 when a service account is set. Use one of:
 
-1. **`android/app/google-services.json`** for package `com.betspapa.scores`. Download it from the Firebase project (Android app). The Gradle build applies the Google services plugin and the messaging SDK only when this file exists and is non-empty.
-2. **A service account JSON** with Firebase Cloud Messaging permission, for the server. Set one of:
-   - `FCM_SERVICE_ACCOUNT_JSON` — the raw JSON
-   - `FCM_SERVICE_ACCOUNT` — path to the file
-   - `GOOGLE_APPLICATION_CREDENTIALS` — path to the file
+- `FCM_SERVICE_ACCOUNT_JSON` — the raw JSON
+- `FCM_SERVICE_ACCOUNT` — path to the file
+- `GOOGLE_APPLICATION_CREDENTIALS` — path to the file
 
-The JSON must include `project_id`, `client_email`, and `private_key`. Do not commit it.
+The JSON must include `project_id`, `client_email`, and `private_key`. Do not commit it. `GET /api/health` reports `push: true` when those fields are loaded. It does not return the key.
 
-The app posts the device token and follows to `POST /api/devices`. Without the service account the server stores the token and does not call Google.
+`POST /api/devices/test` with `{ "token" }` or `{ "latest": true }` sends one test message to a registered token. The process log records the FCM response (`name`, or the error status and message). The log never includes the service-account key or the access token.
+
+A price under 1.20 is not pushed. Simulated, virtual, and SRL matches are not pushed.

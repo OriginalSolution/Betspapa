@@ -304,6 +304,7 @@ public class WatchPlugin extends Plugin {
     @PluginMethod
     public void pushToken(PluginCall call) {
         Context context = getContext();
+        if (context != null) PushBridge.listen(context);
         JSObject result = new JSObject();
         boolean enabled = context != null && PushBridge.enabled();
         result.put("enabled", enabled);

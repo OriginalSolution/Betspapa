@@ -5,7 +5,7 @@ import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
 import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
-import { startPushWatch } from './push.mjs';
+import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
 const pushWatch = startPushWatch();
@@ -115,6 +115,24 @@ async function handleApi(req, res, url) {
     }
     return;
   }
+  if (url.pathname === '/api/devices/test') {
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    try {
+      const body = await readJson(req);
+      const result = await sendTestPush(pushBook, body, (message) => console.log(message));
+      if (result.error) {
+        send(res, result.status, { error: result.error, fcm: result.fcm || null });
+        return;
+      }
+      send(res, 200, { ok: true, fcm: result.fcm });
+    } catch (error) {
+      send(res, 400, { error: error.message || 'Invalid test push' });
+    }
+    return;
+  }
   if (url.pathname === '/api/devices') {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
@@ -172,7 +190,7 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/health') {
-    send(res, 200, { ok: true, mode: config.mode, fixtures: 'live' });
+    send(res, 200, { ok: true, mode: config.mode, fixtures: 'live', push: fcmConfigured() });
     return;
   }
   if (url.pathname === '/api/engine') {

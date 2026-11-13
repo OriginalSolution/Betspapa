@@ -4,6 +4,7 @@ import com.betspapa.watch.WatchNote;
 import com.betspapa.watch.WatchState;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -30,11 +31,17 @@ public class BetspapaFirebaseService extends FirebaseMessagingService {
         if ((body == null || body.isEmpty()) && message.getNotification() != null) body = message.getNotification().getBody();
         synchronized (WatchState.FILE_LOCK) {
             WatchState state = WatchState.load(WatchFiles.file(this));
-            if (state.sent.contains(id)) return;
+            if (state.sent.contains(id) || state.seen(id)) return;
+            WatchNote note = new WatchNote(id, data.get("matchId"), kind, title == null ? "Betspapa" : title, body == null ? "" : body);
+            state.record(note, System.currentTimeMillis());
             state.markSent(id);
-            state.save(WatchFiles.file(this));
+            try {
+                state.save(WatchFiles.file(this));
+            } catch (IOException ignored) {
+                /* the shade alert still posts if the seen-file cannot be written */
+            }
             String sound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
-            AlertPoster.post(this, new WatchNote(id, data.get("matchId"), kind, title == null ? "Betspapa" : title, body == null ? "" : body), sound);
+            AlertPoster.post(this, note, sound);
         }
     }
 }

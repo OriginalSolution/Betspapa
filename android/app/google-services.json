@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "777460169811",
+    "project_id": "betspapa-app",
+    "storage_bucket": "betspapa-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:777460169811:android:c946be50ec736310b95aa6",
+        "android_client_info": {
+          "package_name": "com.betspapa.scores"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYrpkyA8MmpXr3WxMQ7nkmXQ_CV_HIFv0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
