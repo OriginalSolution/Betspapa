@@ -16,6 +16,7 @@ import {
   noteFailure,
   passwordsMatch,
   requestIsSecure,
+  REMEMBER_SECONDS,
   SESSION_SECONDS,
   signSession,
   tooManyFailures,
@@ -241,7 +242,12 @@ test('the operator page is local and the installed app does not call the test pu
   assert.equal(/cdn\.|googleapis|jsdelivr|unpkg|chart\.js/i.test(page), false);
   assert.match(login, /Wrong email or password\./);
   assert.match(login, /name="email"/);
+  assert.match(login, /autocomplete="username"/);
   assert.match(login, /name="password"/);
+  assert.match(login, /autocomplete="current-password"/);
+  assert.match(login, /method="post"/);
+  assert.match(login, /name="remember"[^>]*checked/);
+  assert.equal(/onsubmit|preventDefault/.test(login), false);
   const hits = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
@@ -308,7 +314,11 @@ test('admin routes require the session, throttle failures, and store a device wi
     assert.match(loginPage.body, /<meta name="robots" content="noindex">/);
     assert.match(loginPage.body, /Command centre/);
     assert.match(loginPage.body, /name="email"/);
+    assert.match(loginPage.body, /autocomplete="username"/);
     assert.match(loginPage.body, /name="password"/);
+    assert.match(loginPage.body, /autocomplete="current-password"/);
+    assert.match(loginPage.body, /Keep me signed in/);
+    assert.match(loginPage.body, /name="remember"[^>]*checked/);
     assert.equal(loginPage.body.includes('Run cycle now'), false);
 
     const wrongEmail = await httpAsk({
@@ -369,6 +379,20 @@ test('admin routes require the session, throttle failures, and store a device wi
     assert.match(cookieLine, /Max-Age=43200/);
     assert.equal(cookieLine.includes('Secure'), false);
     const cookie = cookieLine.split(';')[0];
+    const kept = await httpAsk({
+      method: 'POST',
+      path: '/admin/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(EMAIL)}&password=${encodeURIComponent(PASSWORD)}&remember=1`,
+    });
+    assert.equal(kept.status, 303);
+    const keptCookie = String(kept.headers['set-cookie']);
+    assert.match(keptCookie, /HttpOnly/);
+    assert.match(keptCookie, /SameSite=Lax/);
+    assert.match(keptCookie, new RegExp(`Max-Age=${REMEMBER_SECONDS}`));
+    const keptToken = keptCookie.split(';')[0].split('=').slice(1).join('=');
+    const keptExp = JSON.parse(Buffer.from(decodeURIComponent(keptToken).split('.')[0], 'base64url').toString()).exp;
+    assert.ok(keptExp > Date.now() + 29 * 24 * 60 * 60 * 1000);
 
     const locked = await httpAsk({ path: '/api/admin/overview' });
     assert.equal(locked.status, 401);

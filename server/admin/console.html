@@ -6,6 +6,12 @@
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#07080c">
   <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BP Admin">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/admin/icons/apple-touch-icon.png">
   <title>Command centre · Betspapa</title>
   <style>
     :root {
@@ -386,6 +392,7 @@
     });
     load();
     setInterval(load, 30000);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin' });
   </script>
 </body>
 </html>

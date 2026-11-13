@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import {
   adminEmail,
   clearCookie,
@@ -10,6 +11,8 @@ import {
   noteFailure,
   requestIsSecure,
   retryAfterSeconds,
+  REMEMBER_SECONDS,
+  SESSION_SECONDS,
   sessionCookie,
   tooManyFailures,
 } from './adminAuth.mjs';
@@ -73,23 +76,29 @@ function readRaw(req, limit) {
 }
 
 function credentialsFrom(raw, type) {
-  let email = '';
-  let password = '';
   if (String(type || '').includes('application/json')) {
     try {
       const json = JSON.parse(raw || '{}');
-      email = typeof json.email === 'string' ? json.email : '';
-      password = typeof json.password === 'string' ? json.password : '';
+      const remember = json.remember === true || json.remember === '1' || json.remember === 'on' ? '1' : '';
+      return {
+        email: typeof json.email === 'string' ? json.email : '',
+        password: typeof json.password === 'string' ? json.password : '',
+        remember,
+      };
     } catch {
-      email = '';
-      password = '';
+      return { email: '', password: '', remember: '' };
     }
-  } else {
-    const params = new URLSearchParams(raw);
-    email = params.get('email') || '';
-    password = params.get('password') || '';
   }
-  return { email, password };
+  const params = new URLSearchParams(raw);
+  return {
+    email: params.get('email') || '',
+    password: params.get('password') || '',
+    remember: params.get('remember') || '',
+  };
+}
+
+function keepSignedIn(remember) {
+  return remember === '1' || remember === 'on' || remember === 'true';
 }
 
 async function login(req, res) {
@@ -119,10 +128,41 @@ async function login(req, res) {
     return;
   }
   clearFailures(ip);
-  redirect(res, '/admin', sessionCookie(secret, requestIsSecure(req)));
+  const remember = keepSignedIn(given.remember);
+  redirect(res, '/admin', sessionCookie(secret, requestIsSecure(req), Date.now(), {
+    maxAge: remember ? REMEMBER_SECONDS : SESSION_SECONDS,
+    // Chrome does not send SameSite=Strict on the first load of an installed PWA.
+    sameSite: remember ? 'Lax' : 'Strict',
+  }));
+}
+
+const ADMIN_ASSETS = {
+  '/admin/manifest.webmanifest': { file: 'manifest.webmanifest', type: 'application/manifest+json; charset=utf-8' },
+  '/admin/sw.js': { file: 'sw.js', type: 'text/javascript; charset=utf-8', extra: { 'Service-Worker-Allowed': '/admin', 'Cache-Control': 'no-cache' } },
+  '/admin/icons/icon-192.png': { file: 'icons/icon-192.png', type: 'image/png' },
+  '/admin/icons/icon-512.png': { file: 'icons/icon-512.png', type: 'image/png' },
+  '/admin/icons/icon-maskable-512.png': { file: 'icons/icon-maskable-512.png', type: 'image/png' },
+  '/admin/icons/apple-touch-icon.png': { file: 'icons/apple-touch-icon.png', type: 'image/png' },
+};
+
+function sendAsset(res, asset) {
+  const data = readFileSync(new URL(`./admin/${asset.file}`, import.meta.url));
+  res.writeHead(200, {
+    'Content-Type': asset.type,
+    'Content-Length': data.length,
+    'X-Robots-Tag': 'noindex',
+    'Cache-Control': 'no-cache',
+    ...asset.extra,
+  });
+  res.end(data);
 }
 
 export async function handleAdminPage(req, res, url) {
+  const asset = ADMIN_ASSETS[url.pathname];
+  if (asset && (req.method === 'GET' || req.method === 'HEAD')) {
+    sendAsset(res, asset);
+    return;
+  }
   if (url.pathname === '/admin/logout' && req.method === 'POST') {
     redirect(res, '/admin', clearCookie(requestIsSecure(req)));
     return;
