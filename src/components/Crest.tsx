@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Team } from '../types';
-import { crestFontSize, crestLetters, verdictFromImage } from '../lib/crestMark';
+import { crestFontSize, crestLetters } from '../lib/crestMark';
 import { cx, inkFor } from '../lib/format';
 
 export function Crest({ team, size = 22, followed = false }: { team: Team; size?: number; followed?: boolean }) {
@@ -18,9 +18,6 @@ export function Crest({ team, size = 22, followed = false }: { team: Team; size?
         width={size}
         height={size}
         onError={() => setBroken(true)}
-        onLoad={(event) => {
-          if (verdictFromImage(event.currentTarget) !== 'sharp') setBroken(true);
-        }}
       />
     );
   }
