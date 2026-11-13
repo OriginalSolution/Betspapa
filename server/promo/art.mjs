@@ -191,6 +191,117 @@ export function posterSvg(card, logos = {}) {
   `);
 }
 
+function namesOf(card) {
+  if (card.home && card.away) return [String(card.home), String(card.away)];
+  if (card.featuredHome || card.featuredAway) return [String(card.featuredHome || ''), String(card.featuredAway || '')];
+  const [home, away] = String(card.picks?.[0]?.match || card.title || '').split(/\s+vs\s+/i);
+  return [String(home || '').trim(), String(away || '').trim()];
+}
+
+/** Heads and torsos only. The viewBox clips the rest of the cut-out. */
+function upperBody(card, logos, width, height, barY) {
+  const [homeName, awayName] = namesOf(card);
+  const stars = pickPair(homeName, awayName, crestPathForName(homeName), crestPathForName(awayName));
+  let playerH = Math.min(1600, Math.round(barY / 0.42));
+  const widest = Math.max(playerBox(stars.home, playerH).width, playerBox(stars.away, playerH).width);
+  if (widest > width * 0.38) playerH = Math.round(playerH * ((width * 0.38) / widest));
+  const homeBox = playerBox(stars.home, playerH);
+  const awayBox = playerBox(stars.away, playerH);
+  const homeX = Math.round(width * 0.16);
+  const awayX = width - homeX - awayBox.width;
+  const top = Math.round(height * 0.02);
+  const crest = (href, x, glow) => (href
+    ? `<circle cx="${x + 36}" cy="${top + 52}" r="44" fill="${glow}" opacity=".34"/>
+       <image href="${href}" x="${x}" y="${top + 16}" width="72" height="72"/>`
+    : '');
+  const homeCrest = card.homeCrest || crestForName(homeName);
+  const awayCrest = card.awayCrest || crestForName(awayName);
+  return {
+    homeName,
+    awayName,
+    art: `${playerGlow(stars.home, { x: homeX, y: top, height: playerH, maxX: homeX + homeBox.width * 0.62 })}
+      ${playerGlow(stars.away, { x: awayX, y: top, height: playerH, minX: awayX + awayBox.width * 0.38 })}
+      ${playerImage(stars.home, { x: homeX, y: top, height: playerH })}
+      ${playerImage(stars.away, { x: awayX, y: top, height: playerH })}
+      ${crest(homeCrest, 28, stars.home.primary)}
+      ${crest(awayCrest, width - 100, stars.away.primary)}`,
+  };
+}
+
+function wideFrame(width, height, glow, body) {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="hidden">
+  <rect width="${width}" height="${height}" fill="#07080c"/>
+  <rect width="${width}" height="${height}" fill="${glow}" opacity=".16"/>
+  ${body}
+</svg>`;
+}
+
+/** 16:9 Today banner. Heads and torsos stay inside the frame, with the pick and code along the bottom. */
+export function bannerSvg(card, logos = {}) {
+  const width = 1920;
+  const height = 1080;
+  if (card.kind === 'share') {
+    const code = card.code || card.codes?.[0]?.code || '';
+    return wideFrame(width, height, '#e11d2e', `
+      ${brand(72, 56)}
+      <text x="72" y="220" fill="#ff4d5a" font-family="Outfit" font-size="28" font-weight="700" letter-spacing="3">MASTER SLIP</text>
+      <text x="72" y="420" fill="#f4f6fb" font-family="Barlow Condensed" font-size="180" font-weight="700">${esc(code)}</text>
+      <text x="72" y="520" fill="#949bab" font-family="Outfit" font-size="32">${esc(card.legCount || card.legs?.length || '')} legs · ${card.total != null ? Number(card.total).toFixed(2) : ''}</text>
+      <text x="72" y="580" fill="#949bab" font-family="Outfit" font-size="28">${esc(card.fullNote || '')}</text>
+      ${logosRow(card.codes, logos, 1840, 860, 64)}
+    `);
+  }
+  const barY = 760;
+  const scene = upperBody(card, logos, width, height, barY);
+  const market = card.market || card.picks?.[0]?.market || '';
+  const odds = card.odds || card.picks?.[0]?.odds;
+  const hit = card.hit || card.picks?.[0]?.hit;
+  return wideFrame(width, height, '#e11d2e', `
+    ${brand(36, 28)}
+    ${scene.art}
+    <rect x="0" y="${barY}" width="${width}" height="${height - barY}" fill="#07080c"/>
+    <text x="48" y="${barY + 70}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="64" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 18))}</text>
+    <text x="48" y="${barY + 130}" fill="#c5cad6" font-family="Outfit" font-size="32">vs ${esc(cut(scene.awayName, 22))}</text>
+    <text x="860" y="${barY + 78}" fill="#ff4d5a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">PREDICTION</text>
+    <text x="860" y="${barY + 150}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="48" font-weight="700">${esc(cut(market, 22))}</text>
+    <text x="1500" y="${barY + 150}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="64" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
+    ${hit != null ? ring(1780, barY + 120, hit, 48) : ''}
+    <text x="48" y="${barY + 250}" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">CODE</text>
+    <text x="160" y="${barY + 256}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="56" font-weight="700">${esc(card.code || '')}</text>
+    ${logosRow(card.codes, logos, 1860, barY + 200, 52)}
+  `);
+}
+
+/** 2:1 big-picture notification. Chest-up players, names, prediction, and code. */
+export function notifySvg(card, logos = {}) {
+  const width = 1080;
+  const height = 540;
+  if (card.kind === 'share') {
+    return wideFrame(width, height, '#e11d2e', `
+      ${brand(36, 28)}
+      <text x="36" y="180" fill="#ff4d5a" font-family="Outfit" font-size="18" font-weight="700" letter-spacing="2">MASTER SLIP</text>
+      <text x="36" y="300" fill="#f4f6fb" font-family="Barlow Condensed" font-size="92" font-weight="700">${esc(card.code || '')}</text>
+      <text x="36" y="380" fill="#949bab" font-family="Outfit" font-size="24">${esc(card.fullNote || `${card.legCount || ''} legs`)}</text>
+      ${logosRow(card.codes, logos, 1040, 430, 44)}
+    `);
+  }
+  const scene = upperBody(card, logos, width, height, 340);
+  const market = card.market || card.picks?.[0]?.market || '';
+  const odds = card.odds || card.picks?.[0]?.odds;
+  const hit = card.hit || card.picks?.[0]?.hit;
+  return wideFrame(width, height, '#e11d2e', `
+    ${scene.art}
+    <rect x="0" y="340" width="${width}" height="200" fill="#07080c"/>
+    <text x="28" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="42" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 16))}</text>
+    <text x="28" y="448" fill="#c5cad6" font-family="Outfit" font-size="24">vs ${esc(cut(scene.awayName, 18))}</text>
+    <text x="500" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="30" font-weight="700">${esc(cut(market, 24))}</text>
+    <text x="900" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="40" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
+    ${hit != null ? ring(1000, 470, hit, 28) : ''}
+    <text x="28" y="510" fill="#f0c94a" font-family="Outfit" font-size="16" font-weight="700" letter-spacing="2">CODE  ${esc(card.code || '')}</text>
+  `);
+}
+
 export function weekendSvg(card, logos = {}) {
   const split = String(card.picks[0]?.match || '').split(/\s+vs\s+/i);
   const homeName = card.featuredHome || String(split[0] || '').trim();

@@ -5,7 +5,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Shader;
@@ -23,9 +22,8 @@ import java.util.Locale;
 import java.util.Map;
 import org.json.JSONObject;
 
-/** Bundled crest store first, then a remote badge. A miss becomes an initials circle. */
+/** Bundled crest store first, then a remote badge. A miss is a plain shield, never initials. */
 final class CrestCache {
-    private static final int[] PALETTE = {0xFFE11D2E, 0xFF3D7EFF, 0xFFF0C94A, 0xFF21A366, 0xFFA855F7, 0xFF14B8A6, 0xFF6CABDD};
     private static Map<String, String> crestIndex;
 
     private CrestCache() {}
@@ -270,41 +268,27 @@ final class CrestCache {
         return new Rect(left, top, left + edge, top + edge);
     }
 
+    /** Neutral shield. The letters argument is ignored so a missing badge cannot become an initials circle. */
     static Bitmap initials(String abbr, String color, String name, int size) {
         int edge = Math.max(8, size);
         Bitmap bitmap = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        int fill = colorOf(color, name);
-        paint.setColor(fill);
+        paint.setColor(0xFF1A1F2A);
         canvas.drawCircle(edge / 2f, edge / 2f, edge / 2f, paint);
-        paint.setColor(light(fill) ? 0xFF14161C : Color.WHITE);
-        paint.setFakeBoldText(true);
-        paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(edge * (abbr != null && abbr.length() > 2 ? 0.34f : 0.4f));
-        String text = abbr == null || abbr.isEmpty() ? "TM" : abbr;
-        Paint.FontMetrics metrics = paint.getFontMetrics();
-        canvas.drawText(text, edge / 2f, edge / 2f - (metrics.ascent + metrics.descent) / 2f, paint);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(1.5f, edge * 0.06f));
+        paint.setColor(0xFF949BAB);
+        android.graphics.Path shield = new android.graphics.Path();
+        float inset = edge * 0.22f;
+        shield.moveTo(edge / 2f, inset * 0.7f);
+        shield.lineTo(edge - inset, inset);
+        shield.lineTo(edge - inset, edge * 0.48f);
+        shield.cubicTo(edge - inset, edge * 0.72f, edge * 0.62f, edge * 0.84f, edge / 2f, edge - inset * 0.7f);
+        shield.cubicTo(edge * 0.38f, edge * 0.84f, inset, edge * 0.72f, inset, edge * 0.48f);
+        shield.close();
+        canvas.drawPath(shield, paint);
         return bitmap;
-    }
-
-    private static int colorOf(String color, String name) {
-        if (color != null && color.startsWith("#") && color.length() >= 4) {
-            try {
-                return Color.parseColor(color);
-            } catch (IllegalArgumentException ignored) {
-                /* fall through to the board palette */
-            }
-        }
-        int hash = 0;
-        String value = name == null ? "" : name;
-        for (int i = 0; i < value.length(); i++) hash = hash * 31 + value.charAt(i);
-        return PALETTE[Math.abs(hash) % PALETTE.length];
-    }
-
-    private static boolean light(int color) {
-        int luminance = (Color.red(color) * 299 + Color.green(color) * 587 + Color.blue(color) * 114) / 1000;
-        return luminance > 170;
     }
 
     private static File cacheDir(Context context) {

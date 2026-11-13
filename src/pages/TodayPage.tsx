@@ -12,7 +12,7 @@ import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
 
-type PromoCard = { id: string; title: string; image: string; route: string; matchId: string };
+type PromoCard = { id: string; title: string; image: string; banner?: string; route: string; matchId: string };
 
 const PROMOS_URL = 'https://api.betspapa.com/api/promos';
 
@@ -65,7 +65,7 @@ function PromoCarousel() {
     <div className="promo-carousel" ref={scroller} aria-label="Promos">
       {items.map((item) => (
         <Link key={item.id} to={promoHref(item)}>
-          <img src={item.image} alt={item.title} />
+          <img src={item.banner || item.image} alt={item.title} />
         </Link>
       ))}
     </div>
