@@ -86,34 +86,53 @@ async function sportyShare(legs, request) {
   return { code: data.shareCode || null, status: bad.length ? `${bad.length} not open` : 'ok' };
 }
 
+/** Lowest price any booked leg may carry on any desk. Exactly 1.20 is allowed. */
+export const MIN_ODDS = 1.2;
+
+function drop(leg, reason) {
+  return { eventId: leg.eventId, market: leg.market || null, match: leg.match || '', reason };
+}
+
+function legKey(eventId, marketId, specifier, outcomeId) {
+  return `${eventId}|${String(marketId)}|${specifier || ''}|${String(outcomeId)}`;
+}
+
+function selKey(leg) {
+  return legKey(leg.eventId, leg.marketId, leg.specifier, leg.outcomeId);
+}
+
 async function sportyTry(legs, request) {
   const pack = (group, booked) =>
     booked?.code && booked.status === 'ok'
       ? { code: booked.code, totalOdds: product(group.map((leg) => leg.odds)), legs: group.length, matches: group.map((leg) => leg.eventId) }
       : null;
   const direct = pack(legs, await sportyShare(legs, request));
-  if (direct) return direct;
+  if (direct) return { booked: direct, dropped: [] };
   const probed = await pool(legs, 5, async (leg) => ((await sportyShare([leg], request)).status === 'ok' ? leg : null));
   const open = probed.filter(Boolean);
-  if (!open.length) return null;
-  return pack(open, await sportyShare(open, request));
+  const dropped = legs.filter((leg, index) => !probed[index]).map((leg) => drop(leg, 'Not open on SportyBet (closed, started or suspended).'));
+  if (!open.length) return { booked: null, dropped };
+  const booked = pack(open, await sportyShare(open, request));
+  return { booked, dropped: booked ? dropped : legs.map((leg) => drop(leg, 'SportyBet refused the slip.')) };
 }
 
 async function footballTry(legs, request) {
   const post = (group) => request('POST', FOOTBALL_SHARE, { body: sportyBody(group) });
   let group = legs.filter((leg) => leg.marketId && leg.outcomeId);
-  if (!group.length) return null;
+  const dropped = [];
+  if (!group.length) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Market not supported on Football.com.')) };
   let body = await post(group);
   if (body?.bizCode !== 10000) {
     const probed = await pool(group, 5, async (leg) => ((await post([leg]))?.bizCode === 10000 ? leg : null));
+    dropped.push(...group.filter((leg, index) => !probed[index]).map((leg) => drop(leg, 'Not open on Football.com (closed, started or suspended).')));
     group = probed.filter(Boolean);
-    if (!group.length) return null;
+    if (!group.length) return { booked: null, dropped };
     body = await post(group);
-    if (body?.bizCode !== 10000) return null;
+    if (body?.bizCode !== 10000) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Football.com refused the slip.')) };
   }
   const code = body?.data?.shareCode;
-  if (!code) return null;
-  return { code, totalOdds: product(group.map((leg) => leg.odds)), legs: group.length, matches: group.map((leg) => leg.eventId) };
+  if (!code) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Football.com returned no share code.')) };
+  return { booked: { code, totalOdds: product(group.map((leg) => leg.odds)), legs: group.length, matches: group.map((leg) => leg.eventId) }, dropped };
 }
 
 function msportSelection(leg) {
@@ -132,16 +151,36 @@ async function msportTry(legs, request) {
     const body = await request('POST', MSPORT_SHARE, { body: { selections: [msportSelection(leg)] }, headers });
     return body?.bizCode === 10000 ? leg : null;
   });
-  const open = probed.filter(Boolean);
-  if (!open.length) return null;
-  const booked = await request('POST', MSPORT_SHARE, { body: { selections: open.map(msportSelection) }, headers });
-  if (booked?.bizCode !== 10000) return null;
-  const code = booked?.data?.shareCode;
-  if (!code) return null;
-  const confirmed = await request('GET', `${MSPORT_SHARE}/${code}`, { headers: { ...headers, 'Content-Type': 'application/json' } });
-  const slip = confirmed?.data?.bettableBetSlip || [];
-  const totalOdds = slip.length ? product(slip.map((row) => row?.outcome?.odds)) : null;
-  return { code, totalOdds, legs: slip.length || open.length, matches: open.map((leg) => leg.eventId) };
+  const dropped = legs.filter((leg, index) => !probed[index]).map((leg) => drop(leg, 'Not open on MSport (closed, started or suspended).'));
+  let open = probed.filter(Boolean);
+  for (let round = 0; round < 2 && open.length; round += 1) {
+    const booked = await request('POST', MSPORT_SHARE, { body: { selections: open.map(msportSelection) }, headers });
+    if (booked?.bizCode !== 10000 || !booked?.data?.shareCode) {
+      return { booked: null, dropped: [...dropped, ...open.map((leg) => drop(leg, 'MSport refused the slip.'))] };
+    }
+    const code = booked.data.shareCode;
+    const confirmed = await request('GET', `${MSPORT_SHARE}/${code}`, { headers: { ...headers, 'Content-Type': 'application/json' } });
+    const slip = confirmed?.data?.bettableBetSlip || [];
+    const low = new Map();
+    for (const row of slip) {
+      const price = Number(row?.outcome?.odds);
+      if (Number.isFinite(price) && price < MIN_ODDS) {
+        low.set(legKey(row?.event?.eventId, row?.market?.id, row?.market?.specifiers, row?.outcome?.id), price);
+      }
+    }
+    const short = open.filter((leg) => low.has(selKey(leg)));
+    if (!short.length || round === 1) {
+      if (short.length) {
+        // The rebooked slip still carries a short price: refuse it rather than publish a leg below 1.20.
+        return { booked: null, dropped: [...dropped, ...open.map((leg) => drop(leg, 'MSport kept a price below 1.20 on this slip.'))] };
+      }
+      const totalOdds = slip.length ? product(slip.map((row) => row?.outcome?.odds)) : null;
+      return { booked: { code, totalOdds, legs: slip.length || open.length, matches: open.map((leg) => leg.eventId) }, dropped };
+    }
+    dropped.push(...short.map((leg) => drop(leg, `MSport price ${low.get(selKey(leg)).toFixed(2)} is below 1.20.`)));
+    open = open.filter((leg) => !low.has(selKey(leg)));
+  }
+  return { booked: null, dropped };
 }
 
 function betikaSelection(leg) {
@@ -156,9 +195,14 @@ function betikaSelection(leg) {
   };
 }
 
+function betikaRowKey(row) {
+  return legKey(`sr:match:${row.parent_match_id}`, row.sub_type_id, row.special_bet_value, row.outcome_id);
+}
+
 async function betikaTry(legs, request) {
   let group = legs.filter((leg) => leg.marketId && leg.outcomeId);
-  if (!group.length) return null;
+  const dropped = [];
+  if (!group.length) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Market not supported on Betika.')) };
   const encode = (groupToBook) =>
     request('POST', `${BETIKA_SHARE}encode`, {
       body: {
@@ -173,21 +217,48 @@ async function betikaTry(legs, request) {
   let body = await encode(group);
   if (!body?.code) {
     const probed = await pool(group, 5, async (leg) => ((await encode([leg]))?.code ? leg : null));
+    dropped.push(...group.filter((leg, index) => !probed[index]).map((leg) => drop(leg, 'Not open on Betika (closed, started or unlisted).')));
     group = probed.filter(Boolean);
-    if (!group.length) return null;
+    if (!group.length) return { booked: null, dropped };
     body = await encode(group);
   }
-  const code = body?.code;
-  if (!code) return null;
-  const decoded = await request('GET', `${BETIKA_SHARE}decode?code=${encodeURIComponent(code)}&src=MOBILE_WEB`, {});
-  const valid = (decoded?.data || []).filter((row) => String(row.valid) === '1');
-  if (!valid.length) return null;
-  return {
-    code,
-    totalOdds: product(valid.map((row) => row.odd_value)),
-    legs: valid.length,
-    matches: [...new Set(valid.map((row) => `sr:match:${row.parent_match_id}`))].sort(),
-  };
+  for (let round = 0; round < 2; round += 1) {
+    const code = body?.code;
+    if (!code) return { booked: null, dropped: [...dropped, ...group.map((leg) => drop(leg, 'Betika refused the slip.'))] };
+    const decoded = await request('GET', `${BETIKA_SHARE}decode?code=${encodeURIComponent(code)}&src=MOBILE_WEB`, {});
+    const rows = decoded?.data || [];
+    const valid = rows.filter((row) => String(row.valid) === '1');
+    if (!valid.length) return { booked: null, dropped: [...dropped, ...group.map((leg) => drop(leg, 'Betika marked the slip invalid.'))] };
+    const rowByKey = new Map(rows.map((row) => [betikaRowKey(row), row]));
+    const invalid = group.filter((leg) => {
+      const row = rowByKey.get(selKey(leg));
+      return row && String(row.valid) !== '1';
+    });
+    const short = group.filter((leg) => {
+      const row = rowByKey.get(selKey(leg));
+      return row && String(row.valid) === '1' && Number(row.odd_value) < MIN_ODDS;
+    });
+    if (!short.length) {
+      dropped.push(...invalid.map((leg) => drop(leg, 'Betika marked this selection invalid.')));
+      dropped.push(...group.filter((leg) => !rowByKey.has(selKey(leg))).map((leg) => drop(leg, 'Betika left this selection off the slip (not offered).')));
+      const kept = valid.filter((row) => Number(row.odd_value) >= MIN_ODDS);
+      return {
+        booked: {
+          code,
+          totalOdds: product(kept.map((row) => row.odd_value)),
+          legs: kept.length,
+          matches: [...new Set(kept.map((row) => `sr:match:${row.parent_match_id}`))].sort(),
+        },
+        dropped,
+      };
+    }
+    if (round === 1) return { booked: null, dropped: [...dropped, ...group.map((leg) => drop(leg, 'Betika kept a price below 1.20 on this slip.'))] };
+    dropped.push(...short.map((leg) => drop(leg, `Betika price ${Number(rowByKey.get(selKey(leg)).odd_value).toFixed(2)} is below 1.20.`)));
+    group = group.filter((leg) => !short.includes(leg));
+    if (!group.length) return { booked: null, dropped };
+    body = await encode(group);
+  }
+  return { booked: null, dropped };
 }
 
 async function betpawaCall(method, path, request, body) {
@@ -257,38 +328,54 @@ async function betpawaPrice(leg, request) {
 
 async function betpawaTry(legs, request) {
   const chosen = [];
+  const dropped = [];
   const seen = new Set();
   for (const leg of legs) {
-    if (seen.has(leg.eventId)) continue;
+    if (seen.has(leg.eventId)) {
+      dropped.push(drop(leg, 'betPawa takes one selection per match on a shared slip.'));
+      continue;
+    }
     const price = await betpawaPrice(leg, request);
-    if (!price) continue;
+    if (!price) {
+      dropped.push(drop(leg, 'Not listed or not open on betPawa.'));
+      continue;
+    }
+    if (price[1] < MIN_ODDS) {
+      dropped.push(drop(leg, `betPawa price ${price[1].toFixed(2)} is below 1.20.`));
+      continue;
+    }
     seen.add(leg.eventId);
     chosen.push({ id: price[0], odds: price[1], eventId: leg.eventId });
   }
-  if (!chosen.length) return null;
+  if (!chosen.length) return { booked: null, dropped };
   const booked = await betpawaCall('POST', 'v3/booking-number', request, {
     selections: { selections: [{ type: chosen.length > 1 ? 'COMBO' : 'SINGLE', selections: chosen.map((row) => row.id) }] },
   });
   const code = booked?.code;
-  if (!code) return null;
+  if (!code) return { booked: null, dropped: legs.map((leg) => drop(leg, 'betPawa refused the slip.')) };
   const view = await betpawaCall('GET', `v3/booking-number/${code}`, request);
   const count = (view?.items || []).reduce((sum, item) => sum + (item.selections || []).length, 0) || chosen.length;
   return {
-    code,
-    totalOdds: product(chosen.map((row) => row.odds)),
-    legs: count,
-    matches: chosen.map((row) => row.eventId),
-    link: LINKS.betpawa(code),
+    booked: {
+      code,
+      totalOdds: product(chosen.map((row) => row.odds)),
+      legs: count,
+      matches: chosen.map((row) => row.eventId),
+      link: LINKS.betpawa(code),
+    },
+    dropped,
   };
 }
 
 async function chunked(legs, fn) {
   const parts = [];
+  const dropped = [];
   for (const chunk of chunks(legs)) {
-    const booked = await fn(chunk);
-    if (booked?.code) parts.push(booked);
+    const result = await fn(chunk);
+    if (result?.booked?.code) parts.push(result.booked);
+    dropped.push(...(result?.dropped || []));
   }
-  return parts;
+  return { parts, dropped };
 }
 
 function withLink(name, booked) {
@@ -333,6 +420,7 @@ export async function bookAll(legs, request, onBook, only) {
   }
   const index = mapped.length ? await cachedIndex(request) : null;
   const open = mapped.filter((leg) => stillOffered(index, leg));
+  const closed = mapped.filter((leg) => !stillOffered(index, leg)).map((leg) => drop(leg, 'Closed or suspended in the latest price scan.'));
   const allowed = Array.isArray(only) ? new Set(only) : null;
   const runners = [
     ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request))],
@@ -346,10 +434,12 @@ export async function bookAll(legs, request, onBook, only) {
     runners.map(async ([name, run]) => {
       let result;
       try {
-        const parts = open.length ? (await run(open)).map((part) => withLink(name, part)) : [];
-        result = parts.length ? { parts, error: null } : { parts: [], error: 'No open selections on this bookmaker.' };
+        const done = open.length ? await run(open) : { parts: [], dropped: [] };
+        const parts = done.parts.map((part) => withLink(name, part));
+        const dropped = [...closed, ...done.dropped];
+        result = parts.length ? { parts, error: null, dropped } : { parts: [], error: 'No open selections on this bookmaker.', dropped };
       } catch (error) {
-        result = { parts: [], error: publicError(error?.message || error) };
+        result = { parts: [], error: publicError(error?.message || error), dropped: closed };
       }
       books[name] = result;
       onBook?.(name, result);

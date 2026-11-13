@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
 import { qualifyEvents } from './qualify.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
-import { selectionKey } from './selection.mjs';
+import { bookSlips, bookableLegs, slipView, trendGroups } from './slips.mjs';
+import { loadUpcomingEvents } from './upcoming.mjs';
 
 const FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 const INTERVAL_MS = 15 * 60 * 1000;
@@ -18,6 +19,9 @@ function emptyState() {
     slipKey: '',
     legs: [],
     books: {},
+    master: null,
+    trends: [],
+    slipCache: {},
     issues: [],
     settlement: 'open',
   };
@@ -32,6 +36,8 @@ function publicState(state) {
     legCount: state.legs.length,
     settlement: state.settlement,
     books: state.books,
+    master: state.master || null,
+    trends: state.trends || [],
     issues: state.issues,
   };
 }
@@ -74,6 +80,7 @@ export function createEngine(options = {}) {
   }
 
   async function fetchFeed() {
+    if (options.loadEvents) return options.loadEvents();
     const fetchImpl = options.fetchImpl || fetch;
     const retryMs = options.retryMs ?? 2000;
     let last = new Error('Fixture feed failed');
@@ -118,40 +125,26 @@ export function createEngine(options = {}) {
       for (const issue of settled.issues) log('error', `Settlement repair: ${issue}`);
     }
 
-    const legs = settled.legs.filter((leg) => new Date(leg.kickoff).getTime() >= now.getTime() && Number(leg.odds) >= 1.2);
-    const key = selectionKey(legs);
-    const sameSlip = state.slipKey === key;
-    const checked = inspectBooks(sameSlip ? state.books : {});
-    if (checked.issues.length) {
-      issues.push(...checked.issues);
-      for (const issue of checked.issues) log('error', issue);
-    }
-
-    let books = checked.books;
-    if (!legs.length) {
-      log('log', 'No open qualifying legs to book.');
-    } else if (!sameSlip || checked.retry.length) {
-      const desks = sameSlip ? checked.retry : null;
-      try {
-        const request = options.request || (await import('./curl-request.mjs')).requestJson;
-        const booked = await bookAll(legs, request, undefined, desks);
-        books = { ...books, ...booked };
-        const again = inspectBooks(books);
-        books = again.books;
-        if (again.issues.length) {
-          issues.push(...again.issues);
-          for (const issue of again.issues) log('error', issue);
-        }
-        if (again.retry.length) log('error', `Still waiting on a real code from ${again.retry.join(', ')}.`);
-        else log('log', `Booked ${legs.length} open legs.`);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Booking failed';
-        issues.push(message);
-        log('error', `Booking failed: ${message}`);
-      }
-    } else {
-      log('log', 'Stored share codes still match the open slip.');
-    }
+    const legs = bookableLegs(settled.legs, now);
+    const master = { id: 'master', name: 'Master slip', label: 'Master slip', legs };
+    const trends = trendGroups(legs).map((trend) => ({ ...trend, name: `Trend ${trend.label}` }));
+    if (!legs.length) log('log', 'No open qualifying legs to book.');
+    const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
+    const booking = await bookSlips({
+      slips: [master, ...trends],
+      cache: state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : state.slipKey ? { [state.slipKey]: { books: state.books || {}, attempts: {}, lastAttemptAt: 0, bookedAt: state.updatedAt } } : {},
+      book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
+      now: now.getTime(),
+      gapMs: options.slipGapMs ?? 4000,
+      pause,
+      log,
+    });
+    issues.push(...booking.issues);
+    const [masterResult, ...trendResults] = booking.results;
+    const key = masterResult.key;
+    const books = inspectBooks(masterResult.books).books;
+    const masterView = slipView(masterResult, key);
+    const trendViews = trendResults.map((trend) => slipView(trend, key));
 
     const next = {
       ...state,
@@ -159,6 +152,9 @@ export function createEngine(options = {}) {
       slipKey: key,
       legs: settled.legs,
       books,
+      master: masterView,
+      trends: trendViews,
+      slipCache: booking.cache,
       settlement: settled.status,
       issues: [...issues, ...(state.issues || [])].slice(0, 40),
     };
@@ -196,7 +192,8 @@ export function createEngine(options = {}) {
   };
 }
 
-const engine = createEngine();
+// In production the engine reads the catalogue directly instead of calling its own public URL.
+const engine = createEngine({ loadEvents: () => loadUpcomingEvents({ force: true }) });
 
 export function startEngine() {
   engine.start();

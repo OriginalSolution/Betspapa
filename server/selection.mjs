@@ -29,6 +29,7 @@ export function toSelection(leg) {
     marketId: mapped.marketId,
     outcomeId: mapped.outcomeId,
     specifier: mapped.specifier,
+    market: String(leg.market),
     odds: Number.isFinite(odds) && odds > 1 ? odds : 1,
     match,
   };
