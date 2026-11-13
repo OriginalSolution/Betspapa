@@ -1,6 +1,8 @@
 import {
+  adminEmail,
   adminPassword,
   clearCookie,
+  emailsMatch,
   clearFailures,
   failureAddress,
   hasSession,
@@ -70,21 +72,30 @@ function readRaw(req, limit) {
   });
 }
 
-function passwordFrom(raw, type) {
+function credentialsFrom(raw, type) {
+  let email = '';
+  let password = '';
   if (String(type || '').includes('application/json')) {
     try {
       const json = JSON.parse(raw || '{}');
-      return typeof json.password === 'string' ? json.password : '';
+      email = typeof json.email === 'string' ? json.email : '';
+      password = typeof json.password === 'string' ? json.password : '';
     } catch {
-      return '';
+      email = '';
+      password = '';
     }
+  } else {
+    const params = new URLSearchParams(raw);
+    email = params.get('email') || '';
+    password = params.get('password') || '';
   }
-  return new URLSearchParams(raw).get('password') || '';
+  return { email, password };
 }
 
 async function login(req, res) {
   const password = adminPassword();
-  if (!password) {
+  const email = adminEmail();
+  if (!password || !email) {
     sendHtml(res, 503, unavailableHtml());
     return;
   }
@@ -100,9 +111,12 @@ async function login(req, res) {
     sendHtml(res, 400, loginHtml('Sign-in could not be read.'));
     return;
   }
-  if (!passwordsMatch(passwordFrom(raw, req.headers['content-type']), password)) {
+  const given = credentialsFrom(raw, req.headers['content-type']);
+  const emailOk = emailsMatch(given.email, email);
+  const passwordOk = passwordsMatch(given.password, password);
+  if (!emailOk || !passwordOk) {
     noteFailure(ip);
-    sendHtml(res, 401, loginHtml('Wrong password.'));
+    sendHtml(res, 401, loginHtml('Wrong email or password.'));
     return;
   }
   clearFailures(ip);
@@ -126,11 +140,11 @@ export async function handleAdminPage(req, res, url) {
     sendHtml(res, 405, loginHtml('Method not allowed.'));
     return;
   }
-  if (!adminPassword()) {
+  if (!hasSession(req) && (!adminPassword() || !adminEmail())) {
     sendHtml(res, 503, unavailableHtml());
     return;
   }
-  sendHtml(res, hasSession(req) ? 200 : 200, hasSession(req) ? consoleHtml() : loginHtml());
+  sendHtml(res, 200, hasSession(req) ? consoleHtml() : loginHtml());
 }
 
 export async function handleAdminApi(req, res, url, ctx) {

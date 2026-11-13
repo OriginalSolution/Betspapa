@@ -6,9 +6,11 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  adminEmail,
   adminPassword,
   clearFailures,
   cookieHeader,
+  emailsMatch,
   noteFailure,
   passwordsMatch,
   requestIsSecure,
@@ -26,6 +28,7 @@ import { createAlertLog, createDeviceBook } from './push.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKEN = 'device-token-for-admin-test-0001';
 const PASSWORD = 'correct-horse';
+const EMAIL = 'owner@betspapa.test';
 
 test('password compare is exact and the session cookie expires', () => {
   assert.equal(passwordsMatch(PASSWORD, PASSWORD), true);
@@ -33,6 +36,9 @@ test('password compare is exact and the session cookie expires', () => {
   assert.equal(passwordsMatch(`${PASSWORD} `, PASSWORD), false);
   assert.equal(adminPassword({ ADMIN_PASSWORD: '  secret  ' }), 'secret');
   assert.equal(adminPassword({}), '');
+  assert.equal(adminEmail({ ADMIN_EMAIL: '  Owner@Betspapa.test ' }), 'owner@betspapa.test');
+  assert.equal(emailsMatch('  Owner@Betspapa.test ', 'owner@betspapa.test'), true);
+  assert.equal(emailsMatch('other@betspapa.test', 'owner@betspapa.test'), false);
   const now = Date.now();
   const token = signSession(PASSWORD, now);
   assert.equal(verifySession(token, PASSWORD, now + 1000), true);
@@ -217,12 +223,13 @@ test('the next automatic cycle is armed for 20 seconds, then every 15 minutes', 
 
 test('the operator page is local and the installed app does not call the test push', () => {
   const page = consoleHtml();
-  const login = loginHtml('Wrong password.');
+  const login = loginHtml('Wrong email or password.');
   assert.match(page, /noindex/);
   assert.match(page, /Command centre/);
   assert.match(page, /Betspapa operations - Africa\/Accra/);
   assert.equal(/cdn\.|googleapis|jsdelivr|unpkg|chart\.js/i.test(page), false);
-  assert.match(login, /Wrong password\./);
+  assert.match(login, /Wrong email or password\./);
+  assert.match(login, /name="email"/);
   assert.match(login, /name="password"/);
   const hits = [];
   const walk = (dir) => {
@@ -260,6 +267,7 @@ test('admin routes require the session, throttle failures, and store a device wi
   const previous = {
     data: process.env.ENGINE_DATA_DIR,
     password: process.env.ADMIN_PASSWORD,
+    email: process.env.ADMIN_EMAIL,
     token: process.env.ENGINE_RUN_TOKEN,
     nodeEnv: process.env.NODE_ENV,
     render: process.env.RENDER,
@@ -267,6 +275,7 @@ test('admin routes require the session, throttle failures, and store a device wi
   process.env.ENGINE_DATA_DIR = dir;
   process.env.ENGINE_RUN_TOKEN = 'engine-token-test';
   delete process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_EMAIL;
   delete process.env.NODE_ENV;
   delete process.env.RENDER;
   const { createBetspapaServer } = await import('./index.mjs');
@@ -279,36 +288,57 @@ test('admin routes require the session, throttle failures, and store a device wi
     assert.equal(closed.status, 503);
     assert.match(String(closed.headers['x-robots-tag']), /noindex/);
     process.env.ADMIN_PASSWORD = PASSWORD;
+    const passwordOnly = await httpAsk({ path: '/admin' });
+    assert.equal(passwordOnly.status, 503);
+    process.env.ADMIN_EMAIL = EMAIL;
 
     const loginPage = await httpAsk({ path: '/admin' });
     assert.equal(loginPage.status, 200);
     assert.match(loginPage.body, /<meta name="robots" content="noindex">/);
     assert.match(loginPage.body, /Command centre/);
+    assert.match(loginPage.body, /name="email"/);
+    assert.match(loginPage.body, /name="password"/);
     assert.equal(loginPage.body.includes('Run cycle now'), false);
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    const wrongEmail = await httpAsk({
+      method: 'POST',
+      path: '/admin/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent('other@betspapa.test')}&password=${encodeURIComponent(PASSWORD)}`,
+    });
+    const wrongPassword = await httpAsk({
+      method: 'POST',
+      path: '/admin/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(EMAIL)}&password=nope`,
+    });
+    assert.equal(wrongEmail.status, 401);
+    assert.equal(wrongPassword.status, 401);
+    assert.match(wrongEmail.body, /Wrong email or password/);
+    assert.match(wrongPassword.body, /Wrong email or password/);
+    assert.equal(wrongEmail.headers['set-cookie'], undefined);
+    assert.equal(wrongPassword.headers['set-cookie'], undefined);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const wrong = await httpAsk({
         method: 'POST',
         path: '/admin/login',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: 'password=nope',
+        body: `email=${encodeURIComponent(EMAIL)}&password=nope`,
       });
       assert.equal(wrong.status, 401);
-      assert.match(wrong.body, /Wrong password/);
-      assert.equal(wrong.headers['set-cookie'], undefined);
     }
     const blocked = await httpAsk({
       method: 'POST',
       path: '/admin/login',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: `password=${encodeURIComponent(PASSWORD)}`,
+      body: `email=${encodeURIComponent(`  ${EMAIL.toUpperCase()}  `)}&password=${encodeURIComponent(PASSWORD)}`,
     });
     assert.equal(blocked.status, 429);
     const other = await httpAsk({
       method: 'POST',
       path: '/admin/login',
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-for': '203.0.113.40' },
-      body: 'password=nope',
+      body: `email=${encodeURIComponent(EMAIL)}&password=nope`,
     });
     assert.equal(other.status, 401);
 
@@ -319,7 +349,7 @@ test('admin routes require the session, throttle failures, and store a device wi
       method: 'POST',
       path: '/admin/login',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: `password=${encodeURIComponent(PASSWORD)}`,
+      body: `email=${encodeURIComponent(`  ${EMAIL.toUpperCase()}  `)}&password=${encodeURIComponent(PASSWORD)}`,
     });
     assert.equal(signed.status, 303);
     const cookieLine = String(signed.headers['set-cookie']);
@@ -395,7 +425,7 @@ test('admin routes require the session, throttle failures, and store a device wi
       method: 'POST',
       path: '/admin/login',
       headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-forwarded-proto': 'https' },
-      body: `password=${encodeURIComponent(PASSWORD)}`,
+      body: `email=${encodeURIComponent(EMAIL)}&password=${encodeURIComponent(PASSWORD)}`,
     });
     assert.match(String(secure.headers['set-cookie']), /Secure/);
 
@@ -410,6 +440,8 @@ test('admin routes require the session, throttle failures, and store a device wi
     else process.env.ENGINE_DATA_DIR = previous.data;
     if (previous.password == null) delete process.env.ADMIN_PASSWORD;
     else process.env.ADMIN_PASSWORD = previous.password;
+    if (previous.email == null) delete process.env.ADMIN_EMAIL;
+    else process.env.ADMIN_EMAIL = previous.email;
     if (previous.token == null) delete process.env.ENGINE_RUN_TOKEN;
     else process.env.ENGINE_RUN_TOKEN = previous.token;
     if (previous.nodeEnv == null) delete process.env.NODE_ENV;

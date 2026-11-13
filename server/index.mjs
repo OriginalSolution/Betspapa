@@ -17,6 +17,7 @@ const pushBook = pushWatch.book;
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
+const PUBLIC_SITE = 'https://betspapa.com';
 const port = Number(process.env.PORT) || 8787;
 const cache = new Map();
 
@@ -352,6 +353,28 @@ function streamFile(res, file, requested) {
   createReadStream(file).pipe(res);
 }
 
+function isStaticPath(pathname) {
+  return pathname === '/favicon.svg'
+    || pathname === '/favicon.ico'
+    || pathname === '/manifest.webmanifest'
+    || pathname === '/sw.js'
+    || pathname.startsWith('/bookies/')
+    || pathname.startsWith('/crests/')
+    || pathname.startsWith('/icons/')
+    || pathname.startsWith('/assets/')
+    || pathname.startsWith('/sounds/')
+    || extname(pathname) !== '';
+}
+
+function redirectToSite(res) {
+  res.writeHead(302, {
+    Location: PUBLIC_SITE,
+    'Cache-Control': 'no-store',
+    'Content-Length': 0,
+  });
+  res.end();
+}
+
 function serveStatic(req, res, url) {
   const requested = decodeURIComponent(url.pathname);
   const bundled = publicAsset(requested);
@@ -360,7 +383,12 @@ function serveStatic(req, res, url) {
     return;
   }
   if (!existsSync(dist)) {
-    send(res, 404, { error: 'Build the UI with npm run build, or use npm run dev.' });
+    if (isStaticPath(requested)) {
+      res.writeHead(404, { 'Cache-Control': 'no-store', 'Content-Length': 9 });
+      res.end('Not found');
+      return;
+    }
+    redirectToSite(res);
     return;
   }
   const safe = normalize(requested).replace(/^(\.\.[/\\])+/, '');
