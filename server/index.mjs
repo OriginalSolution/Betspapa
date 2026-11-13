@@ -169,9 +169,15 @@ async function handleApi(req, res, url) {
     }
     try {
       const body = await readJson(req);
+      if (Array.isArray(body.groups)) {
+        const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local').split(',')[0].trim();
+        const { requestJson } = await import('./curl-request.mjs');
+        send(req, res, 200, await bookGroups(body.groups, requestJson, new Date(), ip));
+        return;
+      }
       send(req, res, 200, submitBooking(body.legs));
     } catch (error) {
-      send(req, res, 400, { error: error.message || 'Invalid booking request' });
+      send(req, res, error.status === 429 ? 429 : 400, { error: error.message || 'Invalid booking request' });
     }
     return;
   }
@@ -235,31 +241,6 @@ async function handleApi(req, res, url) {
       res.end(data);
     } catch (error) {
       send(req, res, 400, { error: error.message || 'Invalid device registration' });
-    }
-    return;
-  }
-  if (url.pathname === '/api/book') {
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      });
-      res.end();
-      return;
-    }
-    if (req.method !== 'POST') {
-      send(req, res, 405, { error: 'Method not allowed' });
-      return;
-    }
-    const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local').split(',')[0].trim();
-    try {
-      const body = await readJson(req);
-      const groups = Array.isArray(body.groups) ? body.groups : [{ id: 'all', legs: body.legs }];
-      const { requestJson } = await import('./curl-request.mjs');
-      send(req, res, 200, await bookGroups(groups, requestJson, new Date(), ip));
-    } catch (error) {
-      send(req, res, error.status === 429 ? 429 : 400, { error: error.message || 'Could not book those selections' });
     }
     return;
   }
