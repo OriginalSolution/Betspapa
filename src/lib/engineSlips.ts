@@ -259,11 +259,25 @@ export function writeEngineCache(state: EngineState): void {
   for (const listener of listeners) listener();
 }
 
+function engineHasRows(state: EngineState): boolean {
+  return Boolean(state.master) || state.trends.length > 0;
+}
+
+/** The phone reads the public engine. The site reads same-origin /api/engine, then that public URL. */
 export async function fetchEngine(): Promise<EngineState> {
   if (isNativeApp()) {
     const response = await CapacitorHttp.request(nativeRequestOptions('GET', ENGINE_URL, { connectMs: 20_000, readMs: 30_000 }));
     if (response.status < 200 || response.status >= 300) throw new Error(`Slips returned ${response.status}`);
     return parseEngine(readJsonBody(response.data));
+  }
+  try {
+    const local = await fetch('/api/engine');
+    if (local.ok) {
+      const state = parseEngine(await local.json());
+      if (engineHasRows(state)) return state;
+    }
+  } catch {
+    /* GitHub Pages has no API process */
   }
   const response = await fetch(ENGINE_URL);
   if (!response.ok) throw new Error(`Slips returned ${response.status}`);

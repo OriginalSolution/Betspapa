@@ -1,6 +1,6 @@
 import { mapSportyEvent, type SportyEvent } from '../data/sporty';
 import type { Match, MatchEvent, MatchStatus } from '../types';
-import { isSimulatedFixture } from './simulated';
+import { isDummyEventId, isSimulatedFixture } from './simulated';
 
 /** In-play football on the same fixture service the board already uses. The public label stays Betspapa fixtures. */
 export const LIVE_FEED = 'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1';
@@ -296,6 +296,7 @@ export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): M
 }
 
 export function isRealMatch(match: Match): boolean {
+  if (isDummyEventId(match.id)) return false;
   return !isSimulatedFixture({
     country: match.competition.area,
     tournament: match.competition.name,

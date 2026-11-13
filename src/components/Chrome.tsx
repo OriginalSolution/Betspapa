@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { addDays } from '../lib/dates';
-import { ago, cx, dayWord, formatDay } from '../lib/format';
+import { ago, cx, dayWord, formatDay, longDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
 import { IconBell, IconLive, IconPicks, IconRank, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
@@ -70,7 +70,7 @@ export function TabBar() {
 }
 
 export function TopBar({ title }: { title: string }) {
-  const { unread, refresh } = useStore();
+  const { unread, refresh, date } = useStore();
   return (
     <header className="topbar">
       <NavLink to="/" className="brand mobile-brand" end aria-label="Betspapa home">
@@ -78,7 +78,7 @@ export function TopBar({ title }: { title: string }) {
       </NavLink>
       <div className="top-title">
         <h1>{title}</h1>
-        <p>Today’s fixtures</p>
+        <p>{title === 'Today' ? longDay(date) : 'Today’s fixtures'}</p>
       </div>
       <div className="top-actions">
         <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh scores">

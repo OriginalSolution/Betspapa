@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { flattenPage, isSimulated, loadUpcomingEvents, parseOdds } from './upcoming.mjs';
+import { flattenPage, isDummyId, isSimulated, loadUpcomingEvents, parseOdds } from './upcoming.mjs';
 
 const page = {
   bizCode: 10000,
@@ -45,6 +45,37 @@ const page = {
 test('parses 1X2, half-line totals and active BTTS prices only', () => {
   const odds = parseOdds(page.data.tournaments[0].events[0].markets);
   assert.deepEqual(odds, { home: 1.3, draw: 5.6, away: 9, 'over-25': 1.45, 'under-25': 2.6, 'btts-yes': 1.8 });
+});
+
+test('drops a 11111111 placeholder id and keeps a real match id', () => {
+  const events = flattenPage({
+    data: {
+      tournaments: [
+        {
+          name: 'Professional League Cup',
+          events: [
+            {
+              eventId: 'sr:match:111111114672527',
+              homeTeamName: 'Al-Seeb',
+              awayTeamName: 'Al Nahda',
+              estimateStartTime: Date.UTC(2026, 10, 13, 16),
+              sport: { category: { name: 'Oman' } },
+            },
+            {
+              eventId: 'sr:match:75803688',
+              homeTeamName: 'Comoros',
+              awayTeamName: 'Congo',
+              estimateStartTime: Date.UTC(2026, 10, 13, 13),
+              sport: { category: { name: 'International' } },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  assert.deepEqual(events.map((event) => event.eventId), ['sr:match:75803688']);
+  assert.equal(isDummyId('sr:match:111111114672527'), true);
+  assert.equal(isDummyId('sr:match:75803688'), false);
 });
 
 test('drops simulated reality league fixtures and keeps real ones', () => {

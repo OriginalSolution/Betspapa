@@ -1,17 +1,46 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LiveAlertsBanner } from '../components/AlertSetup';
-import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
-import { DateBar, ErrorBanner, FilterChips } from '../components/Chrome';
+import { EmptyState, MatchSkeleton } from '../components/MatchBoard';
+import { ErrorBanner, FilterChips } from '../components/Chrome';
+import { TodayBoard, TodaySortBar, WeekStrip, type TodaySort } from '../components/TodayBoard';
 import { scopeLabel, TodaySearch } from '../components/TodaySearch';
+import { ENGINE_POLL_MS, fetchEngine, readEngineCache, subscribeEngine, writeEngineCache, type EngineState } from '../lib/engineSlips';
 import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
+
+function useEngine() {
+  const [state, setState] = useState<EngineState | null>(() => readEngineCache());
+  useEffect(() => subscribeEngine(() => setState(readEngineCache())), []);
+  useEffect(() => {
+    let stop = false;
+    const pull = async () => {
+      try {
+        const next = await fetchEngine();
+        if (stop) return;
+        writeEngineCache(next);
+        setState(next);
+      } catch {
+        /* cards stay up without a trend chip */
+      }
+    };
+    void pull();
+    const timer = window.setInterval(() => void pull(), ENGINE_POLL_MS);
+    return () => {
+      stop = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+  return state;
+}
 
 export function TodayPage() {
   const { matches, loading, ready, feedNote, refresh } = useStore();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<BoardFilter>('all');
+  const [sort, setSort] = useState<TodaySort>('kickoff');
+  const engine = useEngine();
   const [query, setQuery] = useState('');
   const [extra, setExtra] = useState<Match[]>([]);
   const onQuery = useCallback((value: string) => setQuery(value), []);
@@ -41,7 +70,8 @@ export function TodayPage() {
       )}
       {searching ? null : (
         <>
-          {!(teamId || leagueId) && <DateBar />}
+          {!(teamId || leagueId) && <WeekStrip />}
+          {!(teamId || leagueId) && <TodaySortBar value={sort} onChange={setSort} />}
           {!(teamId || leagueId) && <FilterChips value={filter} onChange={setFilter} />}
           {feedNote && (
             <div className="banner" role="status">
@@ -69,7 +99,7 @@ export function TodayPage() {
               }
             />
           ) : (
-            <MatchBoard matches={shown} />
+            <TodayBoard matches={shown} sort={sort} engine={engine} />
           )}
         </>
       )}

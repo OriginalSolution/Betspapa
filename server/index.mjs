@@ -33,6 +33,7 @@ function send(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    'Access-Control-Allow-Origin': '*',
     'Content-Length': Buffer.byteLength(data),
   });
   res.end(data);
@@ -88,6 +89,15 @@ function readJson(req) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    });
+    res.end();
+    return;
+  }
   if (url.pathname === '/api/book') {
     if (req.method === 'GET') {
       send(res, 200, latestBooking());

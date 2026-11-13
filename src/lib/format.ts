@@ -1,5 +1,5 @@
 import type { Match } from '../types';
-import { addDays } from './dates';
+import { addDays, parseIsoDate } from './dates';
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ');
@@ -21,6 +21,18 @@ export function dayWord(date: string, today: string): string | null {
   if (date === addDays(today, -1)) return 'Yesterday';
   if (date === addDays(today, 1)) return 'Tomorrow';
   return null;
+}
+
+/** "Friday 13 Nov" for the Today header. */
+export function longDay(iso: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).format(parseIsoDate(iso)).replace(',', '');
+}
+
+/** Week-strip face: weekday abbreviation and the day of the month. */
+export function weekdayChip(iso: string): { weekday: string; day: string } {
+  const date = parseIsoDate(iso);
+  const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(date).replace(/\./g, '').slice(0, 3).toUpperCase();
+  return { weekday, day: String(date.getDate()) };
 }
 
 export function minuteLabel(match: Match): string {

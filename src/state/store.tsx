@@ -9,7 +9,7 @@ import { crestKey, resolveCrests } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
 import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
-import { isoFromDate } from '../lib/dates';
+import { isoFromDate, onBoardDate } from '../lib/dates';
 import { isNativeApp } from '../lib/nativeHttp';
 import { playGoalSound, shouldPlayInAppCheer } from '../lib/cheer';
 import { pushBrowserNotification, readNativePermission, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
@@ -362,7 +362,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const matches = await fetchSportyBoard(current.date);
           const choice = chooseFixtures({ ok: true, matches }, []);
           upcomingRef.current = choice.matches;
-          const merged = mergeBoard(stateRef.current.matches, choice.matches, liveRef.current, Date.now());
+          const datedLive = liveRef.current.filter((match) => onBoardDate(match.utcDate, current.date));
+          const merged = mergeBoard(stateRef.current.matches, choice.matches, datedLive, Date.now());
           const decorated = applyCrests(merged, crestRef.current);
           saveFixtureCache(current.date, decorated);
           if (!cancelled) dispatch({ type: 'snapshot', matches: decorated, now: Date.now(), usingDemo: false, feedNote: null });
@@ -439,7 +440,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     upcomingRef.current = [];
-    liveRef.current = [];
   }, [state.date]);
 
   useEffect(() => {
@@ -457,8 +457,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const paint = (live: Match[]) => {
       liveRef.current = live;
       const current = stateRef.current;
+      const datedLive = live.filter((match) => onBoardDate(match.utcDate, current.date));
       const base = upcomingRef.current.length ? upcomingRef.current : current.matches;
-      const merged = applyCrests(mergeBoard(current.matches, base, live, Date.now()), crestRef.current);
+      const merged = applyCrests(mergeBoard(current.matches, base, datedLive, Date.now()), crestRef.current);
       saveFixtureCache(current.date, merged);
       dispatch({ type: 'snapshot', matches: merged, now: Date.now(), usingDemo: false, feedNote: current.feedNote });
     };

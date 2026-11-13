@@ -178,3 +178,28 @@ export function rateLabel(chip: PickChip): string {
   }
   return '';
 }
+
+/** Short name for the inline Today chip, such as "Over 1.5" or "DC 12". */
+export function trendMarketName(market: string): string {
+  if (market.startsWith('dc-')) return `DC ${market.slice(3).toUpperCase()}`;
+  return marketLabel(market).replace(/ goals$/, '').replace(/^Full-time /, '').replace(/^First-half /, 'FH ');
+}
+
+export function trendChipText(chip: PickChip): string {
+  const rate = chip.sample || rateLabel(chip);
+  return [trendMarketName(chip.market), rate, chip.odds.toFixed(2)].filter(Boolean).join(' · ');
+}
+
+/**
+ * The single best 80%+ engine trend for one match.
+ * Needs a real sample such as 8/10 and a price of at least 1.20.
+ * Returns null when the engine has nothing that qualifies.
+ */
+export function bestTrendChip(state: EngineState | null, match: Match): PickChip | null {
+  const card = cardsFromEngine(state, [match], 'confidence').find((item) => item.eventId === match.id);
+  const chips = (card?.chips || []).filter(
+    (chip) => publishableOdds(chip.odds) && Boolean(chip.sample && SAMPLE.test(chip.sample.trim())) && (chip.rate ?? 0) + 1e-12 >= 0.8,
+  );
+  if (!chips.length) return null;
+  return [...chips].sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0) || b.odds - a.odds || a.market.localeCompare(b.market))[0];
+}

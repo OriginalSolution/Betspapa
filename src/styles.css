@@ -1418,3 +1418,214 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   .picks-page.has-float { padding-bottom: 24px; }
 }
 
+.week-wrap { padding-top: 4px; }
+.week-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 14px 4px;
+  scrollbar-width: none;
+}
+.week-strip::-webkit-scrollbar { display: none; }
+.week-day {
+  flex: none;
+  width: 54px;
+  height: 64px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+.week-day small {
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.week-day strong {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+.week-day.is-on { background: var(--red); color: #fff; }
+.week-day.is-on strong { color: #fff; }
+.back-today {
+  margin: 8px 14px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  padding: 0;
+}
+.sort-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 0;
+}
+.sort-toggle button {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.sort-toggle button.is-on {
+  background: #fff;
+  color: #12141a;
+  border-color: transparent;
+}
+.today-board { padding-bottom: 12px; }
+.board-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+}
+.board-section h2 {
+  margin: 0;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.board-section span {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: right;
+}
+.fixture-card {
+  position: relative;
+  margin: 0 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+}
+.fixture-card.is-live,
+.fixture-card.is-followed { box-shadow: inset 3px 0 0 var(--red); }
+.fixture-link {
+  display: block;
+  padding: 14px 14px 16px;
+  text-decoration: none;
+  color: inherit;
+}
+.fixture-league {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 28px;
+}
+.fixture-comp {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.fixture-teams {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  margin-top: 16px;
+}
+.fixture-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+.fixture-side strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.fixture-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 76px;
+  padding-top: 6px;
+}
+.fixture-score,
+.fixture-kick {
+  font-family: var(--score);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.fixture-score { font-size: 36px; letter-spacing: 0.02em; }
+.fixture-kick { font-size: 32px; letter-spacing: -0.02em; }
+.fixture-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.minute-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+}
+.ring-track,
+.ring-value {
+  fill: none;
+  stroke-width: 3;
+}
+.ring-track { stroke: rgba(255, 255, 255, 0.12); }
+.ring-value { stroke: var(--red); stroke-linecap: round; }
+.ring-dot { fill: var(--red); }
+.ring-minute {
+  margin-top: -2px;
+  color: var(--red-2);
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.ring-minute.is-var { color: var(--gold); letter-spacing: 0.04em; }
+.trend-chip {
+  display: inline-flex;
+  margin: 14px 0 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(61, 220, 151, 0.14);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+.fixture-star {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+}
+@media (hover: hover) {
+  .fixture-card:hover { background: #171b24; }
+}
+

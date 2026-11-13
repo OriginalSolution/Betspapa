@@ -85,6 +85,14 @@ export function isSimulated(event) {
   return /simulated|virtual|e-?soccer|esports|cyber|\bsrl$/.test(where) || /\bsrl\b/.test(String(event?.tournament || '').toLowerCase());
 }
 
+/** Catalogue rows without a real Sportradar id use a 11111111 placeholder. */
+export function isDummyId(eventId) {
+  const value = String(eventId || '').trim();
+  if (!value || /dummy|placeholder|virtual|simulated/i.test(value)) return true;
+  const numeric = value.split(':').pop() || '';
+  return numeric.startsWith('11111111');
+}
+
 /** Flatten one catalogue page into Betspapa fixture events. */
 export function flattenPage(payload) {
   const events = [];
@@ -103,7 +111,7 @@ export function flattenPage(payload) {
         country: event.sport?.category?.name || '',
         odds: parseOdds(event.markets),
       };
-      if (!isSimulated(record)) events.push(record);
+      if (!isDummyId(record.eventId) && !isSimulated(record)) events.push(record);
     }
   }
   return events;
