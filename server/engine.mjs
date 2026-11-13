@@ -47,6 +47,7 @@ function publicState(state) {
     master: scrubShort(state.master),
     trends: (state.trends || []).map(scrubShort),
     issues: state.issues,
+    cycleNotes: Array.isArray(state.cycleNotes) ? state.cycleNotes : null,
   };
 }
 
@@ -67,6 +68,7 @@ export function createEngine(options = {}) {
   let running = null;
   let timer = null;
   let kick = null;
+  let nextRunAt = null;
   const historyCache = { teams: new Map(), stats: new Map() };
 
   function teamIds(events, now) {
@@ -217,6 +219,7 @@ export function createEngine(options = {}) {
       slipCache: booking.cache,
       occurrenceByEvent: board.byEvent,
       settlement: settled.status,
+      cycleNotes: issues,
       issues: [...issues, ...(state.issues || [])].slice(0, 40),
     };
     save(next);
@@ -243,11 +246,26 @@ export function createEngine(options = {}) {
     getState: () => publicState(state),
     getEvents: () => state.events,
     getOccurrence: () => state.occurrenceByEvent || {},
+    getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running) }),
     run,
+    stop() {
+      clearTimeout(kick);
+      clearInterval(timer);
+      kick = null;
+      timer = null;
+    },
     start() {
       if (timer) return;
-      kick = setTimeout(() => void run(), 20_000);
-      timer = setInterval(() => void run(), INTERVAL_MS);
+      const started = Date.now();
+      nextRunAt = started + 20_000;
+      kick = setTimeout(() => {
+        nextRunAt = started + INTERVAL_MS;
+        void run();
+      }, 20_000);
+      timer = setInterval(() => {
+        nextRunAt = Date.now() + INTERVAL_MS;
+        void run();
+      }, INTERVAL_MS);
       kick.unref?.();
       timer.unref?.();
     },
@@ -266,6 +284,10 @@ export function startEngine() {
 
 export function getEngineState() {
   return engine.getState();
+}
+
+export function getEngineSchedule() {
+  return engine.getSchedule();
 }
 
 export function getCachedEvents() {

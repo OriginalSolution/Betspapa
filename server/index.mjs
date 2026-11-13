@@ -1,15 +1,20 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { hasSession } from './adminAuth.mjs';
+import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
 import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
+import { countryForRequest } from './geo.mjs';
 import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
 const pushWatch = startPushWatch();
 const pushBook = pushWatch.book;
+const pushAlerts = pushWatch.alerts;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
 const port = Number(process.env.PORT) || 8787;
@@ -115,9 +120,19 @@ async function handleApi(req, res, url) {
     }
     return;
   }
+  if (url.pathname.startsWith('/api/admin/')) {
+    await handleAdminApi(req, res, url, { book: pushBook, alerts: pushAlerts, fcm: fcmConfigured });
+    return;
+  }
   if (url.pathname === '/api/devices/test') {
     if (req.method !== 'POST') {
       send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    const engineToken = process.env.ENGINE_RUN_TOKEN || '';
+    const engineAuth = Boolean(engineToken) && req.headers.authorization === `Bearer ${engineToken}`;
+    if (!engineAuth && !hasSession(req)) {
+      send(res, 401, { error: 'Admin session required.' });
       return;
     }
     try {
@@ -149,7 +164,8 @@ async function handleApi(req, res, url) {
     }
     try {
       const body = await readJson(req);
-      const result = pushBook.register(body);
+      const country = await countryForRequest(req);
+      const result = pushBook.register(body, { country });
       if (result.error) {
         send(res, 400, { error: result.error });
         return;
@@ -312,15 +328,43 @@ async function handleApi(req, res, url) {
   }
 }
 
+function publicAsset(requested) {
+  const allowed = requested === '/favicon.svg'
+    || requested === '/manifest.webmanifest'
+    || requested.startsWith('/bookies/')
+    || requested.startsWith('/crests/')
+    || requested.startsWith('/icons/');
+  if (!allowed) return '';
+  const root = join(process.cwd(), 'public');
+  const file = normalize(join(root, requested));
+  if (file !== root && !file.startsWith(root + sep)) return '';
+  if (!existsSync(file) || statSync(file).isDirectory()) return '';
+  return file;
+}
+
+function streamFile(res, file, requested) {
+  const ext = extname(file);
+  const hashed = requested.startsWith('/assets/');
+  res.writeHead(200, {
+    'Content-Type': TYPES[ext] || 'application/octet-stream',
+    'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+  });
+  createReadStream(file).pipe(res);
+}
+
 function serveStatic(req, res, url) {
+  const requested = decodeURIComponent(url.pathname);
+  const bundled = publicAsset(requested);
+  if (bundled) {
+    streamFile(res, bundled, requested);
+    return;
+  }
   if (!existsSync(dist)) {
     send(res, 404, { error: 'Build the UI with npm run build, or use npm run dev.' });
     return;
   }
-  const requested = decodeURIComponent(url.pathname);
   const safe = normalize(requested).replace(/^(\.\.[/\\])+/, '');
-  const bundledCrest = requested.startsWith('/crests/') ? join(process.cwd(), 'public', safe) : '';
-  let file = bundledCrest && existsSync(bundledCrest) && !statSync(bundledCrest).isDirectory() ? bundledCrest : join(dist, safe);
+  let file = join(dist, safe);
   if (!file.startsWith(dist)) {
     res.writeHead(400);
     res.end('Bad path');
@@ -334,29 +378,42 @@ function serveStatic(req, res, url) {
     }
     file = join(dist, 'index.html');
   }
-  const ext = extname(file);
-  const hashed = requested.startsWith('/assets/');
-  res.writeHead(200, {
-    'Content-Type': TYPES[ext] || 'application/octet-stream',
-    'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600',
-  });
-  createReadStream(file).pipe(res);
+  streamFile(res, file, requested);
 }
 
-const server = createServer((req, res) => {
+async function onRequest(req, res) {
   const url = new URL(req.url || '/', 'http://localhost');
-  if (url.pathname.startsWith('/api/')) {
-    handleApi(req, res, url);
-    return;
+  try {
+    if (url.pathname === '/admin' || url.pathname.startsWith('/admin/')) {
+      await handleAdminPage(req, res, url);
+      return;
+    }
+    if (url.pathname.startsWith('/api/')) {
+      await handleApi(req, res, url);
+      return;
+    }
+    serveStatic(req, res, url);
+  } catch (error) {
+    console.error(`[http] ${error instanceof Error ? error.message : error}`);
+    if (!res.headersSent) send(res, 500, { error: 'Request failed' });
   }
-  serveStatic(req, res, url);
-});
+}
 
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
-  loadUpcomingEvents()
-    .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
-    .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
-  startEngine();
-  pushWatch.start();
-});
+export function createBetspapaServer() {
+  return createServer((req, res) => {
+    void onRequest(req, res);
+  });
+}
+
+const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invoked) {
+  const server = createBetspapaServer();
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
+    loadUpcomingEvents()
+      .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
+      .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
+    startEngine();
+    pushWatch.start();
+  });
+}

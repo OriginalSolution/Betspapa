@@ -1,5 +1,6 @@
 import { CapacitorHttp } from '@capacitor/core';
 import type { Follows, Settings } from '../types';
+import { APP_VERSION } from './appVersion';
 import { readPushToken } from './deviceWatch';
 import { isNativeApp, nativeRequestOptions } from './nativeHttp';
 
@@ -8,6 +9,7 @@ export const DEVICES_URL = 'https://api.betspapa.com/api/devices';
 
 export type DeviceRegistration = {
   token: string;
+  appVersion: string;
   follows: Follows;
   trends: string[];
   bookings: Array<{ id: string; odds: number }>;
@@ -18,7 +20,7 @@ export type DeviceRegistration = {
 };
 
 /** Registers the FCM token. A build without google-services.json has no token and this is a no-op. */
-export async function syncPushDevice(body: Omit<DeviceRegistration, 'token'>): Promise<boolean> {
+export async function syncPushDevice(body: Omit<DeviceRegistration, 'token' | 'appVersion'>): Promise<boolean> {
   if (!isNativeApp()) return false;
   let push = await readPushToken();
   for (let attempt = 0; push.enabled && !push.token && attempt < 8; attempt += 1) {
@@ -26,7 +28,7 @@ export async function syncPushDevice(body: Omit<DeviceRegistration, 'token'>): P
     push = await readPushToken();
   }
   if (!push.enabled || !push.token) return false;
-  const payload: DeviceRegistration = { token: push.token, ...body };
+  const payload: DeviceRegistration = { ...body, token: push.token, appVersion: APP_VERSION };
   try {
     const response = await CapacitorHttp.request(
       nativeRequestOptions('POST', DEVICES_URL, {

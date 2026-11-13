@@ -11,6 +11,7 @@
  * emitted only when those fields are present on a row.
  */
 import { createSign } from 'node:crypto';
+import { cleanCountry } from './geo.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
@@ -443,6 +444,13 @@ export function trendNotes(previous, next, device) {
   return notes;
 }
 
+function cleanVersion(value) {
+  if (typeof value !== 'string') return '';
+  const version = value.trim();
+  if (!/^[0-9A-Za-z._+-]{1,32}$/.test(version)) return '';
+  return version;
+}
+
 export function acceptDevice(body) {
   const token = typeof body?.token === 'string' ? body.token.trim() : '';
   if (token.length < 20 || /\s/.test(token)) return { error: 'A device token is required.' };
@@ -484,6 +492,7 @@ export function acceptDevice(body) {
         varSound: settings.varSound !== false,
         penaltySound: settings.penaltySound !== false,
       },
+      appVersion: cleanVersion(body?.appVersion),
       sent: [],
       updatedAt: new Date().toISOString(),
     },
@@ -510,12 +519,22 @@ export function createDeviceBook(dir) {
 
   return {
     list: () => devices,
-    register(body) {
+    register(body, meta = {}) {
       const accepted = acceptDevice(body);
       if (accepted.error) return accepted;
       const existing = devices.find((item) => item.token === accepted.device.token);
-      accepted.device.sent = existing?.sent || [];
-      devices = [accepted.device, ...devices.filter((item) => item.token !== accepted.device.token)].slice(0, 5000);
+      const now = new Date().toISOString();
+      const device = {
+        ...accepted.device,
+        sent: existing?.sent || [],
+        appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),
+        country: cleanCountry(meta?.country) || cleanCountry(existing?.country) || null,
+        firstSeenAt: existing?.firstSeenAt || existing?.updatedAt || now,
+        lastSeenAt: now,
+      };
+      delete device.ip;
+      delete device.address;
+      devices = [device, ...devices.filter((item) => item.token !== device.token)].slice(0, 5000);
       save();
       return { ok: true, push: fcmConfigured() };
     },
@@ -642,9 +661,49 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
   }
 }
 
+export function alertMatch(note) {
+  const match = note?.match && typeof note.match === 'object' ? note.match : {};
+  if (match.home && match.away) return `${match.home} vs ${match.away}`.replace(/\s+/g, ' ').trim().slice(0, 140);
+  if (typeof note?.fixture === 'string' && note.fixture.trim()) return note.fixture.trim().slice(0, 140);
+  return '';
+}
+
+export function createAlertLog(dir) {
+  const file = join(dir, 'push-log.json');
+  let rows = load();
+
+  function load() {
+    try {
+      const parsed = JSON.parse(readFileSync(file, 'utf8'));
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .filter((row) => row && typeof row.type === 'string' && typeof row.time === 'string')
+        .map((row) => ({ type: String(row.type).slice(0, 40), match: String(row.match || '').slice(0, 140), time: String(row.time) }));
+    } catch {
+      return [];
+    }
+  }
+
+  function save() {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(file, JSON.stringify(rows));
+  }
+
+  return {
+    list: () => rows.map((row) => ({ ...row })),
+    record(note, time = new Date().toISOString()) {
+      const row = { type: String(note?.kind || 'alert').slice(0, 40), match: alertMatch(note), time };
+      if (!row.match) return;
+      rows = [row, ...rows].slice(0, 40);
+      save();
+    },
+  };
+}
+
 export function startPushWatch(options = {}) {
   const dir = options.dir || process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
   const book = options.book || createDeviceBook(dir);
+  const alerts = options.alerts || createAlertLog(dir);
   const log = options.log || ((message) => console.log(`[push] ${message}`));
   const intervalMs = options.intervalMs ?? 25_000;
   let baseline = null;
@@ -687,6 +746,7 @@ export function startPushWatch(options = {}) {
     const previous = baseline;
     baseline = matches;
     if (!fcmConfigured()) return;
+    const logged = new Set();
     for (const device of book.list()) {
       const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
       for (const item of mine) {
@@ -696,7 +756,13 @@ export function startPushWatch(options = {}) {
           const fcm = publicFcm(result.body);
           log(`FCM response ${result.status} ${JSON.stringify(fcm)}`);
           if (result.dropped) book.drop(device.token);
-          else book.remember(device.token, item.id);
+          else {
+            book.remember(device.token, item.id);
+            if (!logged.has(item.id)) {
+              logged.add(item.id);
+              alerts.record(item);
+            }
+          }
         } catch (error) {
           const fcm = error && error.fcm ? ` ${JSON.stringify(error.fcm)}` : '';
           log(`Push failed: ${error instanceof Error ? error.message : error}${fcm}`);
@@ -713,5 +779,5 @@ export function startPushWatch(options = {}) {
     return book;
   }
 
-  return { book, start, tick };
+  return { book, alerts, start, tick };
 }
