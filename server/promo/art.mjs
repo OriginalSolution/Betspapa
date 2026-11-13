@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { esc, pickPair, playerBox, playerImage } from './players.mjs';
+import { esc, pickPair, playerBox, playerGlow, playerImage } from './players.mjs';
 
 const W = 1080;
 const H = 1350;
@@ -172,6 +172,8 @@ export function posterSvg(card, logos = {}) {
     <text x="1008" y="74" text-anchor="end" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">${esc(card.kicker)}</text>
     ${crest(card.homeCrest, 28, 168, stars.home.primary)}
     ${crest(card.awayCrest, W - 28 - 96, 168, stars.away.primary)}
+    ${playerGlow(stars.home, { x: homeX, y: 96, height: playerH, maxX: homeX + homeBox.width * 0.72 })}
+    ${playerGlow(stars.away, { x: awayX, y: 96, height: playerH, minX: awayX + awayBox.width * 0.28 })}
     ${playerImage(stars.home, { x: homeX, y: 96, height: playerH })}
     ${playerImage(stars.away, { x: awayX, y: 96, height: playerH })}
     <text x="64" y="924" fill="#f4f6fb" font-family="Barlow Condensed" font-size="68" font-weight="700">${esc(cut(String(card.home).toUpperCase(), 22))}</text>
@@ -190,8 +192,10 @@ export function posterSvg(card, logos = {}) {
 }
 
 export function weekendSvg(card, logos = {}) {
-  const [homeName, awayName] = String(card.picks[0]?.match || '').split(/\s+vs\s+/i);
-  const stars = pickPair(homeName || '', awayName || '', crestPathForName(homeName), crestPathForName(awayName));
+  const split = String(card.picks[0]?.match || '').split(/\s+vs\s+/i);
+  const homeName = card.featuredHome || String(split[0] || '').trim();
+  const awayName = card.featuredAway || String(split[1] || '').trim();
+  const stars = pickPair(homeName, awayName, crestPathForName(homeName), crestPathForName(awayName));
   const playerH = 960;
   const homeBox = playerBox(stars.home, playerH);
   const awayBox = playerBox(stars.away, playerH);
@@ -209,17 +213,19 @@ export function weekendSvg(card, logos = {}) {
   }).join('');
   const codeY = rowsStart + Math.max(card.picks.length, 1) * (rowH + 14) + 8;
   const canvas = codeY + 140;
-  const crest = (href, x, glow) => (href
-    ? `<circle cx="${x + 40}" cy="250" r="54" fill="${glow}" opacity=".34"/>
-       <image href="${href}" x="${x}" y="210" width="80" height="80"/>`
-    : '');
+  const crest = (href, x, glow, label) => `<g>
+      ${href ? `<circle cx="${x + 40}" cy="228" r="48" fill="${glow}" opacity=".34"/><image href="${href}" x="${x}" y="188" width="80" height="80"/>` : ''}
+      <text x="${x + 40}" y="292" text-anchor="middle" fill="#f4f6fb" font-family="Outfit" font-size="15" font-weight="600">${esc(cut(label, 16))}</text>
+    </g>`;
   return frame('#e11d2e', `
     ${brand()}
-    <text x="72" y="140" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="3">WEEKEND BANKERS</text>
-    ${crest(crestForName(homeName), 28, stars.home.primary)}
-    ${crest(crestForName(awayName), W - 108, stars.away.primary)}
+    <text x="72" y="128" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="3">WEEKEND BANKERS</text>
+    ${playerGlow(stars.home, { x: homeX, y: 168, height: playerH, maxX: homeX + homeBox.width * 0.7 })}
+    ${playerGlow(stars.away, { x: awayX, y: 168, height: playerH, minX: awayX + awayBox.width * 0.3 })}
     ${playerImage(stars.home, { x: homeX, y: 168, height: playerH })}
     ${playerImage(stars.away, { x: awayX, y: 168, height: playerH })}
+    ${crest(crestForName(homeName), 28, stars.home.primary, homeName)}
+    ${crest(crestForName(awayName), W - 108, stars.away.primary, awayName)}
     ${rows}
     <rect x="56" y="${codeY}" width="968" height="110" rx="28" fill="#0c0e14"/>
     <text x="84" y="${codeY + 40}" fill="#f0c94a" font-family="Outfit" font-size="15" font-weight="700" letter-spacing="2">CODE</text>

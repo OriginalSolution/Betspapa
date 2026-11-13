@@ -207,6 +207,7 @@ export function bankersBetween(state, start, end) {
   const master = deskCodes(state?.master?.books);
   const code = picks.find((row) => row.codes.length)?.codes[0]?.code || master[0]?.code || '';
   if (!picks.length || !code) return null;
+  const [featuredHome, featuredAway] = String(picks[0].match || '').split(/\s+vs\s+/i);
   return {
     kind: 'weekend',
     title: 'Weekend Bankers are out',
@@ -215,6 +216,8 @@ export function bankersBetween(state, start, end) {
     matchId: picks[0].eventId,
     code,
     picks,
+    featuredHome: String(featuredHome || '').trim(),
+    featuredAway: String(featuredAway || '').trim(),
     codes: master.length ? master : picks[0].codes,
   };
 }

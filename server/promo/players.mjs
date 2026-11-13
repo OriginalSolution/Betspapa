@@ -34,38 +34,139 @@ const COUNTRY = {
   netherlands: 'NL',
   holland: 'NL',
   italy: 'IT',
+  japan: 'JP',
+  albania: 'AL',
+  luxembourg: 'LU',
+  switzerland: 'CH',
+  romania: 'RO',
+  malawi: 'MW',
+  mali: 'ML',
+  rwanda: 'RW',
+  bermuda: 'BM',
+  belgium: 'BE',
+  croatia: 'HR',
+  denmark: 'DK',
+  sweden: 'SE',
+  norway: 'NO',
+  poland: 'PL',
+  scotland: 'SCO',
+  wales: 'WAL',
+  ireland: 'IE',
+  'republic of ireland': 'IE',
+  usa: 'US',
+  'united states': 'US',
+  mexico: 'MX',
+  uruguay: 'UY',
+  colombia: 'CO',
+  chile: 'CL',
+  turkey: 'TR',
+  turkiye: 'TR',
+  greece: 'GR',
+  austria: 'AT',
+  hungary: 'HU',
+  serbia: 'RS',
+  ukraine: 'UA',
+  'south korea': 'KR',
+  korea: 'KR',
+  australia: 'AU',
+  'south africa': 'ZA',
 };
 
-/** Home-kit colours when we know them. Crest sampling covers everyone else. */
+/** Club home shirts. These beat a crest, which is often a gold ring around a small badge. */
 const KITS = {
   arsenal: ['#C8102E', '#FFFFFF'],
-  'borussia dortmund': ['#FDE100', '#111111'],
-  dortmund: ['#FDE100', '#111111'],
-  'heart of lions': ['#B4232D', '#F0C94A'],
-  'dreams fc': ['#1A4FD8', '#F0C94A'],
   chelsea: ['#034694', '#FFFFFF'],
   liverpool: ['#C8102E', '#FFFFFF'],
   'manchester united': ['#DA291C', '#FFFFFF'],
   'manchester city': ['#6CABDD', '#FFFFFF'],
+  tottenham: ['#F4F6FB', '#111111'],
+  'tottenham hotspur': ['#F4F6FB', '#111111'],
+  newcastle: ['#111111', '#FFFFFF'],
+  'newcastle united': ['#111111', '#FFFFFF'],
   barcelona: ['#A50044', '#004D98'],
   'fc barcelona': ['#A50044', '#004D98'],
   'real madrid': ['#F4F6FB', '#111111'],
-  ghana: ['#F4F6FB', '#C8102E'],
-  nigeria: ['#008751', '#FFFFFF'],
-  senegal: ['#F4F6FB', '#00853F'],
-  'ivory coast': ['#FF8200', '#FFFFFF'],
-  cameroon: ['#007A5E', '#FCD116'],
-  morocco: ['#C1272D', '#006233'],
-  egypt: ['#C8102E', '#FFFFFF'],
-  england: ['#F4F6FB', '#C8102E'],
-  france: ['#002654', '#ED2939'],
-  brazil: ['#FEDD00', '#009C3B'],
-  argentina: ['#75AADB', '#FFFFFF'],
-  germany: ['#F4F6FB', '#111111'],
-  spain: ['#C60B1E', '#F1BF00'],
-  portugal: ['#C8102E', '#006600'],
-  netherlands: ['#FF6600', '#FFFFFF'],
-  italy: ['#0066B3', '#FFFFFF'],
+  'atletico madrid': ['#C8102E', '#FFFFFF'],
+  'atletico de madrid': ['#C8102E', '#FFFFFF'],
+  leganes: ['#1A4FD8', '#FFFFFF'],
+  'cd leganes': ['#1A4FD8', '#FFFFFF'],
+  burgos: ['#F4F6FB', '#111111'],
+  'borussia dortmund': ['#FDE100', '#111111'],
+  dortmund: ['#FDE100', '#111111'],
+  'bayern munich': ['#DC052D', '#FFFFFF'],
+  'bayern munchen': ['#DC052D', '#FFFFFF'],
+  juventus: ['#111111', '#FFFFFF'],
+  inter: ['#010E80', '#111111'],
+  'inter milan': ['#010E80', '#111111'],
+  'ac milan': ['#C8102E', '#111111'],
+  milan: ['#C8102E', '#111111'],
+  napoli: ['#6BB5E0', '#FFFFFF'],
+  roma: ['#8B1E3F', '#F0C94A'],
+  'paris saint germain': ['#0A1F44', '#E10600'],
+  psg: ['#0A1F44', '#E10600'],
+  ajax: ['#C8102E', '#FFFFFF'],
+  benfica: ['#E10600', '#FFFFFF'],
+  porto: ['#0033A0', '#FFFFFF'],
+  'sporting cp': ['#008057', '#FFFFFF'],
+  celtic: ['#008751', '#FFFFFF'],
+  rangers: ['#1A4FD8', '#FFFFFF'],
+  'heart of lions': ['#B4232D', '#F0C94A'],
+  'dreams fc': ['#1A4FD8', '#F0C94A'],
+};
+
+/**
+ * National home shirts by country code. A nation with no cut-out of its own
+ * (Japan, and the rest) is matched to the closest club colour.
+ */
+const NATION_KITS = {
+  GH: ['#F4F6FB', '#C8102E'],
+  NG: ['#008751', '#FFFFFF'],
+  SN: ['#F4F6FB', '#00853F'],
+  CI: ['#FF8200', '#FFFFFF'],
+  CM: ['#007A5E', '#FCD116'],
+  MA: ['#C1272D', '#006233'],
+  EG: ['#C8102E', '#FFFFFF'],
+  ENG: ['#F4F6FB', '#C8102E'],
+  FR: ['#002654', '#ED2939'],
+  BR: ['#FEDD00', '#009C3B'],
+  AR: ['#75AADB', '#FFFFFF'],
+  DE: ['#F4F6FB', '#111111'],
+  ES: ['#C60B1E', '#F1BF00'],
+  PT: ['#C8102E', '#006600'],
+  NL: ['#FF6600', '#FFFFFF'],
+  IT: ['#0066B3', '#FFFFFF'],
+  JP: ['#1A4FD8', '#FFFFFF'],
+  AL: ['#E10600', '#111111'],
+  LU: ['#E10600', '#FFFFFF'],
+  CH: ['#E10600', '#FFFFFF'],
+  RO: ['#FDE100', '#002B7F'],
+  MW: ['#E10600', '#111111'],
+  ML: ['#FDE100', '#009A44'],
+  RW: ['#6BB5E0', '#FDE100'],
+  BM: ['#1A4FD8', '#E10600'],
+  BE: ['#E10600', '#111111'],
+  HR: ['#E10600', '#FFFFFF'],
+  DK: ['#E10600', '#FFFFFF'],
+  SE: ['#FDE100', '#005293'],
+  NO: ['#E10600', '#00205B'],
+  PL: ['#FFFFFF', '#E10600'],
+  SCO: ['#0033A0', '#FFFFFF'],
+  WAL: ['#E10600', '#FFFFFF'],
+  IE: ['#008751', '#FFFFFF'],
+  US: ['#FFFFFF', '#002868'],
+  MX: ['#006847', '#FFFFFF'],
+  UY: ['#6BB5E0', '#FFFFFF'],
+  CO: ['#FDE100', '#0033A0'],
+  CL: ['#E10600', '#FFFFFF'],
+  TR: ['#E10600', '#FFFFFF'],
+  GR: ['#0055A4', '#FFFFFF'],
+  AT: ['#E10600', '#FFFFFF'],
+  HU: ['#E10600', '#008751'],
+  RS: ['#E10600', '#FFFFFF'],
+  UA: ['#FDE100', '#0057B8'],
+  KR: ['#E10600', '#FFFFFF'],
+  AU: ['#FDE100', '#00843D'],
+  ZA: ['#FDE100', '#007A4D'],
 };
 
 function norm(value) {
@@ -107,9 +208,15 @@ function hash(value) {
 
 const FALLBACK = ['#C8102E', '#1A4FD8', '#FDE100', '#F4F6FB', '#007A5E', '#111111', '#6BB5E0', '#FF6600'];
 
+function fromPair(pair, source) {
+  return { primary: rgb(pair[0]), secondary: rgb(pair[1]), source };
+}
+
 export function kitFor(name, crestPath = '') {
   const known = KITS[norm(name)];
-  if (known) return { primary: rgb(known[0]), secondary: rgb(known[1]), source: 'kit' };
+  if (known) return fromPair(known, 'kit');
+  const nation = NATION_KITS[countryCode(name)];
+  if (nation) return fromPair(nation, 'nation');
   if (crestPath) {
     try {
       const colours = coloursFromPng(readFileSync(crestPath));
@@ -166,13 +273,27 @@ export function playerBox(item, height) {
   return { width, height };
 }
 
-/** Soft floor shadow and a kit-coloured rim. The cut-out is never flipped. */
+/**
+ * Kit glow and floor shadow. Drawn before every cut-out so one player's glow
+ * cannot tint the other. minX/maxX keep the ellipse on this player's side.
+ */
+export function playerGlow(item, { x, y, height, minX, maxX }) {
+  const { width } = playerBox(item, height);
+  const cx = x + width / 2;
+  let rx = Math.round(width * 0.42);
+  if (minX != null) rx = Math.min(rx, cx - minX);
+  if (maxX != null) rx = Math.min(rx, maxX - cx);
+  rx = Math.max(28, rx);
+  const ry = Math.round(height * 0.32);
+  const glow = item.primary || '#e11d2e';
+  return `<ellipse cx="${cx}" cy="${y + height * 0.44}" rx="${rx}" ry="${ry}" fill="${glow}" opacity=".3"/>
+    <ellipse cx="${cx}" cy="${y + height - 8}" rx="${Math.round(Math.min(width * 0.32, rx))}" ry="14" fill="#000" opacity=".38"/>`;
+}
+
+/** The cut-out only. Shirt numbers are never mirrored. */
 export function playerImage(item, { x, y, height }) {
   const { width } = playerBox(item, height);
-  const glow = item.primary || '#e11d2e';
-  return `<ellipse cx="${x + width / 2}" cy="${y + height - 6}" rx="${Math.round(width * 0.42)}" ry="18" fill="#000" opacity=".42"/>
-    <ellipse cx="${x + width / 2}" cy="${y + height * 0.46}" rx="${Math.round(width * 0.72)}" ry="${Math.round(height * 0.4)}" fill="${glow}" opacity=".28"/>
-    <image href="${starHref(item)}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMax meet"/>`;
+  return `<image href="${starHref(item)}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMax meet"/>`;
 }
 
 export function esc(value) {
