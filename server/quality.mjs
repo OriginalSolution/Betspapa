@@ -29,9 +29,9 @@ export function inspectBooks(books) {
     if (dropped) issues.push(`${desk} had ${dropped} invalid code(s) removed.`);
     if (!parts.length) {
       retry.push(desk);
-      clean[desk] = { parts: [], error: book?.error || 'No valid share code.' };
+      clean[desk] = { parts: [], error: book?.error || 'No valid share code.', dropped: Array.isArray(book?.dropped) ? book.dropped : [] };
     } else {
-      clean[desk] = { parts, error: null };
+      clean[desk] = { parts, error: null, dropped: Array.isArray(book?.dropped) ? book.dropped : [] };
     }
   }
   if (books && 'betway' in books) issues.push('Betway is not a no-login desk and was ignored.');
