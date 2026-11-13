@@ -34,6 +34,7 @@ export function trendGroups(legs) {
 }
 
 function legView(leg) {
+  const form = Array.isArray(leg.form) ? leg.form.filter((mark) => mark === 'W' || mark === 'D' || mark === 'L').slice(0, 5) : [];
   return {
     eventId: leg.eventId,
     market: leg.market,
@@ -42,6 +43,8 @@ function legView(leg) {
     odds: leg.odds,
     occurrence: leg.occurrence ?? null,
     sample: leg.sample ?? null,
+    form: form.length ? form : null,
+    opponentHeld: leg.opponentHeld === true ? true : null,
   };
 }
 

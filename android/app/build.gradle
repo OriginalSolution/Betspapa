@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 25
-        versionName "0.4.3"
+        versionCode 26
+        versionName "0.4.4"
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

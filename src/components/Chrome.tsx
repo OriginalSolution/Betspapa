@@ -23,7 +23,7 @@ const tabLinks = [
   { to: '/', label: 'Today', icon: <IconToday />, end: true },
   { to: '/picks', label: 'Picks', icon: <IconPicks />, end: false },
   { to: '/slips', label: 'Slips', icon: <IconSlip />, end: false },
-  { to: '/inbox', label: 'Alerts', icon: <IconBell />, end: false },
+  { to: '/trends', label: 'Trends', icon: <IconTrends />, end: false },
   { to: '/more', label: 'More', icon: <IconSettings />, end: false },
 ];
 
@@ -51,7 +51,7 @@ export function SideNav() {
 }
 
 export function TabBar() {
-  const { matches, unread } = useStore();
+  const { matches } = useStore();
   const live = matches.filter((match) => isLiveStatus(match.status)).length;
   return (
     <nav className="tabbar" aria-label="Primary">
@@ -60,7 +60,6 @@ export function TabBar() {
           <span className="tab-icon">
             {link.icon}
             {link.to === '/live' && live > 0 && <i className="count">{live}</i>}
-            {link.to === '/inbox' && unread > 0 && <i className="count">{unread}</i>}
           </span>
           <span>{link.label}</span>
         </NavLink>

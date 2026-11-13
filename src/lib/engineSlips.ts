@@ -72,6 +72,8 @@ const MARKET_LABELS: Record<string, string> = {
   'cards-over45': 'Over 4.5 cards',
 };
 
+export type FormMark = 'W' | 'D' | 'L';
+
 export type EngineLeg = {
   eventId: string;
   market: string;
@@ -80,6 +82,10 @@ export type EngineLeg = {
   odds: number;
   occurrence: number | null;
   sample: string | null;
+  /** Last five results from the engine history. Absent when that history was not sent. */
+  form?: FormMark[] | null;
+  /** True only when the opponent-side 80% check passed. Absent hides the chip. */
+  opponentHeld?: boolean | null;
 };
 
 export type EnginePart = {
@@ -192,6 +198,9 @@ function parseLeg(value: unknown): EngineLeg | null {
   const odds = Number(row.odds);
   if (!eventId || !market || !match || !kickoff || !publishableOdds(odds)) return null;
   const occurrence = Number(row.occurrence);
+  const form = Array.isArray(row.form)
+    ? row.form.filter((mark): mark is FormMark => mark === 'W' || mark === 'D' || mark === 'L').slice(0, 5)
+    : [];
   return {
     eventId,
     market,
@@ -200,6 +209,8 @@ function parseLeg(value: unknown): EngineLeg | null {
     odds,
     occurrence: Number.isFinite(occurrence) ? occurrence : null,
     sample: text(row.sample),
+    form: form.length ? form : null,
+    opponentHeld: row.opponentHeld === true ? true : null,
   };
 }
 

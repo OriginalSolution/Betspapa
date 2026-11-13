@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bestTrendChip, cardsFromEngine, combinedOdds, hitRate, trendChipText } from './matchPicks';
+import { bestTrendChip, cardsFromEngine, combinedOdds, hitRate, marketFilters, tipsFromEngine, trendChipText } from './matchPicks';
 import type { EngineState } from './engineSlips';
 import type { Match } from '../types';
 
@@ -94,5 +94,40 @@ describe('match-first picks', () => {
       ],
     };
     expect(bestTrendChip(percentOnly, hearts)).toBeNull();
+  });
+
+  it('lists one compact tip per market, hides a short price, and keeps real form only when the engine sent it', () => {
+    const rich = state();
+    const over = rich.trends[1].legs[0];
+    over.form = ['W', 'W', 'D', 'W', 'W'];
+    over.opponentHeld = true;
+    const home = rich.trends[0].legs[2];
+    home.form = ['L', 'W'];
+    home.opponentHeld = false;
+    const tips = tipsFromEngine(rich, board);
+    expect(tips.map((tip) => tip.chip.market)).toEqual(['over15', 'home']);
+    expect(tips.every((tip) => tip.chip.odds >= 1.2)).toBe(true);
+    expect(tips[0]?.chip.form).toEqual(['W', 'W', 'D', 'W', 'W']);
+    expect(tips[0]?.chip.opponentHeld).toBe(true);
+    expect(tips[1]?.chip.opponentHeld).toBe(false);
+    expect(tips[1]?.chip.form).toEqual(['L', 'W']);
+    expect(marketFilters(tips).map((chip) => chip.label)).toEqual(['O1.5', 'FT1']);
+    const simulated = {
+      ...board[0],
+      id: 'sr:match:srl',
+      competition: { ...board[0].competition, name: 'UEFA Nations League SRL', area: 'Simulated Reality League' },
+      home: { ...board[0].home, name: 'Andorra SRL', shortName: 'Andorra SRL' },
+      away: { ...board[0].away, name: 'Gibraltar SRL', shortName: 'Gibraltar SRL' },
+    };
+    const fake = {
+      ...rich,
+      trends: [
+        {
+          ...rich.trends[1],
+          legs: [{ ...over, eventId: 'sr:match:srl', match: 'Andorra SRL vs Gibraltar SRL' }],
+        },
+      ],
+    };
+    expect(tipsFromEngine(fake, [simulated])).toEqual([]);
   });
 });

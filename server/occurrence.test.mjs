@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildOccurrenceBoard, masterPick, measureMarket, OCCURRENCE_MARKETS, rateOf } from './occurrence.mjs';
+import { buildOccurrenceBoard, explainTip, lastForm, masterPick, measureMarket, OCCURRENCE_MARKETS, rateOf } from './occurrence.mjs';
 
 const now = new Date('2026-11-13T12:00:00.000Z');
 
@@ -104,6 +104,27 @@ test('books every 80% line with a price, one master leg per match, and skips SRL
   const shown = board.byEvent['sr:match:10'].find((row) => row.market === 'home');
   assert.equal(shown.hits, 0);
   assert.equal(shown.sample, 10);
+});
+
+test('form and the opponent check come from the same history and stay quiet when the sample is short', () => {
+  const homeRows = [
+    ...played(5, (index) => row({ matchId: index + 1, uts: 50 - index, teamIsHome: true, ftHome: index === 0 ? 1 : 2, ftAway: index === 0 ? 1 : 0 })),
+    ...played(5, (index) => row({ matchId: index + 10, uts: 20 - index, teamIsHome: true, ftHome: 0, ftAway: 3 })),
+  ];
+  const awayRows = played(8, (index) => row({ matchId: index + 40, uts: 80 - index, teamIsHome: false, ftHome: 2, ftAway: 0 }));
+  const spoiled = played(8, (index) => row({ matchId: index + 60, uts: 80 - index, teamIsHome: false, ftHome: 0, ftAway: 2 }));
+  const home = OCCURRENCE_MARKETS.find((market) => market.id === 'home');
+  const over = OCCURRENCE_MARKETS.find((market) => market.id === 'over15');
+  assert.deepEqual(lastForm(homeRows.filter((item) => item.teamIsHome)), ['W', 'W', 'W', 'W', 'D']);
+  const held = explainTip(home, homeRows, awayRows);
+  assert.deepEqual(held.form, ['W', 'W', 'W', 'W', 'D']);
+  assert.equal(held.opponentHeld, true);
+  assert.equal(explainTip(home, homeRows, spoiled).opponentHeld, null);
+  const both = explainTip(over, homeRows, awayRows);
+  assert.equal(both.opponentHeld, true);
+  assert.ok(both.form && both.form.length === 5);
+  assert.equal(explainTip(over, homeRows, []).opponentHeld, null);
+  assert.equal(explainTip(over, [], []).form, null);
 });
 
 test('a home trend uses home games only and ignores neutral grounds', () => {
