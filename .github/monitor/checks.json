@@ -1,0 +1,11 @@
+{
+  "checks": [
+    { "name": "Site: betspapa.com home", "url": "https://betspapa.com/", "contains": "Betspapa" },
+    { "name": "API: health", "url": "https://api.betspapa.com/api/health", "timeout": 60, "json_ok_field": "ok",
+      "redeploy_hook_env": "RENDER_DEPLOY_HOOK", "contains": "\"guardian\":\"ok\"" },
+    { "name": "Engine: booked codes on board", "url": "https://api.betspapa.com/api/engine", "timeout": 60, "contains": "sportybet" },
+    { "name": "API: promos feed", "url": "https://api.betspapa.com/api/promos", "timeout": 60 },
+    { "name": "Admin: login page", "url": "https://api.betspapa.com/admin", "timeout": 60 }
+  ],
+  "certificates": ["betspapa.com", "api.betspapa.com"]
+}

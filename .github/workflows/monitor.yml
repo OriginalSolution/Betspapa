@@ -1,0 +1,46 @@
+name: Monitor (self-healing)
+
+# Free on public repos. On a private repo keep the schedule light (each run bills at least 1 minute).
+on:
+  schedule:
+    - cron: '23 */3 * * *'   # every 3 hours, UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/monitor
+      - uses: actions/cache/restore@v4
+        with:
+          path: .monitor-state
+          key: monitor-state-${{ github.run_id }}
+          restore-keys: monitor-state-
+      - name: Check and fix
+        working-directory: .github/monitor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MONITOR_STATE: ${{ github.workspace }}/.monitor-state/state.json
+          # Optional secrets - the monitor skips what is not set:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_FROM: meditusa2023@gmail.com
+          MAIL_TO: meditusa2023@gmail.com
+        run: mkdir -p "$(dirname "$MONITOR_STATE")" && python3 monitor.py
+      - if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .monitor-state
+          key: monitor-state-${{ github.run_id }}
