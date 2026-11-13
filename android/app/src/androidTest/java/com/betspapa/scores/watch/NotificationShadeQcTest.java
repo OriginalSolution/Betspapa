@@ -200,8 +200,8 @@ public class NotificationShadeQcTest {
         match.awayAbbr = "CHE";
         match.homeColor = "#e11d2e";
         match.awayColor = "#034694";
-        match.homeCrest = "https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/240px-Arsenal_FC.svg.png";
-        match.awayCrest = "https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/240px-Chelsea_FC.svg.png";
+        match.homeCrest = "https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/250px-Arsenal_FC.svg.png";
+        match.awayCrest = "https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/250px-Chelsea_FC.svg.png";
         match.competition = "Premier League";
         match.status = "live";
         match.minute = 54;
