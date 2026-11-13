@@ -1,8 +1,9 @@
 /**
- * One shared operator password. The session cookie is an HMAC of its expiry,
- * keyed with a digest of ADMIN_PASSWORD. Failures are counted in memory only.
+ * One shared operator login. The session cookie is an HMAC of its expiry.
+ * Its key is derived from ADMIN_PASSWORD_HASH when that is set, otherwise from ADMIN_PASSWORD.
+ * Failures are counted in memory only.
  */
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, scryptSync, timingSafeEqual } from 'node:crypto';
 import { clientAddress } from './geo.mjs';
 
 export const COOKIE = 'betspapa_admin';
@@ -21,8 +22,49 @@ export function adminEmail(env = process.env) {
   return String(env.ADMIN_EMAIL ?? '').trim().toLowerCase();
 }
 
+export function adminPasswordHash(env = process.env) {
+  return String(env.ADMIN_PASSWORD_HASH ?? '').trim();
+}
+
+/** Hash wins when it is set, even if a plaintext password is also present. */
+export function sessionMaterial(env = process.env) {
+  return adminPasswordHash(env) || adminPassword(env);
+}
+
 export function emailsMatch(input, expected) {
-  return passwordsMatch(String(input ?? '').trim().toLowerCase(), String(expected ?? '').trim().toLowerCase());
+  const right = String(expected ?? '').trim().toLowerCase();
+  if (!right) return false;
+  return passwordsMatch(String(input ?? '').trim().toLowerCase(), right);
+}
+
+/**
+ * `scrypt$<saltHex>$<hashHex>`. The salt passed to scryptSync is the hex
+ * string itself, not the decoded bytes. The digest is 64 bytes, written as hex.
+ */
+export function passwordMatchesHash(input, stored) {
+  const parts = String(stored ?? '').split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const salt = parts[1];
+  const hashHex = parts[2];
+  if (!salt || !/^[0-9a-fA-F]+$/.test(salt) || !/^[0-9a-fA-F]+$/.test(hashHex) || hashHex.length % 2 !== 0) return false;
+  let actual;
+  try {
+    actual = scryptSync(String(input ?? ''), salt, 64);
+  } catch {
+    return false;
+  }
+  const expected = Buffer.from(hashHex, 'hex');
+  if (actual.length !== expected.length) {
+    timingSafeEqual(actual, actual);
+    return false;
+  }
+  return timingSafeEqual(actual, expected);
+}
+
+export function passwordAccepted(input, env = process.env) {
+  const hash = adminPasswordHash(env);
+  if (hash) return passwordMatchesHash(input, hash);
+  return passwordsMatch(input, adminPassword(env));
 }
 
 export function passwordsMatch(input, expected) {
@@ -89,9 +131,9 @@ export function readCookie(req, name = COOKIE) {
 }
 
 export function hasSession(req, env = process.env, now = Date.now()) {
-  const password = adminPassword(env);
-  if (!password) return false;
-  return verifySession(readCookie(req), password, now);
+  const secret = sessionMaterial(env);
+  if (!secret) return false;
+  return verifySession(readCookie(req), secret, now);
 }
 
 export function requestIsSecure(req, env = process.env) {
