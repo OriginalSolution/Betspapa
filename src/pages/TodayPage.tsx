@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState, MatchSkeleton } from '../components/MatchBoard';
 import { ErrorBanner, FilterChips } from '../components/Chrome';
@@ -9,6 +9,54 @@ import { ENGINE_POLL_MS, fetchEngine, readEngineCache, subscribeEngine, writeEng
 import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
+
+type PromoCard = { id: string; title: string; image: string; route: string; matchId: string };
+
+function promoHref(item: PromoCard) {
+  if (item.route === 'match' && item.matchId) return `/match/${item.matchId}`;
+  if (item.route === 'slips') return '/slips';
+  if (item.route === 'picks') return '/picks';
+  return '/';
+}
+
+function PromoCarousel() {
+  const [items, setItems] = useState<PromoCard[]>([]);
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let stop = false;
+    void fetch('/api/promos')
+      .then((response) => (response.ok ? response.json() : { promos: [] }))
+      .then((body: { promos?: PromoCard[] }) => {
+        if (!stop) setItems(Array.isArray(body.promos) ? body.promos : []);
+      })
+      .catch(() => {
+        /* the board still loads */
+      });
+    return () => {
+      stop = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (items.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const timer = window.setInterval(() => {
+      const node = scroller.current;
+      if (!node) return;
+      const next = node.scrollLeft + node.clientWidth >= node.scrollWidth - 8 ? 0 : node.scrollLeft + node.clientWidth;
+      node.scrollTo({ left: next, behavior: 'smooth' });
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [items.length]);
+  if (!items.length) return null;
+  return (
+    <div className="promo-carousel" ref={scroller} aria-label="Promos">
+      {items.map((item) => (
+        <Link key={item.id} to={promoHref(item)}>
+          <img src={item.image} alt={item.title} />
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 function useEngine() {
   const [state, setState] = useState<EngineState | null>(() => readEngineCache());
@@ -59,6 +107,7 @@ export function TodayPage() {
   return (
     <>
       <LiveAlertsBanner />
+      <PromoCarousel />
       <TodaySearch matches={matches} onQuery={onQuery} onCorpus={setExtra} />
       {!searching && (teamId || leagueId) && (
         <div className="scope-bar">

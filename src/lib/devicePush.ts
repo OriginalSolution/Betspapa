@@ -15,7 +15,7 @@ export type DeviceRegistration = {
   bookings: Array<{ id: string; odds: number }>;
   settings: Pick<
     Settings,
-    'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound'
+    'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound' | 'promos'
   >;
 };
 

@@ -18,8 +18,9 @@ import {
 } from './adminAuth.mjs';
 import { loadOverview } from './adminData.mjs';
 import { consoleHtml, loginHtml, unavailableHtml } from './adminPage.mjs';
-import { runEngineCycle } from './engine.mjs';
+import { runEngineCycle, getEngineState } from './engine.mjs';
 import { sendTestPush } from './push.mjs';
+import { deletePromo, listPromos, sendCurrentShare, sendPromo, setApproveFirst } from './promo/service.mjs';
 
 function sendHtml(res, status, html, extra = {}) {
   const data = Buffer.from(html);
@@ -219,6 +220,39 @@ export async function handleAdminApi(req, res, url, ctx) {
       console.error(`[admin] Cycle failed: ${error instanceof Error ? error.message : error}`);
       sendJson(res, 500, { error: 'Engine cycle failed.' });
     }
+    return true;
+  }
+  if (url.pathname === '/api/admin/promos' && req.method === 'GET') {
+    sendJson(res, 200, listPromos());
+    return true;
+  }
+  if (url.pathname === '/api/admin/promos/settings' && req.method === 'POST') {
+    let approveFirst = true;
+    try {
+      approveFirst = JSON.parse((await readRaw(req, 4_000)) || '{}').approveFirst !== false;
+    } catch {
+      sendJson(res, 400, { error: 'Promo settings must be JSON.' });
+      return true;
+    }
+    sendJson(res, 200, { approveFirst: setApproveFirst(approveFirst) });
+    return true;
+  }
+  if (url.pathname === '/api/admin/promos/send-now' && req.method === 'POST') {
+    const origin = `${requestIsSecure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+    const result = await sendCurrentShare(getEngineState(), ctx.book, origin);
+    sendJson(res, result.error ? 400 : 200, result.error ? { error: result.error } : { ok: true, ...result });
+    return true;
+  }
+  const promoSend = url.pathname.match(/^\/api\/admin\/promos\/([^/]+)\/send$/);
+  if (promoSend && req.method === 'POST') {
+    const origin = `${requestIsSecure(req) ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+    const result = await sendPromo(decodeURIComponent(promoSend[1]), ctx.book, origin);
+    sendJson(res, result.error ? 404 : 200, result.error ? { error: result.error } : { ok: true, ...result });
+    return true;
+  }
+  const promoDelete = url.pathname.match(/^\/api\/admin\/promos\/([^/]+)$/);
+  if (promoDelete && req.method === 'DELETE') {
+    sendJson(res, deletePromo(decodeURIComponent(promoDelete[1])) ? 200 : 404, { ok: true });
     return true;
   }
   if (url.pathname === '/api/admin/push-test' && req.method === 'POST') {

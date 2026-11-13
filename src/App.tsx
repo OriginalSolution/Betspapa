@@ -66,6 +66,14 @@ export function App() {
         navigate('/slips');
         return;
       }
+      if (open.route === 'picks') {
+        navigate('/picks');
+        return;
+      }
+      if (open.route === 'today') {
+        navigate('/');
+        return;
+      }
       if (open.route === 'trend') {
         navigate(open.trendId ? `/trends?trend=${encodeURIComponent(open.trendId)}` : '/trends');
       }

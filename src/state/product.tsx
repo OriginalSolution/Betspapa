@@ -220,6 +220,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         redSound: settings.redSound,
         varSound: settings.varSound,
         penaltySound: settings.penaltySound,
+        promos: settings.promos,
       },
     });
   };
