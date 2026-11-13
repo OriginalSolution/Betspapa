@@ -63,9 +63,9 @@ function PromoCarousel() {
   if (!items.length) return null;
   return (
     <div className="promo-carousel" ref={scroller} aria-label="Promos">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <Link key={item.id} to={promoHref(item)}>
-          <img src={item.banner || item.image} alt={item.title} />
+          <img src={item.banner || item.image} alt={item.title} loading={index === 0 ? 'eager' : 'lazy'} decoding="async" />
         </Link>
       ))}
     </div>

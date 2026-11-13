@@ -1,19 +1,56 @@
+import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { gzipSync } from 'node:zlib';
 import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
-import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, startEngine } from './engine.mjs';
+import { getCachedEvents, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
 import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
-import { promoPng, publicPromos, syncPromos } from './promo/service.mjs';
+import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './promo/service.mjs';
+import { bookGroups } from './bookOnDemand.mjs';
+import { slimLivePayload } from './liveSlim.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
 const pushWatch = startPushWatch();
+const guardian = createGuardian({
+  dir: join(process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine'), 'health'),
+  getState: getEngineState,
+  runCycle: runEngineCycle,
+  restore: restoreEngine,
+  fcm: fcmConfigured,
+  pruneDevices: async () => {
+    let removed = 0;
+    for (const device of pushWatch.book.list()) {
+      if (String(device?.token || '').trim().length < 20) {
+        pushWatch.book.drop(device.token);
+        removed += 1;
+      }
+    }
+    return removed;
+  },
+  prunePromos: async () => {
+    const cutoff = Date.now() - 21 * 86_400_000;
+    let removed = 0;
+    for (const item of listPromos().items || []) {
+      const at = Date.parse(item.createdAt || '');
+      if (Number.isFinite(at) && at < cutoff && deletePromo(item.id)) removed += 1;
+    }
+    return removed;
+  },
+  probe: async () => {
+    const started = Date.now();
+    const state = getEngineState();
+    return [{ path: '/api/engine', ms: Date.now() - started, ok: Boolean(state) && typeof state.eventCount === 'number' && 'master' in state }];
+  },
+});
+attachGuardian(guardian);
 const pushBook = pushWatch.book;
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
@@ -35,15 +72,31 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 
-function send(res, status, body) {
-  const data = JSON.stringify(body);
-  res.writeHead(status, {
+function send(req, res, status, body, cacheControl = 'private, no-cache') {
+  const startedAt = Date.now();
+  const json = JSON.stringify(body);
+  const etag = `"${createHash('sha1').update(json).digest('hex')}"`;
+  const headers = {
     'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': 'no-store',
+    'Cache-Control': cacheControl,
+    ETag: etag,
     'Access-Control-Allow-Origin': '*',
-    'Content-Length': Buffer.byteLength(data),
-  });
-  res.end(data);
+    Vary: 'Accept-Encoding',
+  };
+  if (status === 200 && req?.headers?.['if-none-match'] === etag) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+  let payload = Buffer.from(json);
+  if (status === 200 && payload.length > 800 && /\bgzip\b/.test(String(req?.headers?.['accept-encoding'] || ''))) {
+    payload = gzipSync(payload);
+    headers['Content-Encoding'] = 'gzip';
+  }
+  headers['Content-Length'] = payload.length;
+  res.writeHead(status, headers);
+  res.end(payload);
+  noteRequest(String(req?.url || '/').split('?')[0], Date.now() - startedAt, payload.length);
 }
 
 async function cached(key, ttl, fn) {
@@ -107,18 +160,18 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/book') {
     if (req.method === 'GET') {
-      send(res, 200, latestBooking());
+      send(req, res, 200, latestBooking());
       return;
     }
     if (req.method !== 'POST') {
-      send(res, 405, { error: 'Method not allowed' });
+      send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
     try {
       const body = await readJson(req);
-      send(res, 200, submitBooking(body.legs));
+      send(req, res, 200, submitBooking(body.legs));
     } catch (error) {
-      send(res, 400, { error: error.message || 'Invalid booking request' });
+      send(req, res, 400, { error: error.message || 'Invalid booking request' });
     }
     return;
   }
@@ -128,25 +181,25 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/devices/test') {
     if (req.method !== 'POST') {
-      send(res, 405, { error: 'Method not allowed' });
+      send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
     const engineToken = process.env.ENGINE_RUN_TOKEN || '';
     const engineAuth = Boolean(engineToken) && req.headers.authorization === `Bearer ${engineToken}`;
     if (!engineAuth && !hasSession(req)) {
-      send(res, 401, { error: 'Admin session required.' });
+      send(req, res, 401, { error: 'Admin session required.' });
       return;
     }
     try {
       const body = await readJson(req);
       const result = await sendTestPush(pushBook, body, (message) => console.log(message));
       if (result.error) {
-        send(res, result.status, { error: result.error, fcm: result.fcm || null });
+        send(req, res, result.status, { error: result.error, fcm: result.fcm || null });
         return;
       }
-      send(res, 200, { ok: true, fcm: result.fcm });
+      send(req, res, 200, { ok: true, fcm: result.fcm });
     } catch (error) {
-      send(res, 400, { error: error.message || 'Invalid test push' });
+      send(req, res, 400, { error: error.message || 'Invalid test push' });
     }
     return;
   }
@@ -161,7 +214,7 @@ async function handleApi(req, res, url) {
       return;
     }
     if (req.method !== 'POST') {
-      send(res, 405, { error: 'Method not allowed' });
+      send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
     try {
@@ -169,7 +222,7 @@ async function handleApi(req, res, url) {
       const country = await countryForRequest(req);
       const result = pushBook.register(body, { country });
       if (result.error) {
-        send(res, 400, { error: result.error });
+        send(req, res, 400, { error: result.error });
         return;
       }
       const data = JSON.stringify(result);
@@ -181,37 +234,62 @@ async function handleApi(req, res, url) {
       });
       res.end(data);
     } catch (error) {
-      send(res, 400, { error: error.message || 'Invalid device registration' });
+      send(req, res, 400, { error: error.message || 'Invalid device registration' });
+    }
+    return;
+  }
+  if (url.pathname === '/api/book') {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      });
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'local').split(',')[0].trim();
+    try {
+      const body = await readJson(req);
+      const groups = Array.isArray(body.groups) ? body.groups : [{ id: 'all', legs: body.legs }];
+      const { requestJson } = await import('./curl-request.mjs');
+      send(req, res, 200, await bookGroups(groups, requestJson, new Date(), ip));
+    } catch (error) {
+      send(req, res, error.status === 429 ? 429 : 400, { error: error.message || 'Could not book those selections' });
     }
     return;
   }
   if (url.pathname === '/api/engine/run') {
     if (req.method !== 'POST') {
-      send(res, 405, { error: 'Method not allowed' });
+      send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
     const token = process.env.ENGINE_RUN_TOKEN || '';
     if (!token || req.headers.authorization !== `Bearer ${token}`) {
-      send(res, 401, { error: 'Engine run is not authorized.' });
+      send(req, res, 401, { error: 'Engine run is not authorized.' });
       return;
     }
     try {
-      send(res, 200, await runEngineCycle());
+      send(req, res, 200, await runEngineCycle());
     } catch (error) {
       console.error(`[engine] Cycle failed: ${error.message || error}`);
-      send(res, 500, { error: error.message || 'Engine cycle failed' });
+      send(req, res, 500, { error: error.message || 'Engine cycle failed' });
     }
     return;
   }
   if (req.method !== 'GET') {
-    send(res, 405, { error: 'Method not allowed' });
+    send(req, res, 405, { error: 'Method not allowed' });
     return;
   }
   const promoFile = url.pathname.match(/^\/api\/promos\/(.+)\.png$/);
   if (promoFile) {
     const png = promoPng(decodeURIComponent(promoFile[1]));
     if (!png) {
-      send(res, 404, { error: 'Promo art was not found.' });
+      send(req, res, 404, { error: 'Promo art was not found.' });
       return;
     }
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300', 'Content-Length': png.length });
@@ -220,23 +298,32 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/promos') {
     const origin = `${req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
-    send(res, 200, { promos: publicPromos(origin) });
+    send(req, res, 200, { promos: publicPromos(origin) });
+    return;
+  }
+  if (url.pathname === '/api/health/full') {
+    if (!hasSession(req)) {
+      send(req, res, 401, { error: 'Admin session required.' });
+      return;
+    }
+    send(req, res, 200, guardian.status());
     return;
   }
   if (url.pathname === '/api/health') {
-    send(res, 200, { ok: true, mode: config.mode, fixtures: 'live', push: fcmConfigured() });
+    const watch = guardian.status();
+    send(req, res, 200, { ok: true, mode: config.mode, fixtures: 'live', push: fcmConfigured(), guardian: watch.ok ? 'ok' : 'attention' });
     return;
   }
   if (url.pathname === '/api/engine') {
     if (req.method !== 'GET') {
-      send(res, 405, { error: 'Method not allowed' });
+      send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
-    send(res, 200, getEngineState());
+    send(req, res, 200, getEngineState());
     return;
   }
   if (url.pathname === '/api/config') {
-    send(res, 200, {
+    send(req, res, 200, {
       mode: 'sporty',
       provider: 'Betspapa fixtures',
       pollMs: 120000,
@@ -261,9 +348,9 @@ async function handleApi(req, res, url) {
         if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
         return response.json();
       });
-      send(res, 200, events);
+      send(req, res, 200, slimLivePayload(events), 'public, max-age=20');
     } catch (error) {
-      send(res, 502, { error: error.message || 'In-play scores failed' });
+      send(req, res, 502, { error: error.message || 'In-play scores failed' });
     }
     return;
   }
@@ -272,16 +359,9 @@ async function handleApi(req, res, url) {
     try {
       const events = await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' });
       const decorated = withOccurrence(events);
-      const data = JSON.stringify({ source: 'betspapa', generatedAt: new Date().toISOString(), count: decorated.length, events: decorated });
-      res.writeHead(200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'public, max-age=60',
-        'Access-Control-Allow-Origin': '*',
-        'Content-Length': Buffer.byteLength(data),
-      });
-      res.end(data);
+      send(req, res, 200, { source: 'betspapa', generatedAt: new Date().toISOString(), count: decorated.length, events: decorated }, 'public, max-age=60');
     } catch (error) {
-      send(res, 502, { error: error.message || 'Fixture feed failed' });
+      send(req, res, 502, { error: error.message || 'Fixture feed failed' });
     }
     return;
   }
@@ -289,7 +369,7 @@ async function handleApi(req, res, url) {
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
     if (!from || !to || Number.isNaN(new Date(from).getTime()) || Number.isNaN(new Date(to).getTime())) {
-      send(res, 400, { error: 'from and to must be ISO timestamps.' });
+      send(req, res, 400, { error: 'from and to must be ISO timestamps.' });
       return;
     }
     try {
@@ -307,14 +387,14 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
-      send(res, 200, { source: 'betspapa', events: withOccurrence(filtered) });
+      send(req, res, 200, { source: 'betspapa', events: withOccurrence(filtered) }, 'public, max-age=60');
     } catch (error) {
-      send(res, 502, { error: error.message || 'Fixture feed failed' });
+      send(req, res, 502, { error: error.message || 'Fixture feed failed' });
     }
     return;
   }
   if (config.mode !== 'live') {
-    send(res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
+    send(req, res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
     return;
   }
 
@@ -324,25 +404,25 @@ async function handleApi(req, res, url) {
       const to = url.searchParams.get('to');
       const dates = from && to ? providerDates(from, to) : null;
       if (!dates) {
-        send(res, 400, { error: 'from and to must be ISO timestamps.' });
+        send(req, res, 400, { error: 'from and to must be ISO timestamps.' });
         return;
       }
       const all = await cached(`list:${dates.dateFrom}:${dates.dateTo}`, 15_000, () => client().matches(dates.dateFrom, dates.dateTo));
       const matches = filterByRange(all, from, to).sort((a, b) => a.utcDate.localeCompare(b.utcDate));
-      send(res, 200, { matches });
+      send(req, res, 200, { matches });
       return;
     }
     const detail = url.pathname.match(/^\/api\/matches\/([^/]+)$/);
     if (detail) {
       const id = decodeURIComponent(detail[1]);
       const match = await cached(`match:${id}`, 12_000, () => client().match(id));
-      send(res, 200, { match });
+      send(req, res, 200, { match });
       return;
     }
-    send(res, 404, { error: 'Not found' });
+    send(req, res, 404, { error: 'Not found' });
   } catch (error) {
     const status = error.status === 429 ? 429 : error.status === 400 ? 400 : 502;
-    send(res, status, { error: error.message || 'football-data.org request failed' });
+    send(req, res, status, { error: error.message || 'football-data.org request failed' });
   }
 }
 
@@ -440,7 +520,7 @@ async function onRequest(req, res) {
     serveStatic(req, res, url);
   } catch (error) {
     console.error(`[http] ${error instanceof Error ? error.message : error}`);
-    if (!res.headersSent) send(res, 500, { error: 'Request failed' });
+    if (!res.headersSent) send(req, res, 500, { error: 'Request failed' });
   }
 }
 
@@ -459,6 +539,7 @@ if (invoked) {
       .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
       .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
   startEngine();
+  guardian.start();
   pushWatch.start();
   const promoTimer = setInterval(() => {
     syncPromos({ engine: getEngineState(), events: getCachedEvents(), book: pushBook, origin: `http://127.0.0.1:${port}` }).catch((error) => {

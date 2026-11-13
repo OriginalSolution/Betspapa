@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { createEngine } from './engine.mjs';
+import { boardHasCodes, createEngine, preserveBoard } from './engine.mjs';
 
 const now = new Date('2026-11-10T12:00:00.000Z');
 const events = [
@@ -93,4 +93,54 @@ test('books a qualifying leg, keeps the code, and does not mint one when the des
   const rebooked = calls.slice(before).filter((url) => url.includes('/orders/share') || url.includes('/share'));
   assert.equal(rebooked.some((url) => url.includes('sportybet.com')), false);
   assert.ok(rebooked.some((url) => url.includes('football.com')));
+});
+
+test('an empty cycle keeps the last booked board until those legs kick off', () => {
+  const previous = {
+    books: { sportybet: { parts: [{ code: 'KEEP1' }] } },
+    master: {
+      id: 'master',
+      legCount: 1,
+      legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.4 }],
+      books: { sportybet: { parts: [{ code: 'KEEP1' }] } },
+    },
+    trends: [],
+    legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z' }],
+  };
+  const empty = { books: {}, master: { legs: [] }, trends: [], legs: [], issues: [] };
+  const kept = preserveBoard(previous, empty, new Date('2026-11-10T12:00:00.000Z'));
+  assert.equal(kept.books.sportybet.parts[0].code, 'KEEP1');
+  assert.match(kept.issues[0], /last booked board/);
+  const afterKick = preserveBoard(previous, empty, new Date('2026-11-10T19:00:00.000Z'));
+  assert.equal(boardHasCodes(afterKick), false);
+  const fresh = { books: { sportybet: { parts: [{ code: 'NEW1' }] } }, master: null, trends: [], legs: [] };
+  assert.equal(preserveBoard(previous, fresh, new Date('2026-11-10T12:00:00.000Z')).books.sportybet.parts[0].code, 'NEW1');
+});
+
+test('boot restores a booked snapshot and a failed cycle does not clear it', async () => {
+  const engine = createEngine({
+    dir: mkdtempSync(join(tmpdir(), 'betspapa-engine-')),
+    fetchImpl: async () => {
+      throw new Error('down');
+    },
+    loadHistories: async () => new Map(),
+    loadSnapshot: async () => ({
+      books: { sportybet: { parts: [{ code: 'KEEP1' }] } },
+      master: {
+        id: 'master',
+        legCount: 1,
+        legs: [{ eventId: 'sr:match:1', market: 'home', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.5 }],
+        books: { sportybet: { parts: [{ code: 'KEEP1' }] } },
+      },
+      trends: [],
+    }),
+    publishSnapshot: async () => false,
+    now: () => now,
+    retryMs: 0,
+    log: () => {},
+  });
+  assert.equal(await engine.restore(), true);
+  assert.equal(engine.getState().books.sportybet.parts[0].code, 'KEEP1');
+  const after = await engine.run();
+  assert.equal(after.books.sportybet.parts[0].code, 'KEEP1');
 });

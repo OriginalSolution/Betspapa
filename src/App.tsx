@@ -95,12 +95,8 @@ export function App() {
   useEffect(() => {
     const splash = document.getElementById('boot-splash');
     if (!splash) return;
-    const started = Number(document.documentElement.dataset.boot || Date.now());
-    const hold = isNativeApp() ? 0 : Math.max(0, 1100 - (Date.now() - started));
-    const timer = window.setTimeout(() => {
-      splash.classList.add('is-gone');
-      window.setTimeout(() => splash.remove(), 450);
-    }, hold);
+    splash.classList.add('is-gone');
+    const timer = window.setTimeout(() => splash.remove(), 450);
     return () => window.clearTimeout(timer);
   }, []);
 

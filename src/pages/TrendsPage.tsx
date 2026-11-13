@@ -185,6 +185,7 @@ export function TrendsPage() {
           parts={master.parts}
           legs={master.legs}
           bookedAt={master.bookedAt}
+          updated={updatedClock(state?.updatedAt || null)}
           flipped={flipped}
           reduced={reduced}
           copied={copied}
@@ -294,11 +295,19 @@ function CopyButton({ id, value, copied, onCopy }: { id: string; value: string; 
   );
 }
 
+function updatedClock(iso: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Africa/Accra' }).format(date);
+}
+
 function MasterCard({
   desk,
   parts,
   legs,
   bookedAt,
+  updated,
   flipped,
   reduced,
   copied,
@@ -311,6 +320,7 @@ function MasterCard({
   parts: CodePart[];
   legs: ReturnType<typeof masterParts>['legs'];
   bookedAt: string | null;
+  updated: string;
   flipped: boolean;
   reduced: boolean;
   copied: string | null;
@@ -323,6 +333,7 @@ function MasterCard({
   const front = (
     <div className="trend-face">
       <div className="trend-kicker">Master slip</div>
+      {updated && <p className="trend-updated">Updated {updated}</p>}
       {parts.length === 0 && <p className="trend-nocode">No code this cycle</p>}
       {parts.map((part) => {
         const id = `master:${desk}:${part.code}`;

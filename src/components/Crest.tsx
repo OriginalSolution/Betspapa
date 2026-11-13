@@ -40,6 +40,8 @@ export function Crest({ team, size = 22, followed = false }: { team: Team; size?
         alt=""
         width={size}
         height={size}
+        loading="lazy"
+        decoding="async"
         onError={() => setBroken(true)}
       />
     );

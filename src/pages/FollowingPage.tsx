@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CodeStrip } from '../components/CodeStrip';
+import { bookGroups, legsForTier, type BookedGroup, type BookLeg } from '../lib/bookFollow';
+import { marketCodeLabel, partsFromBook, type CodeTier } from '../lib/pickCodes';
 import { Link } from 'react-router-dom';
 import { DateBar, ErrorBanner } from '../components/Chrome';
 import { Crest } from '../components/Crest';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
 import { staleTrendIds } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { fetchEngine, readEngineCache, writeEngineCache, type EngineState } from '../lib/engineSlips';
-import { kickoffWhen } from '../lib/format';
+import { fetchEngine, readEngineCache, writeEngineCache, type DeskId, type EngineState } from '../lib/engineSlips';
+import { cx, kickoffWhen } from '../lib/format';
 import { isFollowed } from '../lib/group';
 import { fetchSportyWindow } from '../data/remote';
-import { faceForFollow, factFromFace, type TrendFact } from '../lib/trendFace';
+import { faceForFollow, factFromFace, splitFollowId, type TrendFact } from '../lib/trendFace';
 import type { Match, Team } from '../types';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
@@ -152,10 +155,108 @@ export function FollowedTrends() {
     setFacts(readTrendFacts());
   }, [faces]);
   const stale = staleTrendIds(trendFollows, picks, matches, Date.now());
+  const [desk, setDesk] = useState<DeskId>('sportybet');
+  const [tier, setTier] = useState<CodeTier>('80');
+  const [focusMarket, setFocusMarket] = useState<string | null>(null);
+  const [booked, setBooked] = useState<BookedGroup[]>([]);
+  const sourceLegs = useMemo(() => {
+    const legs: BookLeg[] = [];
+    for (const face of faces) {
+      const parsed = splitFollowId(face.id);
+      if (!parsed) continue;
+      const pick = picks.find((item) => item.id === face.id);
+      const engineLeg = [...(engine?.tiers || []), ...(engine?.trends || []), ...(engine?.master ? [engine.master] : [])]
+        .flatMap((slip) => slip.legs)
+        .find((leg) => leg.eventId === parsed.matchId && leg.market === parsed.market);
+      const odds = Number(pick?.odds ?? engineLeg?.odds);
+      const occurrence = engineLeg?.occurrence;
+      const rate = typeof occurrence === 'number' ? (occurrence > 1 ? occurrence / 100 : occurrence) : pick?.rate;
+      if (!face.kickoff) continue;
+      legs.push({
+        eventId: parsed.matchId,
+        market: parsed.market,
+        odds,
+        kickoff: face.kickoff,
+        match: face.home && face.away ? `${face.home} vs ${face.away}` : '',
+        rate: typeof rate === 'number' ? rate : 0.8,
+      });
+    }
+    return legs;
+  }, [faces, picks, engine]);
+  const openLegs = useMemo(() => legsForTier(sourceLegs, tier, null), [sourceLegs, tier]);
+  const markets = useMemo(() => [...new Set(openLegs.map((leg) => leg.market))], [openLegs]);
+  const activeMarket = focusMarket && markets.includes(focusMarket) ? focusMarket : null;
+  const requestKey = useMemo(
+    () =>
+      JSON.stringify(
+        [{ id: 'all', legs: openLegs }, ...markets.map((id) => ({ id, legs: legsForTier(sourceLegs, tier, id) }))].map((group) => ({
+          id: group.id,
+          legs: group.legs.map((leg) => `${leg.eventId}:${leg.market}:${leg.odds}`),
+        })),
+      ),
+    [openLegs, markets, sourceLegs, tier],
+  );
+  useEffect(() => {
+    const groups = JSON.parse(requestKey) as Array<{ id: string; legs: string[] }>;
+    const payload = groups
+      .map((group) => ({
+        id: group.id,
+        legs: (group.id === 'all' ? openLegs : legsForTier(sourceLegs, tier, group.id)).filter((leg) =>
+          group.legs.includes(`${leg.eventId}:${leg.market}:${leg.odds}`),
+        ),
+      }))
+      .filter((group) => group.legs.length);
+    if (!payload.length) {
+      setBooked([]);
+      return;
+    }
+    let stop = false;
+    const timer = window.setTimeout(() => {
+      void bookGroups(payload)
+        .then((rows) => {
+          if (!stop) setBooked(rows);
+        })
+        .catch(() => {
+          if (!stop) setBooked([]);
+        });
+    }, 300);
+    return () => {
+      stop = true;
+      window.clearTimeout(timer);
+    };
+  }, [requestKey, openLegs, sourceLegs, tier]);
+  const chosen = booked.find((group) => group.id === (activeMarket || 'all'));
+  const chosenParts = partsFromBook(chosen?.books?.[desk], chosen?.bookedAt || null);
   if (!trendFollows.length) return null;
   return (
     <section className="panel follow-trends">
       <h2>Followed trends</h2>
+      <CodeStrip
+        desk={desk}
+        tier={tier}
+        title={activeMarket ? marketCodeLabel(activeMarket) : `${tier === '100' ? '100%' : tier === '90' ? '90%+' : '80%+'} followed`}
+        parts={chosenParts.parts}
+        bookedAt={chosenParts.bookedAt}
+        onDesk={setDesk}
+        onTier={(next) => {
+          setTier(next);
+          setFocusMarket(null);
+        }}
+      />
+      {markets.length > 0 && (
+        <div className="market-filters" role="tablist" aria-label="Followed markets">
+          <button type="button" className={cx('market-filter', !activeMarket && 'is-on')} onClick={() => setFocusMarket(null)}>
+            All
+            <small>{partsFromBook(booked.find((group) => group.id === 'all')?.books?.[desk], null).parts[0]?.code || ''}</small>
+          </button>
+          {markets.map((id) => (
+            <button key={id} type="button" className={cx('market-filter', activeMarket === id && 'is-on')} onClick={() => setFocusMarket(id)}>
+              {marketCodeLabel(id)}
+              <small>{partsFromBook(booked.find((group) => group.id === id)?.books?.[desk], null).parts[0]?.code || ''}</small>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="inbox-tools">
         <button
           type="button"

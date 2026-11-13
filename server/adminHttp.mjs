@@ -19,6 +19,7 @@ import {
 import { loadOverview } from './adminData.mjs';
 import { consoleHtml, loginHtml, unavailableHtml } from './adminPage.mjs';
 import { runEngineCycle, getEngineState } from './engine.mjs';
+import { guardianStatus } from './guardian.mjs';
 import { sendTestPush } from './push.mjs';
 import { deletePromo, listPromos, sendCurrentShare, sendPromo, sendPromoToDevice, setApproveFirst } from './promo/service.mjs';
 
@@ -204,6 +205,10 @@ export async function handleAdminApi(req, res, url, ctx) {
       console.error(`[admin] Overview failed: ${error instanceof Error ? error.message : error}`);
       sendJson(res, 500, { error: 'Overview failed.' });
     }
+    return true;
+  }
+  if (url.pathname === '/api/admin/health' && req.method === 'GET') {
+    sendJson(res, 200, guardianStatus());
     return true;
   }
   if (url.pathname === '/api/admin/cycle' && req.method === 'POST') {
