@@ -626,8 +626,8 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
       minute: copy.minute,
       status: 'live',
       competition: 'Premier League',
-      homeCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/240px-Arsenal_FC.svg.png',
-      awayCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/240px-Chelsea_FC.svg.png',
+      homeCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/250px-Arsenal_FC.svg.png',
+      awayCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/250px-Chelsea_FC.svg.png',
     },
   };
   try {

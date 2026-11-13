@@ -193,7 +193,7 @@ final class CrestCache {
             JSONObject thumb = best.optJSONObject("thumbnail");
             String source = thumb == null ? "" : thumb.optString("source", "");
             if (source.contains("/")) {
-                source = source.replaceFirst("/\\d+px-", "/200px-");
+                source = source.replaceFirst("/\\d+px-", "/250px-");
             }
             return source;
         } catch (Exception error) {
