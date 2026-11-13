@@ -5,6 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -59,6 +61,9 @@ public class AlertPlannerTest {
         assertFalse(MatchFeeds.headers().containsKey("Origin"));
         assertFalse(MatchFeeds.headers().containsKey("origin"));
         assertFalse(MatchFeeds.headers().containsKey("Referer"));
+        assertEquals("https://www.sportybet.com/gh/sport/football", MatchFeeds.headersFor(MatchFeeds.LIVE).get("Referer"));
+        assertFalse(MatchFeeds.headersFor(MatchFeeds.LIVE).containsKey("Origin"));
+        assertFalse(MatchFeeds.headersFor(MatchFeeds.FIXTURES).containsKey("Referer"));
         assertFalse(MatchFeeds.FIXTURES.toLowerCase().contains("sofascore"));
         assertFalse(MatchFeeds.LIVE.toLowerCase().contains("sofascore"));
         assertEquals("Betspapa fixtures", MatchFeeds.SOURCE_LABEL);
@@ -279,6 +284,22 @@ public class AlertPlannerTest {
         String reviewed = live.replace("\"setScore\"", "\"varReview\":{\"teamId\":\"al-astiklal\",\"player\":\"Striker\",\"minute\":76},\"setScore\"");
         assertEquals("al-astiklal", MatchParser.parseLive(reviewed).get(0).varReview.teamId);
         assertTrue(MatchParser.parseLive("{\"data\":[{\"events\":[{\"eventId\":\"v\",\"homeTeamName\":\"Simulated Home\",\"awayTeamName\":\"Away\",\"matchStatus\":\"H1\",\"status\":1}]}]}").isEmpty());
+
+        String mixed = "{\"data\":["
+                + "{\"name\":\"UEFA Nations League SRL\",\"categoryName\":\"Simulated Reality League\",\"events\":[{\"eventId\":\"srl\",\"homeTeamName\":\"Andorra SRL\",\"awayTeamName\":\"Gibraltar SRL\",\"matchStatus\":\"H1\",\"status\":1}]},"
+                + "{\"name\":\"eSoccer Battle\",\"categoryName\":\"Esports\",\"events\":[{\"eventId\":\"e\",\"homeTeamName\":\"Alpha\",\"awayTeamName\":\"Beta\",\"matchStatus\":\"H1\",\"status\":1}]},"
+                + "{\"name\":\"Serie C, Group C\",\"categoryName\":\"Italy\",\"events\":[{\"eventId\":\"real\",\"homeTeamName\":\"Barletta Calcio\",\"awayTeamName\":\"Altamura Societa' Sportiva SRL\",\"matchStatus\":\"H1\",\"status\":1}]}"
+                + "]}";
+        java.util.List<WatchMatch> kept = MatchParser.parseLive(mixed);
+        assertEquals(1, kept.size());
+        assertEquals("real", kept.get(0).id);
+        String upcomingSrl = "{\"events\":["
+                + "{\"eventId\":\"srl\",\"home\":\"Andorra SRL\",\"away\":\"Gibraltar SRL\",\"kickoff\":\"2026-11-10T16:00:00.000Z\",\"tournament\":\"Premier League SRL\",\"country\":\"Simulated Reality League\"},"
+                + "{\"eventId\":\"real\",\"home\":\"Barletta Calcio\",\"away\":\"Altamura Societa' Sportiva SRL\",\"kickoff\":\"2026-11-10T16:00:00.000Z\",\"tournament\":\"Serie C, Group C\",\"country\":\"Italy\"}"
+                + "]}";
+        java.util.List<WatchMatch> listed = MatchParser.parseUpcoming(upcomingSrl);
+        assertEquals(1, listed.size());
+        assertEquals("real", listed.get(0).id);
     }
 
     @Test
@@ -469,6 +490,23 @@ public class AlertPlannerTest {
         priced.put("odds", "1.20");
         state.merge(new JSONObject().put("bookings", new JSONArray().put(priced)));
         assertTrue(kinds(AlertPlanner.notices(state.matches, state, KICK + 1000L)).contains("win"));
+    }
+
+    @Test
+    public void emptyOrBrokenWatchFileLoadsAsAFreshState() throws Exception {
+        File empty = File.createTempFile("watch-empty", ".json");
+        new FileOutputStream(empty).close();
+        WatchState blank = WatchState.load(empty);
+        assertEquals(0, blank.matches.size());
+        assertEquals(0L, blank.lastPollAt);
+
+        File broken = File.createTempFile("watch-broken", ".json");
+        FileOutputStream output = new FileOutputStream(broken);
+        output.write("{".getBytes("UTF-8"));
+        output.close();
+        WatchState fresh = WatchState.load(broken);
+        assertEquals(0, fresh.matches.size());
+        assertEquals(0L, fresh.lastPollAt);
     }
 
     private static WatchMatch ghana() {

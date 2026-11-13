@@ -1,0 +1,22 @@
+{
+  "fixtures": 643,
+  "before": null,
+  "after": {
+    "both": 556,
+    "percent": 86.5
+  },
+  "sources": {
+    "thesportsdb": 1176,
+    "flag": 3,
+    "wikidata": 15,
+    "wikipedia": 23
+  },
+  "from": "2026-11-12",
+  "to": "2026-11-16",
+  "missing": 98,
+  "layeredBefore": {
+    "both": 494,
+    "percent": 76.8
+  },
+  "generatedAt": "2026-11-13T00:04:50.007Z"
+}

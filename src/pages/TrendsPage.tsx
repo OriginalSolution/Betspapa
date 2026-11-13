@@ -6,6 +6,7 @@ import { squadLabel } from '../data/board';
 import { cx } from '../lib/format';
 import { FollowedTrends } from './FollowingPage';
 import { useProduct } from '../state/product';
+import { useStore } from '../state/store';
 
 const EXTRA = new Set<MarketId>([
   'dc-1x',
@@ -62,6 +63,27 @@ export function TrendsPage() {
   );
 }
 
+function TrendTeams({ trend }: { trend: TrendView }) {
+  const { matches } = useStore();
+  const match = matches.find((item) => item.id === trend.matchId);
+  if (match) {
+    return (
+      <>
+        <Link to={`/?team=${encodeURIComponent(match.home.id)}`}>{match.home.shortName}</Link>
+        {' vs '}
+        <Link to={`/?team=${encodeURIComponent(match.away.id)}`}>{match.away.shortName}</Link>
+        {` · ${trend.marketLabel}`}
+      </>
+    );
+  }
+  return (
+    <>
+      <Link to={`/?team=${encodeURIComponent(trend.teamId)}`}>{trend.teamName}</Link>
+      {` · ${trend.marketLabel}`}
+    </>
+  );
+}
+
 function TrendBlock({ title, detail, rows, focus }: { title: string; detail?: string; rows: TrendView[]; focus?: string | null }) {
   const { trendFollows, toggleTrend } = useProduct();
   if (!rows.length) return null;
@@ -74,12 +96,19 @@ function TrendBlock({ title, detail, rows, focus }: { title: string; detail?: st
         return (
           <article id={`trend-${trend.id}`} key={trend.id} className={cx('trend', trend.bookmarked && 'trend-hot', trend.status === 'won' && 'trend-hit', focus === trend.id && 'trend-focus')}>
             <div>
-              <strong>{trend.label || `${trend.teamName} · ${trend.marketLabel}`}</strong>
+              <strong>
+                <TrendTeams trend={trend} />
+              </strong>
               <p>{trend.note}</p>
               <div className="trend-actions">
                 <button type="button" className={cx('btn', 'btn-tiny', on && 'btn-quiet')} onClick={() => toggleTrend(trend.id)}>
                   {on ? 'Following trend' : 'Follow trend'}
                 </button>
+                {trend.trendId.startsWith('price:') && (
+                  <Link to={`/slips?trend=${encodeURIComponent(trend.trendId)}`} className="btn btn-quiet btn-tiny">
+                    Code
+                  </Link>
+                )}
                 {trend.matchId && (
                   <Link to={`/match/${trend.matchId}`} className="btn btn-quiet btn-tiny">
                     Match

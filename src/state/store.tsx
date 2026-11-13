@@ -3,7 +3,9 @@ import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
 import { followedNotices, staleAlertIds } from '../lib/alerts';
 import { decorateMatches, goalEventMinute, loadGoalBook, mergeNativeMarkers, paintGoals, saveGoalBook } from '../lib/goalMinutes';
 import { flushWatch, mergeInbox, pullWatch, stageWatch } from '../lib/deviceWatch';
-import { resolveCrests } from '../lib/crests';
+import { catalogUrls, loadCrestCatalog } from '../lib/crestCatalog';
+import { lookupCrestChain } from '../lib/crestLive';
+import { crestKey, resolveCrests } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
 import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
@@ -407,11 +409,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       { name: match.away.name, area: match.competition.area, competition: match.competition.name },
     ]);
     let stop = false;
-    void resolveCrests(names, (found) => {
+    void (async () => {
+      const catalog = await loadCrestCatalog();
       if (stop) return;
-      crestRef.current = { ...crestRef.current, ...found };
-      dispatch({ type: 'crests', crests: crestRef.current });
-    });
+      const seeded = catalogUrls(stateRef.current.matches, catalog);
+      if (Object.keys(seeded).length) {
+        crestRef.current = { ...seeded, ...crestRef.current };
+        dispatch({ type: 'crests', crests: crestRef.current });
+      }
+      const pending = names.filter((team) => !crestRef.current[crestKey(team.name)]);
+      await resolveCrests(
+        pending,
+        (found) => {
+          if (stop) return;
+          crestRef.current = { ...crestRef.current, ...found };
+          dispatch({ type: 'crests', crests: crestRef.current });
+        },
+        fetch,
+        lookupCrestChain,
+      );
+    })();
     return () => {
       stop = true;
     };

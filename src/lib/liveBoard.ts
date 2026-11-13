@@ -1,5 +1,6 @@
 import { mapSportyEvent, type SportyEvent } from '../data/sporty';
 import type { Match, MatchEvent, MatchStatus } from '../types';
+import { isSimulatedFixture } from './simulated';
 
 /** In-play football on the same fixture service the board already uses. The public label stays Betspapa fixtures. */
 export const LIVE_FEED = 'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1';
@@ -277,14 +278,22 @@ export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): M
   return next;
 }
 
+export function isRealMatch(match: Match): boolean {
+  return !isSimulatedFixture({
+    country: match.competition.area,
+    tournament: match.competition.name,
+    home: match.home.name,
+    away: match.away.name,
+  });
+}
+
 export function parseLivePayload(payload: { data?: LiveTournament[] | null } | null | undefined): Match[] {
   const rows = Array.isArray(payload?.data) ? payload.data : [];
   const matches: Match[] = [];
   for (const tournament of rows) {
     for (const event of tournament.events || []) {
       const match = parseLiveEvent(event, tournament);
-      if (!match) continue;
-      if (/simulated|virtual|srl/i.test(`${match.competition.name} ${match.home.name} ${match.away.name}`)) continue;
+      if (!match || !isRealMatch(match)) continue;
       matches.push(match);
     }
   }
@@ -330,6 +339,9 @@ function overlay(base: Match, live: Match): Match {
 }
 
 export function mergeBoard(previous: Match[], upcoming: Match[], live: Match[], now: number): Match[] {
+  previous = previous.filter(isRealMatch);
+  upcoming = upcoming.filter(isRealMatch);
+  live = live.filter(isRealMatch);
   const prevById = new Map(previous.map((match) => [match.id, match]));
   const liveById = new Map(live.map((match) => [match.id, match]));
   const seen = new Set<string>();

@@ -182,9 +182,15 @@ public class ScoreCardTest {
         WatchNote trend = new WatchNote("trend:sr:match:gha:over25:hit", ghana.id, "win", "Trend hit · Over 2.5 goals", "Ghana");
         trend.bookCode = "N7KQ2X";
         PendingIntent slip = OpenMatch.forNote(context, trend);
-        assertEquals("slip", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("match", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("sr:match:gha", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_MATCH));
         assertEquals("sr:match:gha:over25", shadowOf(slip).getSavedIntent().getStringExtra(OpenMatch.EXTRA_TREND));
+        WatchNote missing = new WatchNote("trend:sr:match:ars:btts:hit", "", "win", "Trend hit · Both teams to score", "Arsenal");
+        PendingIntent recovered = OpenMatch.forNote(context, missing);
+        assertEquals("sr:match:ars", shadowOf(recovered).getSavedIntent().getStringExtra(OpenMatch.EXTRA_MATCH));
+        assertEquals("match", shadowOf(recovered).getSavedIntent().getStringExtra(OpenMatch.EXTRA_ROUTE));
         assertTrue(shadowOf(slip).getRequestCode() != shadowOf(second).getRequestCode());
+        assertTrue(shadowOf(slip).getRequestCode() != shadowOf(recovered).getRequestCode());
     }
 
     private static Context granted() {

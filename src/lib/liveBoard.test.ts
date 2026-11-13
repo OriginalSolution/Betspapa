@@ -115,4 +115,65 @@ describe('live board', () => {
     });
     expect(parsed[0]?.varReview).toEqual({ teamId: 'home-fc', player: 'Striker', minute: 22 });
   });
+
+  it('drops Simulated Reality League and virtual games, and keeps a real club named SRL', () => {
+    const kick = Date.parse('2026-11-13T16:00:00.000Z');
+    const parsed = parseLivePayload({
+      data: [
+        {
+          name: 'UEFA Nations League SRL',
+          categoryName: 'Simulated Reality League',
+          events: [
+            {
+              eventId: 'sr:match:srl',
+              homeTeamName: 'Andorra SRL',
+              awayTeamName: 'Gibraltar SRL',
+              estimateStartTime: kick,
+              status: 1,
+              matchStatus: 'H1',
+              setScore: '0:0',
+            },
+          ],
+        },
+        {
+          name: 'eSoccer Battle',
+          categoryName: 'Esports',
+          events: [
+            {
+              eventId: 'sr:match:e',
+              homeTeamName: 'Alpha',
+              awayTeamName: 'Beta',
+              estimateStartTime: kick,
+              status: 1,
+              matchStatus: 'H1',
+              setScore: '1:0',
+            },
+          ],
+        },
+        {
+          name: 'Serie C, Group C',
+          categoryName: 'Italy',
+          events: [
+            {
+              eventId: 'sr:match:real',
+              homeTeamName: 'Barletta Calcio',
+              awayTeamName: "Altamura Societa' Sportiva SRL",
+              estimateStartTime: kick,
+              status: 1,
+              matchStatus: 'H1',
+              setScore: '0:0',
+            },
+          ],
+        },
+      ],
+    });
+    expect(parsed.map((match) => match.id)).toEqual(['sr:match:real']);
+    const kept = mergeBoard(
+      [match({ id: 'sr:match:srl', competition: { ...match().competition, name: 'UEFA Nations League SRL', area: 'Simulated Reality League' }, home: { ...match().home, name: 'Andorra SRL' }, away: { ...match().away, name: 'Gibraltar SRL' } })],
+      [],
+      [],
+      kick,
+    );
+    expect(kept).toEqual([]);
+  });
 });

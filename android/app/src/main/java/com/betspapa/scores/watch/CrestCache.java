@@ -17,19 +17,107 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 import org.json.JSONObject;
 
-/** Wikipedia club badges, cached as bitmaps. A miss becomes an initials circle. */
+/** Bundled crest store first, then a remote badge. A miss becomes an initials circle. */
 final class CrestCache {
     private static final int[] PALETTE = {0xFFE11D2E, 0xFF3D7EFF, 0xFFF0C94A, 0xFF21A366, 0xFFA855F7, 0xFF14B8A6, 0xFF6CABDD};
+    private static Map<String, String> crestIndex;
 
     private CrestCache() {}
 
     static Bitmap badge(Context context, String name, String url, String abbr, String color, int size) {
-        Bitmap photo = load(context, name, url, size);
+        String remote = url == null ? "" : url.trim();
+        String lower = remote.toLowerCase(Locale.US);
+        if (lower.contains("sofascore") || lower.contains("sportybet")) remote = "";
+        Bitmap bundled = bundled(context, name, remote, size);
+        if (bundled != null) return bundled;
+        Bitmap photo = load(context, name, remote, size);
         if (photo != null) return photo;
         return initials(abbr, color, name, size);
+    }
+
+    /** The same file the board uses from public/crests. */
+    private static Bitmap bundled(Context context, String name, String url, int size) {
+        String path = url.contains("/crests/") ? url : storedPath(context, name);
+        if (path.isEmpty()) return null;
+        Bitmap raw = decodeAsset(context, path);
+        if (raw == null) return null;
+        return circle(raw, size);
+    }
+
+    private static String storedPath(Context context, String name) {
+        Map<String, String> map = crestIndex(context);
+        if (map.isEmpty() || name == null) return "";
+        String path = map.get(loose(name));
+        return path == null ? "" : path;
+    }
+
+    private static Map<String, String> crestIndex(Context context) {
+        if (crestIndex != null) return crestIndex;
+        Map<String, String> map = new HashMap<String, String>();
+        try {
+            InputStream stream = context.getAssets().open("public/crests/crests.json");
+            try {
+                byte[] buffer = new byte[4096];
+                java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+                int count;
+                while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
+                JSONObject body = new JSONObject(output.toString("UTF-8"));
+                JSONObject byKey = body.optJSONObject("byKey");
+                if (byKey != null) {
+                    Iterator<String> keys = byKey.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        map.put(key, byKey.optString(key, ""));
+                    }
+                }
+            } finally {
+                stream.close();
+            }
+        } catch (Exception ignored) {
+            /* the phone still falls back to a remote badge or initials */
+        }
+        crestIndex = map;
+        return map;
+    }
+
+    private static Bitmap decodeAsset(Context context, String url) {
+        int cut = url.indexOf("/crests/");
+        if (cut < 0) return null;
+        try {
+            InputStream stream = context.getAssets().open("public" + url.substring(cut));
+            try {
+                return BitmapFactory.decodeStream(stream);
+            } finally {
+                stream.close();
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String loose(String name) {
+        String lower = name.toLowerCase(Locale.US).replace("&", " and ");
+        StringBuilder out = new StringBuilder();
+        boolean space = false;
+        for (int i = 0; i < lower.length(); i++) {
+            char c = lower.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+                out.append(c);
+                space = false;
+            } else if (!space && out.length() > 0) {
+                out.append(' ');
+                space = true;
+            }
+        }
+        int end = out.length();
+        while (end > 0 && out.charAt(end - 1) == ' ') end -= 1;
+        return out.substring(0, end);
     }
 
     private static Bitmap load(Context context, String name, String url, int size) {

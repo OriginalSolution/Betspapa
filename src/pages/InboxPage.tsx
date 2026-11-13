@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState } from '../components/MatchBoard';
-import { staleAlertIds } from '../lib/alerts';
+import { alertTarget, staleAlertIds } from '../lib/alerts';
 import { ago, cx } from '../lib/format';
 import type { InboxItem } from '../types';
 import { useStore } from '../state/store';
@@ -147,7 +147,7 @@ function SwipeAlert({ item, onDelete }: { item: InboxItem; onDelete: () => void 
         onPointerCancel={() => end(false)}
       >
         <Link
-          to={item.kind === 'win' || item.kind === 'bust' ? '/trends' : `/match/${item.matchId}`}
+          to={alertTarget(item)}
           className={cx('inbox-item', `kind-${item.kind}`)}
           onClick={(event) => {
             if (dragging.current || offset < -8) event.preventDefault();

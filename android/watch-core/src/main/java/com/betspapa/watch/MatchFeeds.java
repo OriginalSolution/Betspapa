@@ -18,4 +18,13 @@ public final class MatchFeeds {
         headers.put("User-Agent", USER_AGENT);
         return headers;
     }
+
+    /** The in-play catalogue answers when the request names its own football page. No Origin is sent. */
+    public static Map<String, String> headersFor(String url) {
+        Map<String, String> headers = headers();
+        if (url != null && url.contains("sportybet.com")) {
+            headers.put("Referer", "https://www.sportybet.com/gh/sport/football");
+        }
+        return headers;
+    }
 }

@@ -96,6 +96,30 @@ export function staleTrendIds(followedIds: string[], picks: PickView[], matches:
   });
 }
 
+/** `trend:sr:match:1:over25:hit` carries the match before the market segment. */
+export function matchIdFromTrendAlert(id: string): string {
+  if (!id.startsWith('trend:') || !id.endsWith(':hit')) return '';
+  const body = id.slice('trend:'.length, -':hit'.length);
+  const cut = body.lastIndexOf(':');
+  return cut > 0 ? body.slice(0, cut) : '';
+}
+
+export function trendIdFromAlert(id: string): string {
+  if (!id.startsWith('trend:') || !id.endsWith(':hit')) return '';
+  return id.slice('trend:'.length, -':hit'.length);
+}
+
+/** Where an Alerts row opens. A trend hit goes to the match that owns it. */
+export function alertTarget(item: Pick<InboxItem, 'id' | 'kind' | 'matchId'>): string {
+  const matchId = item.matchId || matchIdFromTrendAlert(item.id);
+  if (matchId) {
+    const trend = trendIdFromAlert(item.id);
+    return trend ? `/match/${matchId}?trend=${encodeURIComponent(trend)}` : `/match/${matchId}`;
+  }
+  if (item.kind === 'win' || item.kind === 'bust') return '/trends';
+  return '/';
+}
+
 /** A followed trend that has already landed. Checked again on the next open, and not repeated. */
 export function trendHitNotices(picks: PickView[], followedIds: string[], seen: Set<string>, now: number): InboxItem[] {
   const want = new Set(followedIds);
@@ -104,9 +128,11 @@ export function trendHitNotices(picks: PickView[], followedIds: string[], seen: 
     if (!want.has(pick.id) || pick.status !== 'won' || !publishableOdds(pick.odds)) continue;
     const id = `trend:${pick.id}:hit`;
     if (seen.has(id)) continue;
+    const matchId = pick.matchId || matchIdFromTrendAlert(id);
+    if (!matchId) continue;
     notes.push({
       id,
-      matchId: pick.matchId,
+      matchId,
       kind: 'win',
       title: `Trend hit · ${pick.marketLabel}`,
       body: pick.label,

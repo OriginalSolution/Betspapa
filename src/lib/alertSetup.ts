@@ -18,6 +18,8 @@ export type AlertDeviceStatus = {
   oem: OemBrand | null;
   setupVersion: number;
   setupFinished: boolean;
+  /** Epoch millis of the last native poll that reached the feeds. 0 means none yet. */
+  lastPollAt: number;
 };
 
 export type SetupRecord = {
@@ -34,7 +36,7 @@ export type StepCopy = {
 const ORDER: AlertStepId[] = ['notifications', 'battery', 'exact', 'autostart', 'test'];
 
 export const OEM_INSTRUCTION: Record<OemBrand, string> = {
-  transsion: 'On Tecno, Infinix, and itel, open Phone Master and turn on Autostart for Betspapa.',
+  transsion: 'On Tecno, Infinix, and itel, open Phone Master, turn on Autostart for Betspapa, and lock the app in the recent-apps list so HiOS does not close it.',
   xiaomi: 'On Xiaomi, Redmi, and POCO, open Autostart and allow Betspapa.',
   oppo: 'On Oppo and Realme, open App launch and allow Betspapa to run in the background.',
   vivo: 'On Vivo and iQOO, open Autostart and allow Betspapa.',
@@ -54,6 +56,7 @@ export function emptyDeviceStatus(): AlertDeviceStatus {
     oem: null,
     setupVersion: 0,
     setupFinished: false,
+    lastPollAt: 0,
   };
 }
 
@@ -64,6 +67,7 @@ export function parseDeviceStatus(raw: {
   oem?: unknown;
   setupVersion?: unknown;
   setupFinished?: unknown;
+  lastPollAt?: unknown;
 } | null | undefined): AlertDeviceStatus {
   const fallback = emptyDeviceStatus();
   if (!raw) return fallback;
@@ -76,6 +80,7 @@ export function parseDeviceStatus(raw: {
     oem: parseOem(raw.oem),
     setupVersion: typeof raw.setupVersion === 'number' && Number.isFinite(raw.setupVersion) ? raw.setupVersion : 0,
     setupFinished: Boolean(raw.setupFinished),
+    lastPollAt: typeof raw.lastPollAt === 'number' && Number.isFinite(raw.lastPollAt) ? raw.lastPollAt : 0,
   };
 }
 
@@ -88,6 +93,13 @@ export function parseSetupRecord(raw: string | null): SetupRecord | null {
   } catch {
     return null;
   }
+}
+
+export const POLL_STALE_MS = 10 * 60 * 1000;
+
+/** A poll older than 10 minutes means the background watcher has gone quiet. */
+export function pollIsStale(lastPollAt: number, now = Date.now()): boolean {
+  return lastPollAt > 0 && now - lastPollAt > POLL_STALE_MS;
 }
 
 export function setupIsCurrent(record: SetupRecord | null, version = ALERT_SETUP_VERSION): boolean {

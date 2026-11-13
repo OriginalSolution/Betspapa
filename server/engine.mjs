@@ -159,6 +159,13 @@ export function createEngine(options = {}) {
       issues: [...issues, ...(state.issues || [])].slice(0, 40),
     };
     save(next);
+    if (options.crests !== false && !options.fetchImpl) {
+      const fromDay = now.toISOString().slice(0, 10);
+      const toDay = new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);
+      import('./crestResolve.mjs')
+        .then(({ syncFixtureCrests }) => syncFixtureCrests(events, { fromDay, toDay, limit: 24 }))
+        .catch((error) => log('error', `Crest resolve failed: ${error instanceof Error ? error.message : 'crest resolve failed'}`));
+    }
     return publicState(next);
   }
 

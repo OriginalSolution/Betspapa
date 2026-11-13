@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAlertSetup } from '../components/AlertSetup';
 import { playGoalSound } from '../lib/cheer';
-import { OEM_INSTRUCTION } from '../lib/alertSetup';
+import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
 import { requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
@@ -298,9 +298,18 @@ function AndroidWatchStatus() {
         </button>
       )}
       <p className="lede">
-        On Tecno, Infinix, itel, Xiaomi, Oppo, Realme, Vivo, Huawei, and Samsung, also turn on Autostart for Betspapa and take it off the battery saver list. Those phones can still stop a watcher after Android’s battery prompt.
+        On Tecno, Infinix, itel, Xiaomi, Oppo, Realme, Vivo, Huawei, and Samsung, open Autostart for Betspapa, take it off the battery saver list, and lock it in the recent-apps list. HiOS and similar skins still stop a watcher after Android’s battery prompt.
       </p>
       {status.oem && <p className="lede">{OEM_INSTRUCTION[status.oem]}</p>}
+      <div className="stat">
+        <span>Alert health</span>
+        <strong className={pollIsStale(status.lastPollAt) ? 'is-bad' : status.lastPollAt ? 'is-good' : undefined}>{pollLabel(status.lastPollAt)}</strong>
+      </div>
+      {pollIsStale(status.lastPollAt) && (
+        <button type="button" className="btn" onClick={startAgain}>
+          Alerts look stuck. Set up again
+        </button>
+      )}
       <button
         type="button"
         className="btn"
@@ -316,6 +325,14 @@ function AndroidWatchStatus() {
       </button>
     </div>
   );
+}
+
+function pollLabel(at: number): string {
+  if (!at) return 'No poll yet';
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60_000));
+  if (mins < 1) return 'Just now';
+  if (mins === 1) return '1 minute ago';
+  return `${mins} minutes ago`;
 }
 
 function Permission({ permission, onEnable }: { permission: string; onEnable: () => void }) {

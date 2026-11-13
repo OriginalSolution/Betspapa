@@ -3,7 +3,15 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 /** Same browser agent the server booking client sends. Keep the two in step. */
 export const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
 
-const BLOCKED_HEADERS = new Set(['origin', 'referer', 'referrer']);
+const BLOCKED_HEADERS = new Set(['origin']);
+
+/** A localhost referer would mark the WebView. A bookmaker page referer is how their catalogue answers. */
+function dropHeader(key: string, value: string): boolean {
+  const name = key.toLowerCase();
+  if (BLOCKED_HEADERS.has(name)) return true;
+  if (name === 'referer' || name === 'referrer') return /localhost|capacitor:\/\//i.test(value);
+  return false;
+}
 
 /**
  * The Android WebView is served from https://localhost. A browser fetch to
@@ -18,7 +26,7 @@ export function nativeHeaders(extra: Record<string, string | undefined> = {}): R
   };
   for (const [key, value] of Object.entries(extra)) {
     if (value == null) continue;
-    if (BLOCKED_HEADERS.has(key.toLowerCase())) continue;
+    if (dropHeader(key, value)) continue;
     headers[key] = value;
   }
   headers['User-Agent'] = BROWSER_UA;

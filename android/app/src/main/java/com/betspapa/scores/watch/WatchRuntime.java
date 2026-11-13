@@ -24,11 +24,17 @@ final class WatchRuntime {
         final boolean hot;
         final boolean aboutToStart;
         final long nextDelayMs;
+        final boolean failed;
 
         PollResult(boolean hot, boolean aboutToStart, long nextDelayMs) {
+            this(hot, aboutToStart, nextDelayMs, false);
+        }
+
+        PollResult(boolean hot, boolean aboutToStart, long nextDelayMs, boolean failed) {
             this.hot = hot;
             this.aboutToStart = aboutToStart;
             this.nextDelayMs = nextDelayMs;
+            this.failed = failed;
         }
     }
 
@@ -44,10 +50,17 @@ final class WatchRuntime {
             long now = System.currentTimeMillis();
             boolean stale = snapshot.fixturesAt == 0L || now - snapshot.fixturesAt >= AlertPlanner.FIXTURE_REFRESH_MS;
             List<WatchMatch> fixtures = null;
-            if (stale) fixtures = readFixtures(app);
+            boolean networkFailed = false;
+            if (stale) {
+                fixtures = readFixtures(app);
+                if (fixtures == null) networkFailed = true;
+            }
             boolean hot = AlertPlanner.shouldWatch(snapshot.matches, snapshot, now);
             List<WatchMatch> live = null;
-            if (hot || (fixtures != null && mightWatch(snapshot, fixtures, now))) live = readLive(app);
+            if (hot || (fixtures != null && mightWatch(snapshot, fixtures, now))) {
+                live = readLive(app);
+                if (live == null) networkFailed = true;
+            }
             List<WatchNote> pending;
             boolean aboutToStart;
             String goalSound = "crowd";
@@ -59,6 +72,7 @@ final class WatchRuntime {
                 if (live != null) state.overlayLive(live, now);
                 for (WatchNote note : AlertPlanner.notices(state.matches, state, now)) state.record(note, now);
                 state.commitScores();
+                if (!networkFailed) state.lastPollAt = now;
                 state.save(WatchFiles.file(app));
                 pending = new ArrayList<WatchNote>();
                 for (WatchNote note : state.pendingNotifications()) {
@@ -72,12 +86,12 @@ final class WatchRuntime {
                 aboutToStart = hot && !inPlay(state, now);
                 goalSound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
             }
-            // The open app already raises the toast and the system notification.
-            // Posting again from here would double it. Once the activity leaves,
-            // this loop is the only thing that can still reach the shade.
-            boolean deliver = !WatchScheduler.isUiForeground();
+            // The WebView is frozen when HiOS blanks the screen, even if the activity has not paused.
+            // Always post from this process. A second post uses the same id, so it updates instead of duplicating.
+            boolean quiet = WatchScheduler.isUiForeground() && screenInteractive(app);
+            String sound = quiet ? "off" : goalSound;
             for (WatchNote note : pending) {
-                if (deliver && !AlertPoster.post(app, note, goalSound)) continue;
+                if (!AlertPoster.post(app, note, sound)) continue;
                 synchronized (WatchState.FILE_LOCK) {
                     WatchState state = WatchState.load(WatchFiles.file(app));
                     state.markSent(note.id);
@@ -85,11 +99,11 @@ final class WatchRuntime {
                 }
             }
             long delay = inPlayAfter(app) ? AlertPlanner.POLL_MS : 60_000L;
-            return new PollResult(hot, aboutToStart, delay);
+            return new PollResult(hot, aboutToStart, delay, networkFailed);
         } catch (IOException error) {
             WatchState state = WatchState.load(WatchFiles.file(app));
             boolean hot = state.browser && state.hasInterest() && AlertPlanner.shouldWatch(state.matches, state, System.currentTimeMillis());
-            return new PollResult(hot, false, 60_000L);
+            return new PollResult(hot, false, 60_000L, true);
         } finally {
             try {
                 AlertPoster.settleDisallowed(app);
@@ -100,6 +114,11 @@ final class WatchRuntime {
             if (lock != null && lock.isHeld()) lock.release();
             BUSY.set(false);
         }
+    }
+
+    private static boolean screenInteractive(Context context) {
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        return power != null && power.isInteractive();
     }
 
     private static boolean mightWatch(WatchState state, List<WatchMatch> fixtures, long now) {
@@ -145,7 +164,7 @@ final class WatchRuntime {
         if (manager == null) return null;
         PowerManager.WakeLock lock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "betspapa:watch");
         lock.setReferenceCounted(false);
-        lock.acquire(95_000L);
+        lock.acquire(4L * 60L * 1000L);
         return lock;
     }
 }

@@ -135,6 +135,61 @@ public class BackgroundAlertQcTest {
     }
 
     @Test
+    public void goalAndTrendArriveWhileDozeStandbyAndKilled() throws Exception {
+        grantNotifications();
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        UiDevice device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+        device.wakeUp();
+        device.pressHome();
+        server.setDispatcher(new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                String body = "{\"data\":[{\"name\":\"Ghana Premier League\",\"events\":[{\"eventId\":\"sr:match:qc\",\"homeTeamName\":\"Hearts\",\"awayTeamName\":\"Kotoko\",\"estimateStartTime\":" + (System.currentTimeMillis() - 5 * 60_000L) + ",\"status\":1,\"matchStatus\":\"H1\",\"playedSeconds\":\"18:00\",\"setScore\":\"" + score.get() + "\"}]}]}";
+                return new MockResponse().setResponseCode(200).setBody(body);
+            }
+        });
+        server.start();
+        String live = server.url("/live").toString();
+        String fixtures = server.url("/fixtures").toString();
+        FeedClient.overrideFeeds(fixtures, live);
+        writeOverride(target, fixtures, live);
+        saveLive(target, 0, 0);
+        WatchState seeded = WatchState.load(WatchFiles.file(target));
+        seeded.trends.add("sr:match:qc:over05");
+        seeded.save(WatchFiles.file(target));
+
+        target.startForegroundService(new Intent(target, ScoreWatchService.class));
+        Thread.sleep(1500);
+        device.pressHome();
+        device.executeShellCommand("dumpsys deviceidle force-idle");
+        score.set("1:0");
+        target.sendBroadcast(new Intent(target, WatchAlarmReceiver.class).setAction(WatchScheduler.ACTION_WATCHDOG));
+        Notification goal = waitForText(target, "Goal · Hearts", 25000);
+        assertNotNull("goal missing in Doze: " + dump(target), goal);
+        Notification trend = waitForText(target, "Trend hit", 8000);
+        assertNotNull("trend hit missing in Doze", trend);
+        device.executeShellCommand("dumpsys deviceidle unforce");
+        device.openNotification();
+        Thread.sleep(1200);
+        shot(device, target, "goal-trend-while-doze");
+        device.pressBack();
+        device.executeShellCommand("logcat -d -t 120 -s ScoreWatchService:V WatchRuntime:V *:W");
+
+        device.executeShellCommand("am set-inactive com.betspapa.scores true");
+        device.executeShellCommand("am kill com.betspapa.scores");
+        score.set("2:0");
+        target.sendBroadcast(new Intent(target, WatchAlarmReceiver.class).setAction(WatchScheduler.ACTION_RESTART));
+        Notification second = waitForText(target, "2\u20130", 25000);
+        assertNotNull("second goal missing after standby and kill", second);
+        device.pressHome();
+        device.openNotification();
+        Thread.sleep(1200);
+        shot(device, target, "goal-after-kill");
+        device.pressBack();
+        device.executeShellCommand("am set-inactive com.betspapa.scores false");
+    }
+
+    @Test
     public void settingsStatusAndClosedAppTestAlert() throws Exception {
         grantNotifications();
         Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();

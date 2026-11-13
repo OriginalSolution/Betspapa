@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CountryBadge } from '../components/CountryBadge';
 import { Crest } from '../components/Crest';
 import { IconBall, IconCard } from '../components/Icons';
-import { profile, squadLabel } from '../data/board';
+import { BookMark } from '../components/BookMark';
+import { bookingForPick, DESK_NAMES, readEngineCache, type BookingChip } from '../lib/engineSlips';
+import { profile, squadLabel, marketInfo, type MarketId } from '../data/board';
 import { fetchLiveMatch } from '../data/remote';
 import { FormPips } from '../components/PickCard';
 import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/format';
 import type { EventType, Match, MatchEvent } from '../types';
 import { useStore } from '../state/store';
+import { useProduct } from '../state/product';
 
 const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, var: 2, ht: 3, ft: 4 };
 
 export function MatchPage() {
   const { id = '' } = useParams();
+  const [params] = useSearchParams();
+  const focus = params.get('trend');
   const { findMatch, mode, setActiveMatch, follows, toggleMatch, toggleTeam } = useStore();
   const local = findMatch(id);
   const [remote, setRemote] = useState<Match | null>(null);
@@ -107,6 +112,7 @@ export function MatchPage() {
           </button>
         </div>
       </section>
+      <HitMarkets matchId={match.id} focus={focus} />
       {(match.status === 'live' || match.status === 'halftime' || match.status === 'finished') && <PitchLine match={match} />}
       <section className="timeline-wrap">
         <h2>Events</h2>
@@ -121,6 +127,53 @@ export function MatchPage() {
         )}
       </section>
     </article>
+  );
+}
+
+function marketLabel(id: string): string {
+  try {
+    return marketInfo(id as MarketId).label;
+  } catch {
+    return id;
+  }
+}
+
+function HitMarkets({ matchId, focus }: { matchId: string; focus: string | null }) {
+  const { picks } = useProduct();
+  const related = picks.filter((pick) => pick.matchId === matchId && (pick.status === 'won' || pick.id === focus));
+  const focused = focus && !related.some((pick) => pick.id === focus) ? focus : '';
+  if (!related.length && !focused) return null;
+  const engine = readEngineCache();
+  const booked: BookingChip[] = [];
+  const seen = new Set<string>();
+  for (const pick of related) {
+    const chip = bookingForPick(engine, pick.matchId, pick.market);
+    if (!chip || seen.has(`${chip.bookId}:${chip.code}`)) continue;
+    seen.add(`${chip.bookId}:${chip.code}`);
+    booked.push(chip);
+  }
+  return (
+    <section className="hit-markets">
+      <h2>Trend</h2>
+      {related.map((pick) => (
+        <p key={pick.id} className={cx('hit-market', pick.id === focus && 'is-focus', pick.status === 'won' && 'is-hit')}>
+          <strong>{pick.status === 'won' ? 'Hit' : 'Market'} · {pick.marketLabel}</strong>
+          <span>{pick.label}</span>
+        </p>
+      ))}
+      {focused && (
+        <p className="hit-market is-focus is-hit">
+          <strong>Hit · {marketLabel(focused.slice(focused.lastIndexOf(':') + 1))}</strong>
+        </p>
+      )}
+      {booked.map((code) => (
+        <p key={`${code.bookId}:${code.code}`} className="booking-chip">
+          <BookMark id={code.bookId} />
+          <span>{DESK_NAMES[code.bookId]}</span>
+          <b>{code.code}</b>
+        </p>
+      ))}
+    </section>
   );
 }
 

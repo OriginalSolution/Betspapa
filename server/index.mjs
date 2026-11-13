@@ -18,6 +18,7 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.webmanifest': 'application/manifest+json',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
@@ -145,6 +146,7 @@ async function handleApi(req, res, url) {
             headers: {
               Accept: 'application/json',
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+              Referer: 'https://www.sportybet.com/gh/sport/football',
             },
             signal: AbortSignal.timeout(20_000),
           },
@@ -243,7 +245,8 @@ function serveStatic(req, res, url) {
   }
   const requested = decodeURIComponent(url.pathname);
   const safe = normalize(requested).replace(/^(\.\.[/\\])+/, '');
-  let file = join(dist, safe);
+  const bundledCrest = requested.startsWith('/crests/') ? join(process.cwd(), 'public', safe) : '';
+  let file = bundledCrest && existsSync(bundledCrest) && !statSync(bundledCrest).isDirectory() ? bundledCrest : join(dist, safe);
   if (!file.startsWith(dist)) {
     res.writeHead(400);
     res.end('Bad path');

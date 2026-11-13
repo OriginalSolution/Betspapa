@@ -35,6 +35,8 @@ public final class WatchState {
     public final List<String> muted = new ArrayList<String>();
     public final List<JSONObject> bookings = new ArrayList<JSONObject>();
     public long fixturesAt;
+    /** Wall clock of the last poll that reached the feeds. Watchdog and Settings read this. */
+    public long lastPollAt;
 
     public boolean muted(String matchId) {
         return matchId != null && !matchId.isEmpty() && muted.contains(matchId);
@@ -308,6 +310,7 @@ public final class WatchState {
         json.put("muted", new JSONArray(muted));
         json.put("bookings", new JSONArray(bookings));
         json.put("fixturesAt", fixturesAt);
+        json.put("lastPollAt", lastPollAt);
         json.put("source", MatchFeeds.SOURCE_LABEL);
         return json;
     }
@@ -317,6 +320,7 @@ public final class WatchState {
         if (json == null) return state;
         state.merge(json);
         state.fixturesAt = json.optLong("fixturesAt", 0L);
+        state.lastPollAt = json.optLong("lastPollAt", 0L);
         JSONArray listed = json.optJSONArray("matches");
         if (listed != null) {
             state.matches.clear();
@@ -340,8 +344,11 @@ public final class WatchState {
                 byte[] chunk = new byte[4096];
                 int count;
                 while ((count = input.read(chunk)) != -1) buffer.write(chunk, 0, count);
-                return fromJson(new JSONObject(new String(buffer.toByteArray(), "UTF-8")));
-            } catch (RuntimeException | IOException error) {
+                String text = new String(buffer.toByteArray(), "UTF-8").trim();
+                if (text.isEmpty()) return new WatchState();
+                return fromJson(new JSONObject(text));
+            } catch (Exception error) {
+                // A truncated or empty file must not kill the process. Alerts start from a fresh state.
                 return new WatchState();
             } finally {
                 if (input != null) {
