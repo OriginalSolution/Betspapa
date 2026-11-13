@@ -60,6 +60,7 @@ public class MainActivity extends BridgeActivity {
                 @Override
                 public void onPageLoaded(WebView webView) {
                     webReady = true;
+                    deliverOpen(getIntent());
                 }
             });
         }

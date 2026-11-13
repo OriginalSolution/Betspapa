@@ -104,6 +104,15 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
   throw new Error(lastError);
 }
 
+/** The upcoming feed, across several days. Search uses this. The board stays on one day. */
+export async function fetchSportyWindow(fromIso: string, toIso: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
+  const direct = await transport.direct(FIXTURE_FEED);
+  if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
+    throw new Error(direct.status ? fixtureFailure(direct) : 'Fixture feed failed');
+  }
+  return mapSportyEvents(direct.body.events, fromIso, toIso);
+}
+
 export async function fetchInPlay(transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const read = (result: FixtureResult): Match[] => {
     if (result.status < 200 || result.status >= 300) throw new Error(`In-play scores returned ${result.status}`);

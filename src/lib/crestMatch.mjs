@@ -15,6 +15,21 @@ const CLUB_TOKENS = new Set([
 
 const STATE_SUFFIX = new Set(['se', 'pe', 'rj', 'sp', 'mg', 'ba', 'rs', 'go', 'pr', 'sc', 'al', 'ce', 'ma', 'pa', 'am', 'es', 'rn', 'pb', 'pi', 'to', 'ro', 'ac', 'ap', 'rr', 'df']);
 
+/** Words that change which club a name is. They are not safe to ignore on a longer badge name. */
+const IDENTITY = new Set([
+  'united', 'city', 'town', 'rovers', 'wanderers', 'rangers', 'county', 'albion', 'hotspur', 'villa',
+  'olympic', 'olimpia', 'dynamo', 'dinamo', 'junior', 'orient', 'racing', 'inter', 'nacional',
+  'national', 'boys', 'girls', 'ladies', 'women', 'academy', 'reserve', 'youth',
+]);
+
+/** Prefixes and legal words a feed often drops. "Deportivo Pasto" may arrive as "Pasto". */
+const IGNORABLE_EXTRA = new Set([
+  'real', 'atletico', 'athletic', 'deportivo', 'deportes', 'sporting', 'sport', 'sports', 'club',
+  'calcio', 'futbol', 'futebol', 'football', 'soccer', 'association', 'de', 'the',
+]);
+
+const WOMENS = /\b(women|ladies|femenino|feminino|feminine|femeni|feminas|femenil|frauen|dames|kvinde|female|girls|wfc)\b/;
+
 /** Short feed labels and national-team spellings. Values are the name we search. */
 const ALIASES = {
   'man city': 'manchester city',
@@ -70,6 +85,8 @@ const ALIASES = {
   huddersfield: 'huddersfield town',
   valladolid: 'real valladolid',
   betis: 'real betis',
+  'ad pasto': 'deportivo pasto',
+  'backa topola': 'tsc backa topola',
   'cd junior fc': 'atletico junior',
   'cd tolima': 'deportes tolima',
   'america fc mg': 'america mineiro',
@@ -283,7 +300,7 @@ export function expandAlias(name) {
 export function stripQualifiers(name) {
   return fold(name)
     .replace(/\bu\d{2}\b/g, ' ')
-    .replace(/\b(women|ladies|femenino|feminino|feminine|femeni|wfc|dames|kvinde|female|girls)\b/g, ' ')
+    .replace(WOMENS, ' ')
     .replace(/\b(reserves|reserve|youth|juvenil|academy|castilla|promesas|atletic)\b/g, ' ')
     .replace(/\bjong\b/g, ' ')
     .replace(/\s+(w|q|ii|iii|b|c)$/g, ' ')
@@ -343,6 +360,30 @@ export function flagUrl(name) {
   return `https://flagcdn.com/w160/${flag.iso}.png`;
 }
 
+export function isWomensSide(name) {
+  const folded = fold(name);
+  return WOMENS.test(folded) || /(?:^|\s)w$/.test(folded);
+}
+
+function coreTokens(name) {
+  return coreName(name).split(' ').filter(Boolean);
+}
+
+function distinctiveTokens(name) {
+  return coreTokens(name).filter((token) => token.length >= 4 && !CLUB_TOKENS.has(token) && !IGNORABLE_EXTRA.has(token) && !IDENTITY.has(token));
+}
+
+/** A longer official name matches a short feed name when the extra words are only a prefix. */
+export function safeShortName(query, candidate) {
+  const left = coreTokens(query);
+  const right = coreTokens(candidate);
+  if (!left.length || right.length <= left.length) return false;
+  if (!left.every((token) => right.includes(token))) return false;
+  const extras = right.filter((token) => !left.includes(token));
+  if (!extras.every((token) => token.length <= 3 || CLUB_TOKENS.has(token) || IGNORABLE_EXTRA.has(token))) return false;
+  return distinctiveTokens(query).length > 0;
+}
+
 export function searchQueries(name, context = {}) {
   const queries = [];
   const add = (value) => {
@@ -355,13 +396,18 @@ export function searchQueries(name, context = {}) {
   if (alias) add(alias);
   const core = coreName(name);
   add(core);
+  const distinctive = distinctiveTokens(name);
+  if (distinctive.length) {
+    const longest = distinctive.reduce((best, token) => (token.length > best.length ? token : best), distinctive[0]);
+    add(longest);
+  }
   if (isNationalSide(name, context) || (isNationalContext(context) && flagFor(name))) {
     add(`${alias || core} national football team`);
   } else {
     const country = realCountry(context.area);
     if (country && fold(country) !== fold(core)) add(`${core} ${country}`);
   }
-  return queries.slice(0, 4);
+  return queries.slice(0, 5);
 }
 
 function levenshtein(left, right) {
@@ -408,17 +454,43 @@ export function countryFits(area, country) {
   return Boolean(alias) && (alias === right || right.includes(alias) || alias.includes(right));
 }
 
+function canonLeague(value) {
+  let text = fold(value);
+  const replacements = [
+    [/english league championship|league championship/g, 'championship'],
+    [/league one/g, 'league 1'],
+    [/league two/g, 'league 2'],
+    [/laliga/g, 'la liga'],
+    [/categoria primera a/g, 'primera a'],
+    [/dimayor/g, 'primera a'],
+  ];
+  for (const [pattern, token] of replacements) text = text.replace(pattern, token);
+  return text;
+}
+
+function hasHint(text, hint) {
+  let from = 0;
+  while (from <= text.length) {
+    const index = text.indexOf(hint, from);
+    if (index < 0) return false;
+    const after = text[index + hint.length] || '';
+    if (!(/\d/.test(hint[hint.length - 1]) && /\d/.test(after))) return true;
+    from = index + hint.length;
+  }
+  return false;
+}
+
 export function leagueFits(competition, leagues) {
-  const left = fold(competition);
-  const rights = (Array.isArray(leagues) ? leagues : [leagues]).map((league) => fold(league)).filter(Boolean);
+  const left = canonLeague(competition);
+  const rights = (Array.isArray(leagues) ? leagues : [leagues]).map((league) => canonLeague(league)).filter(Boolean);
   if (!left || !rights.length) return false;
   const hints = [
-    'champions league', 'europa league', 'conference league', 'premier league', 'championship', 'league one', 'league two',
-    'national league', 'fa cup', 'la liga', 'laliga', 'segunda', 'primera federacion', 'copa del rey', 'serie a', 'serie b',
+    'champions league', 'europa league', 'conference league', 'premier league', 'championship', 'league 1', 'league 2',
+    'national league', 'fa cup', 'la liga', 'segunda', 'primera federacion', 'copa del rey', 'serie a', 'serie b',
     'serie c', 'bundesliga', 'eredivisie', 'eerste divisie', 'ligue 1', 'ligue 2', 'primeira liga', 'j1 league', 'j2 league',
-    'j3 league', 'allsvenskan', 'eliteserien', 'super league', 'premiering',
+    'j3 league', 'allsvenskan', 'eliteserien', 'super league', 'premiering', 'prva liga', 'primera a',
   ];
-  return hints.some((hint) => left.includes(hint) && rights.some((league) => league.includes(hint)));
+  return hints.some((hint) => hasHint(left, hint) && rights.some((league) => hasHint(league, hint)));
 }
 
 function soccer(sport) {
@@ -429,15 +501,27 @@ function soccer(sport) {
 export function scoreCandidate(queryName, candidate, context = {}) {
   if (!candidate || !soccer(candidate.sport)) return 0;
   const names = [candidate.name, ...(candidate.aliases || [])].filter(Boolean);
+  const comparable = names.filter((name) => isWomensSide(queryName) || !isWomensSide(name));
+  if (!comparable.length) return 0;
   let best = 0;
-  for (const name of names) best = Math.max(best, nameSimilarity(queryName, name));
+  for (const name of comparable) best = Math.max(best, nameSimilarity(queryName, name));
   if (best < 0.5) return best;
-  if (context.area && candidate.country) {
-    if (countryFits(context.area, candidate.country)) best = Math.min(1, best + 0.03);
-    else if (realCountry(context.area)) best -= 0.28;
-  }
   const leagues = candidate.leagues || (candidate.league ? [candidate.league] : []);
-  if (leagueFits(context.competition || '', leagues)) best = Math.min(1, best + 0.05);
+  const leagueOk = leagueFits(context.competition || '', leagues);
+  const area = realCountry(context.area);
+  let countryOk = false;
+  let countryBad = false;
+  if (context.area && candidate.country) {
+    if (countryFits(context.area, candidate.country)) countryOk = true;
+    else if (area) countryBad = true;
+  }
+  const sameClub = comparable.some((name) => coreName(queryName) === coreName(name));
+  if (countryOk) best = Math.min(1, best + 0.03);
+  else if (countryBad && !(sameClub && leagueOk)) best -= 0.28;
+  if (leagueOk) best = Math.min(1, best + 0.05);
+  if (!countryBad && (countryOk || leagueOk) && comparable.some((name) => safeShortName(queryName, name))) {
+    best = Math.max(best, 0.91);
+  }
   return Math.max(0, Math.min(1, Number(best.toFixed(4))));
 }
 
@@ -451,8 +535,9 @@ export function pickBest(queryName, candidates, context = {}) {
   if (close.length > 1) {
     const sameClub = close.every((row) => coreName(row.candidate.name) === coreName(close[0].candidate.name) && fold(row.candidate.country || '') === fold(close[0].candidate.country || ''));
     if (sameClub) {
+      const senior = close.find((row) => !isWomensSide(row.candidate.name) && allowedImageUrl(row.candidate.badge || ''));
       const badged = close.find((row) => allowedImageUrl(row.candidate.badge || ''));
-      const chosen = badged || close[0];
+      const chosen = senior || badged || close[0];
       return { candidate: chosen.candidate, confidence: chosen.score };
     }
     const leagues = (row) => row.candidate.leagues || (row.candidate.league ? [row.candidate.league] : []);

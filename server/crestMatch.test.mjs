@@ -86,6 +86,50 @@ test('source order prefers a fixture logo, then TheSportsDB, and never SofaScore
   assert.equal(chooseLayer([{ source: 'sportybet', url: 'https://cdn.example/a.png', confidence: 1 }]), null);
 });
 
+test('short feed names match the club when the country or league agrees', () => {
+  const betis = [
+    { name: 'Betis Féminas', country: 'Spain', sport: 'Soccer', league: 'Spanish Primera Division Women', leagues: ['Spanish Primera Division Women'], badge: 'https://example.com/feminas.png' },
+    { name: 'Real Betis', aliases: ['Betis'], country: 'Spain', sport: 'Soccer', league: 'Spanish La Liga', leagues: ['Spanish La Liga', 'Copa del Rey'], badge: 'https://example.com/betis.png' },
+  ];
+  assert.equal(pickBest('Betis', betis, { area: 'Spain', competition: 'Copa del Rey' })?.candidate.name, 'Real Betis');
+  assert.equal(pickBest('Betis', [betis[0]], { area: 'Spain', competition: 'Copa del Rey' }), null);
+
+  const huddersfield = [{ name: 'Huddersfield Town', aliases: ['Huddersfield Town AFC'], country: 'England', sport: 'Soccer', league: 'English League 1', leagues: ['English League 1'], badge: 'https://example.com/ht.png' }];
+  assert.equal(pickBest('Huddersfield', huddersfield, { area: 'England', competition: 'League One' })?.candidate.name, 'Huddersfield Town');
+
+  const iran = [{ name: 'Iran', aliases: ['Persia'], country: 'Iran', sport: 'Soccer', league: 'FIFA World Cup', leagues: ['FIFA World Cup'], badge: 'https://example.com/ir.png' }];
+  assert.equal(pickBest('IR Iran', iran, { area: 'International', competition: 'Int. Friendly Games' })?.candidate.name, 'Iran');
+  assert.equal(isNationalSide('IR Iran', { area: 'International', competition: 'Int. Friendly Games' }), true);
+
+  const topola = [{ name: 'TSC Bačka Topola', country: 'Serbia', sport: 'Soccer', league: 'Serbian Prva Liga', leagues: ['Serbian Prva Liga'], badge: 'https://example.com/tsc.png' }];
+  assert.equal(pickBest('Backa Topola', topola, { area: 'Serbia', competition: 'Prva Liga' })?.candidate.name, 'TSC Bačka Topola');
+
+  const pasto = [
+    { name: 'Pastoreo', country: 'Paraguay', sport: 'Soccer', league: '_No League Soccer', leagues: ['_No League Soccer'], badge: 'https://example.com/pastoreo.png' },
+    { name: 'Deportivo Pasto', country: 'Colombia', sport: 'Soccer', league: 'Colombia Categoría Primera A', leagues: ['Colombia Categoría Primera A'], badge: 'https://example.com/pasto.png' },
+  ];
+  assert.equal(pickBest('AD Pasto', pasto, { area: 'Colombia', competition: 'Liga DIMAYOR' })?.candidate.name, 'Deportivo Pasto');
+  assert.equal(pickBest('AD Pasto', [pasto[0]], { area: 'Colombia', competition: 'Liga DIMAYOR' }), null);
+
+  const bucaramanga = [{ name: 'Atlético Bucaramanga', country: 'Colombia', sport: 'Soccer', league: 'Colombia Categoría Primera A', leagues: ['Colombia Categoría Primera A'], badge: 'https://example.com/buc.png' }];
+  assert.equal(pickBest('CA Bucaramanga', bucaramanga, { area: 'Colombia', competition: 'Liga DIMAYOR' })?.candidate.name, 'Atlético Bucaramanga');
+
+  const newport = [{ name: 'Newport County', country: 'Wales', sport: 'Soccer', league: 'English League 2', leagues: ['English League 2'], badge: 'https://example.com/newport.png' }];
+  assert.equal(pickBest('Newport County', newport, { area: 'England', competition: 'League Two' })?.candidate.name, 'Newport County');
+
+  const united = [{ name: 'Manchester United', country: 'England', sport: 'Soccer', league: 'English Premier League', leagues: ['English Premier League'], badge: 'https://example.com/mun.png' }];
+  assert.equal(pickBest('United', united, { area: 'England', competition: 'Premier League' }), null);
+
+  const qpr = [{ name: 'Queens Park Rangers', aliases: ['QPR'], country: 'England', sport: 'Soccer', league: 'English League Championship', leagues: ['English League Championship'], badge: 'https://example.com/qpr.png' }];
+  assert.equal(pickBest('Queens Park FC', qpr, { area: 'Scotland', competition: 'Championship' }), null);
+  assert.ok(searchQueries('AD Pasto', { area: 'Colombia', competition: 'Liga DIMAYOR' }).some((query) => /deportivo pasto/i.test(query)));
+  assert.ok(searchQueries('SL Benfica Lisbon W', { area: 'International Clubs', competition: 'UEFA Champions League Women' }).some((query) => foldQuery(query) === 'benfica'));
+});
+
+function foldQuery(value) {
+  return String(value).toLowerCase();
+}
+
 test('national teams can fall back to a flag and club searches stay on the club', () => {
   assert.equal(isNationalSide('Spain', { area: 'International', competition: 'UEFA Nations League' }), true);
   assert.equal(isNationalSide('Spain U21', { area: 'International Youth', competition: 'U21 UEFA European Championship, Qualification' }), true);

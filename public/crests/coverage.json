@@ -1,21 +1,22 @@
 {
-  "fixtures": 627,
-  "before": {
-    "both": 370,
-    "percent": 59
-  },
+  "fixtures": 643,
+  "before": null,
   "after": {
-    "both": 493,
-    "percent": 78.6
+    "both": 556,
+    "percent": 86.5
   },
   "sources": {
-    "thesportsdb": 1080,
+    "thesportsdb": 1176,
     "flag": 3,
     "wikidata": 15,
     "wikipedia": 23
   },
   "from": "2026-11-12",
-  "to": "2026-11-15",
-  "missing": 158,
-  "generatedAt": "2026-11-12T20:58:47.758Z"
+  "to": "2026-11-16",
+  "missing": 98,
+  "layeredBefore": {
+    "both": 494,
+    "percent": 76.8
+  },
+  "generatedAt": "2026-11-13T00:04:50.007Z"
 }

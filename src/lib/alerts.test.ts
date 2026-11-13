@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPicks, settle } from '../data/board';
 import { defaultSettings, type Follows, type Match, type Settings } from '../types';
-import { followedNotices, staleAlertIds, staleTrendIds, trendHitNotices } from './alerts';
+import { followedNotices, matchIdFromTrendAlert, alertTarget, staleAlertIds, staleTrendIds, trendHitNotices } from './alerts';
 
 function match(patch: Partial<Match> = {}): Match {
   return {
@@ -75,6 +75,11 @@ describe('trend hits', () => {
     const notes = trendHitNotices(picks, [over!.id], new Set(), Date.parse('2026-11-10T17:16:00.000Z'));
     expect(notes).toHaveLength(1);
     expect(notes[0]?.title).toContain('Over 0.5 goals');
+    expect(notes[0]?.matchId).toBe('sr:match:1');
+    expect(alertTarget(notes[0]!)).toContain('/match/sr:match:1');
+    expect(alertTarget(notes[0]!)).toContain('trend=');
+    expect(alertTarget({ id: 'trend:sr:match:9:btts:hit', kind: 'win', matchId: '' })).toContain('/match/sr:match:9');
+    expect(matchIdFromTrendAlert('trend:sr:match:9:btts:hit')).toBe('sr:match:9');
     expect(notes[0]?.body).toContain('Al Astiklal');
     expect(trendHitNotices(picks, [over!.id], new Set([notes[0]!.id]), Date.now())).toEqual([]);
     expect(picks.find((pick) => pick.market === 'dc-12')?.bookmarked).toBe(false);

@@ -27,9 +27,12 @@ function saveMemory(memory) {
   writeFileSync(memoryFile, JSON.stringify(memory));
 }
 
+const args = process.argv.slice(2);
+const noWiki = args.includes('--no-wiki');
+const dates = args.filter((arg) => /^\d{4}-\d{2}-\d{2}$/.test(arg));
 const now = new Date();
-const fromDay = day(now);
-const toDay = day(new Date(now.getTime() + 3 * 86_400_000));
+const fromDay = dates[0] || day(now);
+const toDay = dates[1] || day(new Date(now.getTime() + 3 * 86_400_000));
 console.log(`[crests] Window ${fromDay} to ${toDay}`);
 
 const response = await fetch(feedUrl, { signal: AbortSignal.timeout(30_000) });
@@ -40,16 +43,36 @@ const events = (body.events || []).filter((event) => {
   return kick >= fromDay && kick <= toDay;
 });
 const teams = teamsFromEvents(events);
+const priorMissing = readJsonSafe(join(root, 'public', 'crests', 'missing.json'));
+const seen = new Set(teams.map((team) => `${team.name}|${team.area || ''}`));
+for (const team of priorMissing.teams || []) {
+  const key = `${team.name}|${team.area || ''}`;
+  if (!team?.name || seen.has(key)) continue;
+  seen.add(key);
+  teams.push({ id: team.id, name: team.name, area: team.area || '', competition: team.competition || '' });
+}
 console.log(`[crests] ${events.length} fixtures, ${teams.length} team rows`);
+
+function readJsonSafe(file) {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return { teams: [] };
+  }
+}
 
 const memory = loadMemory();
 let logged = 0;
 const started = Date.now();
+const before = coverage(events, loadCatalog(root));
+console.log(`[crests] Before ${JSON.stringify(before)}`);
 
-const wikiPromise = measureWikipedia(teams, { memory, workers: 2 }).catch((error) => {
-  console.error(`[crests] Wikipedia baseline failed: ${error.message}`);
-  return {};
-});
+const wikiPromise = noWiki
+  ? Promise.resolve(null)
+  : measureWikipedia(teams, { memory, workers: 2 }).catch((error) => {
+      console.error(`[crests] Wikipedia baseline failed: ${error.message}`);
+      return {};
+    });
 
 const resolved = await resolveTeams(teams, {
   root,
@@ -72,6 +95,7 @@ const report = coverage(events, catalog, wikiHits);
 report.from = fromDay;
 report.to = toDay;
 report.missing = resolved.missing.length;
+report.layeredBefore = before.after;
 report.generatedAt = new Date().toISOString();
 writeFileSync(join(root, 'public', 'crests', 'coverage.json'), JSON.stringify(report, null, 2));
 saveMemory(memory);

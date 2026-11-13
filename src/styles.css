@@ -1016,3 +1016,163 @@ img.crest { padding: 1px; }
   font-weight: 650;
 }
 button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
+
+.today-search { padding-top: 4px; }
+.search-bar {
+  margin: 10px 14px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+}
+.search-bar:focus-within { border-color: var(--red); }
+.search-bar span { color: var(--faint); font-size: 18px; }
+.search-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.search-bar input:focus { outline: none; }
+.search-clear {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+.recent-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 14px 0;
+  scrollbar-width: none;
+}
+.recent-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.recent-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 650;
+  padding: 7px 4px 7px 12px;
+}
+.recent-chip button + button { padding: 7px 10px 7px 4px; color: var(--muted); }
+.discover { padding: 8px 0 4px; }
+.discover h2, .hit-markets h2 {
+  margin: 14px 16px 6px;
+  color: var(--faint);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.search-list { list-style: none; margin: 0; padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.search-row, .search-match {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.search-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+}
+.search-open span, .search-match span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.search-open strong, .search-match strong { font-size: 15px; letter-spacing: -0.02em; }
+.search-open em, .search-match em { color: var(--muted); font-style: normal; font-size: 12px; font-weight: 600; }
+.follow-btn {
+  border: 0;
+  background: var(--red);
+  color: white;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-weight: 750;
+  font-size: 13px;
+}
+.follow-btn.is-on {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+}
+.league-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 750;
+}
+.search-match time, .score-pill {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+.score-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: var(--red);
+  color: white;
+  border-radius: 12px;
+  padding: 4px 8px;
+  line-height: 1.1;
+}
+.score-pill i { font-style: normal; font-size: 11px; font-weight: 700; }
+.search-empty { margin: 8px 16px 16px; color: var(--muted); }
+.scope-bar {
+  margin: 12px 14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scope-bar button {
+  border: 0;
+  background: transparent;
+  color: var(--gold);
+  font-weight: 700;
+}
+.hit-markets { padding: 0 14px 8px; }
+.hit-market, .booking-chip {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.hit-market { flex-direction: column; align-items: flex-start; }
+.hit-market.is-hit strong { color: var(--green); }
+.hit-market span { color: var(--muted); font-size: 13px; }
+.booking-chip b { margin-left: auto; letter-spacing: 0.04em; }
+.trend strong a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
