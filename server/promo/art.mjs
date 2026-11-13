@@ -261,15 +261,15 @@ export function bannerSvg(card, logos = {}) {
     ${brand(36, 28)}
     ${scene.art}
     <rect x="0" y="${barY}" width="${width}" height="${height - barY}" fill="#07080c"/>
-    <text x="48" y="${barY + 70}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="64" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 18))}</text>
-    <text x="48" y="${barY + 130}" fill="#c5cad6" font-family="Outfit" font-size="32">vs ${esc(cut(scene.awayName, 22))}</text>
-    <text x="860" y="${barY + 78}" fill="#ff4d5a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">PREDICTION</text>
-    <text x="860" y="${barY + 150}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="48" font-weight="700">${esc(cut(market, 22))}</text>
-    <text x="1500" y="${barY + 150}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="64" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
-    ${hit != null ? ring(1780, barY + 120, hit, 48) : ''}
-    <text x="48" y="${barY + 250}" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">CODE</text>
-    <text x="160" y="${barY + 256}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="56" font-weight="700">${esc(card.code || '')}</text>
-    ${logosRow(card.codes, logos, 1860, barY + 200, 52)}
+    <text x="48" y="${barY + 96}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="90" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 14))}</text>
+    <text x="48" y="${barY + 156}" fill="#c5cad6" font-family="Outfit" font-size="45">vs ${esc(cut(scene.awayName, 18))}</text>
+    <text x="860" y="${barY + 92}" fill="#ff4d5a" font-family="Outfit" font-size="28" font-weight="700" letter-spacing="2">PREDICTION</text>
+    <text x="860" y="${barY + 168}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="67" font-weight="700">${esc(cut(market, 22))}</text>
+    <text x="1540" y="${barY + 172}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="90" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
+    ${hit != null ? ring(1816, barY + 132, hit, 52) : ''}
+    <text x="48" y="${barY + 268}" fill="#f0c94a" font-family="Outfit" font-size="28" font-weight="700" letter-spacing="2">CODE</text>
+    <text x="188" y="${barY + 276}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="78" font-weight="700">${esc(card.code || '')}</text>
+    ${logosRow(card.codes, logos, 1860, barY + 214, 56)}
   `);
 }
 
@@ -293,12 +293,12 @@ export function notifySvg(card, logos = {}) {
   return wideFrame(width, height, '#e11d2e', `
     ${scene.art}
     <rect x="0" y="340" width="${width}" height="200" fill="#07080c"/>
-    <text x="28" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="42" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 16))}</text>
-    <text x="28" y="448" fill="#c5cad6" font-family="Outfit" font-size="24">vs ${esc(cut(scene.awayName, 18))}</text>
-    <text x="500" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="30" font-weight="700">${esc(cut(market, 24))}</text>
-    <text x="900" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="40" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
-    ${hit != null ? ring(1000, 470, hit, 28) : ''}
-    <text x="28" y="510" fill="#f0c94a" font-family="Outfit" font-size="16" font-weight="700" letter-spacing="2">CODE  ${esc(card.code || '')}</text>
+    <text x="24" y="408" fill="#f4f6fb" font-family="Barlow Condensed" font-size="59" font-weight="700">${esc(cut(scene.homeName.toUpperCase(), 12))}</text>
+    <text x="24" y="458" fill="#c5cad6" font-family="Outfit" font-size="34">vs ${esc(cut(scene.awayName, 16))}</text>
+    <text x="430" y="400" fill="#f4f6fb" font-family="Barlow Condensed" font-size="42" font-weight="700">${esc(cut(market, 22))}</text>
+    <text x="860" y="408" fill="#f4f6fb" font-family="Barlow Condensed" font-size="56" font-weight="700">${odds != null ? Number(odds).toFixed(2) : ''}</text>
+    ${hit != null ? ring(1024, 456, hit, 32) : ''}
+    <text x="24" y="518" fill="#f0c94a" font-family="Outfit" font-size="22" font-weight="700" letter-spacing="2">CODE  ${esc(card.code || '')}</text>
   `);
 }
 
