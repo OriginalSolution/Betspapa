@@ -5,12 +5,27 @@ import { EmptyState, MatchSkeleton } from '../components/MatchBoard';
 import { ErrorBanner, FilterChips } from '../components/Chrome';
 import { TodayBoard, TodaySortBar, WeekStrip, type TodaySort } from '../components/TodayBoard';
 import { scopeLabel, TodaySearch } from '../components/TodaySearch';
+import { CapacitorHttp } from '@capacitor/core';
 import { ENGINE_POLL_MS, fetchEngine, readEngineCache, subscribeEngine, writeEngineCache, type EngineState } from '../lib/engineSlips';
+import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
 
 type PromoCard = { id: string; title: string; image: string; route: string; matchId: string };
+
+const PROMOS_URL = 'https://api.betspapa.com/api/promos';
+
+async function loadPromos(): Promise<{ promos?: PromoCard[] }> {
+  if (isNativeApp()) {
+    const response = await CapacitorHttp.request(nativeRequestOptions('GET', PROMOS_URL, { connectMs: 12_000, readMs: 15_000 }));
+    if (response.status < 200 || response.status >= 300) return { promos: [] };
+    return readJsonBody(response.data) as { promos?: PromoCard[] };
+  }
+  const response = await fetch('/api/promos');
+  if (!response.ok) return { promos: [] };
+  return response.json();
+}
 
 function promoHref(item: PromoCard) {
   if (item.route === 'match' && item.matchId) return `/match/${item.matchId}`;
@@ -24,9 +39,8 @@ function PromoCarousel() {
   const scroller = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let stop = false;
-    void fetch('/api/promos')
-      .then((response) => (response.ok ? response.json() : { promos: [] }))
-      .then((body: { promos?: PromoCard[] }) => {
+    void loadPromos()
+      .then((body) => {
         if (!stop) setItems(Array.isArray(body.promos) ? body.promos : []);
       })
       .catch(() => {
