@@ -88,17 +88,6 @@ export function dayFixtureUrl(from: string, to: string): string {
 export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   let lastError = 'Fixture feed failed';
-  try {
-    const slim = transport.native ? await transport.direct(dayFixtureUrl(from, to)) : await browserResult(await fetch(dayFixtureUrl(from, to)));
-    if (slim.status >= 200 && slim.status < 300 && Array.isArray(slim.body?.events)) {
-      return mapSportyEvents(slim.body.events, from, to);
-    }
-    lastError = fixtureFailure(slim);
-  } catch (error) {
-    lastError = error instanceof Error ? error.message : lastError;
-  }
-  // The packaged app has no local /api server. Browser fetch would send Origin
-  // https://localhost and the fixtures API would reject it.
   if (!transport.native) {
     try {
       const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
@@ -110,6 +99,16 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
       lastError = error instanceof Error ? error.message : lastError;
     }
   }
+  try {
+    const slim = await transport.direct(dayFixtureUrl(from, to));
+    if (slim.status >= 200 && slim.status < 300 && Array.isArray(slim.body?.events)) {
+      return mapSportyEvents(slim.body.events, from, to);
+    }
+    lastError = fixtureFailure(slim);
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : lastError;
+  }
+  // The full catalogue is the fallback when the one-day list is unavailable.
   try {
     const direct = await transport.direct(FIXTURE_FEED);
     if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
