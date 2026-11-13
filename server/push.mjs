@@ -13,12 +13,29 @@
 import { createSign } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDummyId, isSimulated } from './upcoming.mjs';
 
 export const MIN_ODDS = 1.2;
 const LIVE = 'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1';
 
 export function fcmConfigured(env = process.env) {
-  return Boolean(serviceAccount(env));
+  const account = serviceAccount(env);
+  return Boolean(account && account.project_id && account.client_email && account.private_key);
+}
+
+/** Fields safe to print. The service-account key and access token are never included. */
+export function publicFcm(body) {
+  const json = body && typeof body === 'object' ? body : {};
+  const out = {};
+  if (typeof json.name === 'string') out.name = json.name;
+  const error = json.error && typeof json.error === 'object' ? json.error : null;
+  if (error) {
+    out.error = {};
+    if (error.code != null) out.error.code = error.code;
+    if (typeof error.status === 'string') out.error.status = error.status;
+    if (typeof error.message === 'string') out.error.message = error.message.slice(0, 400);
+  }
+  return out;
 }
 
 export function serviceAccount(env = process.env) {
@@ -110,6 +127,43 @@ function incidentKinds(raw) {
   return kinds;
 }
 
+const TREND_LABELS = {
+  home: 'Full-time home win',
+  draw: 'Full-time draw',
+  away: 'Full-time away win',
+  'dc-1x': 'Double chance 1X',
+  'dc-12': 'Double chance 12',
+  'dc-x2': 'Double chance X2',
+  'dnb-home': 'Draw no bet · home',
+  'dnb-away': 'Draw no bet · away',
+  over05: 'Over 0.5 goals',
+  over15: 'Over 1.5 goals',
+  over25: 'Over 2.5 goals',
+  over35: 'Over 3.5 goals',
+  under15: 'Under 1.5 goals',
+  under25: 'Under 2.5 goals',
+  under35: 'Under 3.5 goals',
+  btts: 'Both teams to score',
+  'btts-no': 'Both teams not to score',
+  'home-score': 'Home team to score',
+  'away-score': 'Away team to score',
+  clean: 'Clean sheet',
+  'fh-home': 'First-half home win',
+  'fh-draw': 'First-half draw',
+  'fh-away': 'First-half away win',
+  'fh-over05': 'First-half over 0.5',
+  'fh-over15': 'First-half over 1.5',
+};
+
+function bothSrl(home, away) {
+  const srl = (name) => {
+    const lower = String(name || '').toLowerCase();
+    if (lower.includes('societ') || lower.includes('sportiva') || lower.includes('s.r.l')) return false;
+    return lower.endsWith(' srl');
+  };
+  return srl(home) && srl(away);
+}
+
 function readIncidents(event) {
   const rows = [];
   for (const key of ['timeline', 'incidents', 'comments']) {
@@ -137,9 +191,29 @@ export function normalizeLive(payload) {
       const home = String(event?.homeTeamName || '').trim();
       const away = String(event?.awayTeamName || '').trim();
       if (!id || !home || !away) continue;
+      const country = String(tournament?.categoryName || event?.sport?.category?.name || '');
+      const competition = String(tournament?.name || event?.sport?.category?.tournament?.name || '');
+      if (isDummyId(id) || isSimulated({ country, tournament: competition, home, away }) || bothSrl(home, away)) continue;
       const score = pair(event.setScore);
       const status = liveStatus(event.matchStatus, event.status);
       if (status === 'scheduled') continue;
+      const period = String(event.period || event.matchStatus || '').toUpperCase();
+      let minute = null;
+      const playedHead = String(event.playedSeconds || '').split(':')[0];
+      if (/^\d+$/.test(playedHead)) {
+        minute = Number(playedHead);
+        if ((period === 'H2' || period === '2H' || period === 'HT') && minute < 46) minute += 45;
+      }
+      let htHome = null;
+      let htAway = null;
+      const second = period === '2' || period === 'H2' || period === '2H' || status === 'halftime' || status === 'finished';
+      if (second && Array.isArray(event.gameScore) && event.gameScore.length) {
+        const half = pair(event.gameScore[0]);
+        if (half) {
+          htHome = half[0];
+          htAway = half[1];
+        }
+      }
       matches.push({
         id,
         home,
@@ -147,8 +221,11 @@ export function normalizeLive(payload) {
         homeId: slug(home),
         awayId: slug(away),
         status,
+        minute,
         homeScore: score ? score[0] : 0,
         awayScore: score ? score[1] : 0,
+        htHome,
+        htAway,
         incidents: readIncidents(event),
         varReview: event.varReview && event.varReview.teamId ? event.varReview : null,
       });
@@ -162,7 +239,12 @@ export function diffMatches(previous, next) {
   const notes = [];
   for (const match of next || []) {
     const before = prior.get(match.id);
-    if (!before) continue;
+    if (!before) {
+      if (match.status === 'live' || match.status === 'halftime') {
+        notes.push({ id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match });
+      }
+      continue;
+    }
     if ((before.status === 'scheduled' || !before.status) && (match.status === 'live' || match.status === 'halftime')) {
       notes.push({ id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match });
     }
@@ -226,6 +308,103 @@ export function notesForDevice(notes, device) {
   return (notes || []).filter((item) => item.match && follows(device, item.match) && allowed(device, item.kind));
 }
 
+function halfReady(match) {
+  if (match.htHome == null || match.htAway == null) return false;
+  if (match.status === 'halftime' || match.status === 'finished') return true;
+  return match.status === 'live' && Number.isFinite(match.minute) && match.minute >= 45;
+}
+
+export function settleTrend(market, match) {
+  const homeSide = !(market === 'away' || market === 'away-score' || market === 'dnb-away' || market === 'fh-away');
+  if (String(market).startsWith('fh-')) {
+    if (!halfReady(match)) return 'open';
+    const home = match.htHome;
+    const away = match.htAway;
+    const total = home + away;
+    if (market === 'fh-over05') return total >= 1 ? 'won' : 'bust';
+    if (market === 'fh-over15') return total >= 2 ? 'won' : 'bust';
+    if (market === 'fh-home') return home > away ? 'won' : 'bust';
+    if (market === 'fh-away') return away > home ? 'won' : 'bust';
+    if (market === 'fh-draw') return home === away ? 'won' : 'bust';
+    return 'open';
+  }
+  if (!match || match.status === 'scheduled' || match.status === 'postponed' || match.homeScore == null || match.awayScore == null) return 'open';
+  const home = match.homeScore;
+  const away = match.awayScore;
+  const total = home + away;
+  const finished = match.status === 'finished';
+  const conceded = homeSide ? away : home;
+  const scored = homeSide ? home : away;
+  if (market === 'over05') return total >= 1 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'over15') return total >= 2 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'over25') return total >= 3 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'over35') return total >= 4 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'under15') return total >= 2 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'under25') return total >= 3 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'under35') return total >= 4 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'btts') return home > 0 && away > 0 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'btts-no') return home > 0 && away > 0 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'home-score') return home > 0 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'away-score') return away > 0 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'clean') return conceded > 0 ? 'bust' : finished ? 'won' : 'open';
+  if (market === 'home') return finished ? (home > away ? 'won' : 'bust') : 'open';
+  if (market === 'away') return finished ? (away > home ? 'won' : 'bust') : 'open';
+  if (market === 'draw') return finished ? (home === away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-1x') return finished ? (home >= away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-12') return finished ? (home !== away ? 'won' : 'bust') : 'open';
+  if (market === 'dc-x2') return finished ? (away >= home ? 'won' : 'bust') : 'open';
+  if (market === 'dnb-home') {
+    if (!finished) return 'open';
+    if (home > away) return 'won';
+    if (away > home) return 'bust';
+    return 'open';
+  }
+  if (market === 'dnb-away') {
+    if (!finished) return 'open';
+    if (away > home) return 'won';
+    if (home > away) return 'bust';
+    return 'open';
+  }
+  return scored > 0 && finished ? 'won' : 'open';
+}
+
+function oddsOf(device, trendId) {
+  const row = (device.bookings || []).find((item) => item.id === trendId);
+  if (!row || row.odds == null) return null;
+  const value = Number(row.odds);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function trendNotes(previous, next, device) {
+  const prior = new Map((previous || []).map((match) => [match.id, match]));
+  const notes = [];
+  for (const trendId of device.trends || []) {
+    const id = String(trendId || '');
+    const cut = id.lastIndexOf(':');
+    if (cut <= 0) continue;
+    const matchId = id.slice(0, cut);
+    const market = id.slice(cut + 1);
+    const label = TREND_LABELS[market];
+    if (!label) continue;
+    const match = (next || []).find((item) => item.id === matchId);
+    const before = prior.get(matchId);
+    if (!match || !before) continue;
+    if (settleTrend(market, before) === 'won') continue;
+    if (settleTrend(market, match) !== 'won') continue;
+    const odds = oddsOf(device, id);
+    if (odds != null && odds < MIN_ODDS) continue;
+    notes.push({
+      id: `trend:${id}:hit`,
+      matchId,
+      kind: 'win',
+      title: `Trend hit · ${label}`,
+      body: `${match.home} vs ${match.away} · ${label}`,
+      match,
+    });
+  }
+  return notes;
+}
+
 export function acceptDevice(body) {
   const token = typeof body?.token === 'string' ? body.token.trim() : '';
   if (token.length < 20 || /\s/.test(token)) return { error: 'A device token is required.' };
@@ -238,12 +417,22 @@ export function acceptDevice(body) {
         .slice(0, 200)
     : [];
   const trends = Array.isArray(body.trends) ? body.trends.filter((id) => typeof id === 'string').slice(0, 200) : [];
+  const bookings = Array.isArray(body.bookings)
+    ? body.bookings
+        .filter((row) => row && typeof row.id === 'string')
+        .map((row) => {
+          const odds = Number(row.odds);
+          return { id: row.id.slice(0, 120), odds: Number.isFinite(odds) ? odds : null };
+        })
+        .slice(0, 200)
+    : [];
   const settings = body.settings && typeof body.settings === 'object' ? body.settings : {};
   return {
     device: {
       token,
       follows: { matches, teams },
       trends,
+      bookings,
       settings: {
         kickoff: settings.kickoff !== false,
         goal: settings.goal !== false,
@@ -346,9 +535,45 @@ export async function sendMessage(account, payload) {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (response.status === 404 || response.status === 410) return { dropped: true };
-  if (!response.ok) throw new Error(`FCM returned ${response.status}`);
-  return { dropped: false };
+  const text = await response.text();
+  let body = {};
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { error: { message: 'FCM response was not JSON' } };
+  }
+  if (response.status === 404 || response.status === 410) return { dropped: true, ok: false, status: response.status, body };
+  if (!response.ok) {
+    const error = new Error(`FCM returned ${response.status}`);
+    error.fcm = publicFcm(body);
+    throw error;
+  }
+  return { dropped: false, ok: true, status: response.status, body };
+}
+
+export async function sendTestPush(book, body, log = (message) => console.log(message)) {
+  const account = serviceAccount();
+  if (!fcmConfigured()) return { status: 503, error: 'FCM is not configured.' };
+  let token = typeof body?.token === 'string' ? body.token.trim() : '';
+  if (!token && body?.latest) token = book.list()[0]?.token || '';
+  if (token.length < 20 || /\s/.test(token)) return { status: 400, error: 'A device token is required.' };
+  const note = {
+    id: `test:push:${Date.now()}`,
+    matchId: '',
+    kind: 'goal',
+    title: 'Betspapa',
+    body: 'Push is on.',
+  };
+  try {
+    const result = await sendMessage(account, messageFor(note, { token, settings: { goalSound: 'crowd' } }));
+    const fcm = publicFcm(result.body);
+    log(`[push] FCM response ${result.status} ${JSON.stringify(fcm)}`);
+    return { status: 200, fcm };
+  } catch (error) {
+    const fcm = error && error.fcm ? error.fcm : null;
+    log(`[push] FCM response failed ${error instanceof Error ? error.message : error}${fcm ? ` ${JSON.stringify(fcm)}` : ''}`);
+    return { status: 502, error: error instanceof Error ? error.message : 'FCM request failed', fcm };
+  }
 }
 
 export function startPushWatch(options = {}) {
@@ -358,13 +583,18 @@ export function startPushWatch(options = {}) {
   const intervalMs = options.intervalMs ?? 25_000;
   let baseline = null;
   let warned = false;
+  let announced = false;
   let timer = null;
 
   async function tick() {
     const account = serviceAccount();
-    if (!account && !warned) {
+    if (!fcmConfigured() && !warned) {
       warned = true;
       log('FCM service account is not set. Devices can register. Nothing is pushed.');
+    }
+    if (fcmConfigured() && !announced) {
+      announced = true;
+      log(`FCM HTTP v1 is on for project ${account.project_id}.`);
     }
     let payload;
     try {
@@ -388,17 +618,22 @@ export function startPushWatch(options = {}) {
       return;
     }
     const notes = diffMatches(baseline, matches);
+    const previous = baseline;
     baseline = matches;
-    if (!notes.length || !account) return;
+    if (!fcmConfigured()) return;
     for (const device of book.list()) {
-      for (const item of notesForDevice(notes, device)) {
+      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
+      for (const item of mine) {
         if (book.alreadySent(device.token, item.id)) continue;
         try {
           const result = await sendMessage(account, messageFor(item, device));
+          const fcm = publicFcm(result.body);
+          log(`FCM response ${result.status} ${JSON.stringify(fcm)}`);
           if (result.dropped) book.drop(device.token);
           else book.remember(device.token, item.id);
         } catch (error) {
-          log(`Push failed: ${error instanceof Error ? error.message : error}`);
+          const fcm = error && error.fcm ? ` ${JSON.stringify(error.fcm)}` : '';
+          log(`Push failed: ${error instanceof Error ? error.message : error}${fcm}`);
         }
       }
     }

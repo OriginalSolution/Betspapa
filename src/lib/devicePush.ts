@@ -10,6 +10,7 @@ export type DeviceRegistration = {
   token: string;
   follows: Follows;
   trends: string[];
+  bookings: Array<{ id: string; odds: number }>;
   settings: Pick<
     Settings,
     'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound'
@@ -19,7 +20,11 @@ export type DeviceRegistration = {
 /** Registers the FCM token. A build without google-services.json has no token and this is a no-op. */
 export async function syncPushDevice(body: Omit<DeviceRegistration, 'token'>): Promise<boolean> {
   if (!isNativeApp()) return false;
-  const push = await readPushToken();
+  let push = await readPushToken();
+  for (let attempt = 0; push.enabled && !push.token && attempt < 8; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    push = await readPushToken();
+  }
   if (!push.enabled || !push.token) return false;
   const payload: DeviceRegistration = { token: push.token, ...body };
   try {
