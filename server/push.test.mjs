@@ -77,10 +77,19 @@ test('a device only hears followed matches and the message is high priority', ()
   ];
   const mine = notesForDevice(notes, accepted.device);
   assert.equal(mine.length, 1);
-  const message = messageFor(mine[0], accepted.device);
+  const message = messageFor({
+    ...mine[0],
+    match: { id: 'sr:match:1', home: 'Hearts', away: 'Kotoko', homeScore: 1, awayScore: 0, minute: 12, status: 'live' },
+  }, accepted.device);
   assert.equal(message.message.android.priority, 'HIGH');
-  assert.equal(message.message.android.notification.channel_id, 'betspapa.goal.horn.v4');
-  assert.equal(message.message.android.notification.tag, 'sr:match:1:goal:home:1');
+  assert.equal(message.message.android.ttl, '120s');
+  assert.equal(message.message.notification, undefined);
+  assert.equal(message.message.android.notification, undefined);
+  assert.equal(message.message.data.channel, 'betspapa.goal.horn.v4');
+  assert.equal(message.message.data.id, 'sr:match:1:goal:home:1');
+  assert.equal(message.message.data.home, 'Hearts');
+  assert.equal(message.message.data.homeScore, '1');
+  assert.equal(message.message.data.minute, '12');
 });
 
 test('a match that appears in play is a kick-off, and a simulated row is ignored', () => {

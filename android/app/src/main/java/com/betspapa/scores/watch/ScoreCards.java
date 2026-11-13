@@ -177,6 +177,7 @@ final class ScoreCards {
         if (note != null && "ht".equals(note.kind)) return "HALF-TIME";
         if (note != null && "ft".equals(note.kind)) return "FULL-TIME";
         if (note != null && "red".equals(note.kind)) return "RED CARD";
+        if (note != null && "penalty".equals(note.kind)) return "PENALTY";
         if (match != null && "halftime".equals(match.status)) return "HALF-TIME";
         if (match != null && "finished".equals(match.status)) return "FULL-TIME";
         return mark.isEmpty() ? "LIVE" : "LIVE " + mark;
