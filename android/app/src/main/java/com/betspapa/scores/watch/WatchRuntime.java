@@ -86,12 +86,12 @@ final class WatchRuntime {
                 aboutToStart = hot && !inPlay(state, now);
                 goalSound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
             }
-            // The WebView is frozen when HiOS blanks the screen, even if the activity has not paused.
-            // Always post from this process. A second post uses the same id, so it updates instead of duplicating.
-            boolean quiet = WatchScheduler.isUiForeground() && screenInteractive(app);
-            String sound = quiet ? "off" : goalSound;
+            // HiOS freezes the WebView without pausing the activity, and it does the same
+            // when the user is in another app. Substituting "off" posted the alert on the
+            // silent channel, which is why the shade showed a goal with no cheer.
+            // The file's goalSound is what plays. The page does not also play a copy.
             for (WatchNote note : pending) {
-                if (!AlertPoster.post(app, note, sound)) continue;
+                if (!AlertPoster.post(app, note, goalSound)) continue;
                 synchronized (WatchState.FILE_LOCK) {
                     WatchState state = WatchState.load(WatchFiles.file(app));
                     state.markSent(note.id);
@@ -114,11 +114,6 @@ final class WatchRuntime {
             if (lock != null && lock.isHeld()) lock.release();
             BUSY.set(false);
         }
-    }
-
-    private static boolean screenInteractive(Context context) {
-        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        return power != null && power.isInteractive();
     }
 
     private static boolean mightWatch(WatchState state, List<WatchMatch> fixtures, long now) {

@@ -18,13 +18,22 @@ export const GOAL_NOTIFICATION_FILE: Record<PlayableGoalSound, string> = {
   papa: 'cheer_papa.ogg',
 };
 
-/** One notification channel per cheer. Keep these ids in step with AlertPoster. */
+/**
+ * One notification channel per cheer. v4 replaced the unversioned ids, which
+ * were created with a resource URI HiOS does not play. Keep these in step with AlertPoster.
+ */
 export function goalNotificationChannel(sound: GoalSound): string {
-  if (sound === 'afro') return 'betspapa.goal.afro';
-  if (sound === 'chant') return 'betspapa.goal.chant';
-  if (sound === 'papa') return 'betspapa.goal.papa';
-  if (sound === 'off') return 'betspapa.goal.off';
-  return 'betspapa.goal.crowd';
+  const name = sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'off' ? sound : 'crowd';
+  return `betspapa.goal.${name}.v4`;
+}
+
+/**
+ * On the phone, a granted browser alert plays through the notification channel
+ * even while the page is open. The WebView must not play a second copy.
+ * The preview button and the website still use the in-app player.
+ */
+export function shouldPlayInAppCheer(native: boolean, browserAlerts: boolean, permission: string): boolean {
+  return !(native && browserAlerts && permission === 'granted');
 }
 
 export const DEFAULT_GOAL_VOLUME = 60;

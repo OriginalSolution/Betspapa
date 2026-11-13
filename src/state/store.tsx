@@ -11,7 +11,7 @@ import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate } from '../lib/dates';
 import { isNativeApp } from '../lib/nativeHttp';
-import { playGoalSound } from '../lib/cheer';
+import { playGoalSound, shouldPlayInAppCheer } from '../lib/cheer';
 import { pushBrowserNotification, readNativePermission, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
 import { diffAlerts, type AlertSignal } from '../lib/signals';
 import {
@@ -542,7 +542,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const notified = match && spot.player ? { ...match, events: match.events.map((event) => (event.id === toast.id ? { ...event, player: spot.player } : event)) } : match;
       void pushBrowserNotification(toast, state.settings.goalSound, notified);
     }
-    if (goalSound) playGoalSound(goalSound, state.settings.goalVolume);
+    if (goalSound && shouldPlayInAppCheer(isNativeApp(), state.settings.browser, state.permission)) {
+      playGoalSound(goalSound, state.settings.goalVolume);
+    }
   }, [state.toasts, state.settings.browser, state.settings.goalSound, state.settings.goalVolume, state.permission]);
 
   const setDate = useCallback((date: string) => dispatch({ type: 'set-date', date }), []);

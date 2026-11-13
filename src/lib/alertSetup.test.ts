@@ -41,6 +41,10 @@ describe('alert setup version', () => {
     expect(parseSetupRecord('{"version":1,"finished":true}')).toEqual({ version: 1, finished: true });
     expect(parseSetupRecord('nope')).toBeNull();
     expect(nativeSetupIsCurrent(device({ setupVersion: 1, setupFinished: true }))).toBe(true);
+    expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).notificationSound).toBe('on');
+    expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).soundBlocked).toBe(true);
+    expect(parseDeviceStatus({}).notificationSound).toBe('off');
+    expect(emptyDeviceStatus().soundBlocked).toBe(false);
     expect(shouldShowIntro({ version: 1, finished: true }, false)).toBe(false);
     expect(shouldShowIntro(null, true)).toBe(false);
   });

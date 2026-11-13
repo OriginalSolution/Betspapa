@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Build;
 import androidx.core.app.NotificationCompat;
@@ -26,11 +27,25 @@ public final class AlertPoster {
     static final String WATCH = "betspapa.watch";
     /** Ongoing score cards. Default importance, no sound, so they stay in the main shade. */
     static final String SCORECARD = "betspapa.scorecard";
-    static final String GOAL_CROWD = "betspapa.goal.crowd";
-    static final String GOAL_AFRO = "betspapa.goal.afro";
-    static final String GOAL_CHANT = "betspapa.goal.chant";
-    static final String GOAL_PAPA = "betspapa.goal.papa";
-    static final String GOAL_OFF = "betspapa.goal.off";
+    /**
+     * v4 ids. A channel is immutable, and 0.3.x created these without a version
+     * using a numeric resource URI that HiOS will not play. New ids are the only
+     * way to attach the raw-name sound at HIGH importance.
+     */
+    static final String GOAL_CROWD = "betspapa.goal.crowd.v4";
+    static final String GOAL_AFRO = "betspapa.goal.afro.v4";
+    static final String GOAL_CHANT = "betspapa.goal.chant.v4";
+    static final String GOAL_PAPA = "betspapa.goal.papa.v4";
+    static final String GOAL_OFF = "betspapa.goal.off.v4";
+    private static final String CHANNELS_READY = "goal_channels_v4";
+    private static final String[] LEGACY_CHANNELS = {
+        "betspapa.goal.crowd",
+        "betspapa.goal.afro",
+        "betspapa.goal.chant",
+        "betspapa.goal.papa",
+        "betspapa.goal.off",
+        ALERTS
+    };
 
     private AlertPoster() {}
 
@@ -38,82 +53,132 @@ public final class AlertPoster {
         if (Build.VERSION.SDK_INT < 26) return;
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null) return;
-        NotificationChannel alerts = new NotificationChannel(ALERTS, context.getString(R.string.alert_channel), NotificationManager.IMPORTANCE_HIGH);
-        alerts.setDescription(context.getString(R.string.alert_channel_desc));
         NotificationChannel watch = new NotificationChannel(WATCH, context.getString(R.string.watch_channel), NotificationManager.IMPORTANCE_LOW);
         watch.setDescription(context.getString(R.string.watch_channel_desc));
         watch.setSound(null, null);
         watch.enableVibration(false);
-        manager.createNotificationChannel(alerts);
         manager.createNotificationChannel(watch);
         NotificationChannel scorecard = new NotificationChannel(SCORECARD, context.getString(R.string.scorecard_channel), NotificationManager.IMPORTANCE_DEFAULT);
         scorecard.setDescription(context.getString(R.string.scorecard_channel_desc));
         scorecard.setSound(null, null);
         scorecard.enableVibration(false);
         manager.createNotificationChannel(scorecard);
-        // v0.3.0 moved goals off betspapa.alerts. A channel created without its cheer,
-        // or deleted by the user, drops the post with no error. Refresh the four goal
-        // channels once on this version, then recreate any that are missing.
         SharedPreferences prefs = context.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE);
-        if (!prefs.getBoolean("goal_channels_v3", false)) {
+        boolean first = !prefs.getBoolean(CHANNELS_READY, false);
+        if (first) {
+            for (String legacy : LEGACY_CHANNELS) manager.deleteNotificationChannel(legacy);
+            // Drop a bad v4 channel too, in case a previous process created it before the sound was right.
             manager.deleteNotificationChannel(GOAL_CROWD);
             manager.deleteNotificationChannel(GOAL_AFRO);
             manager.deleteNotificationChannel(GOAL_CHANT);
+            manager.deleteNotificationChannel(GOAL_PAPA);
             manager.deleteNotificationChannel(GOAL_OFF);
-            prefs.edit().putBoolean("goal_channels_v3", true).apply();
         }
-        goalChannel(manager, context, GOAL_CROWD, R.string.goal_channel_crowd, R.raw.cheer_crowd);
-        goalChannel(manager, context, GOAL_AFRO, R.string.goal_channel_afro, R.raw.cheer_afro);
-        goalChannel(manager, context, GOAL_CHANT, R.string.goal_channel_chant, R.raw.cheer_chant);
-        goalChannel(manager, context, GOAL_PAPA, R.string.goal_channel_papa, R.raw.cheer_papa);
-        NotificationChannel silent = manager.getNotificationChannel(GOAL_OFF);
-        if (silent != null && silent.getSound() != null) manager.deleteNotificationChannel(GOAL_OFF);
-        silent = new NotificationChannel(GOAL_OFF, context.getString(R.string.goal_channel_off), NotificationManager.IMPORTANCE_HIGH);
+        goalChannel(manager, context, GOAL_CROWD, R.string.goal_channel_crowd, R.raw.cheer_crowd, first);
+        goalChannel(manager, context, GOAL_AFRO, R.string.goal_channel_afro, R.raw.cheer_afro, first);
+        goalChannel(manager, context, GOAL_CHANT, R.string.goal_channel_chant, R.raw.cheer_chant, first);
+        goalChannel(manager, context, GOAL_PAPA, R.string.goal_channel_papa, R.raw.cheer_papa, first);
+        silentChannel(manager, context, first);
+        if (first) prefs.edit().putBoolean(CHANNELS_READY, true).commit();
+    }
+
+    private static void goalChannel(NotificationManager manager, Context context, String id, int label, int raw, boolean replace) {
+        Uri expected = rawUri(context, raw);
+        NotificationChannel existing = manager.getNotificationChannel(id);
+        if (existing != null && !replace) return;
+        if (existing != null) manager.deleteNotificationChannel(id);
+        NotificationChannel channel = new NotificationChannel(id, context.getString(label), NotificationManager.IMPORTANCE_HIGH);
+        channel.setDescription(context.getString(R.string.goal_channel_desc));
+        channel.setSound(expected, notificationAudio());
+        channel.enableVibration(true);
+        channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+        manager.createNotificationChannel(channel);
+    }
+
+    private static void silentChannel(NotificationManager manager, Context context, boolean replace) {
+        NotificationChannel existing = manager.getNotificationChannel(GOAL_OFF);
+        if (existing != null && !replace) return;
+        if (existing != null) manager.deleteNotificationChannel(GOAL_OFF);
+        NotificationChannel silent = new NotificationChannel(GOAL_OFF, context.getString(R.string.goal_channel_off), NotificationManager.IMPORTANCE_HIGH);
         silent.setDescription(context.getString(R.string.goal_channel_desc));
         silent.setSound(null, null);
+        silent.enableVibration(false);
+        silent.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         manager.createNotificationChannel(silent);
     }
 
-    private static void goalChannel(NotificationManager manager, Context context, String id, int label, int raw) {
-        Uri expected = rawUri(context, raw);
-        NotificationChannel existing = manager.getNotificationChannel(id);
-        if (existing != null && existing.getSound() == null) {
-            manager.deleteNotificationChannel(id);
-            existing = null;
+    /** Crowd, Afrobeats, Chant, Papa Shout, or Off. Read from the file the watcher persists, not from the WebView. */
+    static String selectedSound(Context context) {
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        if (state.goalSound == null || state.goalSound.isEmpty()) return "crowd";
+        return state.goalSound;
+    }
+
+    /** True when the selected cheer can actually be heard. Off, a muted channel, or a silent ringer is false. */
+    static boolean notificationSoundOn(Context context) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
+        if ("off".equals(selectedSound(context))) return false;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            if (manager == null) return false;
+            NotificationChannel channel = manager.getNotificationChannel(channelFor("goal", selectedSound(context)));
+            if (channel == null || channel.getImportance() < NotificationManager.IMPORTANCE_DEFAULT || channel.getSound() == null) return false;
         }
-        NotificationChannel channel = existing != null
-            ? existing
-            : new NotificationChannel(id, context.getString(label), NotificationManager.IMPORTANCE_HIGH);
-        if (existing == null) {
-            channel.setDescription(context.getString(R.string.goal_channel_desc));
-            AudioAttributes audio = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-            channel.setSound(expected, audio);
-            manager.createNotificationChannel(channel);
-        }
+        return streamCanPlay(context);
+    }
+
+    /** The user picked a cheer, notifications are allowed, and the phone will still not play it. */
+    static boolean notificationSoundBlocked(Context context) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
+        if ("off".equals(selectedSound(context))) return false;
+        return !notificationSoundOn(context);
+    }
+
+    static String channelIdForSelected(Context context) {
+        return channelFor("goal", selectedSound(context));
+    }
+
+    private static boolean streamCanPlay(Context context) {
+        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (audio == null) return true;
+        int ringer = audio.getRingerMode();
+        if (ringer == AudioManager.RINGER_MODE_SILENT || ringer == AudioManager.RINGER_MODE_VIBRATE) return false;
+        return audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION) > 0;
+    }
+
+    static boolean wantsSound(String kind, String goalSound, boolean disallowed) {
+        if (disallowed || "off".equals(goalSound)) return false;
+        if (kind == null || "var".equals(kind) || "live".equals(kind)) return false;
+        return true;
     }
 
     static String channelFor(String kind, String goalSound) {
-        if (!"goal".equals(kind)) return ALERTS;
+        if (!wantsSound(kind, goalSound, false)) return GOAL_OFF;
         if ("afro".equals(goalSound)) return GOAL_AFRO;
         if ("chant".equals(goalSound)) return GOAL_CHANT;
         if ("papa".equals(goalSound)) return GOAL_PAPA;
-        if ("off".equals(goalSound)) return GOAL_OFF;
         return GOAL_CROWD;
     }
 
     static Uri soundFor(Context context, String kind, String goalSound) {
-        if (!"goal".equals(kind) || "off".equals(goalSound)) return null;
+        if (!wantsSound(kind, goalSound, false)) return null;
         if ("afro".equals(goalSound)) return rawUri(context, R.raw.cheer_afro);
         if ("chant".equals(goalSound)) return rawUri(context, R.raw.cheer_chant);
         if ("papa".equals(goalSound)) return rawUri(context, R.raw.cheer_papa);
         return rawUri(context, R.raw.cheer_crowd);
     }
 
-    private static Uri rawUri(Context context, int raw) {
-        return Uri.parse("android.resource://" + context.getPackageName() + "/" + raw);
+    /** Name form. HiOS does not resolve android.resource://pkg/&lt;numeric id&gt;. */
+    static Uri rawUri(Context context, int raw) {
+        String name = context.getResources().getResourceEntryName(raw);
+        return Uri.parse("android.resource://" + context.getPackageName() + "/raw/" + name);
+    }
+
+    static AudioAttributes notificationAudio() {
+        return new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
     }
 
     static Notification watching(Context context, int liveCount, boolean aboutToStart) {
@@ -164,12 +229,15 @@ public final class AlertPoster {
         ensure(context);
         if (note == null) return false;
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
-        boolean goalChannel = "goal".equals(note.kind) || "var".equals(note.kind) || note.disallowed;
-        String channel = goalChannel ? channelFor("goal", goalSound) : channelFor(note.kind, goalSound);
+        boolean soundOn = wantsSound(note.kind, goalSound, note.disallowed);
+        String channel = channelFor(soundOn ? note.kind : "var", goalSound);
         int id = replaceId != 0 ? replaceId : AlertPlanner.notificationId(note.id);
         if ("goal".equals(note.kind) && replaceId == 0) {
             VarSlots.Slot slot = VarSlots.take(context, note.matchId);
             if (slot != null) {
+                // A VAR post is silent. Updating that same record keeps HiOS from playing the goal.
+                // Cancel it, then post the goal on the cheer channel as a new alert with the same id.
+                NotificationManagerCompat.from(context).cancel(slot.id);
                 id = slot.id;
                 if (slot.player != null && !slot.player.isEmpty()) note.player = slot.player;
                 if (note.minute == null) note.minute = slot.minute;
@@ -178,25 +246,32 @@ public final class AlertPoster {
         if ("var".equals(note.kind) && !note.disallowed && replaceId == 0) {
             VarSlots.remember(context, note.matchId, id, note.player, note.minute == null ? 0 : note.minute, note.id);
         }
-        boolean silent = note.disallowed || "var".equals(note.kind) || ("goal".equals(note.kind) && "off".equals(goalSound));
         WatchMatch match = findMatch(context, note.matchId);
         boolean dark = NotifTheme.dark(context, styleOf(context));
         NotificationCompat.Builder builder = base(context, channel, note.title, note.body)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(soundOn ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(!note.disallowed)
             .setCategory(Notification.CATEGORY_EVENT)
-            .setOnlyAlertOnce(onlyOnce || note.disallowed || "var".equals(note.kind))
+            .setOnlyAlertOnce(!soundOn || onlyOnce)
             .setGroup("betspapa-" + id)
+            // A grouped child with the platform default is muted on HiOS, which treats it as summary-only.
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setContentIntent(OpenMatch.forNote(context, note));
-        Uri sound = soundFor(context, "goal".equals(note.kind) ? "goal" : note.kind, goalSound);
-        if (silent || (sound == null && "goal".equals(note.kind))) builder.setSilent(true);
-        else if (sound != null && "goal".equals(note.kind)) builder.setSound(sound);
+        Uri sound = soundOn ? soundFor(context, note.kind, goalSound) : null;
+        if (sound == null) builder.setSilent(true);
         try {
             ScoreCards.attach(context, builder, note, match, dark);
         } catch (RuntimeException error) {
             builder.setStyle(new NotificationCompat.BigTextStyle().bigText(note.body));
         }
-        return notify(context, id, builder.build());
+        Notification notification = builder.build();
+        // Compat only has setSound(Uri, stream). Write the same URI and usage the channel uses
+        // so HiOS, which plays notification.sound, resolves raw/name instead of dropping it.
+        if (sound != null) {
+            notification.sound = sound;
+            notification.audioAttributes = notificationAudio();
+        }
+        return notify(context, id, notification);
     }
 
     /** Ongoing score card. Same id per match. Score-unchanged updates do not alert again. */

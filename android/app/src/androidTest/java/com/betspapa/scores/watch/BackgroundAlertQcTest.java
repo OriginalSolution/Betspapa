@@ -211,11 +211,12 @@ public class BackgroundAlertQcTest {
         assertTrue("notification permission did not show as allowed", waitForJs(activity, "(function(){var row=[].slice.call(document.querySelectorAll('.stat')).find(function(el){return el.textContent.indexOf('Notification permission')>=0;}); if(!row) return false; return row.textContent.indexOf('Not allowed')<0 && row.textContent.indexOf('Allowed')>=0;})()", 15000));
         assertTrue(waitForPage(activity, "Optimized", 8000));
         assertTrue(waitForPage(activity, "Allow background activity", 8000));
-        assertTrue(waitForPage(activity, "Send test background notification", 8000));
+        assertTrue(waitForPage(activity, "Notification sound", 8000));
+        assertTrue(waitForPage(activity, "Play test sound", 8000));
         js(activity, "(function(){var node=[].slice.call(document.querySelectorAll('span')).find(function(el){return el.textContent==='Notification permission';}); if(node) node.scrollIntoView({block:'center'}); return true;})()");
         Thread.sleep(800);
         shot(device, target, "settings-notifications");
-        assertTrue(js(activity, "(function(){var button=[].slice.call(document.querySelectorAll('button')).find(function(el){return el.textContent.indexOf('Send test background notification')>=0;}); if(!button) return false; button.click(); return true;})()"));
+        assertTrue(js(activity, "(function(){var button=[].slice.call(document.querySelectorAll('button')).find(function(el){return el.textContent.indexOf('Play test sound')>=0;}); if(!button) return false; button.click(); return true;})()"));
         assertTrue(waitForPage(activity, "about 10 seconds", 8000));
         device.pressHome();
         Thread.sleep(12000);
@@ -284,7 +285,7 @@ public class BackgroundAlertQcTest {
         assertTrue(waitForPage(activity, "Test it", 8000));
         shot(device, target, "setup-test");
 
-        assertTrue(clickText(activity, "Send test notification"));
+        assertTrue(clickText(activity, "Play test sound"));
         assertTrue(waitForPage(activity, "Leave Betspapa", 8000));
         shot(device, target, "setup-leave-app");
         device.pressHome();
