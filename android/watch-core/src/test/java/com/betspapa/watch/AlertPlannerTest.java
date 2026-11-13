@@ -5,6 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -469,6 +471,23 @@ public class AlertPlannerTest {
         priced.put("odds", "1.20");
         state.merge(new JSONObject().put("bookings", new JSONArray().put(priced)));
         assertTrue(kinds(AlertPlanner.notices(state.matches, state, KICK + 1000L)).contains("win"));
+    }
+
+    @Test
+    public void emptyOrBrokenWatchFileLoadsAsAFreshState() throws Exception {
+        File empty = File.createTempFile("watch-empty", ".json");
+        new FileOutputStream(empty).close();
+        WatchState blank = WatchState.load(empty);
+        assertEquals(0, blank.matches.size());
+        assertEquals(0L, blank.lastPollAt);
+
+        File broken = File.createTempFile("watch-broken", ".json");
+        FileOutputStream output = new FileOutputStream(broken);
+        output.write("{".getBytes("UTF-8"));
+        output.close();
+        WatchState fresh = WatchState.load(broken);
+        assertEquals(0, fresh.matches.size());
+        assertEquals(0L, fresh.lastPollAt);
     }
 
     private static WatchMatch ghana() {

@@ -344,8 +344,11 @@ public final class WatchState {
                 byte[] chunk = new byte[4096];
                 int count;
                 while ((count = input.read(chunk)) != -1) buffer.write(chunk, 0, count);
-                return fromJson(new JSONObject(new String(buffer.toByteArray(), "UTF-8")));
-            } catch (RuntimeException | IOException error) {
+                String text = new String(buffer.toByteArray(), "UTF-8").trim();
+                if (text.isEmpty()) return new WatchState();
+                return fromJson(new JSONObject(text));
+            } catch (Exception error) {
+                // A truncated or empty file must not kill the process. Alerts start from a fresh state.
                 return new WatchState();
             } finally {
                 if (input != null) {
