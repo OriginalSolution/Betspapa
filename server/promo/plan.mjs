@@ -143,11 +143,8 @@ export function isBigFixture(event) {
   return /premier league|la liga|serie a|bundesliga|ligue 1|champions league|eredivisie|primeira/.test(text);
 }
 
-export function posterFrom(event, state, now = new Date()) {
-  if (!event?.eventId || !isBigFixture(event)) return null;
-  const kick = new Date(event.kickoff).getTime();
-  const delta = kick - now.getTime();
-  if (!Number.isFinite(delta) || delta < 2.75 * 3600_000 || delta > 3.25 * 3600_000) return null;
+export function posterCard(event, state) {
+  if (!event?.eventId) return null;
   const legs = [];
   for (const slip of [state?.master, ...(state?.trends || [])]) {
     for (const leg of legsOf(slip)) {
@@ -177,6 +174,14 @@ export function posterFrom(event, state, now = new Date()) {
     hit: pick.hit,
     codes: pick.codes,
   };
+}
+
+export function posterFrom(event, state, now = new Date()) {
+  if (!event?.eventId || !isBigFixture(event)) return null;
+  const kick = new Date(event.kickoff).getTime();
+  const delta = kick - now.getTime();
+  if (!Number.isFinite(delta) || delta < 2.75 * 3600_000 || delta > 3.25 * 3600_000) return null;
+  return posterCard(event, state);
 }
 
 export function bankersBetween(state, start, end) {
