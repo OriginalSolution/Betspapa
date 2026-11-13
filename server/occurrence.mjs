@@ -176,6 +176,61 @@ export function measureMarket(market, homeRows, awayRows) {
   return better(rateOf(venue(homeRows, 'home'), market.hit), rateOf(venue(awayRows, 'away'), market.hit));
 }
 
+function asSide(row, teamIsHome) {
+  return { ...row, teamIsHome };
+}
+
+/** Last five results, oldest on the left. Empty history stays null so the app can hide the strip. */
+export function lastForm(rows) {
+  const marks = [];
+  for (const row of rows || []) {
+    const score = scores(row);
+    if (!score) continue;
+    marks.push(score.team > score.opp ? 'W' : score.team < score.opp ? 'L' : 'D');
+    if (marks.length === 5) break;
+  }
+  if (!marks.length) return null;
+  return marks.reverse();
+}
+
+function formRowsFor(market, homeRows, awayRows) {
+  if (market.scope === 'home') return venue(homeRows, 'home');
+  if (market.scope === 'away') return venue(awayRows, 'away');
+  const homeList = market.scope === 'venue-either' ? venue(homeRows, 'home') : homeRows;
+  const awayList = market.scope === 'venue-either' ? venue(awayRows, 'away') : awayRows;
+  const homeRate = rateOf(homeList, market.hit);
+  const awayRate = rateOf(awayList, market.hit);
+  if (!homeRate) return awayList;
+  if (!awayRate) return homeList;
+  if (awayRate.rate > homeRate.rate + 1e-12) return awayList;
+  if (homeRate.rate > awayRate.rate + 1e-12) return homeList;
+  return awayRate.sample > homeRate.sample ? awayList : homeList;
+}
+
+/**
+ * Form is the backed side's real last five. The opponent check passes only when
+ * the other side's recent matches also clear 80% for this market. A short sample
+ * is null, which the app hides instead of inventing a chip.
+ */
+export function explainTip(market, homeRows, awayRows) {
+  const form = lastForm(formRowsFor(market, homeRows, awayRows));
+  let opponentHeld = null;
+  if (market.scope === 'home') {
+    const check = rateOf(venue(awayRows, 'away').map((row) => asSide(row, true)), market.hit);
+    if (check && check.rate + 1e-12 >= THRESHOLD) opponentHeld = true;
+  } else if (market.scope === 'away') {
+    const check = rateOf(venue(homeRows, 'home').map((row) => asSide(row, false)), market.hit);
+    if (check && check.rate + 1e-12 >= THRESHOLD) opponentHeld = true;
+  } else {
+    const homeList = market.scope === 'venue-either' ? venue(homeRows, 'home') : homeRows;
+    const awayList = market.scope === 'venue-either' ? venue(awayRows, 'away') : awayRows;
+    const homeRate = rateOf(homeList, market.hit);
+    const awayRate = rateOf(awayList, market.hit);
+    if (homeRate && awayRate && homeRate.rate + 1e-12 >= THRESHOLD && awayRate.rate + 1e-12 >= THRESHOLD) opponentHeld = true;
+  }
+  return { form, opponentHeld };
+}
+
 function rowsOf(histories, uid) {
   const rows = histories instanceof Map ? histories.get(uid) : histories?.[uid];
   return Array.isArray(rows) ? rows : [];
@@ -216,6 +271,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
         continue;
       }
+      const explained = explainTip(market, homeRows, awayRows);
       legs.push({
         eventId: String(event.eventId),
         market: market.id,
@@ -231,6 +287,8 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         hits: rate.hits,
         played: rate.sample,
         rate: rate.rate,
+        form: explained.form,
+        opponentHeld: explained.opponentHeld,
       });
     }
     if (measured.length) byEvent[String(event.eventId)] = measured;

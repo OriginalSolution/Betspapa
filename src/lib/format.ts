@@ -9,6 +9,28 @@ export function formatTime(iso: string): string {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
+/** Kickoff clock in Ghana, 24-hour. Empty when the timestamp is missing. */
+export function kickoffClock(iso: string): string {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Africa/Accra',
+  }).format(date);
+}
+
+/** Clock when the kickoff is today in Accra, otherwise the date and clock. */
+export function kickoffWhen(iso: string, today: string): string {
+  const clock = kickoffClock(iso);
+  if (!clock) return '';
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Accra', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+  if (day === today) return clock;
+  const label = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Africa/Accra' }).format(new Date(iso));
+  return `${label.replace(',', '')} · ${clock}`;
+}
+
 export function formatDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(

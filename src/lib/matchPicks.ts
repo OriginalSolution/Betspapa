@@ -1,6 +1,7 @@
 import { MARKETS } from '../data/board';
-import { marketLabel, type EngineLeg, type EngineState } from './engineSlips';
+import { marketLabel, type EngineLeg, type EngineState, type FormMark } from './engineSlips';
 import { publishableOdds } from './oddsFloor';
+import { isSimulatedFixture } from './simulated';
 import type { Match } from '../types';
 
 export type PickSort = 'confidence' | 'odds' | 'kickoff';
@@ -22,6 +23,10 @@ export type PickChip = {
   teamName: string;
   opponentId: string;
   opponentName: string;
+  /** Real last-five form from the engine. Null when the history was not sent. */
+  form: FormMark[] | null;
+  /** True when the engine's opponent-side check passed. */
+  opponentHeld: boolean;
 };
 
 export type MatchPickCard = {
@@ -106,6 +111,8 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
       teamName: team,
       opponentId: side === 'away' ? match?.home.id || slug(home) : match?.away.id || slug(away),
       opponentName: opponent,
+      form: leg.form?.length ? leg.form : null,
+      opponentHeld: leg.opponentHeld === true,
     });
   }
   return chips;
@@ -161,6 +168,109 @@ function sortCards(cards: MatchPickCard[], sort: PickSort): MatchPickCard[] {
   if (sort === 'odds') return copy.sort((a, b) => a.lowOdds - b.lowOdds || a.kickoff.localeCompare(b.kickoff));
   if (sort === 'kickoff') return copy.sort((a, b) => a.kickoff.localeCompare(b.kickoff) || b.confidence - a.confidence);
   return copy.sort((a, b) => b.confidence - a.confidence || a.kickoff.localeCompare(b.kickoff));
+}
+
+export type PickTip = {
+  chip: PickChip;
+  home: string;
+  away: string;
+  homeId: string;
+  awayId: string;
+  league: string;
+  competitionId: string;
+  kickoff: string;
+};
+
+const FILTER_LABEL: Record<string, string> = {
+  home: 'FT1',
+  draw: 'FTX',
+  away: 'FT2',
+  'dnb-home': 'DNB1',
+  'dnb-away': 'DNB2',
+  over05: 'O0.5',
+  over15: 'O1.5',
+  over25: 'O2.5',
+  over35: 'O3.5',
+  under15: 'U1.5',
+  under25: 'U2.5',
+  under35: 'U3.5',
+  btts: 'BTTS',
+  'btts-no': 'BTTS no',
+  'dc-1x': 'DC1X',
+  'dc-12': 'DC12',
+  'dc-x2': 'DCX2',
+  'home-over15': 'H O1.5',
+  'away-over15': 'A O1.5',
+  'home-under15': 'H U1.5',
+  'away-under15': 'A U1.5',
+  'home-score': 'H score',
+  'away-score': 'A score',
+  'home-clean': 'H clean',
+  'away-clean': 'A clean',
+  'fh-home': 'FH1',
+  'fh-draw': 'FHX',
+  'fh-away': 'FH2',
+  'fh-over05': 'FH O0.5',
+  'fh-over15': 'FH O1.5',
+};
+
+const FILTER_ORDER = ['over15', 'home', 'dnb-home', 'over25', 'btts-no', 'away', 'btts', 'dnb-away', 'over05', 'over35', 'under25', 'dc-1x', 'dc-12', 'dc-x2', 'home-score', 'away-score'];
+
+export function marketFilterLabel(market: string): string {
+  return FILTER_LABEL[market] || chipLabel(market).short;
+}
+
+function realFixture(card: MatchPickCard, match: Match | undefined): boolean {
+  if (match?.feed === 'demo') return false;
+  return !isSimulatedFixture({
+    country: match?.competition.area,
+    tournament: match?.competition.name || card.league,
+    home: card.home,
+    away: card.away,
+  });
+}
+
+/** One row per 80%+ tip, highest confidence first. Prices under 1.20 never appear. */
+export function tipsFromEngine(state: EngineState | null, matches: Match[]): PickTip[] {
+  const board = new Map(matches.map((match) => [match.id, match]));
+  const tips: PickTip[] = [];
+  for (const card of cardsFromEngine(state, matches, 'confidence')) {
+    const match = board.get(card.eventId);
+    if (!realFixture(card, match)) continue;
+    for (const chip of card.chips) {
+      if (!publishableOdds(chip.odds) || chip.rate == null || chip.rate + 1e-12 < 0.8) continue;
+      tips.push({
+        chip,
+        home: card.home,
+        away: card.away,
+        homeId: card.homeId,
+        awayId: card.awayId,
+        league: card.league,
+        competitionId: card.competitionId,
+        kickoff: card.kickoff,
+      });
+    }
+  }
+  return tips.sort(
+    (a, b) =>
+      (b.chip.rate ?? 0) - (a.chip.rate ?? 0) ||
+      a.kickoff.localeCompare(b.kickoff) ||
+      b.chip.odds - a.chip.odds ||
+      a.chip.market.localeCompare(b.chip.market),
+  );
+}
+
+export function marketFilters(tips: PickTip[]): Array<{ id: string; label: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const tip of tips) counts.set(tip.chip.market, (counts.get(tip.chip.market) || 0) + 1);
+  return [...counts.entries()]
+    .map(([id, count]) => ({ id, label: marketFilterLabel(id), count }))
+    .sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      const ai = FILTER_ORDER.indexOf(a.id);
+      const bi = FILTER_ORDER.indexOf(b.id);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || a.label.localeCompare(b.label);
+    });
 }
 
 export function combinedOdds(chips: PickChip[]): number | null {
