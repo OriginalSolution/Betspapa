@@ -54,3 +54,9 @@ Papa Shout recorded by the Betspapa owner, used with permission.
 About 3.0 s, 48 kHz stereo, peak near −8 dBFS, loudness-matched to
 the other cheers. The phone notification uses the Ogg file. In-app
 Preview plays the MP3 at the volume slider.
+
+goal-horn, goal-arp, red-card, var-check, penalty
+-------------------------------------------------
+Original CC0 stings. See docs/sfx-LICENSE.md. Horn is a stadium
+fanfare. Arpeggio is a bright rising line. Red card, VAR, and
+penalty each have their own Android notification channel.

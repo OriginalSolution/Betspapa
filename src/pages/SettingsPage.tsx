@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useAlertSetup } from '../components/AlertSetup';
-import { playGoalSound } from '../lib/cheer';
+import { playEventSound, playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
 import { openNotificationSound, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
 import { useStore } from '../state/store';
 
-const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'browser'; label: string; detail: string }> = [
+const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'browser'; label: string; detail: string }> = [
   { key: 'kickoff', label: 'Kick-off', detail: 'When a followed match starts, including if you open the app after kick-off' },
-  { key: 'goal', label: 'Goals', detail: 'Including penalties and own goals' },
+  { key: 'goal', label: 'Goals', detail: 'Including own goals. A scored penalty also uses the penalty sound' },
   { key: 'red', label: 'Red cards', detail: 'Straight reds and second yellows' },
+  { key: 'penalty', label: 'Penalties', detail: 'When a penalty is awarded or scored for a followed match' },
   { key: 'ht', label: 'Half-time', detail: 'The break, and the score at the break' },
   { key: 'ft', label: 'Full-time', detail: 'The final score' },
   { key: 'var', label: 'VAR reviews', detail: 'Tell me a goal is being checked, before it counts' },
@@ -47,6 +48,36 @@ export function SettingsPage() {
           volume={settings.goalVolume}
           onChange={(value) => setSetting('goalSound', value)}
           onVolume={(value) => setSetting('goalVolume', value)}
+        />
+        <EventSoundSetting
+          label="Red card sound"
+          detail="Pea whistle and a short brass stab. Off still posts the alert, with no sound."
+          on={settings.redSound}
+          onToggle={(value) => setSetting('redSound', value)}
+          onTest={() => {
+            playEventSound('red');
+            void scheduleBackgroundTest({ kind: 'red' });
+          }}
+        />
+        <EventSoundSetting
+          label="VAR sound"
+          detail="A suspense build for a goal that is being checked."
+          on={settings.varSound}
+          onToggle={(value) => setSetting('varSound', value)}
+          onTest={() => {
+            playEventSound('var');
+            void scheduleBackgroundTest({ kind: 'var' });
+          }}
+        />
+        <EventSoundSetting
+          label="Penalty sound"
+          detail="Two referee tweets and a punch. Used when a penalty is awarded or scored."
+          on={settings.penaltySound}
+          onToggle={(value) => setSetting('penaltySound', value)}
+          onTest={() => {
+            playEventSound('penalty');
+            void scheduleBackgroundTest({ kind: 'penalty' });
+          }}
         />
         {toggles.map((toggle) => (
           <div className="setting" key={toggle.key}>
@@ -127,6 +158,8 @@ const goalSounds: Array<{ id: GoalSound; label: string }> = [
   { id: 'afro', label: 'Afrobeats' },
   { id: 'chant', label: 'Chant' },
   { id: 'papa', label: 'Papa Shout' },
+  { id: 'horn', label: 'Horn' },
+  { id: 'arp', label: 'Arpeggio' },
   { id: 'off', label: 'Off' },
 ];
 
@@ -145,11 +178,11 @@ function GoalSoundSetting({
   return (
     <div className="setting cheer-setting">
       <div>
-        <strong>Goal sound</strong>
-        <span>Crowd is the stadium roar. Afrobeats is the Ghana celebration. Chant is the GOAL! call. Papa Shout is the owner’s own shout. Off keeps the cheer silent. The slider is the in-app level. A phone notification uses the same sound at the system volume.</span>
+        <strong>Notification sound</strong>
+        <span>Crowd, Afrobeats, Chant, Papa Shout, Horn, or Arpeggio. Horn is a stadium fanfare. Arpeggio is a bright rising line. Off keeps the goal cheer silent. The slider is the in-app level. A phone notification uses the same sound at the system volume.</span>
       </div>
       <div className="setting-controls">
-        <div className="chips sound-choices" role="radiogroup" aria-label="Goal sound">
+          <div className="chips sound-choices" role="radiogroup" aria-label="Notification sound">
           {goalSounds.map((option) => (
             <button
               key={option.id}
@@ -241,7 +274,46 @@ function StylePreview({ mode }: { mode: 'dark' | 'light' }) {
   );
 }
 
+function EventSoundSetting({
+  label,
+  detail,
+  on,
+  onToggle,
+  onTest,
+}: {
+  label: string;
+  detail: string;
+  on: boolean;
+  onToggle: (value: boolean) => void;
+  onTest: () => void;
+}) {
+  const [testing, setTesting] = useState(false);
+  return (
+    <div className="setting">
+      <div>
+        <strong>{label}</strong>
+        <span>{detail}</span>
+      </div>
+      <div className="setting-controls">
+        <button
+          type="button"
+          className="btn btn-quiet btn-tiny"
+          onClick={() => {
+            onTest();
+            setTesting(true);
+            window.setTimeout(() => setTesting(false), 2500);
+          }}
+        >
+          {testing ? 'Playing' : 'Test'}
+        </button>
+        <Switch on={on} label={label} onChange={onToggle} />
+      </div>
+    </div>
+  );
+}
+
 function AndroidWatchStatus() {
+  const { settings } = useStore();
   const { status, applyStatus, refresh, startAgain } = useAlertSetup();
   const [testNote, setTestNote] = useState(false);
   if (!status) return <p className="lede">Checking notification access.</p>;
@@ -329,7 +401,7 @@ function AndroidWatchStatus() {
         type="button"
         className="btn"
         onClick={() => {
-          void scheduleBackgroundTest().then((ok) => setTestNote(ok));
+          void scheduleBackgroundTest({ kind: 'goal', goalSound: settings.goalSound }).then((ok) => setTestNote(ok));
         }}
       >
         Play test sound

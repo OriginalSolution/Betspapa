@@ -5,8 +5,11 @@ import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
 import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
+import { startPushWatch } from './push.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
+const pushWatch = startPushWatch();
+const pushBook = pushWatch.book;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
 const port = Number(process.env.PORT) || 8787;
@@ -99,6 +102,40 @@ async function handleApi(req, res, url) {
       send(res, 200, submitBooking(body.legs));
     } catch (error) {
       send(res, 400, { error: error.message || 'Invalid booking request' });
+    }
+    return;
+  }
+  if (url.pathname === '/api/devices') {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+      });
+      res.end();
+      return;
+    }
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    try {
+      const body = await readJson(req);
+      const result = pushBook.register(body);
+      if (result.error) {
+        send(res, 400, { error: result.error });
+        return;
+      }
+      const data = JSON.stringify(result);
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': '*',
+        'Content-Length': Buffer.byteLength(data),
+      });
+      res.end(data);
+    } catch (error) {
+      send(res, 400, { error: error.message || 'Invalid device registration' });
     }
     return;
   }
@@ -293,4 +330,5 @@ server.listen(port, '0.0.0.0', () => {
     .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
     .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
   startEngine();
+  pushWatch.start();
 });

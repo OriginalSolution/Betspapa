@@ -49,7 +49,7 @@ export function saveFollows(follows: Follows) {
 /** Old Cheer becomes Crowd. Old Latin chant stays Chant. Off stays Off. */
 export function migrateGoalSound(raw: { goalSound?: unknown; cheer?: unknown }): Settings['goalSound'] {
   const sound = raw.goalSound;
-  if (sound === 'crowd' || sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'off') return sound;
+  if (sound === 'crowd' || sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'horn' || sound === 'arp' || sound === 'off') return sound;
   if (sound === 'cheer') return 'crowd';
   if (raw.cheer === false) return 'off';
   return 'crowd';

@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { cardsFromEngine, combinedOdds, hitRate } from './matchPicks';
+import type { EngineState } from './engineSlips';
+import type { Match } from '../types';
+
+function state(): EngineState {
+  return {
+    updatedAt: '2026-11-13T12:00:00.000Z',
+    master: null,
+    trends: [
+      {
+        id: '80:home',
+        label: '80%+ Full-time home win',
+        market: 'home',
+        legCount: 3,
+        legs: [
+          { eventId: 'sr:match:1', market: 'home', match: 'AL Peshmerga vs Al-Qasim SC', kickoff: '2026-11-13T18:00:00.000Z', odds: 1.01, occurrence: 90, sample: '9/10' },
+          { eventId: 'sr:match:2', market: 'home', match: 'Alpha vs Beta', kickoff: '2026-11-13T16:00:00.000Z', odds: 1.04, occurrence: 80, sample: '8/10' },
+          { eventId: 'sr:match:3', market: 'home', match: 'Hearts vs Kotoko', kickoff: '2026-11-13T15:00:00.000Z', odds: 1.2, occurrence: 80, sample: '8/10' },
+        ],
+        sameAsMaster: false,
+        bookedAt: null,
+        books: {},
+      },
+      {
+        id: '80:over15',
+        label: '80%+ Over 1.5',
+        market: 'over15',
+        legCount: 1,
+        legs: [
+          { eventId: 'sr:match:3', market: 'over15', match: 'Hearts vs Kotoko', kickoff: '2026-11-13T15:00:00.000Z', odds: 1.55, occurrence: 100, sample: '10/10' },
+        ],
+        sameAsMaster: false,
+        bookedAt: null,
+        books: {},
+      },
+    ],
+  };
+}
+
+const board: Match[] = [
+  {
+    id: 'sr:match:3',
+    competition: { id: 'gha', name: 'Premier League', area: 'Ghana', code: 'GHA', priority: 4 },
+    utcDate: '2026-11-13T15:00:00.000Z',
+    status: 'scheduled',
+    minute: null,
+    injuryTime: null,
+    home: { id: 'hearts', name: 'Hearts of Oak', shortName: 'Hearts', abbr: 'HOO', color: '#e11d2e' },
+    away: { id: 'kotoko', name: 'Asante Kotoko', shortName: 'Kotoko', abbr: 'AK', color: '#f5c518' },
+    homeScore: null,
+    awayScore: null,
+    htHome: null,
+    htAway: null,
+    events: [],
+    venue: null,
+    feed: 'sporty',
+  },
+];
+
+describe('match-first picks', () => {
+  it('drops 1.01 and 1.04 and keeps 1.20 with the engine hit rate', () => {
+    expect(hitRate(80, '8/10')).toBe(0.8);
+    expect(hitRate(null, null)).toBeNull();
+    const cards = cardsFromEngine(state(), board, 'kickoff');
+    const prices = cards.flatMap((card) => card.chips.map((chip) => chip.odds));
+    expect(prices.every((odds) => odds >= 1.2)).toBe(true);
+    expect(prices).not.toContain(1.01);
+    expect(prices).not.toContain(1.04);
+    expect(cards.map((card) => card.eventId)).toEqual(['sr:match:3']);
+    expect(cards[0]?.league).toBe('Premier League');
+    expect(cards[0]?.chips.map((chip) => chip.sample)).toEqual(['10/10', '8/10']);
+    expect(cards[0]?.chips.every((chip) => chip.rate !== 1 / chip.odds)).toBe(true);
+    expect(cardsFromEngine(state(), board, 'confidence')[0]?.chips[0]?.market).toBe('over15');
+    expect(combinedOdds(cards[0]?.chips || [])).toBe(1.86);
+  });
+});

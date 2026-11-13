@@ -19,9 +19,14 @@ public final class WatchState {
     public boolean browser;
     public boolean kickoff = true;
     public boolean goal = true;
+    public boolean redOn = true;
+    public boolean penaltyOn = true;
     public boolean ht = true;
     public boolean ft = true;
     public boolean varOn = true;
+    public boolean redSound = true;
+    public boolean varSound = true;
+    public boolean penaltySound = true;
     public String goalSound = "crowd";
     /** auto follows the phone night mode. dark is the Red Ticker. light is the white score panel. */
     public String notificationStyle = "auto";
@@ -78,6 +83,8 @@ public final class WatchState {
     public boolean allows(String kind) {
         if ("kickoff".equals(kind)) return kickoff;
         if ("goal".equals(kind)) return goal;
+        if ("red".equals(kind)) return redOn;
+        if ("penalty".equals(kind)) return penaltyOn;
         if ("ht".equals(kind)) return ht;
         if ("ft".equals(kind)) return ft;
         if ("var".equals(kind)) return varOn;
@@ -168,9 +175,14 @@ public final class WatchState {
         if (settings != null) {
             if (settings.has("kickoff")) kickoff = settings.optBoolean("kickoff", true);
             if (settings.has("goal")) goal = settings.optBoolean("goal", true);
+            if (settings.has("red")) redOn = settings.optBoolean("red", true);
+            if (settings.has("penalty")) penaltyOn = settings.optBoolean("penalty", true);
             if (settings.has("ht")) ht = settings.optBoolean("ht", true);
             if (settings.has("ft")) ft = settings.optBoolean("ft", true);
             if (settings.has("var")) varOn = settings.optBoolean("var", true);
+            if (settings.has("redSound")) redSound = settings.optBoolean("redSound", true);
+            if (settings.has("varSound")) varSound = settings.optBoolean("varSound", true);
+            if (settings.has("penaltySound")) penaltySound = settings.optBoolean("penaltySound", true);
             if (settings.has("goalSound")) {
                 String normalized = normalizeGoalSound(settings.optString("goalSound", ""));
                 if (normalized != null) goalSound = normalized;
@@ -284,9 +296,14 @@ public final class WatchState {
         JSONObject settings = new JSONObject();
         settings.put("kickoff", kickoff);
         settings.put("goal", goal);
+        settings.put("red", redOn);
+        settings.put("penalty", penaltyOn);
         settings.put("ht", ht);
         settings.put("ft", ft);
         settings.put("var", varOn);
+        settings.put("redSound", redSound);
+        settings.put("varSound", varSound);
+        settings.put("penaltySound", penaltySound);
         settings.put("goalSound", goalSound == null ? "crowd" : goalSound);
         settings.put("notificationStyle", notificationStyle == null ? "auto" : notificationStyle);
         json.put("settings", settings);
@@ -516,7 +533,7 @@ public final class WatchState {
     }
 
     static String normalizeGoalSound(String value) {
-        if ("crowd".equals(value) || "afro".equals(value) || "chant".equals(value) || "papa".equals(value) || "off".equals(value)) return value;
+        if ("crowd".equals(value) || "afro".equals(value) || "chant".equals(value) || "papa".equals(value) || "horn".equals(value) || "arp".equals(value) || "off".equals(value)) return value;
         if ("cheer".equals(value)) return "crowd";
         return null;
     }

@@ -29,6 +29,12 @@ function emptyState() {
   };
 }
 
+function scrubShort(slip) {
+  if (!slip || !Array.isArray(slip.legs)) return slip || null;
+  const legs = slip.legs.filter((leg) => Number(leg.odds) >= 1.2);
+  return { ...slip, legs, legCount: legs.length };
+}
+
 function publicState(state) {
   return {
     updatedAt: state.updatedAt,
@@ -38,8 +44,8 @@ function publicState(state) {
     legCount: state.master?.legCount ?? state.legs.length,
     settlement: state.settlement,
     books: state.books,
-    master: state.master || null,
-    trends: state.trends || [],
+    master: scrubShort(state.master),
+    trends: (state.trends || []).map(scrubShort),
     issues: state.issues,
   };
 }

@@ -1,4 +1,4 @@
-import type { GoalSound } from '../types';
+import type { EventSound, GoalSound } from '../types';
 
 export type PlayableGoalSound = Exclude<GoalSound, 'off'>;
 
@@ -8,6 +8,8 @@ export const GOAL_SOUND_URL: Record<PlayableGoalSound, string> = {
   afro: '/sounds/cheer-afro.mp3',
   chant: '/sounds/cheer-chant.mp3',
   papa: '/sounds/cheer-papa.mp3',
+  horn: '/sounds/goal-horn.ogg',
+  arp: '/sounds/goal-arp.ogg',
 };
 
 /** Android res/raw file, including the extension Capacitor expects on API 24–25. */
@@ -16,14 +18,35 @@ export const GOAL_NOTIFICATION_FILE: Record<PlayableGoalSound, string> = {
   afro: 'cheer_afro.mp3',
   chant: 'cheer_chant.mp3',
   papa: 'cheer_papa.ogg',
+  horn: 'goal_horn.ogg',
+  arp: 'goal_arp.ogg',
 };
+
+/** Dedicated stings. Licence: docs/sfx-LICENSE.md (CC0). */
+export const EVENT_SOUND_URL: Record<EventSound, string> = {
+  red: '/sounds/red-card.ogg',
+  var: '/sounds/var-check.ogg',
+  penalty: '/sounds/penalty.ogg',
+};
+
+export const EVENT_NOTIFICATION_FILE: Record<EventSound, string> = {
+  red: 'red_card.ogg',
+  var: 'var_check.ogg',
+  penalty: 'penalty.ogg',
+};
+
+export function eventNotificationChannel(kind: EventSound): string {
+  if (kind === 'red') return 'betspapa.redcard.v1';
+  if (kind === 'var') return 'betspapa.var.v1';
+  return 'betspapa.penalty.v1';
+}
 
 /**
  * One notification channel per cheer. v4 replaced the unversioned ids, which
  * were created with a resource URI HiOS does not play. Keep these in step with AlertPoster.
  */
 export function goalNotificationChannel(sound: GoalSound): string {
-  const name = sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'off' ? sound : 'crowd';
+  const name = sound === 'afro' || sound === 'chant' || sound === 'papa' || sound === 'horn' || sound === 'arp' || sound === 'off' ? sound : 'crowd';
   return `betspapa.goal.${name}.v4`;
 }
 
@@ -98,6 +121,29 @@ export function installCheerUnlock() {
   window.addEventListener('pointerdown', () => unlockGoalCheer(), { passive: true });
 }
 
+const eventPlayers = new Map<EventSound, SoundHandle>();
+
+function eventElement(sound: EventSound): SoundHandle {
+  const existing = eventPlayers.get(sound);
+  if (existing) return existing;
+  const audio = new Audio(EVENT_SOUND_URL[sound]);
+  audio.preload = 'auto';
+  audio.volume = 1;
+  eventPlayers.set(sound, audio);
+  return audio;
+}
+
+/** In-app preview of a red-card, VAR, or penalty sting. The phone notification uses the channel. */
+export function playEventSound(sound: EventSound) {
+  const audio = eventElement(sound);
+  audio.muted = false;
+  audio.volume = 1;
+  audio.currentTime = 0;
+  void Promise.resolve(audio.play()).catch(() => {
+    /* autoplay can block until the page has been tapped */
+  });
+}
+
 /** Plays the selected bundled goal sound from the start, at the slider gain. */
 export function playGoalSound(sound: GoalSound = 'crowd', volume: number = DEFAULT_GOAL_VOLUME) {
   if (sound === 'off') return;
@@ -112,4 +158,5 @@ export function playGoalSound(sound: GoalSound = 'crowd', volume: number = DEFAU
 
 export function resetGoalAudioForTests() {
   players.clear();
+  eventPlayers.clear();
 }

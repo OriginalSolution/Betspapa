@@ -53,6 +53,8 @@ describe('goal cheer playback', () => {
     playGoalSound('afro', 60);
     playGoalSound('chant', 60);
     playGoalSound('papa', 60);
+    playGoalSound('horn', 60);
+    playGoalSound('arp', 60);
     playGoalSound('off', 100);
 
     const played = FakeAudio.made.map((audio) => ({
@@ -65,6 +67,8 @@ describe('goal cheer playback', () => {
     expect(goalNotificationChannel('afro')).toBe('betspapa.goal.afro.v4');
     expect(goalNotificationChannel('chant')).toBe('betspapa.goal.chant.v4');
     expect(goalNotificationChannel('papa')).toBe('betspapa.goal.papa.v4');
+    expect(goalNotificationChannel('horn')).toBe('betspapa.goal.horn.v4');
+    expect(goalNotificationChannel('arp')).toBe('betspapa.goal.arp.v4');
     expect(goalNotificationChannel('off')).toBe('betspapa.goal.off.v4');
     expect(shouldPlayInAppCheer(true, true, 'granted')).toBe(false);
     expect(shouldPlayInAppCheer(true, false, 'granted')).toBe(true);
@@ -76,6 +80,8 @@ describe('goal cheer playback', () => {
       { src: GOAL_SOUND_URL.afro, volume: 0.6, played: 1, muted: false },
       { src: GOAL_SOUND_URL.chant, volume: 0.6, played: 1, muted: false },
       { src: GOAL_SOUND_URL.papa, volume: 0.6, played: 1, muted: false },
+      { src: GOAL_SOUND_URL.horn, volume: 0.6, played: 1, muted: false },
+      { src: GOAL_SOUND_URL.arp, volume: 0.6, played: 1, muted: false },
     ]);
 
     playGoalSound('afro', 25);
@@ -88,6 +94,8 @@ describe('goal cheer playback', () => {
         `preview afro ${GOAL_SOUND_URL.afro} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.afro} channel ${goalNotificationChannel('afro')}`,
         `preview chant ${GOAL_SOUND_URL.chant} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.chant} channel ${goalNotificationChannel('chant')}`,
         `preview papa ${GOAL_SOUND_URL.papa} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.papa} channel ${goalNotificationChannel('papa')}`,
+        `preview horn ${GOAL_SOUND_URL.horn} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.horn} channel ${goalNotificationChannel('horn')}`,
+        `preview arp ${GOAL_SOUND_URL.arp} gain ${playbackGain(60)} file ${GOAL_NOTIFICATION_FILE.arp} channel ${goalNotificationChannel('arp')}`,
         `preview off channel ${goalNotificationChannel('off')} (no file, gain not applied)`,
       ].join('\n'),
     );

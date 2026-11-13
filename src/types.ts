@@ -1,8 +1,8 @@
 export type MatchStatus = 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed';
 
-export type EventType = 'kickoff' | 'goal' | 'yellow' | 'red' | 'ht' | 'ft' | 'var';
+export type EventType = 'kickoff' | 'goal' | 'yellow' | 'red' | 'penalty' | 'ht' | 'ft' | 'var';
 
-export type AlertKind = 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'win' | 'bust' | 'squad';
+export type AlertKind = 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'win' | 'bust' | 'squad';
 
 export type VarReview = {
   teamId: string;
@@ -64,7 +64,8 @@ export type Match = {
   feed?: 'sporty' | 'demo';
 };
 
-export type GoalSound = 'crowd' | 'afro' | 'chant' | 'papa' | 'off';
+export type GoalSound = 'crowd' | 'afro' | 'chant' | 'papa' | 'horn' | 'arp' | 'off';
+export type EventSound = 'red' | 'var' | 'penalty';
 export type NotificationStyle = 'auto' | 'dark' | 'light';
 export type DataSource = 'sporty' | 'demo';
 
@@ -72,11 +73,19 @@ export type Settings = {
   kickoff: boolean;
   goal: boolean;
   red: boolean;
+  /** A penalty is awarded or scored for a followed match. */
+  penalty: boolean;
   ht: boolean;
   ft: boolean;
   browser: boolean;
   var: boolean;
   goalSound: GoalSound;
+  /** Play the dedicated red-card sting. The red-card alert can still post silently. */
+  redSound: boolean;
+  /** Play the VAR sting. A VAR alert can still post silently. */
+  varSound: boolean;
+  /** Play the penalty sting. A penalty alert can still post silently. */
+  penaltySound: boolean;
   /** In-app cheer loudness, 0–100. 60 is a gain of 0.6. */
   goalVolume: number;
   /** Auto follows the phone. Dark is the Red Ticker. Light is the white score panel. */
@@ -110,11 +119,15 @@ export const defaultSettings: Settings = {
   kickoff: true,
   goal: true,
   red: true,
+  penalty: true,
   ht: true,
   ft: true,
   browser: true,
   var: true,
   goalSound: 'crowd',
+  redSound: true,
+  varSound: true,
+  penaltySound: true,
   goalVolume: 60,
   notificationStyle: 'auto',
   dataSource: 'sporty',

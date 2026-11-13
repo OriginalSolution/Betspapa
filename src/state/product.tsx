@@ -17,6 +17,8 @@ import {
 } from '../data/board';
 import { staleTrendIds, trendHitNotices } from '../lib/alerts';
 import { stageWatch } from '../lib/deviceWatch';
+import { syncPushDevice } from '../lib/devicePush';
+import { publishableOdds } from '../lib/oddsFloor';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
 import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
@@ -81,7 +83,7 @@ function notice(id: string, matchId: string, kind: InboxItem['kind'], title: str
 }
 
 export function ProductProvider({ children }: { children: ReactNode }) {
-  const { matches, t0, pushNotices, watchReady } = useStore();
+  const { matches, t0, pushNotices, watchReady, follows, settings } = useStore();
   const [manual, setManual] = useState<string[]>(() => read<string[]>(SLIP_KEY, []));
   const [dismissed, setDismissed] = useState<string[]>(() => read<string[]>('betspapa.dismissed.v1', []));
   const [lists, setLists] = useState<ListItem[]>(() => read<ListItem[]>(LIST_KEY, []));
@@ -186,7 +188,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       .map((pick) => {
         const match = byMatch.get(pick.matchId);
         const booked = bookingForPick(engine, pick.matchId, pick.market);
-        const odds = Number.isFinite(pick.odds) && pick.odds > 1 ? pick.odds.toFixed(2).replace(/0$/, '').replace(/\.0$/, '') : '';
+        const odds = publishableOdds(pick.odds) ? pick.odds.toFixed(2) : '';
         return {
           id: pick.id,
           matchId: pick.matchId,
@@ -197,9 +199,27 @@ export function ProductProvider({ children }: { children: ReactNode }) {
           bookId: booked?.bookId || '',
           code: booked?.code || '',
         };
-      });
+      })
+      .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
-  }, [trendFollows, matches, picks, engineTick]);
+    void syncPushDevice({
+      follows,
+      trends: trendFollows,
+      settings: {
+        kickoff: settings.kickoff,
+        goal: settings.goal,
+        red: settings.red,
+        penalty: settings.penalty,
+        ht: settings.ht,
+        ft: settings.ft,
+        var: settings.var,
+        goalSound: settings.goalSound,
+        redSound: settings.redSound,
+        varSound: settings.varSound,
+        penaltySound: settings.penaltySound,
+      },
+    });
+  }, [trendFollows, matches, picks, engineTick, follows, settings]);
 
   useEffect(() => {
     if (!watchReady || !trendFollows.length) return;

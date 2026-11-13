@@ -1,5 +1,5 @@
 import type { GoalSound, InboxItem, Match } from '../types';
-import { goalNotificationChannel } from './cheer';
+import { eventNotificationChannel, goalNotificationChannel } from './cheer';
 import { isNativeApp } from './nativeHttp';
 
 export type BrowserPermission = NotificationPermission | 'unsupported';
@@ -19,7 +19,12 @@ export async function ensureGoalChannels(): Promise<void> {
       { id: goalNotificationChannel('afro'), name: 'Goal · Afrobeats', sound: 'cheer_afro.mp3' },
       { id: goalNotificationChannel('chant'), name: 'Goal · Chant', sound: 'cheer_chant.mp3' },
       { id: goalNotificationChannel('papa'), name: 'Goal · Papa Shout', sound: 'cheer_papa.ogg' },
+      { id: goalNotificationChannel('horn'), name: 'Goal · Horn', sound: 'goal_horn.ogg' },
+      { id: goalNotificationChannel('arp'), name: 'Goal · Arpeggio', sound: 'goal_arp.ogg' },
       { id: goalNotificationChannel('off'), name: 'Goal · Silent' },
+      { id: eventNotificationChannel('red'), name: 'Red card', sound: 'red_card.ogg' },
+      { id: eventNotificationChannel('var'), name: 'VAR check', sound: 'var_check.ogg' },
+      { id: eventNotificationChannel('penalty'), name: 'Penalty', sound: 'penalty.ogg' },
     ];
     for (const channel of channels) {
       await LocalNotifications.createChannel({

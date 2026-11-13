@@ -119,6 +119,40 @@ public class AlertPosterTest {
     }
 
     @Test
+    public void newSoundsUseVersionedHighChannels() {
+        Context context = RuntimeEnvironment.getApplication();
+        shadowOf((Application) context).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        context.getSharedPreferences(WatchScheduler.PREFS, Context.MODE_PRIVATE).edit().putBoolean("goal_channels_v4", true).commit();
+
+        assertTrue(AlertPoster.post(context, new WatchNote("qc:horn", "sr:match:1", "goal", "Goal", "Horn"), "horn"));
+        assertTrue(AlertPoster.post(context, new WatchNote("qc:arp", "sr:match:1", "goal", "Goal", "Arpeggio"), "arp"));
+        assertTrue(AlertPoster.post(context, new WatchNote("test:red:1", "sr:match:1", "red", "Red card", "Test red card sound"), "crowd"));
+        assertTrue(AlertPoster.post(context, new WatchNote("test:var:1", "sr:match:1", "var", "VAR", "Test VAR sound"), "crowd"));
+        assertTrue(AlertPoster.post(context, new WatchNote("test:penalty:1", "sr:match:1", "penalty", "Penalty", "Test penalty sound"), "crowd"));
+
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/goal_horn", AlertPoster.soundFor(context, "goal", "horn").toString());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/goal_arp", AlertPoster.soundFor(context, "goal", "arp").toString());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/red_card", AlertPoster.soundFor(context, "red", "crowd").toString());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/var_check", AlertPoster.soundFor(context, "var", "crowd").toString());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/penalty", AlertPoster.soundFor(context, "penalty", "crowd").toString());
+
+        NotificationChannel horn = manager.getNotificationChannel(AlertPoster.GOAL_HORN);
+        NotificationChannel red = manager.getNotificationChannel(AlertPoster.RED_CARD);
+        NotificationChannel varChannel = manager.getNotificationChannel(AlertPoster.VAR_CHECK);
+        NotificationChannel penalty = manager.getNotificationChannel(AlertPoster.PENALTY);
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, horn.getImportance());
+        assertEquals(NotificationManager.IMPORTANCE_HIGH, red.getImportance());
+        assertEquals(AudioAttributes.USAGE_NOTIFICATION, horn.getAudioAttributes().getUsage());
+        assertEquals(AudioAttributes.USAGE_NOTIFICATION, red.getAudioAttributes().getUsage());
+        assertEquals(AudioAttributes.USAGE_NOTIFICATION, varChannel.getAudioAttributes().getUsage());
+        assertEquals(AudioAttributes.USAGE_NOTIFICATION, penalty.getAudioAttributes().getUsage());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/goal_horn", horn.getSound().toString());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/red_card", red.getSound().toString());
+        assertEquals(null, manager.getNotificationChannel("betspapa.goal.crowd"));
+    }
+
+    @Test
     public void legacyChannelsAreReplacedOnceAndALaterMuteIsKept() {
         Context context = RuntimeEnvironment.getApplication();
         shadowOf((Application) context).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);

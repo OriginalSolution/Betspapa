@@ -13,7 +13,7 @@ import type { EventType, Match, MatchEvent } from '../types';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
 
-const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, var: 2, ht: 3, ft: 4 };
+const later: Record<EventType, number> = { kickoff: 0, yellow: 1, goal: 1, red: 1, penalty: 1, var: 2, ht: 3, ft: 4 };
 
 export function MatchPage() {
   const { id = '' } = useParams();
@@ -221,12 +221,12 @@ function EventRow({ event, match }: { event: MatchEvent; match: Match }) {
     );
   }
   const team = event.teamId === match.home.id ? match.home : event.teamId === match.away.id ? match.away : null;
-  const note = event.detail === 'Penalty' ? ' (pen)' : event.detail === 'Own goal' ? ' (og)' : '';
+  const note = event.type === 'penalty' || event.detail === 'Penalty' ? ' (pen)' : event.detail === 'Own goal' ? ' (og)' : '';
   return (
     <li className={cx('event', `ev-${event.type}`)}>
       <span className="ev-min">{event.minute ?? '–'}′</span>
       <span className="ev-icon" aria-hidden="true">
-        {event.type === 'goal' ? <IconBall /> : <IconCard tone={event.type === 'red' ? 'red' : 'yellow'} />}
+        {event.type === 'goal' || event.type === 'penalty' ? <IconBall /> : <IconCard tone={event.type === 'red' ? 'red' : 'yellow'} />}
       </span>
       <span className="ev-copy">
         <strong>

@@ -12,6 +12,7 @@ import android.webkit.WebView;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.splashscreen.SplashScreenViewProvider;
 import com.betspapa.scores.watch.AlertPoster;
+import com.betspapa.scores.watch.PushBridge;
 import com.betspapa.scores.watch.OpenMatch;
 import com.betspapa.scores.watch.WatchPlugin;
 import com.betspapa.scores.watch.WatchScheduler;
@@ -53,6 +54,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         paintBlack();
         AlertPoster.ensure(this);
+        PushBridge.listen(this);
         deliverOpen(getIntent());
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().setBackgroundColor(Color.BLACK);

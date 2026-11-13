@@ -30,7 +30,25 @@ type LiveEvent = {
   comments?: unknown;
 };
 
-type FeedIncident = { type: 'goal' | 'yellow' | 'red' | 'var'; minute: number; side: 'home' | 'away'; player: string | null };
+type FeedIncident = { type: 'goal' | 'yellow' | 'red' | 'var' | 'penalty'; minute: number; side: 'home' | 'away'; player: string | null };
+
+/** The live list does not send these. They are recognized when a timeline or incident row does. */
+export function incidentKinds(raw: string): FeedIncident['type'][] {
+  const type = raw.toLowerCase().replace(/[_-]+/g, ' ');
+  if (!type.trim()) return [];
+  const red = type.includes('red') || type.includes('second yellow') || type.includes('yellow red');
+  const penalty = type.includes('penalty') || type === 'pen';
+  const goal = type.includes('goal') || type.includes('scored');
+  const review = type.includes('var') || type.includes('video assistant');
+  const yellow = type.includes('yellow') && !red;
+  const kinds: FeedIncident['type'][] = [];
+  if (review) kinds.push('var');
+  if (red) kinds.push('red');
+  if (penalty) kinds.push('penalty');
+  if (goal) kinds.push('goal');
+  if (yellow) kinds.push('yellow');
+  return kinds;
+}
 type LiveTournament = { name?: string; categoryName?: string; events?: LiveEvent[] };
 
 const SCORE = /^(\d+)\s*[:\-]\s*(\d+)$/;
@@ -132,9 +150,8 @@ function readIncidents(value: unknown, awayName: string): FeedIncident[] {
   for (const item of value) {
     if (!item || typeof item !== 'object') continue;
     const row = item as Record<string, unknown>;
-    let type = String(row.type || row.incidentType || '').toLowerCase();
-    if (type.includes('goal')) type = 'goal';
-    if (type !== 'goal' && type !== 'yellow' && type !== 'red' && type !== 'var') continue;
+    const kinds = incidentKinds(String(row.type || row.incidentType || ''));
+    if (!kinds.length) continue;
     const minute = incidentMinute(row);
     if (minute == null) continue;
     const label = String(row.side || row.team || row.homeOrAway || '').toLowerCase();
@@ -143,14 +160,14 @@ function readIncidents(value: unknown, awayName: string): FeedIncident[] {
         ? 'away'
         : 'home';
     const player = String(row.player || row.playerName || row.scorer || '').trim() || null;
-    out.push({ type, minute, side, player });
+    for (const type of kinds) out.push({ type, minute, side, player });
   }
   return out;
 }
 
 function timeline(match: Match, incidents: FeedIncident[] = []): MatchEvent[] {
   if (match.status === 'scheduled' || match.status === 'postponed') return match.events;
-  const events = match.events.filter((event) => event.type === 'yellow' || event.type === 'red' || event.type === 'var');
+  const events = match.events.filter((event) => event.type === 'yellow' || event.type === 'red' || event.type === 'var' || event.type === 'penalty');
   for (const incident of incidents) {
     if (incident.type === 'goal') continue;
     events.push({

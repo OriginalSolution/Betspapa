@@ -125,9 +125,8 @@ public final class MatchParser {
         for (int i = 0; i < rows.length(); i++) {
             JSONObject row = rows.optJSONObject(i);
             if (row == null) continue;
-            String type = row.optString("type", row.optString("incidentType", "")).toLowerCase(Locale.US);
-            if (type.contains("goal")) type = "goal";
-            if (!"goal".equals(type) && !"yellow".equals(type) && !"red".equals(type) && !"var".equals(type)) continue;
+            java.util.List<String> kinds = incidentKinds(row.optString("type", row.optString("incidentType", "")));
+            if (kinds.isEmpty()) continue;
             String side = row.optString("side", row.optString("team", row.optString("homeOrAway", ""))).toLowerCase(Locale.US);
             if (side.startsWith("away") || "2".equals(side)) side = "away";
             else if (side.startsWith("home") || "1".equals(side)) side = "home";
@@ -137,14 +136,38 @@ public final class MatchParser {
             if (side.isEmpty()) side = abbr.equals(match.abbrAway()) ? "away" : "home";
             Integer at = incidentMinute(row);
             if (at == null) continue;
-            if ("goal".equals(type)) {
-                int index = "away".equals(side) ? ++away : ++home;
-                String player = row.optString("player", row.optString("playerName", row.optString("scorer", ""))).trim();
-                match.setGoal(side, index, at, abbr, player, true);
-            } else {
-                match.addMarker(type, at, abbr, side);
+            String player = row.optString("player", row.optString("playerName", row.optString("scorer", ""))).trim();
+            for (String type : kinds) {
+                if ("goal".equals(type)) {
+                    int index = "away".equals(side) ? ++away : ++home;
+                    match.setGoal(side, index, at, abbr, player, true);
+                } else {
+                    match.addMarker(type, at, abbr, side, player);
+                }
             }
         }
+    }
+
+    /**
+     * The live list and the event detail payload do not include a timeline, incidents,
+     * comments, VAR, red cards, or penalties (checked 2026-11-13). Rows are still read
+     * when a feed starts sending them. A penalty goal is both a goal and a penalty.
+     */
+    static java.util.List<String> incidentKinds(String raw) {
+        String type = raw == null ? "" : raw.toLowerCase(Locale.US).replace('_', ' ').replace('-', ' ');
+        java.util.List<String> kinds = new java.util.ArrayList<String>();
+        if (type.trim().isEmpty()) return kinds;
+        boolean red = type.contains("red") || type.contains("second yellow") || type.contains("yellow red");
+        boolean penalty = type.contains("penalty") || type.equals("pen");
+        boolean goal = type.contains("goal") || type.contains("scored");
+        boolean review = type.contains("var") || type.contains("video assistant");
+        boolean yellow = type.contains("yellow") && !red;
+        if (review) kinds.add("var");
+        if (red) kinds.add("red");
+        if (penalty) kinds.add("penalty");
+        if (goal) kinds.add("goal");
+        if (yellow) kinds.add("yellow");
+        return kinds;
     }
 
     private static Integer incidentMinute(JSONObject row) {

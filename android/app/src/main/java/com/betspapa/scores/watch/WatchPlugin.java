@@ -296,8 +296,19 @@ public class WatchPlugin extends Plugin {
             return;
         }
         AlertPoster.ensure(getContext());
-        WatchScheduler.scheduleTest(getContext());
+        PushBridge.listen(getContext());
+        WatchScheduler.scheduleTest(getContext(), call.getString("kind", "goal"), call.getString("goalSound", ""));
         call.resolve();
+    }
+
+    @PluginMethod
+    public void pushToken(PluginCall call) {
+        Context context = getContext();
+        JSObject result = new JSObject();
+        boolean enabled = context != null && PushBridge.enabled();
+        result.put("enabled", enabled);
+        result.put("token", context == null ? "" : PushBridge.currentToken(context));
+        call.resolve(result);
     }
 
     /** Opens the goal-sound channel, or the system sound screen when the ringer is what is muted. */
