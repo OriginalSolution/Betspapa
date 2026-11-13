@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { contextOf, posterFrom, priced, shareCardFrom, weekendBankers } from './plan.mjs';
-import { svgToPng } from './raster.mjs';
+import { fontFiles, svgToPng } from './raster.mjs';
 import { shareSvg } from './art.mjs';
+import { playerSvg, starFor } from './players.mjs';
 
 const engine = {
   master: {
@@ -55,9 +56,44 @@ test('weekend bankers run at 06:00 Accra and need a real code', () => {
   assert.equal(weekendBankers(engine, new Date('2026-11-14T07:00:00.000Z')), null);
 });
 
-test('the share card renders to a PNG', () => {
+test('a huge master is replaced by a real 4-to-8 leg code', () => {
+  const huge = {
+    master: {
+      bookedAt: '2026-11-13T16:57:00.000Z',
+      legs: [{ eventId: 'sr:match:1', market: 'over15', match: 'A vs B', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.4, occurrence: 90, sample: '9/10' }],
+      books: { sportybet: { parts: [{ code: 'BIGMASTER', totalOdds: 47280.9, legs: 30 }] } },
+    },
+    trends: [
+      {
+        label: 'Double chance 12',
+        legs: [{ eventId: 'sr:match:9', market: 'dc-12', match: 'Kosovo vs Israel', kickoff: '2026-11-14T17:00:00.000Z', odds: 1.4, occurrence: 88, sample: '8/10' }],
+        books: { sportybet: { parts: [{ code: 'SMALL88', totalOdds: 5.62, legs: 8, matches: ['sr:match:9'] }] } },
+      },
+    ],
+  };
+  const card = shareCardFrom(huge);
+  assert.equal(card.code, 'SMALL88');
+  assert.equal(card.total, 5.62);
+  assert.equal(card.legCount, 8);
+  assert.equal(card.fullNote, 'Full 30-leg master in the app');
+  assert.equal(card.codes.some((row) => row.code === 'BIGMASTER'), false);
+});
+
+test('the away shirt number is not inside the mirrored body', () => {
+  const svg = playerSvg('away', starFor('arsenal'), { mirror: true, x: 10, y: 20, scale: 2 });
+  const body = svg.slice(svg.indexOf('scale(-'), svg.indexOf('</g>'));
+  assert.equal(body.includes('<text'), false);
+  assert.match(svg, />7</);
+});
+
+test('the share card renders to a PNG with the app fonts', () => {
+  assert.ok(fontFiles().some((file) => file.endsWith('BarlowCondensed-Bold.ttf')));
+  assert.ok(fontFiles().some((file) => file.endsWith('Outfit-Bold.ttf')));
   const card = shareCardFrom(engine);
-  const png = svgToPng(shareSvg(card, {}));
+  const svg = shareSvg(card, {});
+  assert.match(svg, /Barlow Condensed/);
+  assert.match(svg, /Outfit/);
+  const png = svgToPng(svg);
   assert.equal(png[0], 0x89);
   assert.equal(png[1], 0x50);
   assert.ok(png.length > 1000);

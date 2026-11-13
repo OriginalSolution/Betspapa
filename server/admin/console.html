@@ -97,7 +97,7 @@
     .alert b { text-transform: capitalize; }
     .flash { min-height: 1.2em; margin: 8px 0 0; font-size: 13px; color: var(--gold); }
     .sub { margin: 0 0 10px; font-size: 13px; }
-    .promo-row { display: grid; grid-template-columns: 92px 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+    .promo-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
     .promo-row img { width: 92px; height: 64px; object-fit: cover; border-radius: 10px; background: #111; }
     .promo-row span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
     h3 { margin: 16px 0 6px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
@@ -145,6 +145,7 @@
   <script>
     const TABS = ['Board', 'Installs', 'Codes', 'Push', 'Promos', 'Crests', 'Settings'];
     let promos = { approveFirst: true, items: [] };
+    let promoToken = '';
     const ZONE = 'Africa/Accra';
     let tab = 'Board';
     let data = null;
@@ -335,12 +336,16 @@
     }
 
     function promosTab() {
+      const tail = data.push && data.push.latestTail ? ' ···' + data.push.latestTail : '';
       const rows = (promos.items || []).map((item) =>
         '<div class="promo-row"><img src="' + esc(item.image) + '" alt=""><div><b>' + esc(item.title) + '</b><span>' + esc(item.status) + ' · ' + esc(item.kind) + (item.code ? ' · ' + esc(item.code) : '') + '</span></div>' +
         '<button type="button" class="primary" data-act="promo-send" data-id="' + esc(item.id) + '">Send to all</button>' +
+        '<button type="button" class="ghost" data-act="promo-mine" data-id="' + esc(item.id) + '">Send to my device</button>' +
         '<button type="button" class="ghost" data-act="promo-delete" data-id="' + esc(item.id) + '">Delete</button></div>').join('') || '<p class="empty">No creatives yet. They appear when a master slip is booked, a big match is about three hours out, or Saturday 06:00 Accra arrives.</p>';
       return '<section class="card"><h2>Promos</h2><p class="sub">Approve first is ' + (promos.approveFirst ? 'on. A creative waits here until you send it.' : 'off. New creatives go out on their own.') + '</p>' +
         '<div class="actions"><button type="button" class="ghost" data-act="promo-approve">' + (promos.approveFirst ? 'Approve first: on' : 'Auto-send') + '</button><button type="button" class="primary" data-act="promo-now">Send master slip now</button></div>' +
+        '<p class="sub">Send to my device uses this token, or the latest registered phone' + esc(tail) + ' when the box is empty. It does not go to every device.</p>' +
+        '<input id="promo-token" value="' + esc(promoToken) + '" placeholder="Device token" autocomplete="off" style="width:100%;min-height:44px;border-radius:12px;border:1px solid var(--line);background:#0c0e14;padding:0 12px">' +
         '<div class="promo-list">' + rows + '</div><p class="flash">' + esc(flash) + '</p></section>';
     }
 
@@ -387,6 +392,9 @@
         } else if (kind === 'promo-send') {
           path = '/api/admin/promos/' + encodeURIComponent(id) + '/send';
           payload = {};
+        } else if (kind === 'promo-mine') {
+          path = '/api/admin/promos/' + encodeURIComponent(id) + '/send-device';
+          payload = { token: promoToken };
         } else if (kind === 'promo-delete') {
           path = '/api/admin/promos/' + encodeURIComponent(id);
           method = 'DELETE';
@@ -416,6 +424,9 @@
       if (!button) return;
       tab = button.dataset.tab;
       if (data) draw();
+    });
+    document.getElementById('view').addEventListener('input', (event) => {
+      if (event.target.id === 'promo-token') promoToken = event.target.value;
     });
     document.getElementById('view').addEventListener('click', (event) => {
       const button = event.target.closest('button[data-act]');
