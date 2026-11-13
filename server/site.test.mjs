@@ -56,6 +56,21 @@ test('a server without the built UI sends pages to betspapa.com and leaves API, 
     assert.equal(admin.status, 200);
     assert.match(admin.body, /name="email"/);
     assert.match(admin.body, /name="password"/);
+    const manifest = JSON.parse((await ask(port, { path: '/admin/manifest.webmanifest' })).body);
+    assert.equal(manifest.name, 'Betspapa Admin');
+    assert.equal(manifest.short_name, 'BP Admin');
+    assert.equal(manifest.start_url, '/admin');
+    assert.equal(manifest.scope, '/admin');
+    assert.equal(manifest.display, 'standalone');
+    assert.equal(manifest.theme_color, '#07080c');
+    assert.equal(manifest.icons.some((icon) => icon.sizes === '192x192'), true);
+    assert.equal(manifest.icons.some((icon) => icon.sizes === '512x512' && icon.purpose === 'maskable'), true);
+    const worker = await ask(port, { path: '/admin/sw.js' });
+    assert.equal(worker.status, 200);
+    assert.match(worker.body, /addEventListener\('fetch'/);
+    assert.match(worker.body, /pathname\.startsWith\('\/api\/'\)/);
+    const icon = await ask(port, { path: '/admin/icons/icon-192.png' });
+    assert.equal(icon.status, 200);
     assert.equal(locked.status, 401);
   } finally {
     await new Promise((resolve) => server.close(resolve));

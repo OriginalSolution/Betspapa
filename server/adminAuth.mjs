@@ -8,6 +8,7 @@ import { clientAddress } from './geo.mjs';
 
 export const COOKIE = 'betspapa_admin';
 export const SESSION_SECONDS = 12 * 60 * 60;
+export const REMEMBER_SECONDS = 30 * 24 * 60 * 60;
 export const FAILURE_LIMIT = 5;
 export const FAILURE_WINDOW_MS = 10 * 60 * 1000;
 
@@ -82,8 +83,8 @@ function signingKey(password) {
   return key;
 }
 
-export function signSession(password, now = Date.now()) {
-  const payload = Buffer.from(JSON.stringify({ exp: now + SESSION_SECONDS * 1000 })).toString('base64url');
+export function signSession(password, now = Date.now(), maxAgeSeconds = SESSION_SECONDS) {
+  const payload = Buffer.from(JSON.stringify({ exp: now + maxAgeSeconds * 1000 })).toString('base64url');
   const sig = createHmac('sha256', signingKey(password)).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
@@ -144,14 +145,17 @@ export function requestIsSecure(req, env = process.env) {
   return false;
 }
 
-export function cookieHeader(token, { secure = false, maxAge = SESSION_SECONDS } = {}) {
-  const parts = [`${COOKIE}=${encodeURIComponent(token)}`, 'HttpOnly', 'SameSite=Strict', 'Path=/', `Max-Age=${maxAge}`];
+export function cookieHeader(token, { secure = false, maxAge = SESSION_SECONDS, sameSite = 'Strict' } = {}) {
+  const site = sameSite === 'Lax' ? 'Lax' : 'Strict';
+  const parts = [`${COOKIE}=${encodeURIComponent(token)}`, 'HttpOnly', `SameSite=${site}`, 'Path=/', `Max-Age=${maxAge}`];
   if (secure) parts.push('Secure');
   return parts.join('; ');
 }
 
-export function sessionCookie(password, secure, now = Date.now()) {
-  return cookieHeader(signSession(password, now), { secure });
+export function sessionCookie(password, secure, now = Date.now(), options = {}) {
+  const maxAge = options.maxAge ?? SESSION_SECONDS;
+  const sameSite = options.sameSite || 'Strict';
+  return cookieHeader(signSession(password, now, maxAge), { secure, maxAge, sameSite });
 }
 
 export function clearCookie(secure) {

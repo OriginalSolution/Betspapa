@@ -14,6 +14,12 @@ const frame = (body) => `<!doctype html>
   <meta name="robots" content="noindex">
   <meta name="theme-color" content="#07080c">
   <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BP Admin">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/admin/icons/apple-touch-icon.png">
   <title>Command centre · Betspapa</title>
   <style>
     :root { color-scheme: dark; --bg:#07080c; --text:#f4f6fb; --muted:#949bab; --red:#e11d2e; --line:rgba(255,255,255,.08); }
@@ -28,6 +34,9 @@ const frame = (body) => `<!doctype html>
     form { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; }
     input, button { font: inherit; border-radius: 14px; min-height: 48px; }
     input { border: 1px solid var(--line); background: #12151c; color: var(--text); padding: 0 14px; }
+    .keep { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+    .keep input { width: 22px; height: 22px; min-height: 22px; margin: 0; padding: 0; accent-color: var(--red); }
+    .keep label { margin: 0; color: var(--text); }
     button { border: 0; background: var(--red); color: white; font-weight: 700; }
     .error { color: #ff8b95; margin: 16px 0 0; }
   </style>
@@ -37,6 +46,9 @@ const frame = (body) => `<!doctype html>
     <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#E11D2E"/><path fill="#fff" d="M9 7.2h8.1c3.3 0 5.4 1.6 5.4 4.1 0 1.7-1 3-2.6 3.6 2 .6 3.2 2.1 3.2 4.1 0 2.8-2.4 4.8-6.1 4.8H9V7.2zm3.1 6.4h4.2c1.4 0 2.3-.7 2.3-1.7s-.9-1.7-2.3-1.7h-4.2v3.4zm0 6.8h4.8c1.6 0 2.6-.8 2.6-2s-1-2-2.6-2h-4.8V20.4z"/></svg>
     ${body}
   </main>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin' });
+  </script>
 </body>
 </html>`;
 
@@ -50,6 +62,10 @@ export function loginHtml(message = '') {
       <input id="email" name="email" type="email" autocomplete="username" required autofocus>
       <label for="password">Password</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <div class="keep">
+        <input id="remember" name="remember" type="checkbox" value="1" checked>
+        <label for="remember">Keep me signed in</label>
+      </div>
       <button type="submit">Enter</button>
     </form>`);
 }
