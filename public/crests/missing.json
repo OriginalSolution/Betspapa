@@ -1,691 +1,213 @@
 {
-  "generatedAt": "2026-11-13T00:04:49.993Z",
+  "generatedAt": "2026-11-13T01:48:39.511Z",
   "teams": [
     {
       "name": "US St Philbert de Grandlieu",
       "id": "us-st-philbert-de-grandlieu",
       "area": "France",
       "competition": "Coupe de France",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Quevilly-Rouen Metropole",
-      "id": "quevilly-rouen-metropole",
-      "area": "France",
-      "competition": "Coupe de France",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Real Sociedad San Sebastian B",
-      "id": "real-sociedad-san-sebastian-b",
-      "area": "Spain",
-      "competition": "LALIGA HYPERMOTION",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "English and French Wikipedia have the club page but no crest file. Commons search for the logo returned nothing."
     },
     {
       "name": "Athletic Club Sjdr MG",
       "id": "athletic-club-sjdr-mg",
       "area": "Brazil",
       "competition": "Brasileiro Serie B",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Queens Park FC",
-      "id": "queens-park-fc",
-      "area": "Scotland",
-      "competition": "Championship",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Kings Lynn FC",
-      "id": "kings-lynn-fc",
-      "area": "England Amateur",
-      "competition": "FA Trophy",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Merthyr Town",
-      "id": "merthyr-town",
-      "area": "England Amateur",
-      "competition": "FA Trophy",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Weston-super-Mare",
-      "id": "weston-super-mare",
-      "area": "England Amateur",
-      "competition": "FA Trophy",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Mio Biwako Shiga",
-      "id": "mio-biwako-shiga",
-      "area": "Japan",
-      "competition": "J3 League",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Spartans FC",
-      "id": "spartans-fc",
-      "area": "Scotland",
-      "competition": "League 2",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "AC Trento",
-      "id": "ac-trento",
-      "area": "Italy",
-      "competition": "Serie C, Group A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Calcio Lecco 1912",
-      "id": "calcio-lecco-1912",
-      "area": "Italy",
-      "competition": "Serie C, Group A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Treviso FBC 1993",
-      "id": "treviso-fbc-1993",
-      "area": "Italy",
-      "competition": "Serie C, Group A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Derthona FBC 1908 ASD",
-      "id": "derthona-fbc-1908-asd",
-      "area": "Italy",
-      "competition": "Serie D, Group A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "USD Sestri Levante 1919",
-      "id": "usd-sestri-levante-1919",
-      "area": "Italy",
-      "competition": "Serie D, Group A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASD Imperia 1923",
-      "id": "asd-imperia-1923",
-      "area": "Italy",
-      "competition": "Serie D, Group A",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No Wikipedia, Wikidata, or TheSportsDB page for Athletic Club of São João del-Rei."
     },
     {
       "name": "Club Milano SSD",
       "id": "club-milano-ssd",
       "area": "Italy",
       "competition": "Serie D, Group B",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Commons only has an ice-hockey HC Milano mark. Alcione Milano is a different club, so it was not used."
     },
     {
       "name": "Villa Dalme Valle Brembana",
       "id": "villa-dalme-valle-brembana",
       "area": "Italy",
       "competition": "Serie D, Group B",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No football-club page or logo file found for Villa d'Almè Valle Brembana."
     },
     {
       "name": "Ssd Real Calepina FC",
       "id": "ssd-real-calepina-fc",
       "area": "Italy",
       "competition": "Serie D, Group B",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No Wikipedia, Commons, or TheSportsDB logo for Real Calepina."
     },
     {
       "name": "Fcd Conegliano 1907",
       "id": "fcd-conegliano-1907",
       "area": "Italy",
       "competition": "Serie D, Group C",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "US Triestina Calcio 1918",
-      "id": "us-triestina-calcio-1918",
-      "area": "Italy",
-      "competition": "Serie D, Group C",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Italian Wikipedia has Conegliano Calcio but no lead image or Commons logo."
     },
     {
       "name": "ASD Varesina Calcio",
       "id": "asd-varesina-calcio",
       "area": "Italy",
       "competition": "Serie D, Group D",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "US Citta Di Pontedera",
-      "id": "us-citta-di-pontedera",
-      "area": "Italy",
-      "competition": "Serie D, Group D",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Pavia Calcio 1911",
-      "id": "pavia-calcio-1911",
-      "area": "Italy",
-      "competition": "Serie D, Group D",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Pro Patria Busto Arsizio",
-      "id": "pro-patria-busto-arsizio",
-      "area": "Italy",
-      "competition": "Serie D, Group D",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "USD Castellanzese 1921",
-      "id": "usd-castellanzese-1921",
-      "area": "Italy",
-      "competition": "Serie D, Group D",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No logo file found. Nearby clubs such as Gallarate were not used."
     },
     {
       "name": "Asd Sasso Marconi 1924",
       "id": "asd-sasso-marconi-1924",
       "area": "Italy",
       "competition": "Serie D, Group E",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The English Wikipedia club page has no crest image."
     },
     {
       "name": "Gsd Ghivizzano Borgoamozzano",
       "id": "gsd-ghivizzano-borgoamozzano",
       "area": "Italy",
       "competition": "Serie D, Group E",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "L’Aquila Calcio 1927",
-      "id": "l-aquila-calcio-1927",
-      "area": "Italy",
-      "competition": "Serie D, Group F",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The only file found is a photo of the town, not a club badge."
     },
     {
       "name": "Forsempronese 1949 SD ARL",
       "id": "forsempronese-1949-sd-arl",
       "area": "Italy",
       "competition": "Serie D, Group F",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No club page or logo file found."
     },
     {
       "name": "ASD Sarnese 1926",
       "id": "asd-sarnese-1926",
       "area": "Italy",
       "competition": "Serie D, Group G",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Asd Anzio Calcio 1924",
-      "id": "asd-anzio-calcio-1924",
-      "area": "Italy",
-      "competition": "Serie D, Group G",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Italian Wikipedia has Sarnese 1926 but no crest file. Savoia was not used."
     },
     {
       "name": "ASD Trastevere Calcio",
       "id": "asd-trastevere-calcio",
       "area": "Italy",
       "competition": "Serie D, Group G",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Cynthia",
-      "id": "cynthia",
-      "area": "Italy",
-      "competition": "Serie D, Group G",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASC Ebolitana 1925",
-      "id": "asc-ebolitana-1925",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "SSD Ischia Calcio",
-      "id": "ssd-ischia-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASD Nocerina 1910",
-      "id": "asd-nocerina-1910",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "SS Manfredonia Calcio",
-      "id": "ss-manfredonia-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Virtus Francavilla Calcio",
-      "id": "virtus-francavilla-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASD Real Normanna",
-      "id": "asd-real-normanna",
-      "area": "Italy",
-      "competition": "Serie D, Group H",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The only Wikidata hit is the women's team, so that badge was not used for the men's Serie D side."
     },
     {
       "name": "Igea Virtus Barcellona",
       "id": "igea-virtus-barcellona",
       "area": "Italy",
       "competition": "Serie D, Group I",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASD Polisportiva Modica Calcio",
-      "id": "asd-polisportiva-modica-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group I",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Gela",
-      "id": "gela",
-      "area": "Italy",
-      "competition": "Serie D, Group I",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Kozakken Boys Werkendam",
-      "id": "kozakken-boys-werkendam",
-      "area": "Netherlands",
-      "competition": "Tweede Divisie",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "GVVV Veenendaal",
-      "id": "gvvv-veenendaal",
-      "area": "Netherlands",
-      "competition": "Tweede Divisie",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "De Treffers Groesbeek",
-      "id": "de-treffers-groesbeek",
-      "area": "Netherlands",
-      "competition": "Tweede Divisie",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The club page exists but has no crest file."
     },
     {
       "name": "Maleyat Kafr El Zayat",
       "id": "maleyat-kafr-el-zayat",
       "area": "Egypt",
       "competition": "2. Division A",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The Egyptian club page exists but has no crest file."
     },
     {
       "name": "We SC",
       "id": "we-sc",
       "area": "Egypt",
       "competition": "2. Division A",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No page for this Egyptian second-division side. Al Ahly was not used."
     },
     {
       "name": "La Viena FC",
       "id": "la-viena-fc",
       "area": "Egypt",
       "competition": "2. Division A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Nykoebing FC",
-      "id": "nykoebing-fc",
-      "area": "Denmark",
-      "competition": "2nd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "FC Helsingoer",
-      "id": "fc-helsingoer",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Ishoej IF",
-      "id": "ishoej-if",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "A stub page exists with no crest. Unrelated Viena files were not used."
     },
     {
       "name": "Hoersholm-Usseroed IK",
       "id": "hoersholm-usseroed-ik",
       "area": "Denmark",
       "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Bronshoj BK",
-      "id": "bronshoj-bk",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Vanloese IF",
-      "id": "vanloese-if",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Naesby BK",
-      "id": "naesby-bk",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ASA Aarhus",
-      "id": "asa-aarhus",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Holbaek B&I",
-      "id": "holbaek-b-i",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CS Italiano",
-      "id": "cs-italiano",
-      "area": "Argentina",
-      "competition": "Primera B",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "RSD Alcala SAD",
-      "id": "rsd-alcala-sad",
-      "area": "Spain",
-      "competition": "Segunda Federacion",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "SDA Tordesillas",
-      "id": "sda-tordesillas",
-      "area": "Spain",
-      "competition": "Segunda Federacion",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "The New Saints FC",
-      "id": "the-new-saints-fc",
-      "area": "Wales",
-      "competition": "FAW Welsh Cup",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Briton Ferry",
-      "id": "briton-ferry",
-      "area": "Wales",
-      "competition": "FAW Welsh Cup",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Danish Wikipedia has the club but no crest file."
     },
     {
       "name": "Briobecca Urayasu",
       "id": "briobecca-urayasu",
       "area": "Japan",
       "competition": "Japan Football League",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The club page exists but has no crest file."
     },
     {
       "name": "J-Lease FC",
       "id": "j-lease-fc",
       "area": "Japan",
       "competition": "Japan Football League",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Agrobiznes Volochisk",
-      "id": "agrobiznes-volochisk",
-      "area": "Ukraine",
-      "competition": "Persha Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Warrington Rylands 1906 FC",
-      "id": "warrington-rylands-1906-fc",
-      "area": "England Amateur",
-      "competition": "Northern Premier League Premier",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Real Aviles CF",
-      "id": "real-aviles-cf",
-      "area": "Spain",
-      "competition": "Primera Federacion",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Hellas Syrou",
-      "id": "hellas-syrou",
-      "area": "Greece",
-      "competition": "Super League 2",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Anagennisi Karditsas 1904",
-      "id": "anagennisi-karditsas-1904",
-      "area": "Greece",
-      "competition": "Super League 2",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Kallithea FC",
-      "id": "kallithea-fc",
-      "area": "Greece",
-      "competition": "Super League 2",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CSDC Espanol",
-      "id": "csdc-espanol",
-      "area": "Argentina",
-      "competition": "Primera C",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CF Vilanova I LA Geltru",
-      "id": "cf-vilanova-i-la-geltru",
-      "area": "Spain Amateur",
-      "competition": "Tercera Federacion, Group 5",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Leningradets",
-      "id": "leningradets",
-      "area": "Russia",
-      "competition": "1. Liga",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The club page exists but has no crest file. FC Tokyo was not used."
     },
     {
       "name": "N. Byskovice",
       "id": "n-byskovice",
       "area": "Czechia",
       "competition": "CFL",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Slask II Wroclaw",
-      "id": "slask-ii-wroclaw",
-      "area": "Poland",
-      "competition": "II Liga",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Only a photo of the village of Býškovice. No football badge."
     },
     {
       "name": "Rekord Bielsko Biala",
       "id": "rekord-bielsko-biala",
       "area": "Poland",
       "competition": "II Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "LKS Lodz II",
-      "id": "lks-lodz-ii",
-      "area": "Poland",
-      "competition": "III Liga, Group 1",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "ZKS Olimpia Elblag",
-      "id": "zks-olimpia-elblag",
-      "area": "Poland",
-      "competition": "III Liga, Group 1",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "LKS 1926 Lomza",
-      "id": "lks-1926-lomza",
-      "area": "Poland",
-      "competition": "III Liga, Group 1",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Kts Weszlo",
-      "id": "kts-weszlo",
-      "area": "Poland",
-      "competition": "III Liga, Group 1",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Blekitni Stargard",
-      "id": "blekitni-stargard",
-      "area": "Poland",
-      "competition": "III Liga, Group 2",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "The only badge found is the futsal club BTS Rekord, not the football side."
     },
     {
       "name": "MKS Viktoria Wrzesnia",
       "id": "mks-viktoria-wrzesnia",
       "area": "Poland",
       "competition": "III Liga, Group 2",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "KS Stilon Gorzow Wlkp",
-      "id": "ks-stilon-gorzow-wlkp",
-      "area": "Poland",
-      "competition": "III Liga, Group 3",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "Searched Wikipedia, Wikidata, Commons, and TheSportsDB. No crest file that is clearly this club."
     },
     {
       "name": "CD Arabe Unido",
       "id": "cd-arabe-unido",
       "area": "Panama",
       "competition": "Liga Panamena",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "TheSportsDB's \"Arabe Unido\" hit is the UAE national team. The Panama club page has no crest file."
     },
     {
       "name": "CD Universitario Penonome",
       "id": "cd-universitario-penonome",
       "area": "Panama",
       "competition": "Liga Panamena",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Zamora FC Barinas II",
-      "id": "zamora-fc-barinas-ii",
-      "area": "Venezuela",
-      "competition": "Segunda Division",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "FK Buducnost",
-      "id": "fk-buducnost",
-      "area": "Montenegro",
-      "competition": "1. CFL",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Krka Novo Mesto",
-      "id": "krka-novo-mesto",
-      "area": "Slovenia",
-      "competition": "2. Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "NK Bistrica Slovenska Bistrica",
-      "id": "nk-bistrica-slovenska-bistrica",
-      "area": "Slovenia",
-      "competition": "2. Liga",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No club page or logo found for Universitario de Penonomé."
     },
     {
       "name": "NK Vrhnika",
       "id": "nk-vrhnika",
       "area": "Slovenia",
       "competition": "2. Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Nd Slovan",
-      "id": "nd-slovan",
-      "area": "Slovenia",
-      "competition": "2. Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "NK Krsko Posavje",
-      "id": "nk-krsko-posavje",
-      "area": "Slovenia",
-      "competition": "2. Liga",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CD Santa Cruz",
-      "id": "cd-santa-cruz",
-      "area": "Chile",
-      "competition": "Primera B",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CDU San Martin",
-      "id": "cdu-san-martin",
-      "area": "Peru",
-      "competition": "Liga 2",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No club page or logo found."
     },
     {
       "name": "Cocle FC",
       "id": "cocle-fc",
       "area": "Panama",
       "competition": "Liga Panamena",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "Gimnasia de Chivilcoy",
-      "id": "gimnasia-de-chivilcoy",
-      "area": "Argentina",
-      "competition": "Torneo Federal A",
-      "reason": "no confident crest"
-    },
-    {
-      "name": "CS Barracas",
-      "id": "cs-barracas",
-      "area": "Argentina",
-      "competition": "Primera C",
-      "reason": "no confident crest"
+      "reason": "no findable badge",
+      "tried": "No club page or logo found. Other Panamanian clubs were not used."
     }
   ]
 }
