@@ -46,8 +46,10 @@ export function loginHtml(message = '') {
     <p>Betspapa operations - Africa/Accra</p>
     ${error}
     <form method="post" action="/admin/login">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required autofocus>
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
       <button type="submit">Enter</button>
     </form>`);
 }

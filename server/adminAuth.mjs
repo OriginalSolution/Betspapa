@@ -17,6 +17,14 @@ export function adminPassword(env = process.env) {
   return String(env.ADMIN_PASSWORD ?? '').trim();
 }
 
+export function adminEmail(env = process.env) {
+  return String(env.ADMIN_EMAIL ?? '').trim().toLowerCase();
+}
+
+export function emailsMatch(input, expected) {
+  return passwordsMatch(String(input ?? '').trim().toLowerCase(), String(expected ?? '').trim().toLowerCase());
+}
+
 export function passwordsMatch(input, expected) {
   const left = createHash('sha256').update(String(input ?? ''), 'utf8').digest();
   const right = createHash('sha256').update(String(expected ?? ''), 'utf8').digest();
