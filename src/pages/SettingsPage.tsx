@@ -7,7 +7,8 @@ import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
 import { useStore } from '../state/store';
 
-const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'browser'; label: string; detail: string }> = [
+const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'browser' | 'promos'; label: string; detail: string }> = [
+  { key: 'promos', label: 'Promos', detail: 'Booking-code cards, match posters, and the Saturday bankers flyer' },
   { key: 'kickoff', label: 'Kick-off', detail: 'When a followed match starts, including if you open the app after kick-off' },
   { key: 'goal', label: 'Goals', detail: 'Including own goals. A scored penalty also uses the penalty sound' },
   { key: 'red', label: 'Red cards', detail: 'Straight reds and second yellows' },

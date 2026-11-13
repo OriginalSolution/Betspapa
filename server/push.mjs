@@ -120,6 +120,9 @@ export function messageFor(note, device) {
     trendId: String(note.trendId || ''),
     fixture: String(note.fixture || ''),
     odds: String(note.odds || ''),
+    image: String(note.image || ''),
+    route: String(note.route || ''),
+    code: String(note.code || ''),
   };
   return {
     message: {
@@ -491,6 +494,7 @@ export function acceptDevice(body) {
         redSound: settings.redSound !== false,
         varSound: settings.varSound !== false,
         penaltySound: settings.penaltySound !== false,
+        promos: settings.promos !== false,
       },
       appVersion: cleanVersion(body?.appVersion),
       sent: [],
@@ -606,6 +610,28 @@ export async function sendMessage(account, payload) {
     throw error;
   }
   return { dropped: false, ok: true, status: response.status, body };
+}
+
+/** One promo image to every device that still wants promos. A sent id is not posted again. */
+export async function broadcastPromo(book, note) {
+  const account = serviceAccount();
+  if (!fcmConfigured() || !account) return { ok: false, error: 'FCM is not configured.', sent: 0 };
+  let sent = 0;
+  for (const device of book?.list?.() || []) {
+    if (device?.settings?.promos === false) continue;
+    if (book.alreadySent(device.token, note.id)) continue;
+    try {
+      const result = await sendMessage(account, messageFor(note, device));
+      if (result.dropped) book.drop(device.token);
+      else {
+        book.remember(device.token, note.id);
+        sent += 1;
+      }
+    } catch {
+      /* the next device still gets the creative */
+    }
+  }
+  return { ok: true, sent };
 }
 
 export async function sendTestPush(book, body, log = (message) => console.log(message)) {

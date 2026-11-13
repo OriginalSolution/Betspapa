@@ -1629,6 +1629,17 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   .fixture-card:hover { background: #171b24; }
 }
 
+.promo-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 8px 14px 0;
+  scrollbar-width: none;
+}
+.promo-carousel::-webkit-scrollbar { display: none; }
+.promo-carousel a { flex: 0 0 100%; scroll-snap-align: start; }
+.promo-carousel img { width: 100%; height: 168px; object-fit: cover; border-radius: 16px; background: #12151c; display: block; }
 .trends-option-c { gap: 10px; }
 .trend-seg {
   display: flex;

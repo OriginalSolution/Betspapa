@@ -91,6 +91,8 @@ export type Settings = {
   /** Auto follows the phone. Dark is the Red Ticker. Light is the white score panel. */
   notificationStyle: NotificationStyle;
   dataSource: DataSource;
+  /** Booking-code cards, match posters, and the weekend bankers flyer. */
+  promos: boolean;
 };
 
 export type Follows = {
@@ -131,4 +133,5 @@ export const defaultSettings: Settings = {
   goalVolume: 60,
   notificationStyle: 'auto',
   dataSource: 'sporty',
+  promos: true,
 };

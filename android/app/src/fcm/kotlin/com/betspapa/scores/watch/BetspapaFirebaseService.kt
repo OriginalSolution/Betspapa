@@ -1,7 +1,10 @@
 package com.betspapa.scores.watch
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import com.betspapa.watch.WatchMatch
+import java.net.URL
 import com.betspapa.watch.WatchNote
 import com.betspapa.watch.WatchState
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -49,6 +52,12 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             }
             sound = state.goalSound?.takeIf { it.isNotEmpty() } ?: "crowd"
         }
+        if (kind == "promo") {
+            val picture = download(data["image"])
+            val posted = AlertPoster.postPromo(this, note, sound, picture, data["code"], data["route"])
+            Log.i(TAG, "posted=$posted id=$id kind=promo channel=${AlertPoster.channelFor("goal", sound)} sound=$sound")
+            return
+        }
         val posted = AlertPoster.post(this, note, sound)
         val channel = AlertPoster.channelFor(kind, sound)
         Log.i(TAG, "posted=$posted id=$id kind=$kind channel=$channel sound=$sound match=${note.matchId}")
@@ -76,6 +85,18 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
         if (minute != null && (kind == "goal" || kind == "var" || kind == "red" || kind == "penalty")) {
             val type = if (kind == "goal") "goal" else kind
             match.addMarker(type, minute, match.abbrHome())
+        }
+    }
+
+    private fun download(url: String?): Bitmap? {
+        if (url.isNullOrBlank() || !(url.startsWith("https://") || url.startsWith("http://"))) return null
+        return try {
+            val connection = URL(url).openConnection()
+            connection.connectTimeout = 8_000
+            connection.readTimeout = 12_000
+            connection.getInputStream().use { BitmapFactory.decodeStream(it) }
+        } catch (_: Exception) {
+            null
         }
     }
 

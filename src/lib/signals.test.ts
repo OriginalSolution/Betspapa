@@ -18,6 +18,7 @@ const settings: Settings = {
   goalVolume: 60,
   notificationStyle: 'auto',
   dataSource: 'sporty',
+  promos: true,
 };
 
 function match(patch: Partial<Match>): Match {

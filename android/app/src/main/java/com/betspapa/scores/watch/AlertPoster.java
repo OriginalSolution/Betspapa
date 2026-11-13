@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -448,6 +449,35 @@ public final class AlertPoster {
 
     private static int score(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    /** Red Ticker big-picture promo. The image is the rendered creative. */
+    static boolean postPromo(Context context, WatchNote note, String goalSound, Bitmap picture, String code, String route) {
+        ensure(context);
+        if (note == null || !NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
+        String channel = channelFor("goal", goalSound);
+        int id = AlertPlanner.notificationId(note.id);
+        String openRoute = route == null || route.isEmpty() ? "today" : route;
+        NotificationCompat.Builder builder = base(context, channel, note.title, note.body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(Notification.CATEGORY_PROMO)
+            .setAutoCancel(true)
+            .setContentIntent(OpenMatch.view(context, note.matchId == null ? "" : note.matchId, openRoute, ""));
+        if (picture != null) {
+            builder.setLargeIcon(picture);
+            builder.setStyle(new NotificationCompat.BigPictureStyle().bigPicture(picture).setSummaryText(note.body));
+        }
+        if (code != null && !code.trim().isEmpty()) {
+            Intent copy = new Intent(context, NotifToastActivity.class);
+            copy.setAction(NotificationActionReceiver.ACTION_COPY);
+            copy.putExtra(NotificationActionReceiver.EXTRA_CODE, code.trim());
+            copy.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+            builder.addAction(0, "Copy code", PendingIntent.getActivity(context, AlertPlanner.notificationId("promo-copy:" + note.id), copy, flags));
+        }
+        NotificationManagerCompat.from(context).notify(note.id, id, builder.build());
+        return true;
     }
 
     private static PendingIntent openApp(Context context) {

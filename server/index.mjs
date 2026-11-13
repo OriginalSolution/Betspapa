@@ -10,6 +10,7 @@ import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, st
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
 import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
+import { promoPng, publicPromos, syncPromos } from './promo/service.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
 const pushWatch = startPushWatch();
@@ -204,6 +205,22 @@ async function handleApi(req, res, url) {
   }
   if (req.method !== 'GET') {
     send(res, 405, { error: 'Method not allowed' });
+    return;
+  }
+  const promoFile = url.pathname.match(/^\/api\/promos\/(.+)\.png$/);
+  if (promoFile) {
+    const png = promoPng(decodeURIComponent(promoFile[1]));
+    if (!png) {
+      send(res, 404, { error: 'Promo art was not found.' });
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=300', 'Content-Length': png.length });
+    res.end(png);
+    return;
+  }
+  if (url.pathname === '/api/promos') {
+    const origin = `${req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'}://${req.headers.host || 'localhost'}`;
+    send(res, 200, { promos: publicPromos(origin) });
     return;
   }
   if (url.pathname === '/api/health') {
@@ -441,7 +458,13 @@ if (invoked) {
     loadUpcomingEvents()
       .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
       .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
-    startEngine();
-    pushWatch.start();
-  });
+  startEngine();
+  pushWatch.start();
+  const promoTimer = setInterval(() => {
+    syncPromos({ engine: getEngineState(), events: getCachedEvents(), book: pushBook, origin: `http://127.0.0.1:${port}` }).catch((error) => {
+      console.error(`[promo] ${error instanceof Error ? error.message : error}`);
+    });
+  }, 60_000);
+  promoTimer.unref?.();
+});
 }
