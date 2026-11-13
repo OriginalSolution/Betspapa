@@ -51,3 +51,27 @@ test('betPawa drops a price under 1.20 and records why', async () => {
   assert.match(books.betpawa.dropped[0].reason, /1\.15 is below 1\.20/);
   assert.equal(books.betpawa.dropped[0].market, 'home');
 });
+
+test('Betika records a leg it silently left off the shared slip', async () => {
+  resetBookerCache();
+  const request = async (method, url) => {
+    if (url.includes('pcUpcomingEvents')) return {};
+    if (url.includes('betika') && url.includes('encode')) return { code: 'BK9' };
+    if (url.includes('betika') && url.includes('decode')) {
+      return { data: [{ parent_match_id: '7', sub_type_id: '18', special_bet_value: 'total=1.5', outcome_id: '12', odd_value: '1.30', valid: '1' }] };
+    }
+    return {};
+  };
+  const books = await bookAll(
+    [
+      { eventId: 'sr:match:7', market: 'over15', odds: 1.3, match: 'A vs B' },
+      { eventId: 'sr:match:8', market: 'over15', odds: 1.3, match: 'C vs D' },
+    ],
+    request,
+    undefined,
+    ['betika'],
+  );
+  assert.equal(books.betika.parts[0].legs, 1);
+  assert.equal(books.betika.dropped.length, 1);
+  assert.equal(books.betika.dropped[0].eventId, 'sr:match:8');
+});
