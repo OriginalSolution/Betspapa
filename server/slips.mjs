@@ -16,6 +16,49 @@ export function bookableLegs(legs, now = new Date()) {
   );
 }
 
+export function legRate(leg) {
+  const rate = Number(leg?.rate);
+  if (Number.isFinite(rate)) return rate > 1 ? rate / 100 : rate;
+  const occurrence = Number(leg?.occurrence);
+  if (!Number.isFinite(occurrence)) return 0;
+  return occurrence > 1 ? occurrence / 100 : occurrence;
+}
+
+const TIERS = [
+  { id: '100', min: 0.995, label: '100%' },
+  { id: '90', min: 0.9, label: '90%+' },
+  { id: '80', min: 0.8, label: '80%+' },
+];
+
+/** Every qualifying leg in a confidence band, plus one slip per market inside that band. */
+export function tierSlips(legs) {
+  const slips = [];
+  for (const tier of TIERS) {
+    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min);
+    if (!rows.length) continue;
+    const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
+    slips.push({
+      id: `tier:${tier.id}`,
+      tier: tier.id,
+      market: null,
+      name: `${tier.label} all picks`,
+      label: `${tier.label} all picks`,
+      legs: ordered,
+    });
+    for (const group of trendGroups(ordered)) {
+      slips.push({
+        id: `tier:${tier.id}:${group.market}`,
+        tier: tier.id,
+        market: group.market,
+        name: `${tier.label} ${group.label}`,
+        label: group.label,
+        legs: group.legs,
+      });
+    }
+  }
+  return slips;
+}
+
 /** One trend per market with at least one qualifying leg, biggest first. */
 export function trendGroups(legs) {
   const byMarket = new Map();

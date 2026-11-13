@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayRangeIso } from '../lib/dates';
-import { fetchSportyBoard, FIXTURE_FEED, type FixtureResult, type FixtureTransport } from './remote';
+import { dayFixtureUrl, fetchSportyBoard, type FixtureResult, type FixtureTransport } from './remote';
 import type { SportyEvent } from './sporty';
 
 function event(kickoff: string): SportyEvent {
@@ -51,7 +51,8 @@ describe('fixture loading', () => {
       }),
     );
     expect(localCalls).toBe(0);
-    expect(directUrl).toBe(FIXTURE_FEED);
+    const range = dayRangeIso('2026-11-10');
+    expect(directUrl).toBe(dayFixtureUrl(range.from, range.to));
     expect(matches).toHaveLength(1);
     expect(matches[0]?.home.name).toBe('Man City');
     expect(matches[0]?.feed).toBe('sporty');

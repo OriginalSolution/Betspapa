@@ -7,6 +7,8 @@ import { LIVE_FEED, parseLivePayload } from '../lib/liveBoard';
 import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
+export const FIXTURE_DAY_URL = 'https://api.betspapa.com/api/fixtures';
+export const LIVE_API = 'https://api.betspapa.com/api/live';
 export { LIVE_FEED };
 
 export type FixtureBody = { events?: SportyEvent[]; error?: string; message?: string };
@@ -79,11 +81,13 @@ function defaultTransport(): FixtureTransport {
   };
 }
 
+export function dayFixtureUrl(from: string, to: string): string {
+  return `${FIXTURE_DAY_URL}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+}
+
 export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   let lastError = 'Fixture feed failed';
-  // The packaged app has no local /api server. Browser fetch would send Origin
-  // https://localhost and the fixtures API would reject it.
   if (!transport.native) {
     try {
       const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
@@ -95,6 +99,16 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
       lastError = error instanceof Error ? error.message : lastError;
     }
   }
+  try {
+    const slim = await transport.direct(dayFixtureUrl(from, to));
+    if (slim.status >= 200 && slim.status < 300 && Array.isArray(slim.body?.events)) {
+      return mapSportyEvents(slim.body.events, from, to);
+    }
+    lastError = fixtureFailure(slim);
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : lastError;
+  }
+  // The full catalogue is the fallback when the one-day list is unavailable.
   try {
     const direct = await transport.direct(FIXTURE_FEED);
     if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
@@ -122,6 +136,12 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
     return parseLivePayload(result.body as { data?: [] });
   };
   let lastError = 'In-play scores failed';
+  try {
+    const slim = transport.native ? await transport.direct(LIVE_API) : await browserResult(await fetch(LIVE_API));
+    return read(slim);
+  } catch (error) {
+    lastError = error instanceof Error ? error.message : lastError;
+  }
   if (!transport.native) {
     try {
       return read(await transport.local('/api/live'));

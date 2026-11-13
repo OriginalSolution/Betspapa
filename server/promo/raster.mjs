@@ -12,10 +12,10 @@ export function fontFiles() {
     .map((name) => join(fontDir, name));
 }
 
-/** Rasterise a poster SVG to a PNG about 1080px wide. */
-export function svgToPng(svg) {
+/** Rasterise a poster SVG. Phone banners use a smaller width than the full poster. */
+export function svgToPng(svg, width = 1080) {
   const resvg = new Resvg(svg, {
-    fitTo: { mode: 'width', value: 1080 },
+    fitTo: { mode: 'width', value: width },
     font: {
       fontFiles: fontFiles(),
       loadSystemFonts: false,

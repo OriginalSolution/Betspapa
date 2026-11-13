@@ -1315,6 +1315,32 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   border-bottom: 2px solid transparent;
 }
 .market-filter.is-on { color: var(--text); border-bottom-color: var(--red); }
+.market-filter small { display: block; margin-top: 2px; color: var(--faint); font-size: 10px; font-weight: 750; letter-spacing: 0.04em; }
+.market-filter.is-on small { color: var(--text); }
+.code-strip { display: grid; gap: 8px; }
+.code-tiers { display: flex; gap: 6px; }
+.code-tier {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.code-tier.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.code-card {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.code-card-title { margin: 0; color: var(--faint); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.code-value { margin: 4px 0 0; font-family: var(--score); font-size: 28px; letter-spacing: 0.04em; }
+.code-part-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.code-markets { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.code-markets::-webkit-scrollbar { display: none; }
 .tip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .tip-head h2 { margin: 4px 0 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .tip-head span { color: var(--faint); font-size: 12px; font-weight: 700; }
@@ -1722,6 +1748,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 }
 .trend-code { font-size: 28px; line-height: 1.05; }
 .trend-nocode { margin: 14px 0 4px; color: var(--muted); font-size: 16px; font-weight: 700; }
+.trend-updated { margin: 4px 0 0; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
 .trend-part + .trend-part { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
 .trend-part-label { margin: 0 0 2px; color: var(--faint); font-size: 10px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase; }
 .trend-part-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 650; }

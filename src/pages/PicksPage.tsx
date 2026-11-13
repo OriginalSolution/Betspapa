@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CodeStrip } from '../components/CodeStrip';
 import { Crest } from '../components/Crest';
 import { FormPips } from '../components/PickCard';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { fetchEngine, marketLabel, readEngineCache, writeEngineCache, ENGINE_POLL_MS, type EngineState } from '../lib/engineSlips';
+import { fetchEngine, marketLabel, readEngineCache, writeEngineCache, ENGINE_POLL_MS, type DeskId, type EngineState } from '../lib/engineSlips';
+import { slipParts, tierMin, tierSlip, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
 import { cx, kickoffClock } from '../lib/format';
 import { combinedOdds, marketFilters, tipsFromEngine, type PickChip, type PickTip } from '../lib/matchPicks';
 import type { Team } from '../types';
@@ -50,6 +52,8 @@ export function PicksPage() {
   const { lists, addLeg, removeLeg, slip } = useProduct();
   const { state, problem } = useEngine();
   const [market, setMarket] = useState('all');
+  const [desk, setDesk] = useState<DeskId>('sportybet');
+  const [tier, setTier] = useState<CodeTier>('80');
   const [catalog, setCatalog] = useState<CrestCatalog>(emptyCatalog);
   const [chosen, setChosen] = useState<string[]>(() => {
     try {
@@ -82,11 +86,13 @@ export function PicksPage() {
       (tip) => !blocked.markets.has(tip.chip.market) && !blocked.teams.has(tip.chip.teamId) && !blocked.competitions.has(tip.competitionId),
     );
   }, [state, matches, blocked]);
-  const filters = useMemo(() => marketFilters(tips), [tips]);
+  const band = useMemo(() => tips.filter((tip) => (tip.chip.rate ?? 0) + 1e-12 >= tierMin(tier)), [tips, tier]);
+  const filters = useMemo(() => marketFilters(band), [band]);
   useEffect(() => {
     if (market !== 'all' && !filters.some((item) => item.id === market)) setMarket('all');
   }, [filters, market]);
-  const shown = market === 'all' ? tips : tips.filter((tip) => tip.chip.market === market);
+  const shown = market === 'all' ? band : band.filter((tip) => tip.chip.market === market);
+  const booked = slipParts(tierSlip(state, tier, market === 'all' ? null : market), desk);
 
   const selected = useMemo(() => {
     const byId = new Map(tips.map((tip) => [tip.chip.id, tip.chip]));
@@ -103,6 +109,16 @@ export function PicksPage() {
 
   return (
     <div className={cx('stack', 'picks-page', selected.length > 0 && 'has-float')}>
+      <CodeStrip
+        desk={desk}
+        tier={tier}
+        title={market === 'all' ? `${TIER_LABEL[tier]} master` : filters.find((item) => item.id === market)?.label || market}
+        parts={booked.parts}
+        bookedAt={booked.bookedAt}
+        note={state?.showingCached ? 'Showing the last booked board' : undefined}
+        onDesk={setDesk}
+        onTier={setTier}
+      />
       <div className="market-filters" role="tablist" aria-label="Filter by market">
         <button type="button" role="tab" aria-selected={market === 'all'} className={cx('market-filter', market === 'all' && 'is-on')} onClick={() => setMarket('all')}>
           All
@@ -117,11 +133,12 @@ export function PicksPage() {
             onClick={() => setMarket(item.id)}
           >
             {item.label}
+            <small>{slipParts(tierSlip(state, tier, item.id), desk).parts[0]?.code || ''}</small>
           </button>
         ))}
       </div>
       <div className="tip-head">
-        <h2>Today’s 80%+ tips</h2>
+        <h2>{TIER_LABEL[tier]} tips</h2>
         <span>{shown.length === 1 ? '1 tip' : `${shown.length} tips`}</span>
       </div>
       {!state && <p className="lede">{problem ? 'Could not load picks. They appear when the engine responds.' : 'Loading picks.'}</p>}

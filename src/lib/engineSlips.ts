@@ -123,6 +123,10 @@ export type EngineState = {
   updatedAt: string | null;
   master: EngineSlip | null;
   trends: EngineSlip[];
+  /** Confidence-band slips: every qualifying leg, and one slip per market. */
+  tiers?: EngineSlip[];
+  /** The live payload had no codes, so this is the previous booked board. */
+  showingCached?: boolean;
 };
 
 const listeners = new Set<() => void>();
@@ -242,10 +246,12 @@ export function parseEngine(body: unknown): EngineState {
   const row = asRecord(body);
   if (!row) throw new Error('Slips feed was empty');
   const trends = Array.isArray(row.trends) ? row.trends.map(parseSlip).filter((slip): slip is EngineSlip => Boolean(slip)) : [];
+  const tiers = Array.isArray(row.tiers) ? row.tiers.map(parseSlip).filter((slip): slip is EngineSlip => Boolean(slip)) : [];
   return {
     updatedAt: text(row.updatedAt),
     master: parseSlip(row.master),
     trends,
+    tiers,
   };
 }
 
@@ -261,6 +267,12 @@ export function readEngineCache(): EngineState | null {
 }
 
 export function writeEngineCache(state: EngineState): void {
+  const cached = readEngineCache();
+  if (!engineHasCodes(state) && cached && engineHasCodes(cached)) {
+    memory = { ...cached, showingCached: true };
+    for (const listener of listeners) listener();
+    return;
+  }
   memory = state;
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(state));
@@ -274,25 +286,52 @@ function engineHasRows(state: EngineState): boolean {
   return Boolean(state.master) || state.trends.length > 0;
 }
 
+function slipCoded(slip: EngineSlip | null | undefined): boolean {
+  if (!slip) return false;
+  return DESKS.some((desk) => (slip.books[desk]?.parts || []).some((part) => part.code));
+}
+
+/** A booked code on the master slip or any market slip. An empty cycle is not a board. */
+export function engineHasCodes(state: EngineState | null | undefined): boolean {
+  if (!state) return false;
+  return slipCoded(state.master) || state.trends.some(slipCoded);
+}
+
+/** Keep the last booked board when the feed comes back with nothing to show. */
+export function preferEngine(next: EngineState, cached: EngineState | null): EngineState {
+  if (engineHasCodes(next) || !cached || !engineHasCodes(cached)) return next;
+  return { ...cached, showingCached: true };
+}
+
 /** The phone reads the public engine. The site reads same-origin /api/engine, then that public URL. */
 export async function fetchEngine(): Promise<EngineState> {
+  const cached = readEngineCache();
+  const finish = (state: EngineState) => preferEngine(state, cached);
   if (isNativeApp()) {
     const response = await CapacitorHttp.request(nativeRequestOptions('GET', ENGINE_URL, { connectMs: 20_000, readMs: 30_000 }));
-    if (response.status < 200 || response.status >= 300) throw new Error(`Slips returned ${response.status}`);
-    return parseEngine(readJsonBody(response.data));
+    if (response.status < 200 || response.status >= 300) {
+      if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
+      throw new Error(`Slips returned ${response.status}`);
+    }
+    return finish(parseEngine(readJsonBody(response.data)));
   }
   try {
     const local = await fetch('/api/engine');
     if (local.ok) {
       const state = parseEngine(await local.json());
-      if (engineHasRows(state)) return state;
+      if (engineHasRows(state)) return finish(state);
     }
   } catch {
     /* GitHub Pages has no API process */
   }
-  const response = await fetch(ENGINE_URL);
-  if (!response.ok) throw new Error(`Slips returned ${response.status}`);
-  return parseEngine(await response.json());
+  try {
+    const response = await fetch(ENGINE_URL);
+    if (!response.ok) throw new Error(`Slips returned ${response.status}`);
+    return finish(parseEngine(await response.json()));
+  } catch (error) {
+    if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
+    throw error;
+  }
 }
 
 export function deskBook(slip: EngineSlip | null | undefined, desk: DeskId): EngineBook {

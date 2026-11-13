@@ -34,8 +34,8 @@ function render(card) {
   const full = card.kind === 'share' ? shareSvg(card, logos) : card.kind === 'weekend' ? weekendSvg(art, logos) : posterSvg(art, logos);
   return {
     png: svgToPng(full),
-    banner: svgToPng(bannerSvg(art, logos)),
-    notify: svgToPng(notifySvg(art, logos)),
+    banner: svgToPng(bannerSvg(art, logos), 800),
+    notify: svgToPng(notifySvg(art, logos), 720),
   };
 }
 

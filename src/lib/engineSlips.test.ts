@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookingForPick, deskBook, parseEngine, showOdds, visibleLegs } from './engineSlips';
+import { bookingForPick, deskBook, engineHasCodes, parseEngine, preferEngine, showOdds, visibleLegs } from './engineSlips';
 
 const payload = {
   updatedAt: '2026-11-13T07:58:55.651Z',
@@ -70,5 +70,17 @@ describe('engine slips', () => {
     expect(visibleLegs(state.master)[0]?.sample).toBe('9/10');
     expect(bookingForPick(state, 'sr:match:1', 'over15')).toEqual({ bookId: 'sportybet', code: '89ANH4' });
     expect(bookingForPick(state, 'sr:match:9', 'over15')).toBeNull();
+  });
+
+  it('keeps a cached booked board when the feed comes back empty', () => {
+    const cached = parseEngine(payload);
+    const empty = parseEngine({ updatedAt: null, master: null, trends: [] });
+    expect(engineHasCodes(cached)).toBe(true);
+    expect(engineHasCodes(empty)).toBe(false);
+    const kept = preferEngine(empty, cached);
+    expect(kept.showingCached).toBe(true);
+    expect(kept.master?.books.sportybet?.parts[0]?.code).toBe('FMS75V');
+    expect(kept.updatedAt).toBe(cached.updatedAt);
+    expect(preferEngine(cached, empty).showingCached).toBeUndefined();
   });
 });
