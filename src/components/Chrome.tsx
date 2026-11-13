@@ -77,7 +77,7 @@ export function TopBar({ title }: { title: string }) {
       </NavLink>
       <div className="top-title">
         <h1>{title}</h1>
-        <p>{title === 'Today' ? longDay(date) : 'Today’s fixtures'}</p>
+        <p>{title === 'Today' ? longDay(date) : title === 'Trends' ? 'Flip the code to see legs' : 'Today’s fixtures'}</p>
       </div>
       <div className="top-actions">
         <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh scores">
