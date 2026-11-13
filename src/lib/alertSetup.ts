@@ -20,6 +20,10 @@ export type AlertDeviceStatus = {
   setupFinished: boolean;
   /** Epoch millis of the last native poll that reached the feeds. 0 means none yet. */
   lastPollAt: number;
+  /** Whether the selected cheer can be heard. Off when the user picked Off, or the phone will mute it. */
+  notificationSound: 'on' | 'off';
+  /** Notifications are allowed, a cheer is selected, and the phone will still not play it. */
+  soundBlocked: boolean;
 };
 
 export type SetupRecord = {
@@ -57,6 +61,8 @@ export function emptyDeviceStatus(): AlertDeviceStatus {
     setupVersion: 0,
     setupFinished: false,
     lastPollAt: 0,
+    notificationSound: 'off',
+    soundBlocked: false,
   };
 }
 
@@ -68,6 +74,8 @@ export function parseDeviceStatus(raw: {
   setupVersion?: unknown;
   setupFinished?: unknown;
   lastPollAt?: unknown;
+  notificationSound?: unknown;
+  soundBlocked?: unknown;
 } | null | undefined): AlertDeviceStatus {
   const fallback = emptyDeviceStatus();
   if (!raw) return fallback;
@@ -81,6 +89,8 @@ export function parseDeviceStatus(raw: {
     setupVersion: typeof raw.setupVersion === 'number' && Number.isFinite(raw.setupVersion) ? raw.setupVersion : 0,
     setupFinished: Boolean(raw.setupFinished),
     lastPollAt: typeof raw.lastPollAt === 'number' && Number.isFinite(raw.lastPollAt) ? raw.lastPollAt : 0,
+    notificationSound: raw.notificationSound === 'on' ? 'on' : 'off',
+    soundBlocked: Boolean(raw.soundBlocked),
   };
 }
 
@@ -235,8 +245,8 @@ export function stepCopy(step: AlertStepId, oem: OemBrand | null, phase: FlowPha
   }
   return {
     title: 'Test it',
-    body: 'We send one alert in about 10 seconds. Leave Betspapa, then come back.',
-    action: 'Send test notification',
+    body: 'We send one alert in about 10 seconds through the same goal-sound channel the watcher uses. Leave Betspapa, then come back. You should hear the cheer you picked. If it is silent, turn Notification sound on for that channel.',
+    action: 'Play test sound',
   };
 }
 

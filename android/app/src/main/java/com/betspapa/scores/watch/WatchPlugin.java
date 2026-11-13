@@ -1,6 +1,8 @@
 package com.betspapa.scores.watch;
 
 import android.Manifest;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -298,6 +300,39 @@ public class WatchPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Opens the goal-sound channel, or the system sound screen when the ringer is what is muted. */
+    @PluginMethod
+    public void openNotificationSound(PluginCall call) {
+        Context context = getContext();
+        if (context == null) {
+            call.reject("Watch is not ready");
+            return;
+        }
+        AlertPoster.ensure(context);
+        boolean channelMuted = false;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(AlertPoster.channelIdForSelected(context));
+            channelMuted = channel == null || channel.getImportance() < NotificationManager.IMPORTANCE_DEFAULT || channel.getSound() == null;
+        }
+        Intent intent;
+        if (channelMuted && Build.VERSION.SDK_INT >= 26) {
+            intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, AlertPoster.channelIdForSelected(context));
+        } else {
+            intent = new Intent(Settings.ACTION_SOUND_SETTINGS);
+        }
+        if (!(context instanceof android.app.Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            context.startActivity(intent);
+        } catch (RuntimeException error) {
+            call.reject("Could not open sound settings");
+            return;
+        }
+        call.resolve(statusObject());
+    }
+
     private JSObject statusObject() {
         Context context = getContext();
         JSObject result = new JSObject();
@@ -336,6 +371,8 @@ public class WatchPlugin extends Plugin {
         }
         result.put("liveCount", live);
         result.put("lastPollAt", lastPollAt);
+        result.put("notificationSound", context != null && AlertPoster.notificationSoundOn(context) ? "on" : "off");
+        result.put("soundBlocked", context != null && AlertPoster.notificationSoundBlocked(context));
         return result;
     }
 

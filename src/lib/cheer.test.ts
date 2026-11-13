@@ -5,6 +5,7 @@ import {
   GOAL_SOUND_URL,
   goalNotificationChannel,
   playbackGain,
+  shouldPlayInAppCheer,
   playGoalSound,
   resetGoalAudioForTests,
 } from './cheer';
@@ -60,6 +61,16 @@ describe('goal cheer playback', () => {
       played: audio.played,
       muted: audio.muted,
     }));
+    expect(goalNotificationChannel('crowd')).toBe('betspapa.goal.crowd.v4');
+    expect(goalNotificationChannel('afro')).toBe('betspapa.goal.afro.v4');
+    expect(goalNotificationChannel('chant')).toBe('betspapa.goal.chant.v4');
+    expect(goalNotificationChannel('papa')).toBe('betspapa.goal.papa.v4');
+    expect(goalNotificationChannel('off')).toBe('betspapa.goal.off.v4');
+    expect(shouldPlayInAppCheer(true, true, 'granted')).toBe(false);
+    expect(shouldPlayInAppCheer(true, false, 'granted')).toBe(true);
+    expect(shouldPlayInAppCheer(true, true, 'denied')).toBe(true);
+    expect(shouldPlayInAppCheer(false, true, 'granted')).toBe(true);
+
     expect(played).toEqual([
       { src: GOAL_SOUND_URL.crowd, volume: 0.6, played: 1, muted: false },
       { src: GOAL_SOUND_URL.afro, volume: 0.6, played: 1, muted: false },

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAlertSetup } from '../components/AlertSetup';
 import { playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
-import { requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
+import { openNotificationSound, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
 import { useStore } from '../state/store';
@@ -305,6 +305,21 @@ function AndroidWatchStatus() {
         <span>Alert health</span>
         <strong className={pollIsStale(status.lastPollAt) ? 'is-bad' : status.lastPollAt ? 'is-good' : undefined}>{pollLabel(status.lastPollAt)}</strong>
       </div>
+      <div className="stat">
+        <span>Notification sound</span>
+        <strong className={status.notificationSound === 'on' ? 'is-good' : 'is-bad'}>{status.notificationSound === 'on' ? 'On' : 'Off'}</strong>
+      </div>
+      {status.soundBlocked && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            void openNotificationSound().then(applyStatus);
+          }}
+        >
+          Turn notification sound on
+        </button>
+      )}
       {pollIsStale(status.lastPollAt) && (
         <button type="button" className="btn" onClick={startAgain}>
           Alerts look stuck. Set up again
@@ -317,9 +332,9 @@ function AndroidWatchStatus() {
           void scheduleBackgroundTest().then((ok) => setTestNote(ok));
         }}
       >
-        Send test background notification
+        Play test sound
       </button>
-      {testNote && <p className="status-ok">Close Betspapa. A test alert should arrive in about 10 seconds.</p>}
+      {testNote && <p className="status-ok">Close Betspapa. You should hear the selected goal sound in about 10 seconds.</p>}
       <button type="button" className="btn" data-setup-again onClick={startAgain}>
         Run alert setup again
       </button>

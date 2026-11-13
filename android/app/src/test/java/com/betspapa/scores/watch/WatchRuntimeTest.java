@@ -35,6 +35,7 @@ public class WatchRuntimeTest {
 
     @After
     public void tearDown() throws Exception {
+        WatchScheduler.noteUiForeground(false);
         FeedClient.overrideFeeds(null, null);
         server.shutdown();
     }
@@ -60,6 +61,9 @@ public class WatchRuntimeTest {
         assertEquals(0, goalCount(context));
         assertEquals(1, liveCount(context));
 
+        // HiOS can leave the activity resumed while the user is in another app.
+        // That used to force the silent channel. The persisted cheer still has to play.
+        WatchScheduler.noteUiForeground(true);
         score.set("1:0");
         WatchRuntime.PollResult scored = WatchRuntime.pollOnce(context);
         assertTrue(scored.hot);
@@ -68,6 +72,8 @@ public class WatchRuntimeTest {
         assertEquals("Goal · Hearts", goal.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
         assertTrue(goal.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Kotoko"));
         assertEquals(AlertPoster.GOAL_CROWD, goal.getChannelId());
+        assertEquals("android.resource://" + context.getPackageName() + "/raw/cheer_crowd", String.valueOf(goal.sound));
+        assertEquals(0, goal.flags & Notification.FLAG_ONLY_ALERT_ONCE);
         assertEquals(1, liveCount(context));
 
         WatchRuntime.pollOnce(context);

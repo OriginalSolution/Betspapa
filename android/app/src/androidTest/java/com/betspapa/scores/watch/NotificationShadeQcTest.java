@@ -325,7 +325,7 @@ public class NotificationShadeQcTest {
         Thread.sleep(900);
         shot(device, "goal-papa-channel");
         device.executeShellCommand("cmd statusbar collapse");
-        if (!onPapa) throw new AssertionError("goal was not posted on betspapa.goal.papa");
+        if (!onPapa) throw new AssertionError("goal was not posted on " + AlertPoster.GOAL_PAPA);
     }
 
     private static void shotSettings(UiDevice device, Context target) throws Exception {

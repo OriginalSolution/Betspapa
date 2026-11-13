@@ -66,6 +66,8 @@ export type WatchDeviceStatus = {
   setupVersion?: number;
   setupFinished?: boolean;
   lastPollAt?: number;
+  notificationSound?: 'on' | 'off';
+  soundBlocked?: boolean;
 };
 
 type WatchPlugin = {
@@ -78,6 +80,7 @@ type WatchPlugin = {
   openAutostart(): Promise<WatchDeviceStatus & { opened?: string }>;
   markSetup(options: { version: number; finished: boolean }): Promise<WatchDeviceStatus>;
   scheduleTest(): Promise<void>;
+  openNotificationSound(): Promise<WatchDeviceStatus>;
   present(options: { payload: string }): Promise<void>;
   addListener(eventName: 'resume', listenerFunc: (status: WatchDeviceStatus) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'pause', listenerFunc: () => void): Promise<PluginListenerHandle>;
@@ -285,7 +288,17 @@ export function watchNativeEvents(handlers: {
   };
 }
 
-/** Schedules a native notification about 10 seconds later. Closing the app does not cancel it. */
+/** Opens the goal-sound channel settings, or the system sound screen when the ringer is muted. */
+export async function openNotificationSound(): Promise<WatchDeviceStatus | null> {
+  if (!isNativeApp()) return null;
+  try {
+    return await Watch.openNotificationSound();
+  } catch {
+    return null;
+  }
+}
+
+/** Schedules a native notification about 10 seconds later, on the selected goal-sound channel. Closing the app does not cancel it. */
 export async function scheduleBackgroundTest(): Promise<boolean> {
   if (!isNativeApp()) return false;
   try {

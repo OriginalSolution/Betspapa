@@ -1,4 +1,5 @@
 import type { GoalSound, InboxItem, Match } from '../types';
+import { goalNotificationChannel } from './cheer';
 import { isNativeApp } from './nativeHttp';
 
 export type BrowserPermission = NotificationPermission | 'unsupported';
@@ -14,21 +15,20 @@ export async function ensureGoalChannels(): Promise<void> {
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
     const channels: Array<{ id: string; name: string; sound?: string }> = [
-      { id: 'betspapa.goal.crowd', name: 'Goal · Crowd', sound: 'cheer_crowd.mp3' },
-      { id: 'betspapa.goal.afro', name: 'Goal · Afrobeats', sound: 'cheer_afro.mp3' },
-      { id: 'betspapa.goal.chant', name: 'Goal · Chant', sound: 'cheer_chant.mp3' },
-      { id: 'betspapa.goal.papa', name: 'Goal · Papa Shout', sound: 'cheer_papa.ogg' },
-      { id: 'betspapa.goal.off', name: 'Goal · Silent' },
-      { id: 'betspapa.alerts', name: 'Match alerts' },
+      { id: goalNotificationChannel('crowd'), name: 'Goal · Crowd', sound: 'cheer_crowd.mp3' },
+      { id: goalNotificationChannel('afro'), name: 'Goal · Afrobeats', sound: 'cheer_afro.mp3' },
+      { id: goalNotificationChannel('chant'), name: 'Goal · Chant', sound: 'cheer_chant.mp3' },
+      { id: goalNotificationChannel('papa'), name: 'Goal · Papa Shout', sound: 'cheer_papa.ogg' },
+      { id: goalNotificationChannel('off'), name: 'Goal · Silent' },
     ];
     for (const channel of channels) {
       await LocalNotifications.createChannel({
         id: channel.id,
         name: channel.name,
         description: 'Betspapa match alerts',
-        importance: 5,
+        importance: 4,
         visibility: 1,
-        vibration: channel.id !== 'betspapa.goal.off',
+        vibration: channel.id !== goalNotificationChannel('off'),
         ...(channel.sound ? { sound: channel.sound } : {}),
       });
     }

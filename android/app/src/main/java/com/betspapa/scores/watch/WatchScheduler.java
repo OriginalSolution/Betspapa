@@ -53,6 +53,11 @@ public final class WatchScheduler {
         return uiForeground;
     }
 
+    /** Records the activity flag without arming WorkManager. Unit tests use this. */
+    static void noteUiForeground(boolean foreground) {
+        uiForeground = foreground;
+    }
+
     /**
      * The activity being visible is when Android still allows a foreground service
      * to start. Leaving the screen must not be the moment we try to start one:
