@@ -240,6 +240,7 @@ async function betikaTry(legs, request) {
     });
     if (!short.length) {
       dropped.push(...invalid.map((leg) => drop(leg, 'Betika marked this selection invalid.')));
+      dropped.push(...group.filter((leg) => !rowByKey.has(selKey(leg))).map((leg) => drop(leg, 'Betika left this selection off the slip (not offered).')));
       const kept = valid.filter((row) => Number(row.odd_value) >= MIN_ODDS);
       return {
         booked: {
