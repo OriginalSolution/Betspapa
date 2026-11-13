@@ -16,7 +16,7 @@ import {
   type TrendView,
 } from '../data/board';
 import { staleTrendIds, trendHitNotices } from '../lib/alerts';
-import { stageWatch } from '../lib/deviceWatch';
+import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
@@ -180,7 +180,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     if (notes.length) pushNotices(notes);
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
-  useEffect(() => {
+  const syncDeviceRef = useRef<() => void>(() => {});
+  syncDeviceRef.current = () => {
     const byMatch = new Map(matches.map((match) => [match.id, match]));
     const engine = readEngineCache();
     const bookings = picks
@@ -221,7 +222,30 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         penaltySound: settings.penaltySound,
       },
     });
+  };
+
+  useEffect(() => {
+    syncDeviceRef.current();
   }, [trendFollows, matches, picks, engineTick, follows, settings]);
+
+  useEffect(() => {
+    let last = 0;
+    const send = () => {
+      const now = Date.now();
+      if (now - last < 4000) return;
+      last = now;
+      syncDeviceRef.current();
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') send();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const stop = watchNativeEvents({ resume: () => send() });
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      stop();
+    };
+  }, []);
 
   useEffect(() => {
     if (!watchReady || !trendFollows.length) return;

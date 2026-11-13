@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#07080c">
+  <meta name="color-scheme" content="dark">
+  <title>Command centre · Betspapa</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07080c;
+      --card: rgba(18, 21, 28, .86);
+      --text: #f4f6fb;
+      --muted: #949bab;
+      --faint: #676e7e;
+      --red: #e11d2e;
+      --red-2: #ff4d5a;
+      --line: rgba(255, 255, 255, .08);
+      --green: #3ddc97;
+      --gold: #f0c94a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background:
+      radial-gradient(900px 420px at 50% -120px, rgba(225, 29, 46, .22), transparent 60%),
+      var(--bg); color: var(--text); font-family: "Avenir Next", "Segoe UI", sans-serif; }
+    body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 2px; z-index: 20;
+      background: linear-gradient(90deg, transparent, var(--red) 20%, #ffb703 50%, var(--red) 80%, transparent); }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { opacity: .45; cursor: default; }
+    .top { position: sticky; top: 0; z-index: 10; background: rgba(7, 8, 12, .9); backdrop-filter: blur(16px); border-bottom: 1px solid var(--line); }
+    .bar, .wrap { width: min(1180px, calc(100% - 28px)); margin: 0 auto; }
+    .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 10px 0; }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .logo { width: 42px; height: 42px; flex: none; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: -.04em; }
+    .brand p, .updated, .sub, .empty, .metric span, .tile span, .chip span, .desk small, .alert time, .apk small { color: var(--muted); }
+    .brand p { margin: 2px 0 0; font-size: 13px; }
+    .who { display: flex; align-items: center; gap: 10px; }
+    .signed { font-size: 13px; color: var(--gold); }
+    .who button, .ghost { border: 1px solid var(--line); background: transparent; border-radius: 999px; min-height: 40px; padding: 0 14px; }
+    .wrap { padding: 16px 0 48px; }
+    .status-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+    .chip { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0; }
+    .chip span { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+    .chip b { display: block; margin-top: 3px; font-size: 15px; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+    .chip.open b { color: var(--green); }
+    .chip.bad b { color: var(--red-2); }
+    .chip.off b { color: var(--gold); }
+    .warn { margin: 8px 0 0; color: var(--red-2); font-size: 13px; }
+    .tabs { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0; }
+    .tabs button { border: 1px solid var(--line); background: rgba(255,255,255,.03); border-radius: 999px; min-height: 40px; padding: 0 14px; white-space: nowrap; }
+    .tabs button.active { background: var(--red); border-color: var(--red); color: white; font-weight: 700; }
+    .tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .82fr); gap: 14px; align-items: start; }
+    .side, .stack { display: flex; flex-direction: column; gap: 14px; }
+    .foot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02)); border: 1px solid var(--line); border-radius: 18px; padding: 16px; box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+    .card h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: -.03em; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0; }
+    .tile { background: rgba(0,0,0,.28); border-radius: 14px; padding: 12px; }
+    .tile b { display: block; font-size: 26px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .tile span { font-size: 12px; }
+    .bars { display: flex; align-items: flex-end; gap: 2px; height: 168px; overflow: hidden; padding-top: 8px; }
+    .tick { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+    .tick i { display: block; width: 100%; border-radius: 6px 6px 2px 2px; background: #2a3142; min-height: 6px; }
+    .tick.latest i { background: var(--red); }
+    .tick em, .tick span { font-style: normal; font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; white-space: nowrap; }
+    .split { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .split-row, .desk, .alert, .apk, .line { display: grid; gap: 10px; align-items: center; }
+    .split-row { grid-template-columns: 72px 1fr auto; }
+    .track { height: 8px; border-radius: 99px; background: rgba(255,255,255,.06); overflow: hidden; }
+    .track i { display: block; height: 100%; background: var(--red); border-radius: 99px; }
+    .apk, .line { grid-template-columns: 1fr auto auto; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+    .desk { grid-template-columns: 36px 1fr auto; padding: 9px 0; border-top: 1px solid var(--line); }
+    .desk img { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; background: #111; }
+    .desk b, .desk code { display: block; }
+    .desk code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; margin-top: 2px; }
+    .pill { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; border-radius: 99px; padding: 4px 8px; border: 1px solid var(--line); }
+    .pill.ready { color: var(--green); }
+    .pill.partial { color: var(--gold); }
+    .pill.missing { color: var(--faint); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .actions button, .primary { border: 0; background: var(--red); color: white; border-radius: 12px; min-height: 44px; padding: 0 14px; font-weight: 700; }
+    .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .metric b { display: block; font-size: 28px; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+    .metric span { font-size: 12px; }
+    .alert { grid-template-columns: auto 1fr auto; padding: 8px 0; border-top: 1px solid var(--line); }
+    .alert b { text-transform: capitalize; }
+    .flash { min-height: 1.2em; margin: 8px 0 0; font-size: 13px; color: var(--gold); }
+    .sub { margin: 0 0 10px; font-size: 13px; }
+    h3 { margin: 16px 0 6px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+    @media (max-width: 900px) {
+      .status-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .layout, .foot, .stats { grid-template-columns: 1fr 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      .foot { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .bar { align-items: flex-start; flex-direction: column; padding: 12px 0; }
+      .who { width: 100%; justify-content: space-between; }
+      .status-grid, .stats, .metrics { grid-template-columns: 1fr 1fr; }
+      .tabs-row { align-items: stretch; flex-direction: column; }
+      .tabs { width: 100%; gap: 6px; }
+      .tabs button { padding: 0 8px; font-size: 13px; }
+      h1 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="bar">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#E11D2E"/><path fill="#fff" d="M9 7.2h8.1c3.3 0 5.4 1.6 5.4 4.1 0 1.7-1 3-2.6 3.6 2 .6 3.2 2.1 3.2 4.1 0 2.8-2.4 4.8-6.1 4.8H9V7.2zm3.1 6.4h4.2c1.4 0 2.3-.7 2.3-1.7s-.9-1.7-2.3-1.7h-4.2v3.4zm0 6.8h4.8c1.6 0 2.6-.8 2.6-2s-1-2-2.6-2h-4.8V20.4z"/></svg>
+        <div>
+          <h1>Command centre</h1>
+          <p>Betspapa operations - Africa/Accra</p>
+        </div>
+      </div>
+      <div class="who">
+        <span class="signed">Signed in</span>
+        <form method="post" action="/admin/logout"><button type="submit">Sign out</button></form>
+      </div>
+    </div>
+  </header>
+  <div class="wrap">
+    <div id="status" class="status" aria-label="Live status"><p class="empty">Loading live status…</p></div>
+    <div class="tabs-row">
+      <nav id="tabs" class="tabs" aria-label="Sections"></nav>
+      <p id="updated" class="updated"></p>
+    </div>
+    <div id="view"></div>
+  </div>
+  <script>
+    const TABS = ['Board', 'Installs', 'Codes', 'Push', 'Crests', 'Settings'];
+    const ZONE = 'Africa/Accra';
+    let tab = 'Board';
+    let data = null;
+    let flash = '';
+    let busy = false;
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+    function num(value) {
+      if (value == null || !Number.isFinite(Number(value))) return '—';
+      return new Intl.NumberFormat('en-GB').format(Number(value));
+    }
+    function floor(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(2) : '—';
+    }
+    function clock(iso) {
+      if (!iso) return '—';
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return '—';
+      return new Intl.DateTimeFormat('en-GB', { timeZone: ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+    }
+    function stamp(iso) {
+      if (!iso) return '—';
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return '—';
+      return new Intl.DateTimeFormat('en-GB', { timeZone: ZONE, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
+    }
+    function nextLabel(iso) {
+      if (!iso) return '—';
+      const delta = new Date(iso).getTime() - Date.now();
+      if (!Number.isFinite(delta)) return '—';
+      return 'in ' + Math.max(0, Math.ceil(delta / 60000)) + ' min';
+    }
+    function place(code) {
+      if (!code || code === 'Unknown') return 'Unknown';
+      if (code === 'GH') return 'Ghana';
+      return code;
+    }
+
+    function drawStatus() {
+      const status = data.status || {};
+      const engine = status.engine === 'ERROR' ? 'bad' : 'open';
+      const fcm = status.fcm ? 'open' : 'off';
+      document.getElementById('status').innerHTML =
+        '<div class="status-grid">' +
+        chip('Engine', esc(status.engine || '—'), engine) +
+        chip('FCM', status.fcm ? 'ON' : 'OFF', fcm) +
+        chip('Feed', num(status.feed) + ' fixtures', '') +
+        chip('Last cycle', clock(status.lastCycle), '') +
+        chip('Next', nextLabel(status.nextRunAt), '') +
+        chip('Odds floor', floor(status.oddsFloor), '') +
+        '</div>' +
+        (status.engineError ? '<p class="warn">' + esc(status.engineError) + '</p>' : '');
+      document.getElementById('updated').textContent = data.generatedAt ? 'Updated ' + clock(data.generatedAt) : '';
+    }
+    function chip(label, value, kind) {
+      return '<div class="chip ' + kind + '"><span>' + esc(label) + '</span><b>' + value + '</b></div>';
+    }
+    function drawTabs() {
+      document.getElementById('tabs').innerHTML = TABS.map((name) =>
+        '<button type="button" data-tab="' + name + '" class="' + (name === tab ? 'active' : '') + '">' + name + '</button>').join('');
+    }
+
+    function tiles(installs) {
+      const download = installs.downloads == null ? '—' : num(installs.downloads);
+      return '<div class="stats">' +
+        stat(download, 'Downloads') +
+        stat(num(installs.devices), 'Devices') +
+        stat(num(installs.activeNow), 'Active now') +
+        stat(num(installs.ghana), 'Ghana') +
+        '</div>' +
+        (installs.downloadsError ? '<p class="warn">' + esc(installs.downloadsError) + '</p>' : '');
+    }
+    function stat(value, label) {
+      return '<div class="tile"><b>' + value + '</b><span>' + label + '</span></div>';
+    }
+    function chart(releases) {
+      if (!releases.length) return '<p class="empty">No APK releases to chart.</p>';
+      const max = Math.max(1, ...releases.map((row) => Number(row.downloads) || 0));
+      const last = releases.length - 1;
+      const step = releases.length > 16 ? Math.ceil(releases.length / 8) : 1;
+      return '<p class="sub">Oldest on the left, latest highlighted.</p><div class="bars" role="img" aria-label="Downloads per release, oldest to newest">' + releases.map((row, index) => {
+        const height = Math.max(8, Math.round(((Number(row.downloads) || 0) / max) * 100));
+        const label = String(row.version || '').replace(/^v/i, '');
+        const show = index === 0 || index === last || index % step === 0;
+        return '<div class="tick' + (index === last ? ' latest' : '') + '" title="' + esc(label + ' · ' + num(row.downloads)) + '"><em>' + (show ? num(row.downloads) : '') + '</em><i style="height:' + height + '%"></i><span>' + (show ? esc(label) : '') + '</span></div>';
+      }).join('') + '</div>';
+    }
+    function countries(rows) {
+      if (!rows.length) return '<p class="empty">No devices yet. Existing phones without a country show as Unknown once they register.</p>';
+      const max = Math.max(...rows.map((row) => row.count));
+      return '<div class="split">' + rows.map((row) => {
+        const width = Math.max(4, Math.round((row.count / max) * 100));
+        return '<div class="split-row"><span>' + esc(place(row.code)) + '</span><div class="track"><i style="width:' + width + '%"></i></div><b>' + num(row.count) + '</b></div>';
+      }).join('') + '</div>';
+    }
+    function apks(releases) {
+      const latest = releases.slice().reverse().slice(0, 8);
+      if (!latest.length) return '<p class="empty">No APK releases published.</p>';
+      return latest.map((row) => '<div class="apk"><b>' + esc(row.version) + '</b><span>' + num(row.downloads) + '</span><small>' + esc(stamp(row.publishedAt)) + '</small></div>').join('');
+    }
+    function desks(rows) {
+      return (rows || []).map((row) => {
+        const extra = row.codes && row.codes.length > 1 ? ' +' + (row.codes.length - 1) : '';
+        const code = row.code ? esc(row.code) + extra : '—';
+        const logo = String(row.logo || '').startsWith('/bookies/') ? '<img src="' + esc(row.logo) + '" alt="">' : '<span></span>';
+        return '<div class="desk">' + logo + '<div><b>' + esc(row.name) + '</b><code>' + code + '</code></div><span class="pill ' + esc(String(row.status || '').toLowerCase()) + '">' + esc(row.status || 'Missing') + '</span></div>';
+      }).join('');
+    }
+    function alerts(rows, limit) {
+      const list = (rows || []).slice(0, limit);
+      if (!list.length) return '<p class="empty">No alerts yet.</p>';
+      return list.map((row) => '<div class="alert"><b>' + esc(row.type || 'alert') + '</b><span>' + esc(row.match || '—') + '</span><time>' + esc(stamp(row.time)) + '</time></div>').join('');
+    }
+    function metrics(items) {
+      return '<div class="metrics">' + items.map((item) => '<div class="metric"><b>' + item.value + '</b><span>' + esc(item.label) + '</span></div>').join('') + '</div>';
+    }
+
+    function board() {
+      const installs = data.installs || {};
+      const cycle = data.cycle || {};
+      const push = data.push || {};
+      const trends = data.trends || {};
+      const crests = data.crests || {};
+      return '<div class="layout"><section class="card"><h2>Installs and users</h2><p class="sub">Downloads are GitHub APK totals, cached 10 minutes. Active now means seen in the last 15 minutes.</p>' +
+        tiles(installs) + chart(installs.releases || []) + countries(installs.countries || []) + '<h3>Latest APKs</h3>' + apks(installs.releases || []) +
+        '</section><div class="side">' +
+        '<section class="card"><h2>Run booking cycle</h2><p class="sub">Last finished ' + esc(stamp(cycle.lastFinished)) + ' · Master slip ' + num(cycle.masterLegs) + ' legs · Next automatic ' + esc(nextLabel(cycle.nextRunAt)) + '</p>' +
+        '<div class="actions"><button type="button" class="primary" data-act="cycle"' + (busy ? ' disabled' : '') + '>' + (cycle.running || busy ? 'Running…' : 'Run cycle now') + '</button></div><p class="flash">' + esc(flash) + '</p></section>' +
+        '<section class="card"><h2>Test Red Ticker push</h2><p class="sub">Data-only test to the latest registered device' + (push.latestTail ? ' ···' + esc(push.latestTail) : '') + '. FCM ' + (push.fcm ? 'on' : 'off') + '.</p>' +
+        '<div class="actions"><button type="button" class="primary" data-act="goal">Send test goal</button><button type="button" class="primary" data-act="kickoff">Kick-off</button></div></section>' +
+        '<section class="card"><h2>Master codes</h2><p class="sub">Share codes the desks actually returned.</p>' + desks(data.codes) + '</section>' +
+        '</div></div><div class="foot">' +
+        '<section class="card"><h2>Trends and picks</h2>' + metrics([
+          { value: num(trends.markets), label: 'Markets at 80%+' },
+          { value: num(trends.masterLegs), label: 'Master legs' },
+          { value: num(trends.droppedUnderFloor), label: 'Lines dropped under 1.20' },
+        ]) + '</section>' +
+        '<section class="card"><h2>Recent alerts</h2>' + alerts(data.alerts, 6) + '</section>' +
+        '<section class="card"><h2>Crests - settings</h2>' + metrics([
+          { value: crests.cataloguePercent == null ? '—' : crests.cataloguePercent + '%', label: 'Catalogue coverage' },
+          { value: crests.upcomingBothPercent == null ? '—' : crests.upcomingBothPercent + '%', label: 'Upcoming board, both crests' },
+          { value: num(crests.missingClubs), label: crests.missingLive ? 'Missing clubs on the board' : 'Missing clubs in the catalogue' },
+        ]) + '<p class="sub">Odds floor ' + floor(crests.oddsFloor) + ' · ' + num(crests.cycleMinutes) + ' min cycle · ' + esc((crests.desks || []).join(', ')) + '</p></section>' +
+        '</div>';
+    }
+
+    function installsTab() {
+      const installs = data.installs || {};
+      const versions = (installs.versions || []).map((row) => '<div class="line"><b>' + esc(row.version) + '</b><span>' + num(row.count) + '</span><span>devices</span></div>').join('') || '<p class="empty">No app versions reported yet.</p>';
+      return '<section class="card"><h2>Installs</h2>' + tiles(installs) + chart(installs.releases || []) + '<h3>Latest APKs</h3>' + apks(installs.releases || []) + '<h3>Countries</h3>' + countries(installs.countries || []) + '<h3>App versions</h3>' + versions + '</section>';
+    }
+    function codesTab() {
+      const trends = data.trendCodes || [];
+      const extra = trends.length ? trends.map((trend) => {
+        const body = trend.sameAsMaster ? '<p class="empty">Uses the master codes.</p>' : (trend.desks && trend.desks.length ? desks(trend.desks) : '<p class="empty">No code yet.</p>');
+        return '<h3>' + esc(trend.label) + ' · ' + num(trend.legCount) + ' legs</h3>' + body;
+      }).join('') : '<p class="empty">No trend slips on the last cycle.</p>';
+      return '<section class="card"><h2>Codes</h2><p class="sub">Only codes a bookmaker returned. A missing desk stays blank.</p>' + desks(data.codes) + extra + '</section>';
+    }
+    function pushTab() {
+      const push = data.push || {};
+      return '<section class="card"><h2>Push</h2><p class="sub">FCM ' + (push.fcm ? 'on' : 'off') + ' · ' + num(push.devices) + ' devices' + (push.latestTail ? ' · latest ···' + esc(push.latestTail) : '') + (push.latestSeen ? ' · seen ' + esc(stamp(push.latestSeen)) : '') + '</p>' +
+        '<div class="actions"><button type="button" class="primary" data-act="goal">Send test goal</button><button type="button" class="primary" data-act="kickoff">Kick-off</button></div><p class="flash">' + esc(flash) + '</p><h3>Recent alerts</h3>' + alerts(data.alerts, 30) + '</section>';
+    }
+    function crestsTab() {
+      const crests = data.crests || {};
+      return '<section class="card"><h2>Crests</h2>' + metrics([
+        { value: crests.cataloguePercent == null ? '—' : crests.cataloguePercent + '%', label: 'Catalogue coverage' },
+        { value: crests.upcomingBothPercent == null ? '—' : crests.upcomingBothPercent + '%', label: 'Upcoming board, both crests' },
+        { value: num(crests.missingClubs), label: crests.missingLive ? 'Missing clubs on the board' : 'Missing clubs in the catalogue' },
+      ]) + '<p class="sub">' + num(crests.upcomingFixtures) + ' upcoming fixtures in the engine · ' + num(crests.catalogueTeams) + ' clubs in the catalogue' + (crests.generatedAt ? ' · report ' + esc(stamp(crests.generatedAt)) : '') + '</p></section>';
+    }
+    function settingsTab() {
+      const status = data.status || {};
+      const crests = data.crests || {};
+      return '<section class="card"><h2>Settings</h2>' + metrics([
+        { value: floor(status.oddsFloor), label: 'Odds floor' },
+        { value: num(status.cycleMinutes) + ' min', label: 'Booking cycle' },
+        { value: '12 h', label: 'Operator session' },
+      ]) + '<p class="sub">Desks: ' + esc((crests.desks || []).join(', ')) + '</p>' +
+        '<p class="sub">Country comes from the edge header when the host sends one, otherwise a country-only lookup. The IP address is not stored. Phones seen before this change stay Unknown until they register again.</p>' +
+        '<p class="sub">The app sends its version and refreshes last seen on open. Resume refresh ships in the next APK.</p>' +
+        (status.engineError ? '<p class="warn">' + esc(status.engineError) + '</p>' : '<p class="sub">Engine ' + esc(status.engine || 'OPEN') + ' · FCM ' + (status.fcm ? 'on' : 'off') + '.</p>') +
+        '</section>';
+    }
+
+    function draw() {
+      drawStatus();
+      drawTabs();
+      const view = { Board: board, Installs: installsTab, Codes: codesTab, Push: pushTab, Crests: crestsTab, Settings: settingsTab }[tab] || board;
+      document.getElementById('view').innerHTML = view();
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/admin/overview', { cache: 'no-store' });
+        if (res.status === 401 || res.status === 503) {
+          location.replace('/admin');
+          return;
+        }
+        if (!res.ok) throw new Error('status');
+        data = await res.json();
+        draw();
+        document.body.dataset.ready = '1';
+      } catch {
+        if (!data) document.getElementById('view').innerHTML = '<p class="empty">The board could not be loaded.</p>';
+      }
+    }
+
+    async function act(kind) {
+      if (busy) return;
+      busy = true;
+      flash = kind === 'cycle' ? 'Running the booking cycle…' : 'Sending…';
+      draw();
+      try {
+        const path = kind === 'cycle' ? '/api/admin/cycle' : '/api/admin/push-test';
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(kind === 'cycle' ? {} : { kind }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          location.replace('/admin');
+          return;
+        }
+        flash = body.error || (kind === 'cycle' ? 'Cycle finished.' : 'Sent.');
+      } catch {
+        flash = 'The request did not finish.';
+      } finally {
+        busy = false;
+        await load();
+      }
+    }
+
+    document.getElementById('tabs').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-tab]');
+      if (!button) return;
+      tab = button.dataset.tab;
+      if (data) draw();
+    });
+    document.getElementById('view').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-act]');
+      if (!button) return;
+      act(button.dataset.act);
+    });
+    load();
+    setInterval(load, 30000);
+  </script>
+</body>
+</html>
