@@ -10,6 +10,7 @@ export type SportyEvent = {
   tournament: string;
   country: string;
   odds?: Record<string, number> | null;
+  occurrence?: Array<{ market: string; hits: number; sample: number; rate: number }>;
   url?: string;
 };
 
@@ -77,6 +78,7 @@ export function mapSportyEvent(event: SportyEvent): Match {
     venue: null,
     varReview: null,
     odds,
+    occurrence: Array.isArray(event.occurrence) ? event.occurrence : undefined,
     feed: 'sporty',
   };
 }

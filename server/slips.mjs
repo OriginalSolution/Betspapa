@@ -1,29 +1,14 @@
 /**
- * Trend slips and the master slip. A trend is one market (the app's `price:<market>`
- * trend id) and its slip holds every qualifying leg of that market. The master slip
- * holds every qualifying trend pick. Each distinct slip is booked once and reused
- * until its legs change. Codes only ever come from the bookmakers' share routes.
+ * One slip per 80%+ market, plus the master slip. Each distinct slip is booked
+ * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
+import { labelFor } from './occurrence.mjs';
 import { inspectBooks } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
 
 export const MIN_ODDS = 1.2;
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
-
-export const TREND_LABELS = {
-  home: 'Home win',
-  draw: 'Draw',
-  away: 'Away win',
-  over15: 'Over 1.5 goals',
-  over25: 'Over 2.5 goals',
-  over35: 'Over 3.5 goals',
-  under25: 'Under 2.5 goals',
-  btts: 'Both teams to score',
-  'btts-no': 'Both teams not to score',
-  'home-score': 'Home team to score',
-  'away-score': 'Away team to score',
-};
 
 export function bookableLegs(legs, now = new Date()) {
   return (Array.isArray(legs) ? legs : []).filter(
@@ -40,16 +25,24 @@ export function trendGroups(legs) {
   }
   return [...byMarket.entries()]
     .map(([market, rows]) => ({
-      id: `price:${market}`,
+      id: `80:${market}`,
       market,
-      label: TREND_LABELS[market] || market,
+      label: `80%+ ${labelFor(market)}`,
       legs: rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId)),
     }))
     .sort((a, b) => b.legs.length - a.legs.length || a.label.localeCompare(b.label));
 }
 
 function legView(leg) {
-  return { eventId: leg.eventId, market: leg.market, match: leg.match, kickoff: leg.kickoff, odds: leg.odds };
+  return {
+    eventId: leg.eventId,
+    market: leg.market,
+    match: leg.match,
+    kickoff: leg.kickoff,
+    odds: leg.odds,
+    occurrence: leg.occurrence ?? null,
+    sample: leg.sample ?? null,
+  };
 }
 
 /**

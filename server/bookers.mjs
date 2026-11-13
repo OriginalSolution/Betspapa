@@ -24,6 +24,11 @@ const BP_MARKETS = {
   19: ['5006', 't', { 12: 'Over', 13: 'Under' }],
   20: ['5003', 't', { 12: 'Over', 13: 'Under' }],
   29: ['3795', null, { 74: 'Yes', 76: 'No' }],
+  31: ['3816', null, { 74: 'Yes', 76: 'No' }],
+  32: ['3807', null, { 74: 'Yes', 76: 'No' }],
+  60: ['3668', null, { 1: '1', 2: 'X', 3: '2' }],
+  68: ['4958', 't', { 12: 'Over', 13: 'Under' }],
+  166: ['1096783', 't', { 12: 'Over', 13: 'Under' }],
 };
 
 const eventCache = new Map();
@@ -367,13 +372,31 @@ async function betpawaTry(legs, request) {
   };
 }
 
+function wholeSlipRefused(result, group) {
+  if (result?.booked?.code || group.length < 2) return false;
+  const dropped = result?.dropped || [];
+  return dropped.length >= group.length && dropped.every((row) => /refused the slip/i.test(String(row.reason || '')));
+}
+
+/** A desk that refuses a long slip is retried in halves instead of dropping the legs. */
+async function placeChunk(group, fn) {
+  const result = await fn(group);
+  if (!wholeSlipRefused(result, group)) {
+    return { parts: result?.booked?.code ? [result.booked] : [], dropped: result?.dropped || [] };
+  }
+  const mid = Math.ceil(group.length / 2);
+  const left = await placeChunk(group.slice(0, mid), fn);
+  const right = await placeChunk(group.slice(mid), fn);
+  return { parts: [...left.parts, ...right.parts], dropped: [...left.dropped, ...right.dropped] };
+}
+
 async function chunked(legs, fn) {
   const parts = [];
   const dropped = [];
   for (const chunk of chunks(legs)) {
-    const result = await fn(chunk);
-    if (result?.booked?.code) parts.push(result.booked);
-    dropped.push(...(result?.dropped || []));
+    const placed = await placeChunk(chunk, fn);
+    parts.push(...placed.parts);
+    dropped.push(...placed.dropped);
   }
   return { parts, dropped };
 }

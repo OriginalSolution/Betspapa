@@ -41,6 +41,35 @@ const MARKET_LABELS: Record<string, string> = {
   'btts-no': 'Both teams not to score',
   'home-score': 'Home team to score',
   'away-score': 'Away team to score',
+  over05: 'Over 0.5 goals',
+  under15: 'Under 1.5 goals',
+  under35: 'Under 3.5 goals',
+  'dc-1x': 'Double chance 1X',
+  'dc-12': 'Double chance 12',
+  'dc-x2': 'Double chance X2',
+  'dnb-home': 'Draw no bet home',
+  'dnb-away': 'Draw no bet away',
+  'home-over15': 'Home over 1.5 goals',
+  'home-over25': 'Home over 2.5 goals',
+  'home-under15': 'Home under 1.5 goals',
+  'away-over15': 'Away over 1.5 goals',
+  'away-over25': 'Away over 2.5 goals',
+  'away-under15': 'Away under 1.5 goals',
+  'home-clean': 'Home clean sheet',
+  'away-clean': 'Away clean sheet',
+  'fh-home': 'First-half home win',
+  'fh-draw': 'First-half draw',
+  'fh-away': 'First-half away win',
+  'fh-over05': 'First-half over 0.5',
+  'fh-over15': 'First-half over 1.5',
+  'corners-over75': 'Over 7.5 corners',
+  'corners-over85': 'Over 8.5 corners',
+  'corners-over95': 'Over 9.5 corners',
+  'corners-over105': 'Over 10.5 corners',
+  'corners-under95': 'Under 9.5 corners',
+  'corners-under105': 'Under 10.5 corners',
+  'cards-over35': 'Over 3.5 cards',
+  'cards-over45': 'Over 4.5 cards',
 };
 
 export type EngineLeg = {
@@ -49,6 +78,8 @@ export type EngineLeg = {
   match: string;
   kickoff: string;
   odds: number;
+  occurrence: number | null;
+  sample: string | null;
 };
 
 export type EnginePart = {
@@ -160,7 +191,16 @@ function parseLeg(value: unknown): EngineLeg | null {
   const kickoff = text(row.kickoff);
   const odds = Number(row.odds);
   if (!eventId || !market || !match || !kickoff || !Number.isFinite(odds)) return null;
-  return { eventId, market, match, kickoff, odds };
+  const occurrence = Number(row.occurrence);
+  return {
+    eventId,
+    market,
+    match,
+    kickoff,
+    odds,
+    occurrence: Number.isFinite(occurrence) ? occurrence : null,
+    sample: text(row.sample),
+  };
 }
 
 function parseSlip(value: unknown): EngineSlip | null {
@@ -258,7 +298,7 @@ export type BookingChip = { bookId: DeskId; code: string };
 /** A real code for this leg, preferring that trend's own slip. Never invented. */
 export function bookingForPick(state: EngineState | null, eventId: string, market: string): BookingChip | null {
   if (!state || !eventId || !market) return null;
-  const trend = state.trends.find((item) => item.id === `price:${market}` || item.market === market);
+  const trend = state.trends.find((item) => item.id === `80:${market}` || item.id === `price:${market}` || item.market === market);
   const slips = [trend, state.master].filter((item): item is EngineSlip => Boolean(item));
   for (const slip of slips) {
     if (!slip.legs.some((leg) => leg.eventId === eventId && leg.market === market)) continue;

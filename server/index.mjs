@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
-import { getCachedEvents, getEngineState, runEngineCycle, startEngine } from './engine.mjs';
+import { getCachedEvents, getEngineState, getEventOccurrence, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
@@ -41,6 +41,14 @@ async function cached(key, ttl, fn) {
   const value = await fn();
   cache.set(key, { value, expires: Date.now() + ttl });
   return value;
+}
+
+function withOccurrence(events) {
+  const table = getEventOccurrence();
+  return events.map((event) => {
+    const rows = table?.[event.eventId];
+    return Array.isArray(rows) && rows.length ? { ...event, occurrence: rows } : event;
+  });
 }
 
 function client() {
@@ -164,7 +172,8 @@ async function handleApi(req, res, url) {
     // Public fixture feed the Android app reads directly. Real fixtures only.
     try {
       const events = await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' });
-      const data = JSON.stringify({ source: 'betspapa', generatedAt: new Date().toISOString(), count: events.length, events });
+      const decorated = withOccurrence(events);
+      const data = JSON.stringify({ source: 'betspapa', generatedAt: new Date().toISOString(), count: decorated.length, events: decorated });
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'public, max-age=60',
@@ -199,7 +208,7 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
-      send(res, 200, { source: 'betspapa', events: filtered });
+      send(res, 200, { source: 'betspapa', events: withOccurrence(filtered) });
     } catch (error) {
       send(res, 502, { error: error.message || 'Fixture feed failed' });
     }

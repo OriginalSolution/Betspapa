@@ -198,6 +198,9 @@ export type PickView = {
   form: FormMark[];
   squad: SquadStrength;
   label: string;
+  /** Set when the rate comes from recent matches rather than the price. */
+  hits?: number;
+  sample?: number;
 };
 
 export type LedgerEntry = {
@@ -248,8 +251,8 @@ export function trendsFromPicks(picks: PickView[]): TrendView[] {
       market: pick.market,
       marketLabel: pick.marketLabel,
       label: pick.label,
-      sample: 0,
-      hits: 0,
+      sample: pick.sample ?? 0,
+      hits: pick.hits ?? 0,
       rate: pick.rate,
       bookmarked: pick.bookmarked,
       developing: !pick.bookmarked && pick.rate >= 0.7 && pick.rate <= TIP_RATE,
@@ -422,7 +425,36 @@ const ODDS_MARKETS: Array<[string, MarketId, boolean]> = [
   ['away-over-05', 'away-score', true],
   ['fh-over-05', 'fh-over05', true],
   ['fh-over-15', 'fh-over15', true],
+  ['fh-home', 'fh-home', true],
+  ['fh-draw', 'fh-draw', false],
+  ['fh-away', 'fh-away', false],
 ];
+
+/** Same window the engine uses before it will call a rate 80%+. */
+const MEASURED = 8;
+
+function applyOccurrence(pick: PickView, match: Match): PickView {
+  const rows = match.occurrence;
+  if (!Array.isArray(rows) || !rows.length) return pick;
+  const row = rows.find((item) => item.market === pick.market && item.sample >= MEASURED && item.hits >= 0);
+  if (!row) return { ...pick, bookmarked: false, softened: false, grade: null };
+  const rate = row.hits / row.sample;
+  let confidence = confidenceOf(rate, 0);
+  if (rate >= TIP_RATE && confidence <= TIP_RATE) confidence = TIP_RATE + 0.001;
+  const bookmarked = rate + 1e-12 >= TIP_RATE;
+  return {
+    ...pick,
+    rate,
+    hits: row.hits,
+    sample: row.sample,
+    support: 0,
+    supportText: `${row.hits} of the last ${row.sample} matches.`,
+    confidence,
+    grade: bookmarked && SLIP_MARKETS.has(pick.market) ? gradeFor(confidence) : null,
+    bookmarked,
+    softened: false,
+  };
+}
 
 function combinePrice(left?: number, right?: number): number | null {
   if (left == null || right == null || left <= 1 || right <= 1) return null;
@@ -504,12 +536,13 @@ function picksFromOdds(match: Match): PickView[] {
     if (price == null || !publishableOdds(price)) continue;
     picks.push(pricePick(match, market, price, 'Combined from the full-time 1X2 prices.'));
   }
+  const measured = picks.map((pick) => applyOccurrence(pick, match));
   if (match.status === 'live' || match.status === 'halftime' || match.status === 'finished') {
     for (const market of ['fh-home', 'fh-draw', 'fh-away'] as MarketId[]) {
-      picks.push(pricePick(match, market, null, 'Settles from the half-time score.'));
+      measured.push(applyOccurrence(pricePick(match, market, null, 'Settles from the half-time score.'), match));
     }
   }
-  return picks;
+  return measured;
 }
 
 export function buildPicks(matches: Match[]): PickView[] {
@@ -562,7 +595,11 @@ export function buildPicks(matches: Match[]): PickView[] {
 }
 
 export function qualifying(picks: PickView[]): PickView[] {
-  return picks.filter((pick) => publishableOdds(pick.odds) && SLIP_MARKETS.has(pick.market) && pick.bookmarked && pick.confidence > TIP_RATE);
+  return picks.filter((pick) => {
+    if (!publishableOdds(pick.odds) || !SLIP_MARKETS.has(pick.market)) return false;
+    if ((pick.sample ?? 0) >= MEASURED) return pick.rate + 1e-9 >= TIP_RATE;
+    return pick.bookmarked && pick.confidence > TIP_RATE;
+  });
 }
 
 export type SharePart = {

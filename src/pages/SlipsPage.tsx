@@ -343,6 +343,7 @@ function TrendSlip({
                 </span>
                 <span className="slip-leg-meta">
                   {marketLabel(leg.market)}
+                  {leg.sample ? ` · ${leg.occurrence}% · ${leg.sample}` : ''}
                   {price ? ` · ${price}` : ''}
                   {kick ? ` · ${kick}` : ''}
                 </span>

@@ -1,11 +1,12 @@
-/** Unattended fixture, qualify, book, and repair cycle. It does not call Predict2u. */
+/** Unattended fixture, occurrence, book, and repair cycle. It does not call Predict2u. */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
-import { qualifyEvents } from './qualify.mjs';
+import { loadHistories } from './history.mjs';
+import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { bookSlips, bookableLegs, slipView, trendGroups } from './slips.mjs';
-import { loadUpcomingEvents } from './upcoming.mjs';
+import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
 
 const FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 const INTERVAL_MS = 15 * 60 * 1000;
@@ -22,6 +23,7 @@ function emptyState() {
     master: null,
     trends: [],
     slipCache: {},
+    occurrenceByEvent: {},
     issues: [],
     settlement: 'open',
   };
@@ -33,7 +35,7 @@ function publicState(state) {
     feedAt: state.feedAt,
     feedError: state.feedError,
     eventCount: state.events.length,
-    legCount: state.legs.length,
+    legCount: state.master?.legCount ?? state.legs.length,
     settlement: state.settlement,
     books: state.books,
     master: state.master || null,
@@ -59,6 +61,19 @@ export function createEngine(options = {}) {
   let running = null;
   let timer = null;
   let kick = null;
+  const historyCache = { teams: new Map(), stats: new Map() };
+
+  function teamIds(events, now) {
+    const ids = [];
+    for (const event of events) {
+      if (!isRealFixture(event) || !isOpenToday(event, now)) continue;
+      const home = teamUid(event.homeId);
+      const away = teamUid(event.awayId);
+      if (home != null) ids.push(home);
+      if (away != null) ids.push(away);
+    }
+    return ids;
+  }
 
   function load() {
     try {
@@ -115,7 +130,42 @@ export function createEngine(options = {}) {
       log('error', `Fixture feed failed: ${message}. Keeping ${events.length} cached events.`);
     }
 
-    const fresh = qualifyEvents(events, now).map((leg) => {
+    if (options.loadExtraPrices) {
+      try {
+        events = mergePrices(events, await options.loadExtraPrices());
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Corner prices failed';
+        issues.push(`Corner and card prices failed: ${message}`);
+        log('error', message);
+      }
+    }
+
+    const ids = teamIds(events, now);
+    let loaded;
+    try {
+      loaded = options.loadHistories
+        ? { histories: await options.loadHistories(events), teamErrors: 0, statsMissing: 0, statsDeferred: 0, teams: 0 }
+        : await loadHistories(ids, { cache: historyCache, log, now: now.getTime() });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Team history failed';
+      issues.push(`Team history failed: ${message}. Keeping the previous slips.`);
+      log('error', message);
+      const kept = { ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) };
+      save(kept);
+      return publicState(kept);
+    }
+    if (!options.loadHistories && loaded.teams > 0 && loaded.teamErrors === loaded.teams) {
+      issues.push('Team history failed for every side. Keeping the previous slips.');
+      log('error', issues[issues.length - 1]);
+      const kept = { ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) };
+      save(kept);
+      return publicState(kept);
+    }
+
+    const board = buildOccurrenceBoard(events, loaded.histories, now);
+    if (loaded.statsMissing) board.notes.push(`No corner or card count for ${loaded.statsMissing} recent matches, so those lines were skipped where the sample fell under 8.`);
+    if (loaded.statsDeferred) board.notes.push(`Corner and card counts for ${loaded.statsDeferred} recent matches wait for the next cycle.`);
+    const fresh = board.legs.map((leg) => {
       const previous = (state.legs || []).find((item) => item.eventId === leg.eventId && item.market === leg.market);
       return previous ? { ...leg, status: previous.status || 'open', homeScore: previous.homeScore ?? null, awayScore: previous.awayScore ?? null, finished: Boolean(previous.finished) } : leg;
     });
@@ -126,9 +176,13 @@ export function createEngine(options = {}) {
     }
 
     const legs = bookableLegs(settled.legs, now);
-    const master = { id: 'master', name: 'Master slip', label: 'Master slip', legs };
-    const trends = trendGroups(legs).map((trend) => ({ ...trend, name: `Trend ${trend.label}` }));
-    if (!legs.length) log('log', 'No open qualifying legs to book.');
+    const chosen = masterPick(legs);
+    const master = { id: 'master', name: '80%+ Master Slip', label: '80%+ Master Slip', legs: chosen };
+    const trends = trendGroups(legs).map((trend) => ({ ...trend, name: trend.label }));
+    issues.push(`80%+ occurrence: ${legs.length} picks across ${trends.length} markets, ${chosen.length} on the master slip.`);
+    issues.push(...board.notes);
+    if (!legs.length) log('log', 'No open 80%+ legs to book.');
+    else log('log', issues.find((line) => line.startsWith('80%+ occurrence')) || '');
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const booking = await bookSlips({
       slips: [master, ...trends],
@@ -155,6 +209,7 @@ export function createEngine(options = {}) {
       master: masterView,
       trends: trendViews,
       slipCache: booking.cache,
+      occurrenceByEvent: board.byEvent,
       settlement: settled.status,
       issues: [...issues, ...(state.issues || [])].slice(0, 40),
     };
@@ -181,6 +236,7 @@ export function createEngine(options = {}) {
   return {
     getState: () => publicState(state),
     getEvents: () => state.events,
+    getOccurrence: () => state.occurrenceByEvent || {},
     run,
     start() {
       if (timer) return;
@@ -193,7 +249,10 @@ export function createEngine(options = {}) {
 }
 
 // In production the engine reads the catalogue directly instead of calling its own public URL.
-const engine = createEngine({ loadEvents: () => loadUpcomingEvents({ force: true }) });
+const engine = createEngine({
+  loadEvents: () => loadUpcomingEvents({ force: true }),
+  loadExtraPrices: () => loadExtraPrices(),
+});
 
 export function startEngine() {
   engine.start();
@@ -205,6 +264,10 @@ export function getEngineState() {
 
 export function getCachedEvents() {
   return engine.getEvents();
+}
+
+export function getEventOccurrence() {
+  return engine.getOccurrence();
 }
 
 export function runEngineCycle() {

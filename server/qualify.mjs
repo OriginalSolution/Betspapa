@@ -1,4 +1,8 @@
-/** Same 80% price rule the app uses for a qualifying tip. Closed kickoffs are left out. */
+/**
+ * The old price rule: a tip qualified when the price itself implied more than 80%.
+ * The engine no longer books from this. Occurrence in occurrence.mjs does.
+ * Closed kickoffs are left out.
+ */
 
 const TIP = 0.8;
 const MIN_ODDS = 1.2;

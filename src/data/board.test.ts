@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { projectDemo } from './project';
-import { applyShares, bookingCodes, buildPicks, listTrends, qualifying, rankLedger, seedLedger, settle } from './board';
+import { applyShares, bookingCodes, buildPicks, listTrends, qualifying, rankLedger, seedLedger, settle, trendsFromPicks } from './board';
+import type { Match } from '../types';
 
 const t0 = Date.parse('2026-11-10T18:00:00Z');
 const today = '2026-11-10';
@@ -79,6 +80,48 @@ describe('VAR settlement', () => {
     expect(live.find((code) => code.id === 'betika')?.bookingState).toBe('error');
     expect(live.find((code) => code.id === 'footballcom')?.bookingState).toBe('unavailable');
     expect(settle('over35', board(24_000).find((match) => match.id === 'ars-liv')!, true)).toBe('open');
+  });
+});
+
+describe('occurrence on a real fixture', () => {
+  const match = {
+    id: 'sr:match:77',
+    competition: { id: 'nations', name: 'Nations League', area: 'International', code: 'INT', priority: 4 },
+    utcDate: '2026-11-13T19:45:00.000Z',
+    status: 'scheduled',
+    minute: null,
+    injuryTime: null,
+    home: { id: 'bulgaria', name: 'Bulgaria', shortName: 'Bulgaria', abbr: 'BUL', color: '#21a366' },
+    away: { id: 'iceland', name: 'Iceland', shortName: 'Iceland', abbr: 'ISL', color: '#3d7eff' },
+    homeScore: null,
+    awayScore: null,
+    htHome: null,
+    htAway: null,
+    events: [],
+    venue: null,
+    feed: 'sporty',
+    odds: { home: 1.22, draw: 3.4, away: 4.2, 'over-15': 1.8, 'btts-yes': 1.9 },
+    occurrence: [
+      { market: 'home', hits: 4, sample: 10, rate: 0.4 },
+      { market: 'over15', hits: 9, sample: 10, rate: 0.9 },
+      { market: 'btts', hits: 8, sample: 10, rate: 0.8 },
+    ],
+  } as Match;
+
+  it('bookmarks the record, not the short price, and shows the sample', () => {
+    const picks = buildPicks([match]);
+    const home = picks.find((pick) => pick.market === 'home');
+    const over = picks.find((pick) => pick.market === 'over15');
+    const both = picks.find((pick) => pick.market === 'btts');
+    expect(home?.bookmarked).toBe(false);
+    expect(over?.bookmarked).toBe(true);
+    expect(over?.rate).toBeCloseTo(0.9);
+    expect(both?.bookmarked).toBe(true);
+    expect(qualifying(picks).map((pick) => pick.market).sort()).toEqual(['btts', 'over15']);
+    const trend = trendsFromPicks(picks).find((row) => row.market === 'over15');
+    expect(trend?.sample).toBe(10);
+    expect(trend?.hits).toBe(9);
+    expect(trend?.note).toBe('9 of the last 10 matches.');
   });
 });
 
