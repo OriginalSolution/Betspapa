@@ -10,7 +10,8 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const CACHE_TTL_MS = 5 * 60_000;
 const STALE_MS = 60 * 60_000;
-const MARKETS = '1,18,29,11,19,20';
+export const CATALOGUE_MARKETS = '1,10,11,18,19,20,29,31,32,60,68';
+const EXTRA_MARKETS = '166,800063';
 
 const cache = { loadedAt: 0, events: [], pending: null };
 
@@ -57,6 +58,21 @@ export function parseOdds(markets = []) {
       } else if (id === '29') {
         if (oid === '74' || desc === 'yes') odds['btts-yes'] = value;
         if (oid === '76' || desc === 'no') odds['btts-no'] = value;
+      } else if (id === '10') {
+        if (oid === '9') odds['dc-1x'] = value;
+        if (oid === '10') odds['dc-12'] = value;
+        if (oid === '11') odds['dc-x2'] = value;
+      } else if (id === '60') {
+        if (oid === '1' || desc === 'home') odds['fh-home'] = value;
+        if (oid === '2' || desc === 'draw') odds['fh-draw'] = value;
+        if (oid === '3' || desc === 'away') odds['fh-away'] = value;
+      } else if (id === '68') writeTotal(odds, 'fh', market.specifier, outcome);
+      else if (id === '31' && (oid === '74' || desc === 'yes')) odds['home-clean'] = value;
+      else if (id === '32' && (oid === '74' || desc === 'yes')) odds['away-clean'] = value;
+      else if (id === '166') writeTotal(odds, 'corners', market.specifier, outcome);
+      else if (id === '800063') {
+        if (desc === '4+' || oid.endsWith('00000004')) odds['cards-over-35'] = value;
+        if (desc === '5+' || oid.endsWith('00000005')) odds['cards-over-45'] = value;
       }
     }
   }
@@ -81,6 +97,8 @@ export function flattenPage(payload) {
         home: String(event.homeTeamName),
         away: String(event.awayTeamName),
         kickoff: new Date(kickoffMs).toISOString(),
+        homeId: event.homeTeamId ? String(event.homeTeamId) : null,
+        awayId: event.awayTeamId ? String(event.awayTeamId) : null,
         tournament: tournament.name || event.sport?.category?.tournament?.name || 'Fixture',
         country: event.sport?.category?.name || '',
         odds: parseOdds(event.markets),
@@ -91,8 +109,8 @@ export function flattenPage(payload) {
   return events;
 }
 
-async function fetchPage(pageNum, fetchImpl) {
-  const url = `${BASE}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=${MARKETS}&pageSize=${PAGE_SIZE}&pageNum=${pageNum}`;
+async function fetchPage(pageNum, fetchImpl, markets = CATALOGUE_MARKETS) {
+  const url = `${BASE}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=${encodeURIComponent(markets)}&pageSize=${PAGE_SIZE}&pageNum=${pageNum}`;
   const response = await fetchImpl(url, {
     headers: {
       Accept: 'application/json',
@@ -110,13 +128,13 @@ async function fetchPage(pageNum, fetchImpl) {
   return { events: flattenPage(payload), total: Number(payload?.data?.totalNum) || 0 };
 }
 
-async function loadAll(fetchImpl) {
-  const first = await fetchPage(1, fetchImpl);
+async function loadAll(fetchImpl, markets = CATALOGUE_MARKETS) {
+  const first = await fetchPage(1, fetchImpl, markets);
   const pages = Math.min(MAX_PAGES, Math.max(1, Math.ceil(first.total / PAGE_SIZE)));
   const events = [...first.events];
   for (let start = 2; start <= pages; start += 4) {
     const batch = [];
-    for (let page = start; page < start + 4 && page <= pages; page += 1) batch.push(fetchPage(page, fetchImpl));
+    for (let page = start; page < start + 4 && page <= pages; page += 1) batch.push(fetchPage(page, fetchImpl, markets));
     for (const result of await Promise.allSettled(batch)) {
       if (result.status === 'fulfilled') events.push(...result.value.events);
       else console.error(`[fixtures] ${result.reason?.message || result.reason}`);
@@ -147,6 +165,34 @@ function refresh(fetchImpl) {
  * Cached real fixture list. A stale list (under an hour old) is returned at once
  * while a fresh one loads in the background. Throws when nothing real is available.
  */
+const extraCache = { loadedAt: 0, prices: new Map(), pending: null };
+
+/** Corner and card prices are omitted when requested together with the main lines, so they load on their own. */
+export async function loadExtraPrices({ fetchImpl = fetch } = {}) {
+  if (extraCache.prices.size && Date.now() - extraCache.loadedAt < CACHE_TTL_MS) return extraCache.prices;
+  if (extraCache.pending) return extraCache.pending;
+  extraCache.pending = loadAll(fetchImpl, EXTRA_MARKETS)
+    .then((events) => {
+      const prices = new Map(events.filter((event) => event.odds && Object.keys(event.odds).length).map((event) => [event.eventId, event.odds]));
+      extraCache.prices = prices;
+      extraCache.loadedAt = Date.now();
+      return prices;
+    })
+    .finally(() => {
+      extraCache.pending = null;
+    });
+  return extraCache.pending;
+}
+
+export function mergePrices(events, extra) {
+  if (!extra) return events;
+  return (events || []).map((event) => {
+    const more = extra instanceof Map ? extra.get(event.eventId) : extra[event.eventId];
+    if (!more) return event;
+    return { ...event, odds: { ...(event.odds || {}), ...more } };
+  });
+}
+
 export async function loadUpcomingEvents({ force = false, fetchImpl = fetch } = {}) {
   const age = Date.now() - cache.loadedAt;
   if (!force && cache.events.length && age < CACHE_TTL_MS) return cache.events;

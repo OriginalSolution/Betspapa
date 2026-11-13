@@ -59,6 +59,8 @@ export type Match = {
   varReview?: VarReview | null;
   /** Decimal prices supplied with the fixture. */
   odds?: Record<string, number> | null;
+  /** Recent hit rates for this fixture, when the engine has measured them. */
+  occurrence?: Array<{ market: string; hits: number; sample: number; rate: number }>;
   feed?: 'sporty' | 'demo';
 };
 

@@ -13,8 +13,8 @@ test('drops legs under 1.20 and started games, keeps exactly 1.20', () => {
 
 test('groups qualifying legs into one trend per market, biggest first', () => {
   const groups = trendGroups([leg(1, 'over15'), leg(2, 'home'), leg(3, 'over15')]);
-  assert.deepEqual(groups.map((group) => [group.id, group.legs.length]), [['price:over15', 2], ['price:home', 1]]);
-  assert.equal(groups[0].label, 'Over 1.5 goals');
+  assert.deepEqual(groups.map((group) => [group.id, group.legs.length]), [['80:over15', 2], ['80:home', 1]]);
+  assert.equal(groups[0].label, '80%+ Over 1.5 goals');
 });
 
 test('books each distinct slip once, shares codes with an identical trend, and caps failing retries', async () => {

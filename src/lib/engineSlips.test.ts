@@ -9,7 +9,7 @@ const payload = {
     market: null,
     legCount: 2,
     legs: [
-      { eventId: 'sr:match:1', market: 'over15', match: 'Alpha vs Beta', kickoff: '2026-11-13T16:00:00.000Z', odds: 1.2 },
+      { eventId: 'sr:match:1', market: 'over15', match: 'Alpha vs Beta', kickoff: '2026-11-13T16:00:00.000Z', odds: 1.2, occurrence: 90, sample: '9/10' },
       { eventId: 'sr:match:2', market: 'home', match: 'Gamma vs Delta', kickoff: '2026-11-13T18:00:00.000Z', odds: 1.15 },
     ],
     sameAsMaster: false,
@@ -66,6 +66,8 @@ describe('engine slips', () => {
     expect(showOdds(1.2)).toBe('1.20');
     expect(showOdds(1.19)).toBeNull();
     expect(visibleLegs(state.master).map((leg) => leg.eventId)).toEqual(['sr:match:1']);
+    expect(visibleLegs(state.master)[0]?.occurrence).toBe(90);
+    expect(visibleLegs(state.master)[0]?.sample).toBe('9/10');
     expect(bookingForPick(state, 'sr:match:1', 'over15')).toEqual({ bookId: 'sportybet', code: '89ANH4' });
     expect(bookingForPick(state, 'sr:match:9', 'over15')).toBeNull();
   });
