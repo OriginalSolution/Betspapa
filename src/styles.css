@@ -329,14 +329,11 @@ button.banner.banner-alert {
   flex: none;
   background: #fff;
 }
-.crest-letters {
-  display: block;
-  line-height: 1;
-  text-align: center;
-  max-width: 88%;
-  font-weight: 800;
-  letter-spacing: -0.05em;
+.crest-empty {
+  background: #1a1f2a;
+  color: #949bab;
 }
+.crest-empty svg { width: 68%; height: 68%; display: block; }
 img.crest { display: inline-block; padding: 1px; }
 .pick-sides { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .crest.team-on { box-shadow: 0 0 0 2px var(--gold); }
@@ -1639,7 +1636,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 }
 .promo-carousel::-webkit-scrollbar { display: none; }
 .promo-carousel a { flex: 0 0 100%; scroll-snap-align: start; }
-.promo-carousel img { width: 100%; height: 168px; object-fit: cover; border-radius: 16px; background: #12151c; display: block; }
+.promo-carousel img { width: 100%; aspect-ratio: 16 / 9; height: auto; object-fit: cover; object-position: center top; border-radius: 16px; background: #07080c; display: block; }
 .trends-option-c { gap: 10px; }
 .trend-seg {
   display: flex;

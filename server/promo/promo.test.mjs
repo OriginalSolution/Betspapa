@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { contextOf, posterFrom, priced, shareCardFrom, weekendBankers } from './plan.mjs';
 import { fontFiles, svgToPng } from './raster.mjs';
-import { crestPathForName, shareSvg } from './art.mjs';
+import { bannerSvg, crestPathForName, notifySvg, shareSvg } from './art.mjs';
 import { countryCode, pickPair } from './players.mjs';
 
 const engine = {
@@ -112,6 +112,22 @@ test('Japan, Leganes and Burgos keep their shirt colours', () => {
   assert.match(pair.home.id, /royal-blue/);
   assert.match(pair.away.id, /white-black/);
   assert.notEqual(pair.home.id, pair.away.id);
+});
+
+test('the carousel banner is 16:9 and the notification art is 2:1', () => {
+  const card = {
+    kind: 'poster',
+    home: 'Spain',
+    away: 'Japan',
+    market: 'First-half over 0.5',
+    odds: 1.21,
+    hit: 80,
+    code: 'CU6Z6G',
+    codes: [],
+    kicker: 'INTERNATIONAL BREAK',
+  };
+  assert.match(bannerSvg(card, {}), /width="1920" height="1080"/);
+  assert.match(notifySvg(card, {}), /width="1080" height="540"/);
 });
 
 test('the share card renders to a PNG with the app fonts', () => {

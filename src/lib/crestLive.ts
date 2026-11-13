@@ -89,6 +89,19 @@ async function wikidataCrest(name: string, context: CrestContext, fetchImpl: typ
   return badge && allowedImageUrl(badge) ? badge : null;
 }
 
+const missing = new Map<string, Promise<string | null>>();
+
+/** One lookup per club name. A miss stays empty so the shield is not a letter badge. */
+export function resolveMissingCrest(name: string): Promise<string | null> {
+  const key = name.trim().toLowerCase();
+  if (!key) return Promise.resolve(null);
+  const pending = missing.get(key);
+  if (pending) return pending;
+  const job = lookupCrestChain(name).catch(() => null);
+  missing.set(key, job);
+  return job;
+}
+
 export async function lookupCrestChain(name: string, fetchImpl: typeof fetch = fetch, context: CrestContext = {}): Promise<string | null> {
   try {
     const sports = await sportsDbCrest(name, context, fetchImpl);
