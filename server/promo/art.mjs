@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { esc, playerSvg, starFor } from './players.mjs';
+import { esc, pickPair, playerBox, playerImage } from './players.mjs';
 
 const W = 1080;
 const H = 1350;
@@ -26,6 +26,19 @@ export function logoData(id, root = process.cwd()) {
   const path = join(root, 'public', 'bookies', file);
   if (!existsSync(path)) return '';
   return `data:image/png;base64,${readFileSync(path).toString('base64')}`;
+}
+
+export function crestPathForName(name, root = process.cwd()) {
+  try {
+    const catalog = JSON.parse(readFileSync(join(root, 'public', 'crests', 'crests.json'), 'utf8'));
+    const key = String(name || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+    const file = catalog.byKey?.[key] || catalog.byId?.[key.replace(/ /g, '-')] || '';
+    if (typeof file !== 'string' || !file.startsWith('/crests/')) return '';
+    const path = join(root, 'public', file.replace(/^\//, ''));
+    return existsSync(path) ? path : '';
+  } catch {
+    return '';
+  }
 }
 
 export function crestForName(name, root = process.cwd()) {
@@ -144,23 +157,26 @@ export function shareSvg(card, logos = {}) {
 }
 
 export function posterSvg(card, logos = {}) {
-  const home = starFor(card.home);
-  const away = starFor(card.away);
-  const scale = 2.7;
-  const crest = (href, x, y) => (href
-    ? `<circle cx="${x + 52}" cy="${y + 52}" r="70" fill="${GLOW[card.context] || '#e11d2e'}" opacity=".28"/>
-       <image href="${href}" x="${x}" y="${y}" width="104" height="104"/>`
+  const stars = pickPair(card.home, card.away, crestPathForName(card.home), crestPathForName(card.away));
+  const playerH = 760;
+  const homeBox = playerBox(stars.home, playerH);
+  const awayBox = playerBox(stars.away, playerH);
+  const homeX = 168;
+  const awayX = W - 168 - awayBox.width;
+  const crest = (href, x, y, glow) => (href
+    ? `<circle cx="${x + 48}" cy="${y + 48}" r="64" fill="${glow}" opacity=".34"/>
+       <image href="${href}" x="${x}" y="${y}" width="96" height="96"/>`
     : '');
   return frame(GLOW[card.context] || '#e11d2e', `
     ${brand()}
     <text x="1008" y="74" text-anchor="end" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="2">${esc(card.kicker)}</text>
-    ${crest(card.homeCrest, 28, 150)}
-    ${crest(card.awayCrest, 948, 150)}
-    ${playerSvg('home', home, { x: 118, y: 86, scale })}
-    ${playerSvg('away', away, { x: 530, y: 86, scale, mirror: true })}
-    <text x="64" y="900" fill="#f4f6fb" font-family="Barlow Condensed" font-size="72" font-weight="700">${esc(cut(String(card.home).toUpperCase(), 22))}</text>
-    <text x="64" y="952" fill="#c5cad6" font-family="Outfit" font-size="32" font-weight="500">vs ${esc(card.away)}</text>
-    <text x="64" y="992" fill="#949bab" font-family="Outfit" font-size="22">${esc(cut(card.tournament, 36))}   ·   ${esc(when(card.kickoff))}</text>
+    ${crest(card.homeCrest, 28, 168, stars.home.primary)}
+    ${crest(card.awayCrest, W - 28 - 96, 168, stars.away.primary)}
+    ${playerImage(stars.home, { x: homeX, y: 96, height: playerH })}
+    ${playerImage(stars.away, { x: awayX, y: 96, height: playerH })}
+    <text x="64" y="924" fill="#f4f6fb" font-family="Barlow Condensed" font-size="68" font-weight="700">${esc(cut(String(card.home).toUpperCase(), 22))}</text>
+    <text x="64" y="968" fill="#c5cad6" font-family="Outfit" font-size="30" font-weight="500">vs ${esc(card.away)}</text>
+    <text x="64" y="1004" fill="#949bab" font-family="Outfit" font-size="20">${esc(cut(card.tournament, 36))}   ·   ${esc(when(card.kickoff))}</text>
     <rect x="56" y="1024" width="968" height="150" rx="28" fill="#12151c" stroke="rgba(255,255,255,.08)"/>
     <text x="84" y="1068" fill="#ff4d5a" font-family="Outfit" font-size="16" font-weight="700" letter-spacing="2">BETSPAPA PREDICTION</text>
     <text x="84" y="1132" fill="#f4f6fb" font-family="Barlow Condensed" font-size="46" font-weight="700">${esc(cut(card.market, 22))}</text>
@@ -174,25 +190,40 @@ export function posterSvg(card, logos = {}) {
 }
 
 export function weekendSvg(card, logos = {}) {
-  const home = starFor(String(card.picks[0]?.match || '').split(/\s+vs\s+/i)[0]);
-  const away = starFor(String(card.picks[0]?.match || '').split(/\s+vs\s+/i)[1]);
+  const [homeName, awayName] = String(card.picks[0]?.match || '').split(/\s+vs\s+/i);
+  const stars = pickPair(homeName || '', awayName || '', crestPathForName(homeName), crestPathForName(awayName));
+  const playerH = 960;
+  const homeBox = playerBox(stars.home, playerH);
+  const awayBox = playerBox(stars.away, playerH);
+  const homeX = Math.max(120, Math.round(W / 2 - homeBox.width - 24));
+  const awayX = Math.min(W - 120 - awayBox.width, Math.round(W / 2 + 24));
+  const rowH = 132;
+  const rowsStart = 168 + playerH + 28;
   const rows = card.picks.map((pick, index) => {
-    const y = 620 + index * 156;
-    return `<rect x="56" y="${y}" width="968" height="140" rx="24" fill="#12151c" stroke="rgba(255,255,255,.06)"/>
-      <text x="84" y="${y + 58}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="34" font-weight="700">${esc(cut(pick.match, 32))}</text>
-      <text x="84" y="${y + 98}" fill="#949bab" font-family="Outfit" font-size="20">${esc(cut(pick.market, 28))}  ·  ${esc(when(pick.kickoff))}</text>
-      <text x="860" y="${y + 78}" text-anchor="end" fill="#f4f6fb" font-family="Barlow Condensed" font-size="44" font-weight="700">${pick.odds.toFixed(2)}</text>
-      ${ring(968, y + 70, pick.hit, 34)}`;
+    const y = rowsStart + index * (rowH + 14);
+    return `<rect x="56" y="${y}" width="968" height="${rowH}" rx="24" fill="#12151c" stroke="rgba(255,255,255,.06)"/>
+      <text x="84" y="${y + 54}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="34" font-weight="700">${esc(cut(pick.match, 32))}</text>
+      <text x="84" y="${y + 94}" fill="#949bab" font-family="Outfit" font-size="20">${esc(cut(pick.market, 28))}  ·  ${esc(when(pick.kickoff))}</text>
+      <text x="860" y="${y + 74}" text-anchor="end" fill="#f4f6fb" font-family="Barlow Condensed" font-size="44" font-weight="700">${pick.odds.toFixed(2)}</text>
+      ${ring(968, y + 66, pick.hit, 32)}`;
   }).join('');
+  const codeY = rowsStart + Math.max(card.picks.length, 1) * (rowH + 14) + 8;
+  const canvas = codeY + 140;
+  const crest = (href, x, glow) => (href
+    ? `<circle cx="${x + 40}" cy="250" r="54" fill="${glow}" opacity=".34"/>
+       <image href="${href}" x="${x}" y="210" width="80" height="80"/>`
+    : '');
   return frame('#e11d2e', `
     ${brand()}
-    <text x="72" y="148" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="3">WEEKEND BANKERS</text>
-    ${playerSvg('wk-home', home, { x: 250, y: 150, scale: 1.45 })}
-    ${playerSvg('wk-away', away, { x: 560, y: 150, scale: 1.45, mirror: true })}
+    <text x="72" y="140" fill="#f0c94a" font-family="Outfit" font-size="20" font-weight="700" letter-spacing="3">WEEKEND BANKERS</text>
+    ${crest(crestForName(homeName), 28, stars.home.primary)}
+    ${crest(crestForName(awayName), W - 108, stars.away.primary)}
+    ${playerImage(stars.home, { x: homeX, y: 168, height: playerH })}
+    ${playerImage(stars.away, { x: awayX, y: 168, height: playerH })}
     ${rows}
-    <rect x="56" y="1108" width="968" height="110" rx="28" fill="#0c0e14"/>
-    <text x="84" y="1148" fill="#f0c94a" font-family="Outfit" font-size="15" font-weight="700" letter-spacing="2">CODE</text>
-    <text x="84" y="1194" fill="#f4f6fb" font-family="Barlow Condensed" font-size="48" font-weight="700">${esc(card.code)}</text>
-    ${logosRow(card.codes, logos, 1000, 1140, 46)}
-  `);
+    <rect x="56" y="${codeY}" width="968" height="110" rx="28" fill="#0c0e14"/>
+    <text x="84" y="${codeY + 40}" fill="#f0c94a" font-family="Outfit" font-size="15" font-weight="700" letter-spacing="2">CODE</text>
+    <text x="84" y="${codeY + 86}" fill="#f4f6fb" font-family="Barlow Condensed" font-size="48" font-weight="700">${esc(card.code)}</text>
+    ${logosRow(card.codes, logos, 1000, codeY + 32, 46)}
+  `, canvas);
 }

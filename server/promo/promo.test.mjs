@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { contextOf, posterFrom, priced, shareCardFrom, weekendBankers } from './plan.mjs';
 import { fontFiles, svgToPng } from './raster.mjs';
-import { shareSvg } from './art.mjs';
-import { playerSvg, starFor } from './players.mjs';
+import { crestPathForName, shareSvg } from './art.mjs';
+import { countryCode, pickPair } from './players.mjs';
 
 const engine = {
   master: {
@@ -79,11 +79,28 @@ test('a huge master is replaced by a real 4-to-8 leg code', () => {
   assert.equal(card.codes.some((row) => row.code === 'BIGMASTER'), false);
 });
 
-test('the away shirt number is not inside the mirrored body', () => {
-  const svg = playerSvg('away', starFor('arsenal'), { mirror: true, x: 10, y: 20, scale: 2 });
-  const body = svg.slice(svg.indexOf('scale(-'), svg.indexOf('</g>'));
-  assert.equal(body.includes('<text'), false);
-  assert.match(svg, />7</);
+test('stars face the centre and a national side uses its country set', () => {
+  assert.equal(countryCode('Ghana'), 'GH');
+  assert.equal(countryCode("Cote d'Ivoire"), 'CI');
+  const pair = pickPair('Ghana', 'Nigeria');
+  assert.equal(pair.home.country, 'GH');
+  assert.equal(pair.away.country, 'NG');
+  assert.equal(pair.home.facing, 'right');
+  assert.equal(pair.away.facing, 'left');
+  assert.equal(pair.home.mirror, false);
+  assert.equal(pair.away.mirror, false);
+  assert.notEqual(pair.home.id, pair.away.id);
+  const again = pickPair('Ghana', 'Nigeria');
+  assert.equal(again.home.id, pair.home.id);
+  assert.equal(again.away.id, pair.away.id);
+  const clubs = pickPair('Arsenal', 'Chelsea');
+  assert.equal(clubs.home.facing, 'right');
+  assert.equal(clubs.away.facing, 'left');
+  assert.equal(clubs.home.country, undefined);
+  assert.notEqual(clubs.home.id, clubs.away.id);
+  const crests = pickPair('Leganes', 'Burgos CF', crestPathForName('Leganes'), crestPathForName('Burgos CF'));
+  assert.match(crests.away.id, /grey/);
+  assert.equal(crests.away.facing, 'left');
 });
 
 test('the share card renders to a PNG with the app fonts', () => {

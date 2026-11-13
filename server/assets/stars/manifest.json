@@ -1,0 +1,1061 @@
+{
+  "name": "Betspapa fictional star library",
+  "description": "Photorealistic AI-generated fictional footballers in plain kits. Not likenesses of real named players. No club badges, sponsor logos, or kit text other than a shirt number. For promo flyers only.",
+  "count": 70,
+  "height_px": 700,
+  "formats": [
+    "png",
+    "webp"
+  ],
+  "items": [
+    {
+      "id": "club-red-white-hero",
+      "file": "png/club-red-white-hero.png",
+      "webp": "webp/club-red-white-hero.webp",
+      "primary": "#C8102E",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 245,
+      "height": 700
+    },
+    {
+      "id": "club-red-white-cele",
+      "file": "png/club-red-white-cele.png",
+      "webp": "webp/club-red-white-cele.webp",
+      "primary": "#C8102E",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 323,
+      "height": 700
+    },
+    {
+      "id": "club-red-black-hero",
+      "file": "png/club-red-black-hero.png",
+      "webp": "webp/club-red-black-hero.webp",
+      "primary": "#C8102E",
+      "secondary": "#111111",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 327,
+      "height": 700
+    },
+    {
+      "id": "club-red-black-cele",
+      "file": "png/club-red-black-cele.png",
+      "webp": "webp/club-red-black-cele.webp",
+      "primary": "#C8102E",
+      "secondary": "#111111",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 324,
+      "height": 700
+    },
+    {
+      "id": "club-sky-blue-hero",
+      "file": "png/club-sky-blue-hero.png",
+      "webp": "webp/club-sky-blue-hero.webp",
+      "primary": "#6BB5E0",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 249,
+      "height": 700
+    },
+    {
+      "id": "club-sky-blue-cele",
+      "file": "png/club-sky-blue-cele.png",
+      "webp": "webp/club-sky-blue-cele.webp",
+      "primary": "#6BB5E0",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 328,
+      "height": 700
+    },
+    {
+      "id": "club-royal-blue-hero",
+      "file": "png/club-royal-blue-hero.png",
+      "webp": "webp/club-royal-blue-hero.webp",
+      "primary": "#1A4FD8",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 333,
+      "height": 700
+    },
+    {
+      "id": "club-royal-blue-cele",
+      "file": "png/club-royal-blue-cele.png",
+      "webp": "webp/club-royal-blue-cele.webp",
+      "primary": "#1A4FD8",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 361,
+      "height": 700
+    },
+    {
+      "id": "club-navy-hero",
+      "file": "png/club-navy-hero.png",
+      "webp": "webp/club-navy-hero.webp",
+      "primary": "#0A1F44",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 256,
+      "height": 700
+    },
+    {
+      "id": "club-navy-cele",
+      "file": "png/club-navy-cele.png",
+      "webp": "webp/club-navy-cele.webp",
+      "primary": "#0A1F44",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 351,
+      "height": 700
+    },
+    {
+      "id": "club-white-black-hero",
+      "file": "png/club-white-black-hero.png",
+      "webp": "webp/club-white-black-hero.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#111111",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 333,
+      "height": 700
+    },
+    {
+      "id": "club-white-black-cele",
+      "file": "png/club-white-black-cele.png",
+      "webp": "webp/club-white-black-cele.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#111111",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 354,
+      "height": 700
+    },
+    {
+      "id": "club-white-red-hero",
+      "file": "png/club-white-red-hero.png",
+      "webp": "webp/club-white-red-hero.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#C8102E",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 244,
+      "height": 700
+    },
+    {
+      "id": "club-white-red-cele",
+      "file": "png/club-white-red-cele.png",
+      "webp": "webp/club-white-red-cele.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#C8102E",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 373,
+      "height": 700
+    },
+    {
+      "id": "club-black-hero",
+      "file": "png/club-black-hero.png",
+      "webp": "webp/club-black-hero.webp",
+      "primary": "#111111",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 347,
+      "height": 700
+    },
+    {
+      "id": "club-black-cele",
+      "file": "png/club-black-cele.png",
+      "webp": "webp/club-black-cele.webp",
+      "primary": "#111111",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 366,
+      "height": 700
+    },
+    {
+      "id": "club-yellow-black-hero",
+      "file": "png/club-yellow-black-hero.png",
+      "webp": "webp/club-yellow-black-hero.webp",
+      "primary": "#F0C94A",
+      "secondary": "#111111",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 247,
+      "height": 700
+    },
+    {
+      "id": "club-yellow-black-cele",
+      "file": "png/club-yellow-black-cele.png",
+      "webp": "webp/club-yellow-black-cele.webp",
+      "primary": "#F0C94A",
+      "secondary": "#111111",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 387,
+      "height": 700
+    },
+    {
+      "id": "club-yellow-green-hero",
+      "file": "png/club-yellow-green-hero.png",
+      "webp": "webp/club-yellow-green-hero.webp",
+      "primary": "#F5C400",
+      "secondary": "#1B7A3D",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 317,
+      "height": 700
+    },
+    {
+      "id": "club-yellow-green-cele",
+      "file": "png/club-yellow-green-cele.png",
+      "webp": "webp/club-yellow-green-cele.webp",
+      "primary": "#F5C400",
+      "secondary": "#1B7A3D",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 350,
+      "height": 700
+    },
+    {
+      "id": "club-green-white-hero",
+      "file": "png/club-green-white-hero.png",
+      "webp": "webp/club-green-white-hero.webp",
+      "primary": "#1B7A3D",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 245,
+      "height": 700
+    },
+    {
+      "id": "club-green-white-cele",
+      "file": "png/club-green-white-cele.png",
+      "webp": "webp/club-green-white-cele.webp",
+      "primary": "#1B7A3D",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 362,
+      "height": 700
+    },
+    {
+      "id": "club-dark-green-hero",
+      "file": "png/club-dark-green-hero.png",
+      "webp": "webp/club-dark-green-hero.webp",
+      "primary": "#0D3B24",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 249,
+      "height": 700
+    },
+    {
+      "id": "club-dark-green-cele",
+      "file": "png/club-dark-green-cele.png",
+      "webp": "webp/club-dark-green-cele.webp",
+      "primary": "#0D3B24",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 345,
+      "height": 700
+    },
+    {
+      "id": "club-orange-hero",
+      "file": "png/club-orange-hero.png",
+      "webp": "webp/club-orange-hero.webp",
+      "primary": "#E85D04",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 246,
+      "height": 700
+    },
+    {
+      "id": "club-orange-cele",
+      "file": "png/club-orange-cele.png",
+      "webp": "webp/club-orange-cele.webp",
+      "primary": "#E85D04",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 343,
+      "height": 700
+    },
+    {
+      "id": "club-claret-blue-hero",
+      "file": "png/club-claret-blue-hero.png",
+      "webp": "webp/club-claret-blue-hero.webp",
+      "primary": "#6D1A2C",
+      "secondary": "#6BA3D6",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 328,
+      "height": 700
+    },
+    {
+      "id": "club-claret-blue-cele",
+      "file": "png/club-claret-blue-cele.png",
+      "webp": "webp/club-claret-blue-cele.webp",
+      "primary": "#6D1A2C",
+      "secondary": "#6BA3D6",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 348,
+      "height": 700
+    },
+    {
+      "id": "club-purple-hero",
+      "file": "png/club-purple-hero.png",
+      "webp": "webp/club-purple-hero.webp",
+      "primary": "#5B2C6F",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 245,
+      "height": 700
+    },
+    {
+      "id": "club-purple-cele",
+      "file": "png/club-purple-cele.png",
+      "webp": "webp/club-purple-cele.webp",
+      "primary": "#5B2C6F",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 352,
+      "height": 700
+    },
+    {
+      "id": "club-maroon-hero",
+      "file": "png/club-maroon-hero.png",
+      "webp": "webp/club-maroon-hero.webp",
+      "primary": "#7A1218",
+      "secondary": "#F0C94A",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 242,
+      "height": 700
+    },
+    {
+      "id": "club-maroon-cele",
+      "file": "png/club-maroon-cele.png",
+      "webp": "webp/club-maroon-cele.webp",
+      "primary": "#7A1218",
+      "secondary": "#F0C94A",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 348,
+      "height": 700
+    },
+    {
+      "id": "club-grey-hero",
+      "file": "png/club-grey-hero.png",
+      "webp": "webp/club-grey-hero.webp",
+      "primary": "#6B7280",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 246,
+      "height": 700
+    },
+    {
+      "id": "club-grey-cele",
+      "file": "png/club-grey-cele.png",
+      "webp": "webp/club-grey-cele.webp",
+      "primary": "#6B7280",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 355,
+      "height": 700
+    },
+    {
+      "id": "club-pink-hero",
+      "file": "png/club-pink-hero.png",
+      "webp": "webp/club-pink-hero.webp",
+      "primary": "#E91E8C",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "club"
+      ],
+      "width": 247,
+      "height": 700
+    },
+    {
+      "id": "club-pink-cele",
+      "file": "png/club-pink-cele.png",
+      "webp": "webp/club-pink-cele.webp",
+      "primary": "#E91E8C",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "club"
+      ],
+      "width": 355,
+      "height": 700
+    },
+    {
+      "id": "nat-ghana-white-hero",
+      "file": "png/nat-ghana-white-hero.png",
+      "webp": "webp/nat-ghana-white-hero.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#C8102E",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "GH"
+      ],
+      "country": "GH",
+      "width": 320,
+      "height": 700
+    },
+    {
+      "id": "nat-ghana-white-cele",
+      "file": "png/nat-ghana-white-cele.png",
+      "webp": "webp/nat-ghana-white-cele.webp",
+      "primary": "#F4F6FB",
+      "secondary": "#C8102E",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "GH"
+      ],
+      "country": "GH",
+      "width": 346,
+      "height": 700
+    },
+    {
+      "id": "nat-ghana-red-hero",
+      "file": "png/nat-ghana-red-hero.png",
+      "webp": "webp/nat-ghana-red-hero.webp",
+      "primary": "#C8102E",
+      "secondary": "#F0C94A",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "GH"
+      ],
+      "country": "GH",
+      "width": 254,
+      "height": 700
+    },
+    {
+      "id": "nat-ghana-red-cele",
+      "file": "png/nat-ghana-red-cele.png",
+      "webp": "webp/nat-ghana-red-cele.webp",
+      "primary": "#C8102E",
+      "secondary": "#F0C94A",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "GH"
+      ],
+      "country": "GH",
+      "width": 366,
+      "height": 700
+    },
+    {
+      "id": "nat-nigeria-green-hero",
+      "file": "png/nat-nigeria-green-hero.png",
+      "webp": "webp/nat-nigeria-green-hero.webp",
+      "primary": "#008751",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "NG"
+      ],
+      "country": "NG",
+      "width": 256,
+      "height": 700
+    },
+    {
+      "id": "nat-nigeria-green-cele",
+      "file": "png/nat-nigeria-green-cele.png",
+      "webp": "webp/nat-nigeria-green-cele.webp",
+      "primary": "#008751",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "NG"
+      ],
+      "country": "NG",
+      "width": 352,
+      "height": 700
+    },
+    {
+      "id": "nat-senegal-white-hero",
+      "file": "png/nat-senegal-white-hero.png",
+      "webp": "webp/nat-senegal-white-hero.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#00853F",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "SN"
+      ],
+      "country": "SN",
+      "width": 248,
+      "height": 700
+    },
+    {
+      "id": "nat-senegal-white-cele",
+      "file": "png/nat-senegal-white-cele.png",
+      "webp": "webp/nat-senegal-white-cele.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#00853F",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "SN"
+      ],
+      "country": "SN",
+      "width": 347,
+      "height": 700
+    },
+    {
+      "id": "nat-ivory-coast-orange-hero",
+      "file": "png/nat-ivory-coast-orange-hero.png",
+      "webp": "webp/nat-ivory-coast-orange-hero.webp",
+      "primary": "#FF6B00",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "CI"
+      ],
+      "country": "CI",
+      "width": 248,
+      "height": 700
+    },
+    {
+      "id": "nat-ivory-coast-orange-cele",
+      "file": "png/nat-ivory-coast-orange-cele.png",
+      "webp": "webp/nat-ivory-coast-orange-cele.webp",
+      "primary": "#FF6B00",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "CI"
+      ],
+      "country": "CI",
+      "width": 340,
+      "height": 700
+    },
+    {
+      "id": "nat-cameroon-green-hero",
+      "file": "png/nat-cameroon-green-hero.png",
+      "webp": "webp/nat-cameroon-green-hero.webp",
+      "primary": "#007A5E",
+      "secondary": "#FFD100",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "CM"
+      ],
+      "country": "CM",
+      "width": 247,
+      "height": 700
+    },
+    {
+      "id": "nat-cameroon-green-cele",
+      "file": "png/nat-cameroon-green-cele.png",
+      "webp": "webp/nat-cameroon-green-cele.webp",
+      "primary": "#007A5E",
+      "secondary": "#FFD100",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "CM"
+      ],
+      "country": "CM",
+      "width": 345,
+      "height": 700
+    },
+    {
+      "id": "nat-morocco-red-hero",
+      "file": "png/nat-morocco-red-hero.png",
+      "webp": "webp/nat-morocco-red-hero.webp",
+      "primary": "#C1272D",
+      "secondary": "#006233",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "MA"
+      ],
+      "country": "MA",
+      "width": 240,
+      "height": 700
+    },
+    {
+      "id": "nat-morocco-red-cele",
+      "file": "png/nat-morocco-red-cele.png",
+      "webp": "webp/nat-morocco-red-cele.webp",
+      "primary": "#C1272D",
+      "secondary": "#006233",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "MA"
+      ],
+      "country": "MA",
+      "width": 336,
+      "height": 700
+    },
+    {
+      "id": "nat-egypt-red-hero",
+      "file": "png/nat-egypt-red-hero.png",
+      "webp": "webp/nat-egypt-red-hero.webp",
+      "primary": "#CE1126",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "EG"
+      ],
+      "country": "EG",
+      "width": 247,
+      "height": 700
+    },
+    {
+      "id": "nat-egypt-red-cele",
+      "file": "png/nat-egypt-red-cele.png",
+      "webp": "webp/nat-egypt-red-cele.webp",
+      "primary": "#CE1126",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "EG"
+      ],
+      "country": "EG",
+      "width": 310,
+      "height": 700
+    },
+    {
+      "id": "nat-england-white-hero",
+      "file": "png/nat-england-white-hero.png",
+      "webp": "webp/nat-england-white-hero.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#C8102E",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "ENG"
+      ],
+      "country": "ENG",
+      "width": 247,
+      "height": 700
+    },
+    {
+      "id": "nat-england-white-cele",
+      "file": "png/nat-england-white-cele.png",
+      "webp": "webp/nat-england-white-cele.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#C8102E",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "ENG"
+      ],
+      "country": "ENG",
+      "width": 337,
+      "height": 700
+    },
+    {
+      "id": "nat-france-navy-hero",
+      "file": "png/nat-france-navy-hero.png",
+      "webp": "webp/nat-france-navy-hero.webp",
+      "primary": "#0A1F5C",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "FR"
+      ],
+      "country": "FR",
+      "width": 250,
+      "height": 700
+    },
+    {
+      "id": "nat-france-navy-cele",
+      "file": "png/nat-france-navy-cele.png",
+      "webp": "webp/nat-france-navy-cele.webp",
+      "primary": "#0A1F5C",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "FR"
+      ],
+      "country": "FR",
+      "width": 333,
+      "height": 700
+    },
+    {
+      "id": "nat-brazil-yellow-hero",
+      "file": "png/nat-brazil-yellow-hero.png",
+      "webp": "webp/nat-brazil-yellow-hero.webp",
+      "primary": "#FFDF00",
+      "secondary": "#009C3B",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "BR"
+      ],
+      "country": "BR",
+      "width": 250,
+      "height": 700
+    },
+    {
+      "id": "nat-brazil-yellow-cele",
+      "file": "png/nat-brazil-yellow-cele.png",
+      "webp": "webp/nat-brazil-yellow-cele.webp",
+      "primary": "#FFDF00",
+      "secondary": "#009C3B",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "BR"
+      ],
+      "country": "BR",
+      "width": 352,
+      "height": 700
+    },
+    {
+      "id": "nat-argentina-sky-hero",
+      "file": "png/nat-argentina-sky-hero.png",
+      "webp": "webp/nat-argentina-sky-hero.webp",
+      "primary": "#75AADB",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "AR"
+      ],
+      "country": "AR",
+      "width": 254,
+      "height": 700
+    },
+    {
+      "id": "nat-argentina-sky-cele",
+      "file": "png/nat-argentina-sky-cele.png",
+      "webp": "webp/nat-argentina-sky-cele.webp",
+      "primary": "#75AADB",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "AR"
+      ],
+      "country": "AR",
+      "width": 330,
+      "height": 700
+    },
+    {
+      "id": "nat-germany-white-hero",
+      "file": "png/nat-germany-white-hero.png",
+      "webp": "webp/nat-germany-white-hero.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#111111",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "DE"
+      ],
+      "country": "DE",
+      "width": 246,
+      "height": 700
+    },
+    {
+      "id": "nat-germany-white-cele",
+      "file": "png/nat-germany-white-cele.png",
+      "webp": "webp/nat-germany-white-cele.webp",
+      "primary": "#FFFFFF",
+      "secondary": "#111111",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "DE"
+      ],
+      "country": "DE",
+      "width": 343,
+      "height": 700
+    },
+    {
+      "id": "nat-spain-red-hero",
+      "file": "png/nat-spain-red-hero.png",
+      "webp": "webp/nat-spain-red-hero.webp",
+      "primary": "#C60B1E",
+      "secondary": "#F1BF00",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "ES"
+      ],
+      "country": "ES",
+      "width": 244,
+      "height": 700
+    },
+    {
+      "id": "nat-spain-red-cele",
+      "file": "png/nat-spain-red-cele.png",
+      "webp": "webp/nat-spain-red-cele.webp",
+      "primary": "#C60B1E",
+      "secondary": "#F1BF00",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "ES"
+      ],
+      "country": "ES",
+      "width": 333,
+      "height": 700
+    },
+    {
+      "id": "nat-portugal-red-hero",
+      "file": "png/nat-portugal-red-hero.png",
+      "webp": "webp/nat-portugal-red-hero.webp",
+      "primary": "#BA0C2F",
+      "secondary": "#006600",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "PT"
+      ],
+      "country": "PT",
+      "width": 244,
+      "height": 700
+    },
+    {
+      "id": "nat-portugal-red-cele",
+      "file": "png/nat-portugal-red-cele.png",
+      "webp": "webp/nat-portugal-red-cele.webp",
+      "primary": "#BA0C2F",
+      "secondary": "#006600",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "PT"
+      ],
+      "country": "PT",
+      "width": 320,
+      "height": 700
+    },
+    {
+      "id": "nat-netherlands-orange-hero",
+      "file": "png/nat-netherlands-orange-hero.png",
+      "webp": "webp/nat-netherlands-orange-hero.webp",
+      "primary": "#FF6B00",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "NL"
+      ],
+      "country": "NL",
+      "width": 245,
+      "height": 700
+    },
+    {
+      "id": "nat-netherlands-orange-cele",
+      "file": "png/nat-netherlands-orange-cele.png",
+      "webp": "webp/nat-netherlands-orange-cele.webp",
+      "primary": "#FF6B00",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "NL"
+      ],
+      "country": "NL",
+      "width": 335,
+      "height": 700
+    },
+    {
+      "id": "nat-italy-blue-hero",
+      "file": "png/nat-italy-blue-hero.png",
+      "webp": "webp/nat-italy-blue-hero.webp",
+      "primary": "#0066B3",
+      "secondary": "#FFFFFF",
+      "pose": "hero",
+      "facing": "right",
+      "tags": [
+        "national",
+        "IT"
+      ],
+      "country": "IT",
+      "width": 250,
+      "height": 700
+    },
+    {
+      "id": "nat-italy-blue-cele",
+      "file": "png/nat-italy-blue-cele.png",
+      "webp": "webp/nat-italy-blue-cele.webp",
+      "primary": "#0066B3",
+      "secondary": "#FFFFFF",
+      "pose": "cele",
+      "facing": "left",
+      "tags": [
+        "national",
+        "IT"
+      ],
+      "country": "IT",
+      "width": 348,
+      "height": 700
+    }
+  ],
+  "note": "Optimized from the 900px library. PNG is what the renderer embeds. WebP is the source set."
+}

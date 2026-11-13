@@ -1,19 +1,102 @@
 /**
- * Original illustrated players. The project owns these drawings.
- * They are not photographs and not club or press art. A licensed photo
- * source can replace `playerSvg` later without changing the posters.
+ * Fictional star cut-outs. These are AI-generated players in plain kits,
+ * not photographs of real footballers. The drawn cartoon players are gone.
  */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { coloursFromPng } from './crestColour.mjs';
 
-const STARS = {
-  ghana: { number: '10', kit: '#f4f6fb', trim: '#f0c94a', shorts: '#111111', skin: '#8d5a3a', hair: '#1a120c' },
-  arsenal: { number: '7', kit: '#e11d2e', trim: '#ffffff', shorts: '#ffffff', skin: '#c48a62', hair: '#2a1c14' },
-  'heart of lions': { number: '9', kit: '#b4232d', trim: '#f0c94a', shorts: '#f4f6fb', skin: '#8d5a3a', hair: '#1a120c' },
-  'dreams fc': { number: '10', kit: '#1a4fd8', trim: '#f0c94a', shorts: '#1a4fd8', skin: '#c48a62', hair: '#2a1c14' },
-  'borussia dortmund': { number: '9', kit: '#f0c94a', trim: '#111111', shorts: '#111111', skin: '#c48a62', hair: '#3a2414' },
+const assetDir = join(dirname(fileURLToPath(import.meta.url)), '../assets/stars');
+const library = JSON.parse(readFileSync(join(assetDir, 'manifest.json'), 'utf8')).items;
+const hrefs = new Map();
+
+const COUNTRY = {
+  ghana: 'GH',
+  'black stars': 'GH',
+  nigeria: 'NG',
+  'super eagles': 'NG',
+  senegal: 'SN',
+  'ivory coast': 'CI',
+  "cote d'ivoire": 'CI',
+  'cote divoire': 'CI',
+  'cote d ivoire': 'CI',
+  cameroon: 'CM',
+  morocco: 'MA',
+  egypt: 'EG',
+  england: 'ENG',
+  france: 'FR',
+  brazil: 'BR',
+  argentina: 'AR',
+  germany: 'DE',
+  spain: 'ES',
+  portugal: 'PT',
+  netherlands: 'NL',
+  holland: 'NL',
+  italy: 'IT',
 };
 
-const SKINS = ['#8d5a3a', '#6b3e28', '#c48a62', '#e0b088'];
-const KITS = ['#e11d2e', '#1a4fd8', '#f0c94a', '#f4f6fb', '#1f8a4c', '#111111'];
+/** Home-kit colours when we know them. Crest sampling covers everyone else. */
+const KITS = {
+  arsenal: ['#C8102E', '#FFFFFF'],
+  'borussia dortmund': ['#FDE100', '#111111'],
+  dortmund: ['#FDE100', '#111111'],
+  'heart of lions': ['#B4232D', '#F0C94A'],
+  'dreams fc': ['#1A4FD8', '#F0C94A'],
+  chelsea: ['#034694', '#FFFFFF'],
+  liverpool: ['#C8102E', '#FFFFFF'],
+  'manchester united': ['#DA291C', '#FFFFFF'],
+  'manchester city': ['#6CABDD', '#FFFFFF'],
+  barcelona: ['#A50044', '#004D98'],
+  'fc barcelona': ['#A50044', '#004D98'],
+  'real madrid': ['#F4F6FB', '#111111'],
+  ghana: ['#F4F6FB', '#C8102E'],
+  nigeria: ['#008751', '#FFFFFF'],
+  senegal: ['#F4F6FB', '#00853F'],
+  'ivory coast': ['#FF8200', '#FFFFFF'],
+  cameroon: ['#007A5E', '#FCD116'],
+  morocco: ['#C1272D', '#006233'],
+  egypt: ['#C8102E', '#FFFFFF'],
+  england: ['#F4F6FB', '#C8102E'],
+  france: ['#002654', '#ED2939'],
+  brazil: ['#FEDD00', '#009C3B'],
+  argentina: ['#75AADB', '#FFFFFF'],
+  germany: ['#F4F6FB', '#111111'],
+  spain: ['#C60B1E', '#F1BF00'],
+  portugal: ['#C8102E', '#006600'],
+  netherlands: ['#FF6600', '#FFFFFF'],
+  italy: ['#0066B3', '#FFFFFF'],
+};
+
+function norm(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(u\d+|women|fc|cf|afc|sc)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function countryCode(name) {
+  const key = norm(name);
+  return COUNTRY[key] || '';
+}
+
+function rgb(hex) {
+  const raw = String(hex || '').replace('#', '');
+  if (raw.length !== 6) return [128, 128, 128];
+  return [parseInt(raw.slice(0, 2), 16), parseInt(raw.slice(2, 4), 16), parseInt(raw.slice(4, 6), 16)];
+}
+
+function distance(a, b) {
+  const dr = a[0] - b[0];
+  const dg = a[1] - b[1];
+  const db = a[2] - b[2];
+  return dr * dr + dg * dg + db * db;
+}
 
 function hash(value) {
   let n = 0;
@@ -22,77 +105,74 @@ function hash(value) {
   return n;
 }
 
-export function starFor(name) {
-  const key = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  if (STARS[key]) return { ...STARS[key], named: true };
-  const n = hash(key);
-  return {
-    number: String((n % 11) + 7),
-    kit: KITS[n % KITS.length],
-    trim: n % 2 ? '#f0c94a' : '#ffffff',
-    shorts: n % 3 ? '#111111' : '#f4f6fb',
-    skin: SKINS[n % SKINS.length],
-    hair: n % 2 ? '#1a120c' : '#3a2418',
-    named: false,
-  };
+const FALLBACK = ['#C8102E', '#1A4FD8', '#FDE100', '#F4F6FB', '#007A5E', '#111111', '#6BB5E0', '#FF6600'];
+
+export function kitFor(name, crestPath = '') {
+  const known = KITS[norm(name)];
+  if (known) return { primary: rgb(known[0]), secondary: rgb(known[1]), source: 'kit' };
+  if (crestPath) {
+    try {
+      const colours = coloursFromPng(readFileSync(crestPath));
+      if (colours) return { ...colours, source: 'crest' };
+    } catch {
+      /* a missing crest uses the name fallback */
+    }
+  }
+  const tone = FALLBACK[hash(norm(name)) % FALLBACK.length];
+  return { primary: rgb(tone), secondary: [255, 255, 255], source: 'name' };
 }
 
-/** One illustrated cut-out. The shirt number is drawn upright, even when the body is mirrored. */
-export function playerSvg(id, star, { mirror = false, x = 0, y = 0, scale = 1 } = {}) {
-  const safe = String(id).replace(/[^a-z0-9]+/gi, '') || 'p';
-  const flip = mirror ? `translate(${x + 160 * scale} ${y}) scale(${-scale} ${scale})` : `translate(${x} ${y}) scale(${scale})`;
-  const numX = x + 80 * scale;
-  const numY = y + 124 * scale;
-  return `<defs>
-    <linearGradient id="${safe}-kit" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${star.kit}"/>
-      <stop offset="1" stop-color="${shade(star.kit, 0.62)}"/>
-    </linearGradient>
-    <linearGradient id="${safe}-shine" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
-      <stop offset=".32" stop-color="#fff" stop-opacity=".28"/>
-      <stop offset="1" stop-color="#000" stop-opacity=".2"/>
-    </linearGradient>
-    <filter id="${safe}-ds" x="-30%" y="-10%" width="160%" height="130%">
-      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#000" flood-opacity=".55"/>
-    </filter>
-  </defs>
-  <g filter="url(#${safe}-ds)">
-    <ellipse cx="${x + 80 * scale}" cy="${y + 268 * scale}" rx="${46 * scale}" ry="${8 * scale}" fill="#000" opacity=".45"/>
-    <g transform="${flip}">
-      <path d="M96 232c10 2 22 8 26 16 1 3-2 6-9 6h-22c-5 0-7-2-7-6 1-7 5-13 12-16z" fill="#141414"/>
-      <path d="M108 214c8 6 10 16 6 22-6 2-16-2-18-10-1-6 4-12 12-12z" fill="#0c0c0c"/>
-      <path d="M100 168c8 6 14 34 12 58-1 8-8 12-15 9-8-3-12-22-12-44 0-12 6-26 15-23z" fill="${star.shorts}"/>
-      <path d="M98 168h16v10h-18z" fill="${star.trim}"/>
-      <path d="M48 236c-10 4-20 10-22 18-1 3 3 6 9 6h24c6 0 8-3 8-7 0-8-7-15-19-17z" fill="#141414"/>
-      <path d="M40 218c-8 6-8 16-4 22 7 2 16-4 16-12 0-6-5-12-12-10z" fill="#0c0c0c"/>
-      <path d="M60 168c-10 7-16 36-13 60 1 8 8 12 15 9 8-3 13-24 14-46 1-14-6-28-16-23z" fill="${star.shorts}"/>
-      <path d="M52 168h16v10H50z" fill="${star.trim}"/>
-      <path d="M52 132c16-6 44-8 60 2 5 10 8 28 3 38-12 6-32 8-48 4-12-3-20-16-18-28 1-6 1-12 3-16z" fill="${star.shorts}"/>
-      <path d="M56 70c10-14 40-18 56-6 10 7 16 20 17 34 2 18-4 40-12 50-10 6-40 8-56 0-10-10-14-34-12-54 1-10 2-18 7-24z" fill="url(#${safe}-kit)"/>
-      <path d="M56 70c10-14 40-18 56-6 10 7 16 20 17 34 2 18-4 40-12 50-10 6-40 8-56 0-10-10-14-34-12-54 1-10 2-18 7-24z" fill="url(#${safe}-shine)"/>
-      <path d="M58 70h48v9H58z" fill="${star.trim}"/>
-      <path d="M70 78h20l-4 16h-12z" fill="${star.trim}" opacity=".9"/>
-      <path d="M50 82c-10 12-16 28-16 44 0 7 3 11 8 10 6-2 10-12 14-24 4-10 6-18 4-26-2-4-6-6-10-4z" fill="${star.trim}"/>
-      <path d="M42 128c-4 12-4 26 1 34 4 6 10 6 13 1 4-10 6-24 3-34-2-6-12-7-17-1z" fill="${star.skin}"/>
-      <path d="M112 80c10 10 16 26 16 42 0 7-3 11-8 10-6-2-10-12-14-24-3-10-5-18-3-25 1-4 5-6 9-3z" fill="${star.trim}"/>
-      <path d="M120 126c4 12 5 26 1 34-3 6-9 6-13 1-3-10-5-24-2-34 2-6 11-7 14-1z" fill="${star.skin}"/>
-      <path d="M72 62c8 10 22 10 30 0 1 12-5 20-15 20s-16-8-15-20z" fill="${star.skin}"/>
-      <ellipse cx="86" cy="40" rx="22" ry="24" fill="${star.skin}"/>
-      <path d="M66 36c6-20 26-30 42-20 10 6 14 16 12 26-10-8-22-10-34-6-8 2-16 2-20 0z" fill="${star.hair}"/>
-      <path d="M64 44c-3 10 0 18 5 18 2-8 2-14-1-18-1 0-3 0-4 0z" fill="${star.hair}"/>
-      <path d="M100 28c8 2 16 10 16 18-8-2-14 0-20-4-4-6-2-12 4-14z" fill="${star.hair}" opacity=".85"/>
-      <path d="M74 38c2 2 6 2 8 0" fill="none" stroke="#2a140c" stroke-width="1.4" opacity=".35"/>
-    </g>
-    <text x="${numX}" y="${numY}" text-anchor="middle" font-family="Barlow Condensed" font-weight="700" font-size="${28 * scale}" fill="#fff">${esc(star.number)}</text>
-  </g>`;
+function primaryDistance(item, kit) {
+  return distance(rgb(item.primary), kit.primary);
 }
 
-function shade(hex, amount) {
-  const raw = String(hex || '').replace('#', '');
-  if (raw.length !== 6) return '#111111';
-  const mix = (channel) => Math.max(0, Math.min(255, Math.round(channel * amount))).toString(16).padStart(2, '0');
-  return `#${mix(parseInt(raw.slice(0, 2), 16))}${mix(parseInt(raw.slice(2, 4), 16))}${mix(parseInt(raw.slice(4, 6), 16))}`;
+function choose(name, kit, facing, avoidId) {
+  const code = countryCode(name);
+  const national = code ? library.filter((item) => item.country === code) : [];
+  const pool = national.length ? national : library.filter((item) => !item.country);
+  const faced = pool.filter((item) => item.facing === facing && item.id !== avoidId);
+  const list = (faced.length ? faced : pool.filter((item) => item.id !== avoidId)).slice();
+  list.sort((a, b) => {
+    const pa = primaryDistance(a, kit);
+    const pb = primaryDistance(b, kit);
+    if (Math.abs(pa - pb) > 3500) return pa - pb || a.id.localeCompare(b.id);
+    const sa = distance(rgb(a.secondary), kit.secondary);
+    const sb = distance(rgb(b.secondary), kit.secondary);
+    return pa + sa * 0.15 - (pb + sb * 0.15) || a.id.localeCompare(b.id);
+  });
+  const item = list[0] || pool[0];
+  return { ...item, mirror: false };
+}
+
+/** Home faces right, toward the centre. Away faces left. Shirt numbers are never mirrored. */
+export function pickPair(home, away, homeCrest = '', awayCrest = '') {
+  const homeKit = kitFor(home, homeCrest);
+  const awayKit = kitFor(away, awayCrest);
+  const homeStar = choose(home, homeKit, 'right', '');
+  const awayStar = choose(away, awayKit, 'left', homeStar.id);
+  return { home: homeStar, away: awayStar, homeKit, awayKit };
+}
+
+export function starHref(item) {
+  if (!hrefs.has(item.id)) {
+    const bytes = readFileSync(join(assetDir, item.file));
+    hrefs.set(item.id, `data:image/png;base64,${bytes.toString('base64')}`);
+  }
+  return hrefs.get(item.id);
+}
+
+export function playerBox(item, height) {
+  const width = Math.round(height * (item.width / item.height));
+  return { width, height };
+}
+
+/** Soft floor shadow and a kit-coloured rim. The cut-out is never flipped. */
+export function playerImage(item, { x, y, height }) {
+  const { width } = playerBox(item, height);
+  const glow = item.primary || '#e11d2e';
+  return `<ellipse cx="${x + width / 2}" cy="${y + height - 6}" rx="${Math.round(width * 0.42)}" ry="18" fill="#000" opacity=".42"/>
+    <ellipse cx="${x + width / 2}" cy="${y + height * 0.46}" rx="${Math.round(width * 0.72)}" ry="${Math.round(height * 0.4)}" fill="${glow}" opacity=".28"/>
+    <image href="${starHref(item)}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMax meet"/>`;
 }
 
 export function esc(value) {
