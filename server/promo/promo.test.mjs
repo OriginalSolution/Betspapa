@@ -53,6 +53,8 @@ test('weekend bankers run at 06:00 Accra and need a real code', () => {
   const card = weekendBankers(engine, saturday);
   assert.equal(card.code, 'MSPORT88');
   assert.equal(card.picks.every((pick) => pick.odds >= 1.2), true);
+  assert.equal(card.featuredHome, 'Kosovo');
+  assert.equal(card.featuredAway, 'Israel');
   assert.equal(weekendBankers(engine, new Date('2026-11-14T07:00:00.000Z')), null);
 });
 
@@ -98,9 +100,18 @@ test('stars face the centre and a national side uses its country set', () => {
   assert.equal(clubs.away.facing, 'left');
   assert.equal(clubs.home.country, undefined);
   assert.notEqual(clubs.home.id, clubs.away.id);
-  const crests = pickPair('Leganes', 'Burgos CF', crestPathForName('Leganes'), crestPathForName('Burgos CF'));
-  assert.match(crests.away.id, /grey/);
-  assert.equal(crests.away.facing, 'left');
+});
+
+test('Japan, Leganes and Burgos keep their shirt colours', () => {
+  const japan = pickPair('Japan', 'Spain', crestPathForName('Japan'), crestPathForName('Spain'));
+  assert.match(japan.home.id, /royal-blue/);
+  assert.equal(japan.home.facing, 'right');
+  assert.match(japan.away.id, /^nat-spain-red/);
+  assert.equal(japan.away.facing, 'left');
+  const pair = pickPair('Leganes', 'Burgos CF', crestPathForName('Leganes'), crestPathForName('Burgos CF'));
+  assert.match(pair.home.id, /royal-blue/);
+  assert.match(pair.away.id, /white-black/);
+  assert.notEqual(pair.home.id, pair.away.id);
 });
 
 test('the share card renders to a PNG with the app fonts', () => {
