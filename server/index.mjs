@@ -5,6 +5,7 @@ import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
 import { getCachedEvents, getEngineState, runEngineCycle, startEngine } from './engine.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
+import { loadUpcomingEvents } from './upcoming.mjs';
 
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
@@ -115,7 +116,7 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/health') {
-    send(res, 200, { ok: true, mode: config.mode });
+    send(res, 200, { ok: true, mode: config.mode, fixtures: 'live' });
     return;
   }
   if (url.pathname === '/api/engine') {
@@ -157,6 +158,23 @@ async function handleApi(req, res, url) {
     }
     return;
   }
+  if (url.pathname === '/api/sportybet/upcoming') {
+    // Public fixture feed the Android app reads directly. Real fixtures only.
+    try {
+      const events = await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' });
+      const data = JSON.stringify({ source: 'betspapa', generatedAt: new Date().toISOString(), count: events.length, events });
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'public, max-age=60',
+        'Access-Control-Allow-Origin': '*',
+        'Content-Length': Buffer.byteLength(data),
+      });
+      res.end(data);
+    } catch (error) {
+      send(res, 502, { error: error.message || 'Fixture feed failed' });
+    }
+    return;
+  }
   if (url.pathname === '/api/fixtures') {
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
@@ -165,15 +183,10 @@ async function handleApi(req, res, url) {
       return;
     }
     try {
-      const events = await cached('sporty-upcoming', 60_000, async () => {
-        const response = await fetch('https://api.betspapa.com/api/sportybet/upcoming', { signal: AbortSignal.timeout(25_000) });
-        if (!response.ok) throw new Error(`Betspapa fixtures returned ${response.status}`);
-        const body = await response.json();
-        return Array.isArray(body.events) ? body.events : [];
-      }).catch((error) => {
+      const events = await loadUpcomingEvents().catch((error) => {
         const saved = getCachedEvents();
         if (saved.length) {
-          console.error(`[engine] Fixture proxy failed: ${error.message}. Serving ${saved.length} cached events.`);
+          console.error(`[fixtures] Fixture catalogue failed: ${error.message}. Serving ${saved.length} cached events.`);
           return saved;
         }
         throw error;
@@ -263,6 +276,9 @@ const server = createServer((req, res) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`Betspapa listening on http://0.0.0.0:${port} (${config.mode})`);
+  console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
+  loadUpcomingEvents()
+    .then((events) => console.log(`[fixtures] Warm cache: ${events.length} real fixtures.`))
+    .catch((error) => console.error(`[fixtures] Warm-up failed: ${error.message}`));
   startEngine();
 });

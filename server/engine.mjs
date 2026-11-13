@@ -5,6 +5,7 @@ import { bookAll } from './bookers.mjs';
 import { qualifyEvents } from './qualify.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
+import { loadUpcomingEvents } from './upcoming.mjs';
 
 const FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 const INTERVAL_MS = 15 * 60 * 1000;
@@ -74,6 +75,7 @@ export function createEngine(options = {}) {
   }
 
   async function fetchFeed() {
+    if (options.loadEvents) return options.loadEvents();
     const fetchImpl = options.fetchImpl || fetch;
     const retryMs = options.retryMs ?? 2000;
     let last = new Error('Fixture feed failed');
@@ -189,7 +191,8 @@ export function createEngine(options = {}) {
   };
 }
 
-const engine = createEngine();
+// In production the engine reads the catalogue directly instead of calling its own public URL.
+const engine = createEngine({ loadEvents: () => loadUpcomingEvents({ force: true }) });
 
 export function startEngine() {
   engine.start();
