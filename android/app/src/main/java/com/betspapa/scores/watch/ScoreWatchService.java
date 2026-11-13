@@ -52,19 +52,20 @@ public class ScoreWatchService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         WatchRuntime.serviceRunning = true;
         holdWake();
-        if (!startInForeground()) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
+        // Android kills a started foreground service that never calls startForeground.
+        // A failure still returns START_STICKY so the watchdog alarm can bring it back.
+        startInForeground();
         handler.removeCallbacks(tick);
         handler.post(tick);
+        WatchScheduler.armWatchdog(this);
         return START_STICKY;
     }
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        // A swipe often kills the process immediately after this. The alarm is what brings the watcher back.
-        WatchScheduler.arm(this);
+        // HiOS often kills the process immediately after a swipe. The alarm is what starts the watcher again.
+        WatchScheduler.scheduleRestart(this);
+        WatchScheduler.armWatchdog(this);
         holdWake();
         startInForeground();
     }
@@ -85,27 +86,36 @@ public class ScoreWatchService extends Service {
 
     private void poll() {
         holdWake();
-        final WatchRuntime.PollResult result = WatchRuntime.pollOnce(this);
+        final WatchRuntime.PollResult result;
+        try {
+            result = WatchRuntime.pollOnce(this);
+        } finally {
+            releaseWake();
+        }
         handler.post(new Runnable() {
             @Override
             public void run() {
-                if (!result.hot) {
-                    WatchScheduler.arm(ScoreWatchService.this);
-                    stopWatching();
-                    return;
-                }
                 startInForeground();
-                handler.postDelayed(tick, result.nextDelayMs);
+                WatchScheduler.armWatchdog(ScoreWatchService.this);
+                // Idle matches stay on a slow native loop. Stopping here is what left HiOS silent until the app opened.
+                long delay = result.hot ? result.nextDelayMs : WatchScheduler.WATCHDOG_MS;
+                handler.postDelayed(tick, Math.max(delay, AlertPlanner.POLL_MS));
             }
         });
     }
 
     private void holdWake() {
         if (lock == null) return;
-        lock.acquire(3L * 60L * 1000L);
+        if (lock.isHeld()) return;
+        lock.acquire(45_000L);
+    }
+
+    private void releaseWake() {
+        if (lock != null && lock.isHeld()) lock.release();
     }
 
     private boolean startInForeground() {
+        // specialUse is the long-running type for a score watcher. dataSync is capped on Android 15, so it is only the fallback.
         try {
             if (Build.VERSION.SDK_INT >= 34) {
                 try {
@@ -128,11 +138,5 @@ public class ScoreWatchService extends Service {
         } catch (RuntimeException error) {
             return false;
         }
-    }
-
-    private void stopWatching() {
-        handler.removeCallbacks(tick);
-        stopForeground(STOP_FOREGROUND_REMOVE);
-        stopSelf();
     }
 }

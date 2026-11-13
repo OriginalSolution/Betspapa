@@ -65,6 +65,7 @@ export type WatchDeviceStatus = {
   oem?: string;
   setupVersion?: number;
   setupFinished?: boolean;
+  lastPollAt?: number;
 };
 
 type WatchPlugin = {

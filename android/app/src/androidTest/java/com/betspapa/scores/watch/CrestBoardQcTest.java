@@ -14,7 +14,6 @@ import androidx.test.uiautomator.By;
 import androidx.test.uiautomator.UiDevice;
 import androidx.test.uiautomator.UiObject2;
 import com.betspapa.scores.MainActivity;
-import com.betspapa.watch.WatchFiles;
 import com.betspapa.watch.WatchMatch;
 import com.betspapa.watch.WatchNote;
 import com.betspapa.watch.WatchState;

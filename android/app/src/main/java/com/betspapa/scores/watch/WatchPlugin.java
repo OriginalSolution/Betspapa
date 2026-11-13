@@ -328,11 +328,14 @@ public class WatchPlugin extends Plugin {
         result.put("setupFinished", setupFinished);
         result.put("watching", WatchRuntime.serviceRunning);
         int live = 0;
+        long lastPollAt = 0L;
         if (context != null) {
             WatchState state = WatchState.load(WatchFiles.file(context));
             live = AlertPlanner.liveCount(state.matches, state);
+            lastPollAt = state.lastPollAt;
         }
         result.put("liveCount", live);
+        result.put("lastPollAt", lastPollAt);
         return result;
     }
 

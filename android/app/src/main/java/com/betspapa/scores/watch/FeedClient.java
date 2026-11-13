@@ -30,6 +30,25 @@ final class FeedClient {
     }
 
     static String get(Context context, String url) throws IOException {
+        IOException last = new IOException("Feed request failed");
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return getOnce(context, url);
+            } catch (IOException error) {
+                last = error;
+                if (attempt == 2) break;
+                try {
+                    Thread.sleep(500L * (attempt + 1));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw last;
+                }
+            }
+        }
+        throw last;
+    }
+
+    private static String getOnce(Context context, String url) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) new URL(resolve(context, url)).openConnection();
         connection.setRequestMethod("GET");
         connection.setConnectTimeout(30_000);

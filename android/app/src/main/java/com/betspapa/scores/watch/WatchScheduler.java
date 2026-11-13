@@ -36,7 +36,13 @@ public final class WatchScheduler {
     private static final String PERIODIC = "betspapa-watch";
     private static final String ONCE = "betspapa-watch-now";
     private static final int ALARM_CODE = 41;
+    private static final int WATCHDOG_CODE = 42;
+    private static final int RESTART_CODE = 43;
     private static final int TEST_CODE = 77;
+    /** Doze-safe check that the process is still polling. HiOS drops a dead process's Handler. */
+    public static final long WATCHDOG_MS = 5L * 60L * 1000L;
+    public static final String ACTION_WATCHDOG = "com.betspapa.scores.watch.WATCHDOG";
+    public static final String ACTION_RESTART = "com.betspapa.scores.watch.RESTART";
     /** Restart heartbeat while a match is live, in case the process was killed. */
     private static final long HEARTBEAT_MS = 45_000L;
     private static volatile boolean uiForeground;
@@ -75,30 +81,57 @@ public final class WatchScheduler {
 
     public static void arm(Context context) {
         ensurePeriodic(context);
+        armWatchdog(context);
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) return;
         PendingIntent pending = alarmIntent(context);
         WatchState state = WatchState.load(WatchFiles.file(context));
         if (!ready(context, state)) {
             alarms.cancel(pending);
+            alarms.cancel(watchdogIntent(context));
             context.stopService(new Intent(context, ScoreWatchService.class));
             return;
         }
+        if (!WatchRuntime.serviceRunning) start(context);
         long now = System.currentTimeMillis();
         boolean hot = AlertPlanner.shouldWatch(state.matches, state, now);
-        if (hot) {
-            if (!WatchRuntime.serviceRunning) start(context);
-        } else if (WatchRuntime.serviceRunning) {
-            context.stopService(new Intent(context, ScoreWatchService.class));
+        long trigger = hot ? now + HEARTBEAT_MS : now + WATCHDOG_MS;
+        schedule(alarms, pending, trigger, 15_000L);
+    }
+
+    /** Fires even in Doze. Starts the service again if HiOS has killed it, then polls. */
+    public static void armWatchdog(Context context) {
+        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarms == null) return;
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        PendingIntent pending = watchdogIntent(context);
+        if (!ready(context, state)) {
+            alarms.cancel(pending);
+            return;
         }
-        long trigger = hot ? now + HEARTBEAT_MS : Math.max(AlertPlanner.nextWake(state.matches, state, now), now + 15_000L);
-        schedule(alarms, pending, trigger);
+        schedule(alarms, pending, System.currentTimeMillis() + WATCHDOG_MS, WATCHDOG_MS);
+    }
+
+    /** Brought back a few seconds after a swipe. The process is usually already gone. */
+    public static void scheduleRestart(Context context) {
+        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarms == null) return;
+        schedule(alarms, restartIntent(context), System.currentTimeMillis() + 5_000L, 3_000L);
     }
 
     public static void onAlarm(Context context) {
         ensureWatching(context);
         if (WatchRuntime.serviceRunning) nudge(context);
+        else start(context);
         arm(context);
+    }
+
+    public static void onWatchdog(Context context) {
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        if (!ready(context, state)) return;
+        if (!WatchRuntime.serviceRunning) start(context);
+        else nudge(context);
+        armWatchdog(context);
     }
 
     /** Ask the running watcher to poll now. A fresh start uses the foreground-service API. */
@@ -135,7 +168,7 @@ public final class WatchScheduler {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pending = PendingIntent.getBroadcast(context, TEST_CODE, intent, flags);
-        schedule(alarms, pending, System.currentTimeMillis() + 10_000L);
+        schedule(alarms, pending, System.currentTimeMillis() + 10_000L, 5_000L);
     }
 
     public static void requestBatteryExemption(Context context) {
@@ -211,13 +244,13 @@ public final class WatchScheduler {
         }
     }
 
-    private static void schedule(AlarmManager alarms, PendingIntent pending, long trigger) {
-        long elapsed = Math.max(trigger - System.currentTimeMillis(), 15_000L);
+    private static void schedule(AlarmManager alarms, PendingIntent pending, long trigger, long minDelay) {
+        long elapsed = Math.max(trigger - System.currentTimeMillis(), minDelay);
         try {
             if (canExact(alarms)) {
-                alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending);
+                alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + elapsed, pending);
             } else {
-                alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pending);
+                alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + elapsed, pending);
             }
         } catch (SecurityException error) {
             alarms.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + elapsed, pending);
@@ -234,5 +267,21 @@ public final class WatchScheduler {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
         return PendingIntent.getBroadcast(context, ALARM_CODE, intent, flags);
+    }
+
+    private static PendingIntent watchdogIntent(Context context) {
+        Intent intent = new Intent(context, WatchAlarmReceiver.class);
+        intent.setAction(ACTION_WATCHDOG);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getBroadcast(context, WATCHDOG_CODE, intent, flags);
+    }
+
+    private static PendingIntent restartIntent(Context context) {
+        Intent intent = new Intent(context, WatchAlarmReceiver.class);
+        intent.setAction(ACTION_RESTART);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+        return PendingIntent.getBroadcast(context, RESTART_CODE, intent, flags);
     }
 }

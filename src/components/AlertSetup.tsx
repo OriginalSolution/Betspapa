@@ -8,6 +8,7 @@ import {
   nativeSetupIsCurrent,
   nextUnsatisfiedIndex,
   parseDeviceStatus,
+  pollIsStale,
   readStoredSetup,
   retryNote,
   retrySteps,
@@ -118,6 +119,9 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
       if (shouldShowIntro(local, nativeSetupIsCurrent(parsed))) {
         setFinished(false);
         openFlow(introSteps(parsed));
+      } else if (pollIsStale(parsed.lastPollAt)) {
+        setFinished(false);
+        openFlow(retrySteps(parsed));
       } else {
         setFinished(true);
         setOpen(false);

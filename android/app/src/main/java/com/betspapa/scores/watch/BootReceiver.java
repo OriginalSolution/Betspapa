@@ -9,7 +9,8 @@ public class BootReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Context app = context.getApplicationContext();
         WatchScheduler.ensurePeriodic(app);
-        WatchScheduler.enqueueRefresh(app);
+        WatchScheduler.armWatchdog(app);
+        WatchScheduler.scheduleRestart(app);
         WatchScheduler.arm(app);
     }
 }

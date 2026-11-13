@@ -11,6 +11,7 @@ import {
   nextUnsatisfiedIndex,
   parseDeviceStatus,
   parseSetupRecord,
+  pollIsStale,
   retrySteps,
   sentCopy,
   setupIsCurrent,
@@ -49,7 +50,10 @@ describe('alert setup steps', () => {
   it('asks for every missing check, then the test', () => {
     const status = device({ notifications: 'prompt', batteryUnrestricted: false, exactAlarms: 'denied', oem: 'transsion' });
     expect(introSteps(status)).toEqual(['notifications', 'battery', 'exact', 'autostart', 'test']);
-    expect(stepCopy('autostart', 'transsion', 'ask').body).toBe(OEM_INSTRUCTION.transsion);
+    expect(stepCopy('autostart', 'transsion', 'ask').body).toContain('Phone Master');
+    expect(pollIsStale(Date.now() - 11 * 60 * 1000)).toBe(true);
+    expect(pollIsStale(Date.now() - 2 * 60 * 1000)).toBe(false);
+    expect(pollIsStale(0)).toBe(false);
   });
 
   it('skips checks that are already granted and skips exact alarms before Android 12', () => {
