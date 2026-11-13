@@ -1,5 +1,5 @@
 import { countryMark } from '../lib/country';
-import { isSimulatedFixture } from '../lib/simulated';
+import { isDummyEventId, isSimulatedFixture } from '../lib/simulated';
 import type { Match, Team } from '../types';
 
 export type SportyEvent = {
@@ -90,6 +90,7 @@ export function mapSportyEvents(events: SportyEvent[], fromIso: string, toIso: s
     .filter((event) => {
       const kick = new Date(event.kickoff).getTime();
       if (!Number.isFinite(kick) || kick < from || kick > to || !event.home || !event.away) return false;
+      if (isDummyEventId(event.eventId)) return false;
       return !isSimulatedFixture({
         country: event.country,
         tournament: event.tournament,

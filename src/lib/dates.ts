@@ -28,6 +28,14 @@ export function dayRangeIso(date: string): { from: string; to: string } {
   return { from: start.toISOString(), to: end.toISOString() };
 }
 
+/** True when a kickoff falls on the board's local calendar day. */
+export function onBoardDate(utcDate: string, date: string): boolean {
+  const kick = Date.parse(utcDate);
+  if (!Number.isFinite(kick)) return false;
+  const { from, to } = dayRangeIso(date);
+  return kick >= Date.parse(from) && kick <= Date.parse(to);
+}
+
 export function atLocal(today: string, dayDelta: number, hour: number, minute: number): string {
   const date = parseIsoDate(today);
   date.setDate(date.getDate() + dayDelta);

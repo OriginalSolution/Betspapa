@@ -20,6 +20,7 @@ export function TodaySearch({ matches, onQuery, onCorpus }: { matches: Match[]; 
   const [params, setParams] = useSearchParams();
   const { follows, toggleTeam } = useStore();
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
   const [filter, setFilter] = useState<SearchFilter>('all');
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
   const [leagues, setLeagues] = useState<string[]>(() => loadLeagueFollows());
@@ -68,10 +69,16 @@ export function TodaySearch({ matches, onQuery, onCorpus }: { matches: Match[]; 
   };
 
   const hits = text.length >= 2 ? searchBoard(source, text, filter) : null;
-  const discovery = !text && !scoped;
+  const discovery = searching && !text && !scoped;
 
   return (
-    <div className="today-search">
+    <div
+      className="today-search"
+      onFocusCapture={() => setSearching(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setSearching(false);
+      }}
+    >
       <label className="search-bar">
         <span aria-hidden="true">⌕</span>
         <input

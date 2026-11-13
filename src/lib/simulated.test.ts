@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mapSportyEvents } from '../data/sporty';
-import { isSimulatedFixture } from './simulated';
+import { isDummyEventId, isSimulatedFixture } from './simulated';
 
 describe('simulated fixtures', () => {
   it('drops Simulated Reality League, virtual, and eSoccer, and keeps a real SRL club', () => {
@@ -23,6 +23,9 @@ describe('simulated fixtures', () => {
       }),
     ).toBe(false);
     expect(isSimulatedFixture({ tournament: 'Premier League', country: 'England', home: 'Arsenal', away: 'Chelsea' })).toBe(false);
+    expect(isDummyEventId('sr:match:111111114672527')).toBe(true);
+    expect(isDummyEventId('dummy-match-1')).toBe(true);
+    expect(isDummyEventId('sr:match:75803688')).toBe(false);
   });
 
   it('leaves simulated events out of the upcoming board', () => {

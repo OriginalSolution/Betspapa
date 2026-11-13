@@ -7,6 +7,15 @@
 
 const DUMMY = /simulated|virtual|e-?soccer|esports|cyber/i;
 const SRL_WORD = /\bsrl\b/i;
+const DUMMY_ID = /dummy|placeholder|virtual|simulated/i;
+
+/** Sporty catalogue placeholders use a 11111111 id. Those are not real fixtures. */
+export function isDummyEventId(id: string | null | undefined): boolean {
+  const value = String(id || '').trim();
+  if (!value || DUMMY_ID.test(value)) return true;
+  const numeric = value.split(':').pop() || '';
+  return numeric.startsWith('11111111');
+}
 
 export function isSrlSide(name: string | null | undefined): boolean {
   const text = String(name || '').trim();

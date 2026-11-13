@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardsFromEngine, combinedOdds, hitRate } from './matchPicks';
+import { bestTrendChip, cardsFromEngine, combinedOdds, hitRate, trendChipText } from './matchPicks';
 import type { EngineState } from './engineSlips';
 import type { Match } from '../types';
 
@@ -73,5 +73,26 @@ describe('match-first picks', () => {
     expect(cards[0]?.chips.every((chip) => chip.rate !== 1 / chip.odds)).toBe(true);
     expect(cardsFromEngine(state(), board, 'confidence')[0]?.chips[0]?.market).toBe('over15');
     expect(combinedOdds(cards[0]?.chips || [])).toBe(1.86);
+  });
+
+  it('picks one real 80% chip and skips a match with nothing at 1.20', () => {
+    const hearts = board[0];
+    const chip = bestTrendChip(state(), hearts);
+    expect(chip?.market).toBe('over15');
+    expect(chip?.sample).toBe('10/10');
+    expect(chip?.odds).toBeGreaterThanOrEqual(1.2);
+    expect(trendChipText(chip!)).toBe('Over 1.5 · 10/10 · 1.55');
+    const quiet = { ...state(), trends: state().trends.map((trend) => ({ ...trend, legs: trend.legs.filter((leg) => leg.eventId !== 'sr:match:3') })) };
+    expect(bestTrendChip(quiet, hearts)).toBeNull();
+    const percentOnly = {
+      ...state(),
+      trends: [
+        {
+          ...state().trends[1],
+          legs: [{ ...state().trends[1].legs[0], occurrence: 90, sample: null }],
+        },
+      ],
+    };
+    expect(bestTrendChip(percentOnly, hearts)).toBeNull();
   });
 });
