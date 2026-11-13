@@ -499,6 +499,11 @@ export function coverage(events, catalog, wikiHits) {
   const rows = (events || []).filter((event) => event?.home && event?.away && !virtualEvent(event));
   const has = (name) => indexKeys(name).some((key) => catalog.byKey[key] || catalog.byId[teamSlug(name)]);
   const both = rows.filter((event) => has(event.home) && has(event.away)).length;
+  const missingTeams = new Set();
+  for (const event of rows) {
+    if (!has(event.home)) missingTeams.add(teamSlug(event.home));
+    if (!has(event.away)) missingTeams.add(teamSlug(event.away));
+  }
   let before = null;
   if (wikiHits) {
     const wikiBoth = rows.filter((event) => wikiHits[event.home] && wikiHits[event.away]).length;
@@ -510,6 +515,7 @@ export function coverage(events, catalog, wikiHits) {
     fixtures: rows.length,
     before,
     after: { both, percent: rows.length ? Number(((100 * both) / rows.length).toFixed(1)) : 0 },
+    missingTeams: missingTeams.size,
     sources,
   };
 }

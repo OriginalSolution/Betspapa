@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 def fcmServices = file('google-services.json')
 def fcmEnabled = fcmServices.exists() && fcmServices.length() > 2
@@ -13,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 24
-        versionName "0.4.2"
+        versionCode 25
+        versionName "0.4.3"
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -42,9 +43,17 @@ android {
     testOptions {
         unitTests.includeAndroidResources = true
     }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
     sourceSets {
         main {
             java.srcDirs += fcmEnabled ? 'src/fcm/java' : 'src/nofcm/java'
+            if (fcmEnabled) kotlin.srcDirs += 'src/fcm/kotlin'
         }
     }
 }

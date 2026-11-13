@@ -20,7 +20,7 @@ try {
 
 const now = new Date();
 const fromDay = day(now);
-const toDay = day(new Date(now.getTime() + 3 * 86_400_000));
+const toDay = day(new Date(now.getTime() + 4 * 86_400_000));
 const response = await fetch(feedUrl, { signal: AbortSignal.timeout(30_000) });
 if (!response.ok) throw new Error(`Fixture feed returned ${response.status}`);
 const body = await response.json();

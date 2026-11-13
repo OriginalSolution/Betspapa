@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13T01:48:39.511Z",
+  "generatedAt": "2026-11-13T13:52:58.160Z",
   "teams": [
     {
       "name": "US St Philbert de Grandlieu",
@@ -8,14 +8,6 @@
       "competition": "Coupe de France",
       "reason": "no findable badge",
       "tried": "English and French Wikipedia have the club page but no crest file. Commons search for the logo returned nothing."
-    },
-    {
-      "name": "Athletic Club Sjdr MG",
-      "id": "athletic-club-sjdr-mg",
-      "area": "Brazil",
-      "competition": "Brasileiro Serie B",
-      "reason": "no findable badge",
-      "tried": "No Wikipedia, Wikidata, or TheSportsDB page for Athletic Club of São João del-Rei."
     },
     {
       "name": "Club Milano SSD",
@@ -42,30 +34,6 @@
       "tried": "No Wikipedia, Commons, or TheSportsDB logo for Real Calepina."
     },
     {
-      "name": "Fcd Conegliano 1907",
-      "id": "fcd-conegliano-1907",
-      "area": "Italy",
-      "competition": "Serie D, Group C",
-      "reason": "no findable badge",
-      "tried": "Italian Wikipedia has Conegliano Calcio but no lead image or Commons logo."
-    },
-    {
-      "name": "ASD Varesina Calcio",
-      "id": "asd-varesina-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group D",
-      "reason": "no findable badge",
-      "tried": "No logo file found. Nearby clubs such as Gallarate were not used."
-    },
-    {
-      "name": "Asd Sasso Marconi 1924",
-      "id": "asd-sasso-marconi-1924",
-      "area": "Italy",
-      "competition": "Serie D, Group E",
-      "reason": "no findable badge",
-      "tried": "The English Wikipedia club page has no crest image."
-    },
-    {
       "name": "Gsd Ghivizzano Borgoamozzano",
       "id": "gsd-ghivizzano-borgoamozzano",
       "area": "Italy",
@@ -80,30 +48,6 @@
       "competition": "Serie D, Group F",
       "reason": "no findable badge",
       "tried": "No club page or logo file found."
-    },
-    {
-      "name": "ASD Sarnese 1926",
-      "id": "asd-sarnese-1926",
-      "area": "Italy",
-      "competition": "Serie D, Group G",
-      "reason": "no findable badge",
-      "tried": "Italian Wikipedia has Sarnese 1926 but no crest file. Savoia was not used."
-    },
-    {
-      "name": "ASD Trastevere Calcio",
-      "id": "asd-trastevere-calcio",
-      "area": "Italy",
-      "competition": "Serie D, Group G",
-      "reason": "no findable badge",
-      "tried": "The only Wikidata hit is the women's team, so that badge was not used for the men's Serie D side."
-    },
-    {
-      "name": "Igea Virtus Barcellona",
-      "id": "igea-virtus-barcellona",
-      "area": "Italy",
-      "competition": "Serie D, Group I",
-      "reason": "no findable badge",
-      "tried": "The club page exists but has no crest file."
     },
     {
       "name": "Maleyat Kafr El Zayat",
@@ -130,14 +74,6 @@
       "tried": "A stub page exists with no crest. Unrelated Viena files were not used."
     },
     {
-      "name": "Hoersholm-Usseroed IK",
-      "id": "hoersholm-usseroed-ik",
-      "area": "Denmark",
-      "competition": "3rd Division",
-      "reason": "no findable badge",
-      "tried": "Danish Wikipedia has the club but no crest file."
-    },
-    {
       "name": "Briobecca Urayasu",
       "id": "briobecca-urayasu",
       "area": "Japan",
@@ -152,22 +88,6 @@
       "competition": "Japan Football League",
       "reason": "no findable badge",
       "tried": "The club page exists but has no crest file. FC Tokyo was not used."
-    },
-    {
-      "name": "N. Byskovice",
-      "id": "n-byskovice",
-      "area": "Czechia",
-      "competition": "CFL",
-      "reason": "no findable badge",
-      "tried": "Only a photo of the village of Býškovice. No football badge."
-    },
-    {
-      "name": "Rekord Bielsko Biala",
-      "id": "rekord-bielsko-biala",
-      "area": "Poland",
-      "competition": "II Liga",
-      "reason": "no findable badge",
-      "tried": "The only badge found is the futsal club BTS Rekord, not the football side."
     },
     {
       "name": "MKS Viktoria Wrzesnia",
@@ -192,14 +112,6 @@
       "competition": "Liga Panamena",
       "reason": "no findable badge",
       "tried": "No club page or logo found for Universitario de Penonomé."
-    },
-    {
-      "name": "NK Vrhnika",
-      "id": "nk-vrhnika",
-      "area": "Slovenia",
-      "competition": "2. Liga",
-      "reason": "no findable badge",
-      "tried": "No club page or logo found."
     },
     {
       "name": "Cocle FC",

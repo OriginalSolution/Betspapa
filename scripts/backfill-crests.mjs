@@ -1,5 +1,5 @@
 /**
- * Resolve crests for today and the next three days.
+ * Resolve crests for today through the next four days.
  * Usage: node scripts/backfill-crests.mjs
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -32,7 +32,7 @@ const noWiki = args.includes('--no-wiki');
 const dates = args.filter((arg) => /^\d{4}-\d{2}-\d{2}$/.test(arg));
 const now = new Date();
 const fromDay = dates[0] || day(now);
-const toDay = dates[1] || day(new Date(now.getTime() + 3 * 86_400_000));
+const toDay = dates[1] || day(new Date(now.getTime() + 4 * 86_400_000));
 console.log(`[crests] Window ${fromDay} to ${toDay}`);
 
 const response = await fetch(feedUrl, { signal: AbortSignal.timeout(30_000) });

@@ -13,6 +13,8 @@
 import { createSign } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
+import { loadCatalog } from './crestResolve.mjs';
 import { isDummyId, isSimulated } from './upcoming.mjs';
 
 export const MIN_ODDS = 1.2;
@@ -66,30 +68,66 @@ export function channelFor(kind, settings = {}) {
   return `betspapa.goal.${name}.v4`;
 }
 
+let crestCatalog;
+
+function crestCatalogSafe() {
+  if (crestCatalog) return crestCatalog;
+  try {
+    crestCatalog = loadCatalog();
+  } catch {
+    crestCatalog = { byId: {}, byKey: {} };
+  }
+  return crestCatalog;
+}
+
+/** Absolute crest URL the phone can fetch. Empty when this club has no stored badge. */
+export function crestUrlFor(name) {
+  const catalog = crestCatalogSafe();
+  const file = catalog.byId?.[teamSlug(name)] || catalog.byKey?.[looseKey(name)] || '';
+  if (!file || typeof file !== 'string') return '';
+  if (/^https?:\/\//i.test(file)) return file;
+  return `https://api.betspapa.com${file.startsWith('/') ? file : `/${file}`}`;
+}
+
+/**
+ * Data-only FCM. A notification block makes Android draw a plain system card
+ * and never calls onMessageReceived, so the Red Ticker would not run.
+ */
 export function messageFor(note, device) {
   const channel = channelFor(note.kind, device.settings);
+  const match = note.match || {};
+  const home = String(match.home || '');
+  const away = String(match.away || '');
+  const data = {
+    id: String(note.id || ''),
+    matchId: String(note.matchId || match.id || ''),
+    kind: String(note.kind || ''),
+    title: String(note.title || ''),
+    body: String(note.body || ''),
+    channel,
+    home,
+    away,
+    homeScore: match.homeScore == null ? '' : String(match.homeScore),
+    awayScore: match.awayScore == null ? '' : String(match.awayScore),
+    minute: match.minute == null ? '' : String(match.minute),
+    status: String(match.status || ''),
+    homeCrest: String(match.homeCrest || crestUrlFor(home)),
+    awayCrest: String(match.awayCrest || crestUrlFor(away)),
+    competition: String(match.competition || ''),
+    market: String(note.market || ''),
+    marketLabel: String(note.marketLabel || ''),
+    trendId: String(note.trendId || ''),
+    fixture: String(note.fixture || ''),
+    odds: String(note.odds || ''),
+  };
   return {
     message: {
       token: device.token,
       android: {
         priority: 'HIGH',
         ttl: '120s',
-        notification: {
-          title: note.title,
-          body: note.body,
-          channel_id: channel,
-          tag: note.id,
-          notification_priority: 'PRIORITY_MAX',
-        },
       },
-      data: {
-        id: String(note.id),
-        matchId: String(note.matchId || ''),
-        kind: String(note.kind || ''),
-        title: String(note.title || ''),
-        body: String(note.body || ''),
-        channel,
-      },
+      data,
     },
   };
 }
@@ -557,15 +595,43 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
   let token = typeof body?.token === 'string' ? body.token.trim() : '';
   if (!token && body?.latest) token = book.list()[0]?.token || '';
   if (token.length < 20 || /\s/.test(token)) return { status: 400, error: 'A device token is required.' };
+  const allowed = new Set(['goal', 'kickoff', 'win', 'red', 'var', 'penalty']);
+  const kind = allowed.has(body?.kind) ? body.kind : 'goal';
+  const matchId = typeof body?.matchId === 'string' && body.matchId.trim() ? body.matchId.trim() : 'qc-arsenal';
+  const copy = {
+    goal: { title: 'Goal · Arsenal', body: 'Saka score · Arsenal 2–1 Chelsea', minute: 54 },
+    kickoff: { title: 'Kick-off', body: 'Arsenal vs Chelsea is underway', minute: 1 },
+    win: { title: 'Trend hit · Over 2.5 goals', body: 'Arsenal vs Chelsea · Over 2.5 goals', minute: 54 },
+    red: { title: 'Red card · Chelsea', body: 'Keeper 50′ · Arsenal vs Chelsea', minute: 50 },
+    var: { title: 'VAR', body: 'Saka 54′ · Arsenal goal under review', minute: 54 },
+    penalty: { title: 'Penalty · Arsenal', body: 'Saka 61′ · Arsenal vs Chelsea', minute: 61 },
+  }[kind];
   const note = {
-    id: `test:push:${Date.now()}`,
-    matchId: '',
-    kind: 'goal',
-    title: 'Betspapa',
-    body: 'Push is on.',
+    id: `test:${kind}:${Date.now()}`,
+    matchId,
+    kind,
+    title: copy.title,
+    body: copy.body,
+    market: kind === 'win' ? 'over25' : '',
+    marketLabel: kind === 'win' ? 'Over 2.5 goals' : '',
+    trendId: kind === 'win' ? `${matchId}:over25` : '',
+    fixture: 'ARS vs CHE',
+    odds: kind === 'win' ? '1.72' : '',
+    match: {
+      id: matchId,
+      home: 'Arsenal',
+      away: 'Chelsea',
+      homeScore: 2,
+      awayScore: 1,
+      minute: copy.minute,
+      status: 'live',
+      competition: 'Premier League',
+      homeCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/240px-Arsenal_FC.svg.png',
+      awayCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/240px-Chelsea_FC.svg.png',
+    },
   };
   try {
-    const result = await sendMessage(account, messageFor(note, { token, settings: { goalSound: 'crowd' } }));
+    const result = await sendMessage(account, messageFor(note, { token, settings: body?.settings || { goalSound: 'crowd' } }));
     const fcm = publicFcm(result.body);
     log(`[push] FCM response ${result.status} ${JSON.stringify(fcm)}`);
     return { status: 200, fcm };
