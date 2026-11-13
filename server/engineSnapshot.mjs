@@ -13,17 +13,24 @@ function token() {
 }
 
 export async function loadEngineSnapshot(fetchImpl = fetch) {
-  try {
-    const response = await fetchImpl(ENGINE_SNAPSHOT_URL, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!response.ok) return null;
-    const body = await response.json();
-    return body && typeof body === 'object' ? body : null;
-  } catch {
-    return null;
+  const attempts = [
+    {
+      url: `https://api.github.com/repos/${REPO}/contents/${FILE}?ref=${encodeURIComponent(BRANCH)}`,
+      headers: { Accept: 'application/vnd.github.raw', 'User-Agent': 'betspapa-engine' },
+    },
+    { url: ENGINE_SNAPSHOT_URL, headers: { Accept: 'application/json', 'User-Agent': 'betspapa-engine' } },
+  ];
+  for (const attempt of attempts) {
+    try {
+      const response = await fetchImpl(attempt.url, { headers: attempt.headers, signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) continue;
+      const body = await response.json();
+      if (body && typeof body === 'object' && !Array.isArray(body)) return body;
+    } catch {
+      /* the next copy of the snapshot can still load */
+    }
   }
+  return null;
 }
 
 export async function publishEngineSnapshot(state, fetchImpl = fetch) {
