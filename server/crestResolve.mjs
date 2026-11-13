@@ -27,7 +27,7 @@ import {
   wikidataCandidates,
 } from '../src/lib/crestMatch.mjs';
 
-const USER_AGENT = 'Betspapa/0.3.5 (crest resolver; https://github.com/OriginalSolution/Betspapa)';
+const USER_AGENT = 'Betspapa/0.3.6 (crest resolver; https://github.com/OriginalSolution/Betspapa)';
 const SPORTSDB = 'https://www.thesportsdb.com/api/v1/json/123';
 const SPORTS_GAP_MS = 1500;
 const WIKI_GAP_MS = 280;
