@@ -104,5 +104,6 @@ test('coverage counts fixtures where both crests resolved, and skips a simulated
   const report = coverage(events, catalog, { Arsenal: true });
   assert.equal(report.fixtures, 1);
   assert.equal(report.after.both, 1);
+  assert.equal(report.missingTeams, 0);
   assert.equal(report.before.both, 0);
 });
