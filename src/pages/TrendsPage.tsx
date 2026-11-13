@@ -104,6 +104,11 @@ function TrendBlock({ title, detail, rows, focus }: { title: string; detail?: st
                 <button type="button" className={cx('btn', 'btn-tiny', on && 'btn-quiet')} onClick={() => toggleTrend(trend.id)}>
                   {on ? 'Following trend' : 'Follow trend'}
                 </button>
+                {trend.trendId.startsWith('price:') && (
+                  <Link to={`/slips?trend=${encodeURIComponent(trend.trendId)}`} className="btn btn-quiet btn-tiny">
+                    Code
+                  </Link>
+                )}
                 {trend.matchId && (
                   <Link to={`/match/${trend.matchId}`} className="btn btn-quiet btn-tiny">
                     Match

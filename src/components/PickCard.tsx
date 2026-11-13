@@ -63,6 +63,11 @@ export function PickCard({ pick }: { pick: PickView }) {
         <button type="button" className={cx('btn', 'btn-tiny', saved && 'btn-quiet')} onClick={() => (saved ? removeLeg(pick.id) : addLeg(pick.id))}>
           {saved ? 'On slip' : 'Add to slip'}
         </button>
+        {pick.trendId.startsWith('price:') && (
+          <Link to={`/slips?trend=${encodeURIComponent(pick.trendId)}`} className="btn btn-quiet btn-tiny">
+            Code
+          </Link>
+        )}
         <button type="button" className={cx('btn', 'btn-tiny', trendFollows.includes(pick.id) && 'btn-quiet')} onClick={() => toggleTrend(pick.id)}>
           {trendFollows.includes(pick.id) ? 'Following trend' : 'Follow trend'}
         </button>

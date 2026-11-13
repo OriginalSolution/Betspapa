@@ -14,6 +14,9 @@ describe('native HTTP headers', () => {
     });
     expect(Object.keys(headers).some((key) => key.toLowerCase() === 'origin')).toBe(false);
     expect(Object.keys(headers).some((key) => key.toLowerCase() === 'referer' || key.toLowerCase() === 'referrer')).toBe(false);
+    const book = nativeHeaders({ Referer: 'https://www.sportybet.com/gh/sport/football' });
+    expect(book.Referer).toBe('https://www.sportybet.com/gh/sport/football');
+    expect(book.Origin).toBeUndefined();
     expect(headers['User-Agent']).toMatch(/Chrome\/124/);
     expect(headers['x-cap-user-agent']).toBe(headers['User-Agent']);
     expect(headers.operid).toBe('3');

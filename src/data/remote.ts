@@ -65,13 +65,16 @@ function defaultTransport(): FixtureTransport {
     native: isNativeApp(),
     local: async (url) => browserResult(await fetch(url)),
     direct: async (url) => {
+      const headers = /sportybet\.com|football\.com|msport\.com/i.test(url)
+        ? { Referer: 'https://www.sportybet.com/gh/sport/football' }
+        : undefined;
       if (isNativeApp()) {
         const response = await CapacitorHttp.request(
-          nativeRequestOptions('GET', url, { connectMs: FIXTURE_CONNECT_MS, readMs: FIXTURE_READ_MS }),
+          nativeRequestOptions('GET', url, { connectMs: FIXTURE_CONNECT_MS, readMs: FIXTURE_READ_MS, headers }),
         );
         return { status: response.status, body: asFixtureBody(readJsonBody(response.data)) };
       }
-      return browserResult(await fetch(url));
+      return browserResult(await fetch(url, headers ? { headers } : undefined));
     },
   };
 }

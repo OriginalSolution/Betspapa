@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  applyShares,
   bookingCodes,
   buildPicks,
   isBlacklisted,
@@ -11,17 +10,14 @@ import {
   suggestPicks,
   type BookingCode,
   type LedgerEntry,
-  type SharePayload,
   type LegStatus,
   type ListItem,
   type PickView,
   type TrendView,
 } from '../data/board';
 import { staleTrendIds, trendHitNotices } from '../lib/alerts';
-import { publishableOdds } from '../lib/oddsFloor';
 import { stageWatch } from '../lib/deviceWatch';
-import { bookOnDevice } from '../lib/deviceBook';
-import { isNativeApp } from '../lib/nativeHttp';
+import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
 import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
 import { useStore } from './store';
@@ -91,6 +87,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const [lists, setLists] = useState<ListItem[]>(() => read<ListItem[]>(LIST_KEY, []));
   const [trendFollows, setTrendFollows] = useState<string[]>(() => read<string[]>(TREND_KEY, []).filter((id) => typeof id === 'string'));
   const [extra, setExtra] = useState<LedgerEntry[]>(() => read<LedgerEntry[]>(LEDGER_KEY, []));
+  const [engineTick, setEngineTick] = useState(0);
   const baseline = useRef<{ t0: number; status: Map<string, LegStatus>; codes: Map<string, LegStatus> } | null>(null);
 
   const picks = useMemo(() => buildPicks(matches), [matches]);
@@ -107,17 +104,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   );
   const suggestions = useMemo(() => suggestPicks(picks, slip, greenMarkets).filter((pick) => !isBlacklisted(pick, lists)), [picks, slip, greenMarkets, lists]);
   const slipPicks = useMemo(() => picks.filter((pick) => slip.includes(pick.id)), [picks, slip]);
-  const [shares, setShares] = useState<SharePayload | null>(null);
-  const codes = useMemo(() => applyShares(bookingCodes(slipPicks), shares), [slipPicks, shares]);
-  const bookKey = useMemo(
-    () =>
-      slipPicks
-        .filter((pick) => pick.matchId.startsWith('sr:match:'))
-        .map((pick) => `${pick.matchId}:${pick.market}`)
-        .sort()
-        .join('|'),
-    [slipPicks],
-  );
+  const codes = useMemo(() => bookingCodes(slipPicks), [slipPicks]);
   const visiblePicks = useMemo(() => picks.filter((pick) => !isBlacklisted(pick, lists)), [picks, lists]);
   const hiddenCount = picks.length - visiblePicks.length;
 
@@ -127,67 +114,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   useEffect(() => write(TREND_KEY, trendFollows), [trendFollows]);
   useEffect(() => write(LEDGER_KEY, extra), [extra]);
 
-  const bookLegs = useRef(slipPicks);
-  const bookMatches = useRef(matches);
-  bookLegs.current = slipPicks;
-  bookMatches.current = matches;
-
-  useEffect(() => {
-    if (!bookKey) {
-      setShares(null);
-      return;
-    }
-    const byId = new Map(bookMatches.current.map((match) => [match.id, match]));
-    const legs = bookLegs.current
-      .filter((pick) => pick.matchId.startsWith('sr:match:') && publishableOdds(pick.odds))
-      .map((pick) => {
-        const match = byId.get(pick.matchId);
-        return {
-          eventId: pick.matchId,
-          market: pick.market,
-          odds: pick.odds,
-          match: match ? `${match.home.shortName} vs ${match.away.shortName}` : pick.label,
-        };
-      });
-    let stop = false;
-    let timer = 0;
-    const run = async () => {
-      if (isNativeApp()) {
-        try {
-          await bookOnDevice(
-            legs,
-            (payload) => {
-              if (!stop) setShares(payload);
-            },
-            () => stop,
-          );
-        } catch {
-          if (!stop) setShares({ status: 'error', error: 'Booking request failed.' });
-        }
-        return;
-      }
-      try {
-        const response = await fetch('/api/book', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ legs }),
-        });
-        if (!response.ok) throw new Error('booking');
-        const body = (await response.json()) as SharePayload;
-        if (stop) return;
-        setShares(body);
-        if (body.status === 'pending') timer = window.setTimeout(() => void run(), 2000);
-      } catch {
-        if (!stop) setShares({ status: 'error', error: 'Booking request failed.' });
-      }
-    };
-    setShares({ status: 'pending', books: {} });
-    void run();
-    return () => {
-      stop = true;
-      window.clearTimeout(timer);
-    };
-  }, [bookKey]);
+  useEffect(() => subscribeEngine(() => setEngineTick((tick) => tick + 1)), []);
 
   useEffect(() => {
     const status = new Map(picks.map((pick) => [pick.id, pick.status]));
@@ -253,11 +180,12 @@ export function ProductProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const byMatch = new Map(matches.map((match) => [match.id, match]));
+    const engine = readEngineCache();
     const bookings = picks
       .filter((pick) => trendFollows.includes(pick.id))
       .map((pick) => {
         const match = byMatch.get(pick.matchId);
-        const booked = codes.find((code) => code.bookingState === 'ready' && code.code && code.legs.some((leg) => leg.id === pick.id));
+        const booked = bookingForPick(engine, pick.matchId, pick.market);
         const odds = Number.isFinite(pick.odds) && pick.odds > 1 ? pick.odds.toFixed(2).replace(/0$/, '').replace(/\.0$/, '') : '';
         return {
           id: pick.id,
@@ -266,12 +194,12 @@ export function ProductProvider({ children }: { children: ReactNode }) {
           marketLabel: pick.marketLabel,
           odds,
           fixture: match ? `${match.home.abbr} vs ${match.away.abbr}` : `${pick.teamName} vs ${pick.opponentName}`,
-          bookId: booked?.id || '',
+          bookId: booked?.bookId || '',
           code: booked?.code || '',
         };
       });
     stageWatch({ trends: trendFollows, matches, bookings });
-  }, [trendFollows, matches, picks, codes]);
+  }, [trendFollows, matches, picks, engineTick]);
 
   useEffect(() => {
     if (!watchReady || !trendFollows.length) return;

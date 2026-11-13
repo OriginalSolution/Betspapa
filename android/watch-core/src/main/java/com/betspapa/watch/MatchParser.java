@@ -10,7 +10,8 @@ import org.json.JSONObject;
 
 public final class MatchParser {
     private static final Pattern SCORE = Pattern.compile("^(\\d+)\\s*[:\\-]\\s*(\\d+)$");
-    private static final Pattern VIRTUAL = Pattern.compile("simulated|virtual|\\bsrl\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern DUMMY = Pattern.compile("simulated|virtual|e-?soccer|esports|cyber", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SRL_WORD = Pattern.compile("\\bsrl\\b", Pattern.CASE_INSENSITIVE);
 
     private MatchParser() {}
 
@@ -26,7 +27,7 @@ public final class MatchParser {
             String id = event.optString("eventId", "").trim();
             long kick = WatchClock.parseIso(event.optString("kickoff", ""));
             if (id.isEmpty() || home.isEmpty() || away.isEmpty() || kick <= 0) continue;
-            if (virtual(home + " " + away + " " + event.optString("tournament", ""))) continue;
+            if (simulatedFixture(event.optString("country", ""), event.optString("tournament", ""), home, away)) continue;
             matches.add(scheduled(id, home, away, kick));
         }
         return matches;
@@ -57,16 +58,18 @@ public final class MatchParser {
         String id = event.optString("eventId", "").trim();
         if (id.isEmpty() || home.isEmpty() || away.isEmpty()) return null;
         String competition = "";
+        String categoryName = tournament.optString("categoryName", "");
         JSONObject sport = event.optJSONObject("sport");
         if (sport != null) {
             JSONObject category = sport.optJSONObject("category");
             if (category != null) {
+                if (categoryName.isEmpty()) categoryName = category.optString("name", "");
                 JSONObject listed = category.optJSONObject("tournament");
                 if (listed != null) competition = listed.optString("name", "");
             }
         }
         if (competition.isEmpty()) competition = tournament.optString("name", "");
-        if (virtual(home + " " + away + " " + competition)) return null;
+        if (simulatedFixture(categoryName, competition, home, away)) return null;
         String status = liveStatus(event.optString("matchStatus", ""), event.has("status") && !event.isNull("status") ? event.optInt("status") : null);
         if ("scheduled".equals(status)) return null;
         long kick = event.optLong("estimateStartTime", 0L);
@@ -213,7 +216,19 @@ public final class MatchParser {
         return new int[] {Integer.parseInt(matcher.group(1)), Integer.parseInt(matcher.group(2))};
     }
 
-    private static boolean virtual(String text) {
-        return VIRTUAL.matcher(text == null ? "" : text).find();
+    /** Simulated Reality and virtual fixtures stay off the board. A real club ending in the legal form SRL does not. */
+    private static boolean simulatedFixture(String country, String tournament, String home, String away) {
+        String place = (country == null ? "" : country) + " " + (tournament == null ? "" : tournament);
+        String names = (home == null ? "" : home) + " " + (away == null ? "" : away);
+        if (DUMMY.matcher(place + " " + names).find()) return true;
+        if (SRL_WORD.matcher(place).find()) return true;
+        return srlSide(home) && srlSide(away);
+    }
+
+    private static boolean srlSide(String name) {
+        if (name == null) return false;
+        String lower = name.toLowerCase(Locale.ROOT);
+        if (lower.contains("societ") || lower.contains("sportiva") || lower.contains("s.r.l")) return false;
+        return lower.endsWith(" srl");
     }
 }

@@ -5,7 +5,7 @@
 import { allowedImageUrl, flagUrl, isNationalSide, pickBest, searchQueries, sportsDbCandidates, wikidataCandidates } from './crestMatch.mjs';
 import { lookupCrest, rememberCrest, type CrestContext } from './crests';
 
-const USER_AGENT = 'Betspapa/0.3.7 (crest resolver; https://github.com/OriginalSolution/Betspapa)';
+const USER_AGENT = 'Betspapa/0.3.8 (crest resolver; https://github.com/OriginalSolution/Betspapa)';
 const SPORTSDB = 'https://www.thesportsdb.com/api/v1/json/123';
 
 let sportsAt = 0;

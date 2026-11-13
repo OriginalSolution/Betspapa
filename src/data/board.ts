@@ -156,6 +156,8 @@ const trendSeeds: TrendSeed[] = [
 
 export type TrendView = {
   id: string;
+  /** `price:<market>` on a priced trend. That id is the engine trend slip. */
+  trendId: string;
   matchId: string;
   teamId: string;
   teamName: string;
@@ -239,6 +241,7 @@ export function trendsFromPicks(picks: PickView[]): TrendView[] {
   return picks
     .map((pick) => ({
       id: pick.id,
+      trendId: pick.trendId,
       matchId: pick.matchId,
       teamId: pick.teamId,
       teamName: pick.teamName,
@@ -266,6 +269,7 @@ export function listTrends(): TrendView[] {
       const recentWins = form.slice(-3).filter((mark) => mark === 'W').length;
       return {
         id: seed.id,
+        trendId: seed.id,
         matchId: '',
         teamId: seed.teamId,
         teamName: teamName(seed.teamId),

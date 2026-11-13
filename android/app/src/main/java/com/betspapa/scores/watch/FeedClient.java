@@ -54,7 +54,7 @@ final class FeedClient {
         connection.setConnectTimeout(30_000);
         connection.setReadTimeout(90_000);
         connection.setInstanceFollowRedirects(true);
-        for (Map.Entry<String, String> header : MatchFeeds.headers().entrySet()) {
+        for (Map.Entry<String, String> header : MatchFeeds.headersFor(url).entrySet()) {
             connection.setRequestProperty(header.getKey(), header.getValue());
         }
         try {

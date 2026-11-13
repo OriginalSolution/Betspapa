@@ -4,6 +4,7 @@ import { CountryBadge } from '../components/CountryBadge';
 import { Crest } from '../components/Crest';
 import { IconBall, IconCard } from '../components/Icons';
 import { BookMark } from '../components/BookMark';
+import { bookingForPick, DESK_NAMES, readEngineCache, type BookingChip } from '../lib/engineSlips';
 import { profile, squadLabel, marketInfo, type MarketId } from '../data/board';
 import { fetchLiveMatch } from '../data/remote';
 import { FormPips } from '../components/PickCard';
@@ -138,13 +139,19 @@ function marketLabel(id: string): string {
 }
 
 function HitMarkets({ matchId, focus }: { matchId: string; focus: string | null }) {
-  const { picks, codes } = useProduct();
+  const { picks } = useProduct();
   const related = picks.filter((pick) => pick.matchId === matchId && (pick.status === 'won' || pick.id === focus));
   const focused = focus && !related.some((pick) => pick.id === focus) ? focus : '';
   if (!related.length && !focused) return null;
-  const booked = codes.filter(
-    (code) => code.bookingState === 'ready' && code.parts.some((part) => part.code) && code.legs.some((leg) => leg.matchId === matchId && (leg.status === 'won' || leg.id === focus)),
-  );
+  const engine = readEngineCache();
+  const booked: BookingChip[] = [];
+  const seen = new Set<string>();
+  for (const pick of related) {
+    const chip = bookingForPick(engine, pick.matchId, pick.market);
+    if (!chip || seen.has(`${chip.bookId}:${chip.code}`)) continue;
+    seen.add(`${chip.bookId}:${chip.code}`);
+    booked.push(chip);
+  }
   return (
     <section className="hit-markets">
       <h2>Trend</h2>
@@ -160,10 +167,10 @@ function HitMarkets({ matchId, focus }: { matchId: string; focus: string | null 
         </p>
       )}
       {booked.map((code) => (
-        <p key={code.id} className="booking-chip">
-          <BookMark id={code.id} />
-          <span>{code.name}</span>
-          <b>{code.parts.find((part) => part.code)?.code || code.code}</b>
+        <p key={`${code.bookId}:${code.code}`} className="booking-chip">
+          <BookMark id={code.bookId} />
+          <span>{DESK_NAMES[code.bookId]}</span>
+          <b>{code.code}</b>
         </p>
       ))}
     </section>
