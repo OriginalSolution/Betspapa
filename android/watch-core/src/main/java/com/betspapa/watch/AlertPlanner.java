@@ -232,7 +232,30 @@ public final class AlertPlanner {
         if ("finished".equals(match.status)) {
             out.add(new WatchNote(match.id + ":ft", match.id, "ft", "Full-time", match.home + " " + current + " " + match.away));
         }
+        boolean sawVar = match.varReview != null;
+        for (WatchMatch.Marker marker : match.markers) {
+            if ("red".equals(marker.type)) out.add(cardNote(match, marker, "red", "Red card"));
+            if ("penalty".equals(marker.type)) out.add(cardNote(match, marker, "penalty", "Penalty"));
+            if ("var".equals(marker.type) && !sawVar) out.add(cardNote(match, marker, "var", "VAR"));
+        }
         return out;
+    }
+
+    private static WatchNote cardNote(WatchMatch match, WatchMatch.Marker marker, String kind, String title) {
+        boolean away = "away".equals(marker.side);
+        String team = away ? match.away : match.home;
+        String player = marker.player == null || marker.player.isEmpty() ? title : marker.player;
+        WatchNote note = new WatchNote(
+            match.id + ":" + kind + ":" + marker.side + ":" + marker.minute + ":" + player,
+            match.id,
+            kind,
+            title + " · " + team,
+            player + " " + marker.minute + "′ · " + match.home + " vs " + match.away
+        );
+        note.minute = marker.minute;
+        note.player = player;
+        note.varCheck = "var".equals(kind);
+        return note;
     }
 
     private static int count(Integer score) {

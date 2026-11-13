@@ -1,6 +1,6 @@
 import type { Match, MatchEvent, Settings } from '../types';
 
-type ScoreKind = 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var';
+type ScoreKind = 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var';
 
 export type AlertSignal = {
   key: string;
@@ -75,6 +75,21 @@ export function signalsFor(match: Match, _generation: number): AlertSignal[] {
   };
   pushGoals('home', match.homeScore ?? 0, homeGoals);
   pushGoals('away', match.awayScore ?? 0, awayGoals);
+
+  for (const event of match.events) {
+    const awarded = event.type === 'penalty' || (event.type === 'goal' && /penalty/i.test(event.detail || ''));
+    if (!awarded) continue;
+    const team = event.teamId === match.home.id ? match.home : event.teamId === match.away.id ? match.away : null;
+    const minute = event.minute != null ? `${event.minute}′` : '';
+    const player = event.player ? `${event.player}${minute ? ` ${minute}` : ''}` : minute || 'Penalty';
+    out.push({
+      key: `${match.id}:penalty:${event.id}`,
+      matchId: match.id,
+      kind: 'penalty',
+      title: `Penalty · ${team?.shortName ?? 'Penalty'}`,
+      body: `${player} · ${versus}`,
+    });
+  }
 
   for (const event of match.events) {
     if (event.type !== 'red') continue;

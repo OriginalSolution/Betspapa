@@ -24,6 +24,11 @@
     <string name="goal_channel_afro">Goal · Afrobeats</string>
     <string name="goal_channel_chant">Goal · Chant</string>
     <string name="goal_channel_papa">Goal · Papa Shout</string>
+    <string name="goal_channel_horn">Goal · Horn</string>
+    <string name="goal_channel_arp">Goal · Arpeggio</string>
     <string name="goal_channel_off">Goal · Silent</string>
+    <string name="red_channel">Red card</string>
+    <string name="var_channel">VAR check</string>
+    <string name="penalty_channel">Penalty</string>
     <string name="goal_channel_desc">The goal cheer selected in Settings</string>
 </resources>

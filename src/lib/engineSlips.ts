@@ -190,7 +190,7 @@ function parseLeg(value: unknown): EngineLeg | null {
   const match = text(row.match);
   const kickoff = text(row.kickoff);
   const odds = Number(row.odds);
-  if (!eventId || !market || !match || !kickoff || !Number.isFinite(odds)) return null;
+  if (!eventId || !market || !match || !kickoff || !publishableOdds(odds)) return null;
   const occurrence = Number(row.occurrence);
   return {
     eventId,

@@ -31,7 +31,11 @@ public class AlertPlannerTest {
         assertEquals("afro", state.goalSound);
         state.merge(settingsSound("papa"));
         assertEquals("papa", state.goalSound);
-        assertEquals("papa", state.toJson().getJSONObject("settings").getString("goalSound"));
+        state.merge(settingsSound("horn"));
+        assertEquals("horn", state.goalSound);
+        state.merge(settingsSound("arp"));
+        assertEquals("arp", state.goalSound);
+        assertEquals("arp", state.toJson().getJSONObject("settings").getString("goalSound"));
     }
 
     private static JSONObject settingsSound(String sound) {
@@ -466,8 +470,24 @@ public class AlertPlannerTest {
     }
 
     @Test
+    public void redAndPenaltyComeOnlyFromIncidents() {
+        String bare = "{\"data\":[{\"events\":[{\"eventId\":\"sr:match:1\",\"homeTeamName\":\"Al Astiklal\",\"awayTeamName\":\"Nashama\",\"matchStatus\":\"H1\",\"playedSeconds\":\"40:00\",\"setScore\":\"0:0\"}]}]}";
+        WatchMatch quiet = MatchParser.parseLive(bare).get(0);
+        assertEquals(0, quiet.markers.size());
+        String feed = "{\"data\":[{\"events\":[{\"eventId\":\"sr:match:1\",\"homeTeamName\":\"Al Astiklal\",\"awayTeamName\":\"Nashama\",\"matchStatus\":\"H1\",\"playedSeconds\":\"41:00\",\"setScore\":\"0:0\",\"timeline\":[{\"type\":\"red card\",\"minute\":38,\"side\":\"away\",\"player\":\"Keeper\"},{\"type\":\"penalty\",\"minute\":41,\"side\":\"home\",\"player\":\"Striker\"}]}]}]}";
+        WatchMatch parsed = MatchParser.parseLive(feed).get(0);
+        WatchState state = followed();
+        List<WatchNote> notes = AlertPlanner.notices(java.util.Collections.singletonList(parsed), state, KICK + 41 * 60_000L);
+        assertTrue(kinds(notes).contains("red"));
+        assertTrue(kinds(notes).contains("penalty"));
+        assertFalse(kinds(AlertPlanner.notices(java.util.Collections.singletonList(quiet), state, KICK + 40 * 60_000L)).contains("red"));
+    }
+
+    @Test
     public void trendHitsUnderOnePointTwoAreDropped() {
         assertTrue(AlertPlanner.belowFloor("1.19"));
+        assertTrue(AlertPlanner.belowFloor("1.01"));
+        assertTrue(AlertPlanner.belowFloor("1.04"));
         assertFalse(AlertPlanner.belowFloor("1.20"));
         assertFalse(AlertPlanner.belowFloor(""));
         WatchState state = new WatchState();

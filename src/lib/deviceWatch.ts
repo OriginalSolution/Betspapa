@@ -4,7 +4,10 @@ import { loadGoalBook, markersFor } from './goalMinutes';
 import { isFollowed } from './group';
 import { isNativeApp } from './nativeHttp';
 
-export type WatchSettings = Pick<Settings, 'kickoff' | 'goal' | 'red' | 'ht' | 'ft' | 'var' | 'goalSound' | 'notificationStyle'>;
+export type WatchSettings = Pick<
+  Settings,
+  'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'notificationStyle' | 'redSound' | 'varSound' | 'penaltySound'
+>;
 
 export type ScheduleRow = {
   id: string;
@@ -79,7 +82,8 @@ type WatchPlugin = {
   requestExactAlarm(): Promise<WatchDeviceStatus>;
   openAutostart(): Promise<WatchDeviceStatus & { opened?: string }>;
   markSetup(options: { version: number; finished: boolean }): Promise<WatchDeviceStatus>;
-  scheduleTest(): Promise<void>;
+  scheduleTest(options?: { kind?: string; goalSound?: string }): Promise<void>;
+  pushToken(): Promise<{ token: string; enabled: boolean }>;
   openNotificationSound(): Promise<WatchDeviceStatus>;
   present(options: { payload: string }): Promise<void>;
   addListener(eventName: 'resume', listenerFunc: (status: WatchDeviceStatus) => void): Promise<PluginListenerHandle>;
@@ -298,14 +302,23 @@ export async function openNotificationSound(): Promise<WatchDeviceStatus | null>
   }
 }
 
-/** Schedules a native notification about 10 seconds later, on the selected goal-sound channel. Closing the app does not cancel it. */
-export async function scheduleBackgroundTest(): Promise<boolean> {
+/** Schedules a native notification about 10 seconds later. Closing the app does not cancel it. */
+export async function scheduleBackgroundTest(options?: { kind?: string; goalSound?: string }): Promise<boolean> {
   if (!isNativeApp()) return false;
   try {
-    await Watch.scheduleTest();
+    await Watch.scheduleTest(options);
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function readPushToken(): Promise<{ token: string; enabled: boolean }> {
+  if (!isNativeApp()) return { token: '', enabled: false };
+  try {
+    return await Watch.pushToken();
+  } catch {
+    return { token: '', enabled: false };
   }
 }
 

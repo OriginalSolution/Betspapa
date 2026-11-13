@@ -101,13 +101,14 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
 }
 
 export function slipView(slip, masterKey) {
+  const legs = (slip.legs || []).filter((leg) => Number(leg.odds) >= MIN_ODDS);
   return {
     id: slip.id,
     name: slip.name,
     market: slip.market || null,
     label: slip.label || slip.name,
-    legCount: slip.legs.length,
-    legs: slip.legs.map(legView),
+    legCount: legs.length,
+    legs: legs.map(legView),
     sameAsMaster: Boolean(masterKey && slip.key === masterKey && slip.id !== 'master'),
     bookedAt: slip.bookedAt || null,
     books: slip.books,

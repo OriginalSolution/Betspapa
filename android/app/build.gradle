@@ -1,14 +1,21 @@
 apply plugin: 'com.android.application'
 
+def fcmServices = file('google-services.json')
+def fcmEnabled = fcmServices.exists() && fcmServices.length() > 2
+
 android {
     namespace = "com.betspapa.scores"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
-        versionName "0.3.9"
+        versionCode 22
+        versionName "0.4.0"
+        buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -35,6 +42,11 @@ android {
     testOptions {
         unitTests.includeAndroidResources = true
     }
+    sourceSets {
+        main {
+            java.srcDirs += fcmEnabled ? 'src/fcm/java' : 'src/nofcm/java'
+        }
+    }
 }
 
 repositories {
@@ -51,6 +63,10 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':watch-core')
     implementation 'androidx.work:work-runtime:2.9.1'
+    if (fcmEnabled) {
+        implementation platform('com.google.firebase:firebase-bom:33.7.0')
+        implementation 'com.google.firebase:firebase-messaging'
+    }
     testImplementation "junit:junit:$junitVersion"
     testImplementation 'org.robolectric:robolectric:4.14.1'
     testImplementation 'com.squareup.okhttp3:mockwebserver:4.12.0'

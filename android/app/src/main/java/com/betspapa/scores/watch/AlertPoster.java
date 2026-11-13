@@ -36,7 +36,12 @@ public final class AlertPoster {
     static final String GOAL_AFRO = "betspapa.goal.afro.v4";
     static final String GOAL_CHANT = "betspapa.goal.chant.v4";
     static final String GOAL_PAPA = "betspapa.goal.papa.v4";
+    static final String GOAL_HORN = "betspapa.goal.horn.v4";
+    static final String GOAL_ARP = "betspapa.goal.arp.v4";
     static final String GOAL_OFF = "betspapa.goal.off.v4";
+    static final String RED_CARD = "betspapa.redcard.v1";
+    static final String VAR_CHECK = "betspapa.var.v1";
+    static final String PENALTY = "betspapa.penalty.v1";
     private static final String CHANNELS_READY = "goal_channels_v4";
     private static final String[] LEGACY_CHANNELS = {
         "betspapa.goal.crowd",
@@ -78,6 +83,11 @@ public final class AlertPoster {
         goalChannel(manager, context, GOAL_AFRO, R.string.goal_channel_afro, R.raw.cheer_afro, first);
         goalChannel(manager, context, GOAL_CHANT, R.string.goal_channel_chant, R.raw.cheer_chant, first);
         goalChannel(manager, context, GOAL_PAPA, R.string.goal_channel_papa, R.raw.cheer_papa, first);
+        goalChannel(manager, context, GOAL_HORN, R.string.goal_channel_horn, R.raw.goal_horn, false);
+        goalChannel(manager, context, GOAL_ARP, R.string.goal_channel_arp, R.raw.goal_arp, false);
+        goalChannel(manager, context, RED_CARD, R.string.red_channel, R.raw.red_card, false);
+        goalChannel(manager, context, VAR_CHECK, R.string.var_channel, R.raw.var_check, false);
+        goalChannel(manager, context, PENALTY, R.string.penalty_channel, R.raw.penalty, false);
         silentChannel(manager, context, first);
         if (first) prefs.edit().putBoolean(CHANNELS_READY, true).commit();
     }
@@ -147,25 +157,69 @@ public final class AlertPoster {
     }
 
     static boolean wantsSound(String kind, String goalSound, boolean disallowed) {
-        if (disallowed || "off".equals(goalSound)) return false;
-        if (kind == null || "var".equals(kind) || "live".equals(kind)) return false;
+        return wantsSound(kind, goalSound, disallowed, false, eventSounds(null));
+    }
+
+    static boolean wantsSound(String kind, String goalSound, boolean disallowed, boolean preview, EventSounds sounds) {
+        if (disallowed) return false;
+        if ("red".equals(kind)) return preview || sounds.red;
+        if ("var".equals(kind)) return preview || sounds.varOn;
+        if ("penalty".equals(kind)) return preview || sounds.penalty;
+        if ("off".equals(goalSound)) return false;
+        if (kind == null || "live".equals(kind)) return false;
         return true;
     }
 
     static String channelFor(String kind, String goalSound) {
-        if (!wantsSound(kind, goalSound, false)) return GOAL_OFF;
+        return channelFor(kind, goalSound, false, eventSounds(null));
+    }
+
+    static String channelFor(String kind, String goalSound, boolean preview, EventSounds sounds) {
+        if (!wantsSound(kind, goalSound, false, preview, sounds)) return GOAL_OFF;
+        if ("red".equals(kind)) return RED_CARD;
+        if ("var".equals(kind)) return VAR_CHECK;
+        if ("penalty".equals(kind)) return PENALTY;
         if ("afro".equals(goalSound)) return GOAL_AFRO;
         if ("chant".equals(goalSound)) return GOAL_CHANT;
         if ("papa".equals(goalSound)) return GOAL_PAPA;
+        if ("horn".equals(goalSound)) return GOAL_HORN;
+        if ("arp".equals(goalSound)) return GOAL_ARP;
         return GOAL_CROWD;
     }
 
     static Uri soundFor(Context context, String kind, String goalSound) {
-        if (!wantsSound(kind, goalSound, false)) return null;
+        return soundFor(context, kind, goalSound, false, eventSounds(context));
+    }
+
+    static Uri soundFor(Context context, String kind, String goalSound, boolean preview, EventSounds sounds) {
+        if (!wantsSound(kind, goalSound, false, preview, sounds)) return null;
+        if ("red".equals(kind)) return rawUri(context, R.raw.red_card);
+        if ("var".equals(kind)) return rawUri(context, R.raw.var_check);
+        if ("penalty".equals(kind)) return rawUri(context, R.raw.penalty);
         if ("afro".equals(goalSound)) return rawUri(context, R.raw.cheer_afro);
         if ("chant".equals(goalSound)) return rawUri(context, R.raw.cheer_chant);
         if ("papa".equals(goalSound)) return rawUri(context, R.raw.cheer_papa);
+        if ("horn".equals(goalSound)) return rawUri(context, R.raw.goal_horn);
+        if ("arp".equals(goalSound)) return rawUri(context, R.raw.goal_arp);
         return rawUri(context, R.raw.cheer_crowd);
+    }
+
+    static final class EventSounds {
+        final boolean red;
+        final boolean varOn;
+        final boolean penalty;
+
+        EventSounds(boolean red, boolean varOn, boolean penalty) {
+            this.red = red;
+            this.varOn = varOn;
+            this.penalty = penalty;
+        }
+    }
+
+    static EventSounds eventSounds(Context context) {
+        if (context == null) return new EventSounds(true, true, true);
+        WatchState state = WatchState.load(WatchFiles.file(context));
+        return new EventSounds(state.redSound, state.varSound, state.penaltySound);
     }
 
     /** Name form. HiOS does not resolve android.resource://pkg/&lt;numeric id&gt;. */
@@ -229,14 +283,17 @@ public final class AlertPoster {
         ensure(context);
         if (note == null) return false;
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
-        boolean soundOn = wantsSound(note.kind, goalSound, note.disallowed);
-        String channel = channelFor(soundOn ? note.kind : "var", goalSound);
+        boolean preview = note.id != null && note.id.startsWith("test:");
+        EventSounds sounds = eventSounds(context);
+        boolean soundOn = wantsSound(note.kind, goalSound, note.disallowed, preview, sounds);
+        String channel = soundOn ? channelFor(note.kind, goalSound, preview, sounds) : GOAL_OFF;
         int id = replaceId != 0 ? replaceId : AlertPlanner.notificationId(note.id);
         if ("goal".equals(note.kind) && replaceId == 0) {
             VarSlots.Slot slot = VarSlots.take(context, note.matchId);
             if (slot != null) {
                 // A VAR post is silent. Updating that same record keeps HiOS from playing the goal.
                 // Cancel it, then post the goal on the cheer channel as a new alert with the same id.
+                if (slot.noteId != null && !slot.noteId.isEmpty()) NotificationManagerCompat.from(context).cancel(slot.noteId, slot.id);
                 NotificationManagerCompat.from(context).cancel(slot.id);
                 id = slot.id;
                 if (slot.player != null && !slot.player.isEmpty()) note.player = slot.player;
@@ -257,7 +314,7 @@ public final class AlertPoster {
             // A grouped child with the platform default is muted on HiOS, which treats it as summary-only.
             .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .setContentIntent(OpenMatch.forNote(context, note));
-        Uri sound = soundOn ? soundFor(context, note.kind, goalSound) : null;
+        Uri sound = soundOn ? soundFor(context, note.kind, goalSound, preview, sounds) : null;
         if (sound == null) builder.setSilent(true);
         try {
             ScoreCards.attach(context, builder, note, match, dark);
@@ -271,7 +328,7 @@ public final class AlertPoster {
             notification.sound = sound;
             notification.audioAttributes = notificationAudio();
         }
-        return notify(context, id, notification);
+        return notify(context, note.id, id, notification);
     }
 
     /** Ongoing score card. Same id per match. Score-unchanged updates do not alert again. */
@@ -294,7 +351,7 @@ public final class AlertPoster {
         } catch (RuntimeException error) {
             builder.setStyle(new NotificationCompat.BigTextStyle().bigText(note.body));
         }
-        notify(context, AlertPlanner.notificationId("live:" + match.id), builder.build());
+        notify(context, "live:" + match.id, AlertPlanner.notificationId("live:" + match.id), builder.build());
     }
 
     static void refreshLive(Context context) {
@@ -317,6 +374,7 @@ public final class AlertPoster {
         String previous = prefs.getString("live-ids", "");
         for (String id : previous.split(",")) {
             if (id.isEmpty() || liveIds.contains(id)) continue;
+            NotificationManagerCompat.from(context).cancel("live:" + id, AlertPlanner.notificationId("live:" + id));
             NotificationManagerCompat.from(context).cancel(AlertPlanner.notificationId("live:" + id));
             prefs.edit().remove("live-sig-" + id).apply();
         }
@@ -353,9 +411,10 @@ public final class AlertPoster {
             .setContentText(body == null ? "" : body);
     }
 
-    private static boolean notify(Context context, int id, Notification notification) {
+    private static boolean notify(Context context, String tag, int id, Notification notification) {
         try {
-            NotificationManagerCompat.from(context).notify(id, notification);
+            if (tag == null || tag.isEmpty()) NotificationManagerCompat.from(context).notify(id, notification);
+            else NotificationManagerCompat.from(context).notify(tag, id, notification);
             return true;
         } catch (SecurityException error) {
             return false;

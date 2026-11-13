@@ -147,10 +147,15 @@ public final class WatchMatch {
     }
 
     public void addMarker(String type, int minute, String abbr, String side) {
+        addMarker(type, minute, abbr, side, "");
+    }
+
+    public void addMarker(String type, int minute, String abbr, String side, String player) {
         if (type == null || type.isEmpty() || "goal".equals(type)) return;
         int at = Math.max(0, Math.min(130, minute));
         String tag = abbr == null ? "" : abbr;
         String team = side == null ? "" : side;
+        String name = player == null ? "" : player.trim();
         for (Marker marker : markers) {
             if (type.equals(marker.type) && marker.minute == at && tag.equals(marker.abbr)) return;
         }
@@ -159,6 +164,7 @@ public final class WatchMatch {
         marker.minute = at;
         marker.abbr = tag;
         marker.side = team;
+        marker.player = name;
         markers.add(marker);
     }
 
@@ -349,7 +355,7 @@ public final class WatchMatch {
                     boolean estimated = !row.has("estimated") || row.optBoolean("estimated", true);
                     match.setGoal(side, index, at, abbr, row.optString("player", ""), !estimated);
                 } else {
-                    match.addMarker(type, at, abbr, row.optString("side", ""));
+                    match.addMarker(type, at, abbr, row.optString("side", ""), row.optString("player", ""));
                 }
             }
         }

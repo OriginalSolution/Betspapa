@@ -29,12 +29,26 @@ describe('odds floor', () => {
   it('keeps 1.20 and drops anything shorter from picks, trends, slips, and hit alerts', () => {
     expect(publishableOdds(1.2)).toBe(true);
     expect(publishableOdds(1.199)).toBe(false);
+    expect(publishableOdds(1.01)).toBe(false);
+    expect(publishableOdds(1.04)).toBe(false);
     expect(publishableOdds(1.08)).toBe(false);
     const picks = buildPicks([match()]);
     expect(picks.length).toBeGreaterThan(0);
     expect(picks.every((pick) => pick.odds >= 1.2)).toBe(true);
     expect(picks.some((pick) => pick.market === 'over25' && pick.odds === 1.2)).toBe(true);
     expect(picks.some((pick) => pick.market === 'over15' || pick.market === 'home')).toBe(false);
+    const heavy = match();
+    heavy.id = 'sr:match:pesh';
+    heavy.home = { ...heavy.home, shortName: 'AL Peshmerga' };
+    heavy.away = { ...heavy.away, shortName: 'Al-Qasim SC' };
+    heavy.odds = { home: 1.01, draw: 8, away: 12 };
+    const other = match();
+    other.id = 'sr:match:short';
+    other.odds = { home: 1.04, draw: 6, away: 9 };
+    const priced = buildPicks([heavy, other, match()]);
+    expect(priced.some((pick) => pick.odds < 1.2)).toBe(false);
+    expect(priced.some((pick) => pick.label.includes('AL Peshmerga') && pick.market === 'home')).toBe(false);
+    expect(priced.some((pick) => pick.odds === 1.04)).toBe(false);
     const trends = trendsFromPicks(picks);
     expect(trends.every((trend) => picks.some((pick) => pick.id === trend.id && pick.odds >= 1.2))).toBe(true);
     expect(qualifying(picks).every((pick) => pick.odds >= 1.2)).toBe(true);

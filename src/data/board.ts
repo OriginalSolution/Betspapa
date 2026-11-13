@@ -488,7 +488,7 @@ function pricePick(match: Match, market: MarketId, price: number | null, note: s
     grade: slip ? gradeFor(confidence) : null,
     bookmarked: slip && implied > TIP_RATE,
     softened: slip && implied > TIP_RATE && confidence <= TIP_RATE,
-    odds: price != null && price > 1 ? Math.round(price * 100) / 100 : 0,
+    odds: price != null && publishableOdds(price) ? Math.round(price * 100) / 100 : 0,
     status: settle(market, match, !backingAway),
     form: [],
     squad: 'full',

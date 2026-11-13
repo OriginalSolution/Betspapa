@@ -164,15 +164,23 @@ public final class WatchScheduler {
 
     /** Native notification about 10s later, including after the process has been swiped away. */
     public static void scheduleTest(Context context) {
+        scheduleTest(context, "goal", "");
+    }
+
+    public static void scheduleTest(Context context, String kind, String soundOverride) {
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) return;
         WatchState state = WatchState.load(WatchFiles.file(context));
-        String sound = state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound;
+        String sound = soundOverride == null || soundOverride.isEmpty()
+            ? (state.goalSound == null || state.goalSound.isEmpty() ? "crowd" : state.goalSound)
+            : soundOverride;
         Intent intent = new Intent(context, TestAlertReceiver.class);
         intent.putExtra(TestAlertReceiver.EXTRA_SOUND, sound);
+        intent.putExtra(TestAlertReceiver.EXTRA_KIND, kind == null || kind.isEmpty() ? "goal" : kind);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
-        PendingIntent pending = PendingIntent.getBroadcast(context, TEST_CODE, intent, flags);
+        int code = TEST_CODE + Math.abs((String.valueOf(kind) + ":" + sound).hashCode() % 40);
+        PendingIntent pending = PendingIntent.getBroadcast(context, code, intent, flags);
         schedule(alarms, pending, System.currentTimeMillis() + 10_000L, 5_000L);
     }
 
