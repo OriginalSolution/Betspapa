@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { scryptSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -11,6 +12,7 @@ import {
   clearFailures,
   cookieHeader,
   emailsMatch,
+  passwordMatchesHash,
   noteFailure,
   passwordsMatch,
   requestIsSecure,
@@ -39,6 +41,15 @@ test('password compare is exact and the session cookie expires', () => {
   assert.equal(adminEmail({ ADMIN_EMAIL: '  Owner@Betspapa.test ' }), 'owner@betspapa.test');
   assert.equal(emailsMatch('  Owner@Betspapa.test ', 'owner@betspapa.test'), true);
   assert.equal(emailsMatch('other@betspapa.test', 'owner@betspapa.test'), false);
+  assert.equal(emailsMatch('owner@betspapa.test', ''), false);
+  const salt = '00112233445566778899aabbccddeeff';
+  const digest = scryptSync(PASSWORD, salt, 64);
+  const decodedSalt = scryptSync(PASSWORD, Buffer.from(salt, 'hex'), 64);
+  assert.equal(digest.equals(decodedSalt), false);
+  const stored = `scrypt$${salt}$${digest.toString('hex')}`;
+  assert.equal(passwordMatchesHash(PASSWORD, stored), true);
+  assert.equal(passwordMatchesHash('decoy-password', stored), false);
+  assert.equal(passwordMatchesHash(PASSWORD, `scrypt$${salt}$${decodedSalt.toString('hex')}`), false);
   const now = Date.now();
   const token = signSession(PASSWORD, now);
   assert.equal(verifySession(token, PASSWORD, now + 1000), true);
@@ -268,6 +279,7 @@ test('admin routes require the session, throttle failures, and store a device wi
     data: process.env.ENGINE_DATA_DIR,
     password: process.env.ADMIN_PASSWORD,
     email: process.env.ADMIN_EMAIL,
+    hash: process.env.ADMIN_PASSWORD_HASH,
     token: process.env.ENGINE_RUN_TOKEN,
     nodeEnv: process.env.NODE_ENV,
     render: process.env.RENDER,
@@ -276,6 +288,7 @@ test('admin routes require the session, throttle failures, and store a device wi
   process.env.ENGINE_RUN_TOKEN = 'engine-token-test';
   delete process.env.ADMIN_PASSWORD;
   delete process.env.ADMIN_EMAIL;
+  delete process.env.ADMIN_PASSWORD_HASH;
   delete process.env.NODE_ENV;
   delete process.env.RENDER;
   const { createBetspapaServer } = await import('./index.mjs');
@@ -288,8 +301,6 @@ test('admin routes require the session, throttle failures, and store a device wi
     assert.equal(closed.status, 503);
     assert.match(String(closed.headers['x-robots-tag']), /noindex/);
     process.env.ADMIN_PASSWORD = PASSWORD;
-    const passwordOnly = await httpAsk({ path: '/admin' });
-    assert.equal(passwordOnly.status, 503);
     process.env.ADMIN_EMAIL = EMAIL;
 
     const loginPage = await httpAsk({ path: '/admin' });
@@ -429,6 +440,31 @@ test('admin routes require the session, throttle failures, and store a device wi
     });
     assert.match(String(secure.headers['set-cookie']), /Secure/);
 
+    const salt = '00112233445566778899aabbccddeeff';
+    const stored = `scrypt$${salt}$${scryptSync(PASSWORD, salt, 64).toString('hex')}`;
+    process.env.ADMIN_PASSWORD = 'decoy-password';
+    process.env.ADMIN_PASSWORD_HASH = stored;
+    const fromHash = await httpAsk({
+      method: 'POST',
+      path: '/admin/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(EMAIL)}&password=${encodeURIComponent(PASSWORD)}`,
+    });
+    assert.equal(fromHash.status, 303);
+    const hashCookie = String(fromHash.headers['set-cookie']).split(';')[0];
+    const hashOverview = await httpAsk({ path: '/api/admin/overview', headers: { cookie: hashCookie } });
+    assert.equal(hashOverview.status, 200);
+    const ignoredPlain = await httpAsk({
+      method: 'POST',
+      path: '/admin/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(EMAIL)}&password=${encodeURIComponent('decoy-password')}`,
+    });
+    assert.equal(ignoredPlain.status, 401);
+    assert.match(ignoredPlain.body, /Wrong email or password/);
+    delete process.env.ADMIN_PASSWORD_HASH;
+    process.env.ADMIN_PASSWORD = PASSWORD;
+
     const left = await httpAsk({ method: 'POST', path: '/admin/logout', headers: { cookie } });
     assert.equal(left.status, 303);
     assert.match(String(left.headers['set-cookie']), /Max-Age=0/);
@@ -442,6 +478,8 @@ test('admin routes require the session, throttle failures, and store a device wi
     else process.env.ADMIN_PASSWORD = previous.password;
     if (previous.email == null) delete process.env.ADMIN_EMAIL;
     else process.env.ADMIN_EMAIL = previous.email;
+    if (previous.hash == null) delete process.env.ADMIN_PASSWORD_HASH;
+    else process.env.ADMIN_PASSWORD_HASH = previous.hash;
     if (previous.token == null) delete process.env.ENGINE_RUN_TOKEN;
     else process.env.ENGINE_RUN_TOKEN = previous.token;
     if (previous.nodeEnv == null) delete process.env.NODE_ENV;

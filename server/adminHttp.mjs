@@ -1,13 +1,13 @@
 import {
   adminEmail,
-  adminPassword,
   clearCookie,
   emailsMatch,
+  passwordAccepted,
+  sessionMaterial,
   clearFailures,
   failureAddress,
   hasSession,
   noteFailure,
-  passwordsMatch,
   requestIsSecure,
   retryAfterSeconds,
   sessionCookie,
@@ -93,9 +93,8 @@ function credentialsFrom(raw, type) {
 }
 
 async function login(req, res) {
-  const password = adminPassword();
-  const email = adminEmail();
-  if (!password || !email) {
+  const secret = sessionMaterial();
+  if (!secret) {
     sendHtml(res, 503, unavailableHtml());
     return;
   }
@@ -112,15 +111,15 @@ async function login(req, res) {
     return;
   }
   const given = credentialsFrom(raw, req.headers['content-type']);
-  const emailOk = emailsMatch(given.email, email);
-  const passwordOk = passwordsMatch(given.password, password);
+  const emailOk = emailsMatch(given.email, adminEmail());
+  const passwordOk = passwordAccepted(given.password);
   if (!emailOk || !passwordOk) {
     noteFailure(ip);
     sendHtml(res, 401, loginHtml('Wrong email or password.'));
     return;
   }
   clearFailures(ip);
-  redirect(res, '/admin', sessionCookie(password, requestIsSecure(req)));
+  redirect(res, '/admin', sessionCookie(secret, requestIsSecure(req)));
 }
 
 export async function handleAdminPage(req, res, url) {
@@ -140,7 +139,7 @@ export async function handleAdminPage(req, res, url) {
     sendHtml(res, 405, loginHtml('Method not allowed.'));
     return;
   }
-  if (!hasSession(req) && (!adminPassword() || !adminEmail())) {
+  if (!hasSession(req) && !sessionMaterial()) {
     sendHtml(res, 503, unavailableHtml());
     return;
   }
@@ -149,7 +148,7 @@ export async function handleAdminPage(req, res, url) {
 
 export async function handleAdminApi(req, res, url, ctx) {
   if (!url.pathname.startsWith('/api/admin/')) return false;
-  if (!adminPassword()) {
+  if (!sessionMaterial()) {
     sendJson(res, 503, { error: 'Operator page is unavailable.' });
     return true;
   }
