@@ -8,7 +8,7 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
-import { getCachedEvents, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { engineNeedsRepair, getCachedEvents, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
@@ -22,6 +22,7 @@ const pushWatch = startPushWatch();
 const guardian = createGuardian({
   dir: join(process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine'), 'health'),
   getState: getEngineState,
+  needsRepair: engineNeedsRepair,
   runCycle: runEngineCycle,
   restore: restoreEngine,
   fcm: fcmConfigured,

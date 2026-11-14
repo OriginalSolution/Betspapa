@@ -62,7 +62,7 @@ test('books every 80% line with a price, one master leg per match, and skips SRL
       kickoff: '2026-11-13T18:00:00.000Z',
       tournament: 'Nations League',
       country: 'International',
-      odds: { home: 3, 'over-15': 1.7, 'over-25': 1.19, 'btts-yes': 1.8, 'corners-over-85': 1.73, 'cards-over-35': 1.4 },
+      odds: { home: 1.35, 'over-15': 1.25, 'over-25': 1.05, 'btts-yes': 1.4, 'corners-over-85': 1.73, 'cards-over-35': 1.4 },
     },
     {
       eventId: 'sr:match:11',
@@ -89,15 +89,15 @@ test('books every 80% line with a price, one master leg per match, and skips SRL
   const markets = board.legs.filter((leg) => leg.eventId === 'sr:match:10').map((leg) => leg.market);
   assert.ok(markets.includes('over15'));
   assert.ok(markets.includes('btts'));
-  assert.ok(markets.includes('corners-over85'));
-  assert.ok(markets.includes('cards-over35'));
+  assert.equal(markets.includes('corners-over85'), false);
+  assert.equal(markets.includes('cards-over35'), false);
   assert.equal(markets.includes('home'), false);
   assert.equal(markets.includes('over25'), false);
   assert.equal(board.legs.some((leg) => leg.eventId !== 'sr:match:10'), false);
   const over = board.legs.find((leg) => leg.market === 'over15');
   assert.equal(over.occurrence, 100);
   assert.equal(over.sample, '10/10');
-  assert.equal(over.odds, 1.7);
+  assert.equal(over.odds, 1.25);
   const master = masterPick(board.legs.filter((leg) => leg.eventId === 'sr:match:10'));
   assert.equal(master.length, 1);
   assert.equal(master[0].market, 'btts');

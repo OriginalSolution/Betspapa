@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
+import { boardDirty, projectBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { bookSlips, bookableLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
@@ -31,26 +32,21 @@ function emptyState() {
   };
 }
 
-function scrubShort(slip) {
-  if (!slip || !Array.isArray(slip.legs)) return slip || null;
-  const legs = slip.legs.filter((leg) => Number(leg.odds) >= 1.2);
-  return { ...slip, legs, legCount: legs.length };
-}
-
-function publicState(state) {
+function publicState(state, now = new Date()) {
+  const view = projectBoard(state, now);
   return {
-    updatedAt: state.updatedAt,
-    feedAt: state.feedAt,
-    feedError: state.feedError,
-    eventCount: state.events.length,
-    legCount: state.master?.legCount ?? state.legs.length,
-    settlement: state.settlement,
-    books: state.books,
-    master: scrubShort(state.master),
-    trends: (state.trends || []).map(scrubShort),
-    tiers: (state.tiers || []).map(scrubShort),
-    issues: state.issues,
-    cycleNotes: Array.isArray(state.cycleNotes) ? state.cycleNotes : null,
+    updatedAt: view.updatedAt,
+    feedAt: view.feedAt,
+    feedError: view.feedError,
+    eventCount: (view.events || state.events || []).length,
+    legCount: view.master?.legCount ?? (view.legs || []).length,
+    settlement: view.settlement,
+    books: view.books,
+    master: view.master,
+    trends: view.trends || [],
+    tiers: view.tiers || [],
+    issues: view.issues,
+    cycleNotes: Array.isArray(view.cycleNotes) ? view.cycleNotes : null,
   };
 }
 
@@ -204,16 +200,16 @@ export function createEngine(options = {}) {
       const message = error instanceof Error ? error.message : 'Team history failed';
       issues.push(`Team history failed: ${message}. Keeping the previous slips.`);
       log('error', message);
-      const kept = { ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) };
+      const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
       save(kept);
-      return publicState(kept);
+      return publicState(kept, now);
     }
     if (!options.loadHistories && loaded.teams > 0 && loaded.teamErrors === loaded.teams) {
       issues.push('Team history failed for every side. Keeping the previous slips.');
       log('error', issues[issues.length - 1]);
-      const kept = { ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) };
+      const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
       save(kept);
-      return publicState(kept);
+      return publicState(kept, now);
     }
 
     const board = buildOccurrenceBoard(events, loaded.histories, now);
@@ -243,7 +239,7 @@ export function createEngine(options = {}) {
       slips: [master, ...trends, ...tiers],
       cache: state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : state.slipKey ? { [state.slipKey]: { books: state.books || {}, attempts: {}, lastAttemptAt: 0, bookedAt: state.updatedAt } } : {},
       book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
-      now: now.getTime(),
+      now: () => (options.now ? options.now() : new Date()).getTime(),
       gapMs: options.slipGapMs ?? 4000,
       pause,
       log,
@@ -252,11 +248,12 @@ export function createEngine(options = {}) {
     const [masterResult, ...rest] = booking.results;
     const trendResults = rest.slice(0, trends.length);
     const tierResults = rest.slice(trends.length);
-    const key = masterResult.key;
-    const books = inspectBooks(masterResult.books).books;
-    const masterView = slipView(masterResult, key);
-    const trendViews = trendResults.map((trend) => slipView(trend, key));
-    const tierViews = tierResults.map((trend) => slipView(trend, key));
+    const key = masterResult?.key;
+    const clock = options.now ? options.now() : new Date();
+    const books = inspectBooks(masterResult?.books).books;
+    const masterView = masterResult ? slipView(masterResult, key, clock) : null;
+    const trendViews = trendResults.map((trend) => slipView(trend, key, clock));
+    const tierViews = tierResults.map((trend) => slipView(trend, key, clock));
 
     const next = {
       ...state,
@@ -273,11 +270,11 @@ export function createEngine(options = {}) {
       cycleNotes: issues,
       issues: [...issues, ...(state.issues || [])].slice(0, 40),
     };
-    const kept = preserveBoard(state, next, now);
+    const kept = projectBoard(preserveBoard(state, next, now), now);
     save(kept);
     if (boardHasCodes(kept)) {
       const publish = options.publishSnapshot || publishEngineSnapshot;
-      void publish(publicState(kept)).catch(() => {});
+      void publish(publicState(kept, now)).catch(() => {});
     }
     if (options.crests !== false && !options.fetchImpl) {
       const fromDay = now.toISOString().slice(0, 10);
@@ -286,7 +283,7 @@ export function createEngine(options = {}) {
         .then(({ syncFixtureCrests }) => syncFixtureCrests(events, { fromDay, toDay, limit: 24 }))
         .catch((error) => log('error', `Crest resolve failed: ${error instanceof Error ? error.message : 'crest resolve failed'}`));
     }
-    return publicState(kept);
+    return publicState(kept, now);
   }
 
   function run() {
@@ -299,7 +296,8 @@ export function createEngine(options = {}) {
   }
 
   return {
-    getState: () => publicState(state),
+    getState: () => publicState(state, options.now ? options.now() : new Date()),
+    needsRepair: () => boardDirty(state, options.now ? options.now() : new Date()),
     getEvents: () => state.events,
     getOccurrence: () => state.occurrenceByEvent || {},
     getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running) }),
@@ -331,8 +329,8 @@ export function createEngine(options = {}) {
     },
     start() {
       if (timer) return;
+      nextRunAt = Date.now() + 20_000;
       void this.restore().finally(() => {
-        nextRunAt = Date.now() + INTERVAL_MS;
         void run();
       });
       timer = setInterval(() => {
@@ -356,6 +354,10 @@ export function startEngine() {
 
 export function getEngineState() {
   return engine.getState();
+}
+
+export function engineNeedsRepair() {
+  return engine.needsRepair();
 }
 
 export function getEngineSchedule() {

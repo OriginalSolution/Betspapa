@@ -27,11 +27,12 @@ export function inspectBooks(books) {
     const parts = (book?.parts || []).filter((part) => validPart(desk, part));
     const dropped = (book?.parts || []).length - parts.length;
     if (dropped) issues.push(`${desk} had ${dropped} invalid code(s) removed.`);
+    const kept = Array.isArray(book?.kept) ? book.kept : [];
     if (!parts.length) {
       retry.push(desk);
-      clean[desk] = { parts: [], error: book?.error || 'No valid share code.', dropped: Array.isArray(book?.dropped) ? book.dropped : [] };
+      clean[desk] = { parts: [], error: book?.error || 'No valid share code.', dropped: Array.isArray(book?.dropped) ? book.dropped : [], kept };
     } else {
-      clean[desk] = { parts, error: null, dropped: Array.isArray(book?.dropped) ? book.dropped : [] };
+      clean[desk] = { parts, error: null, dropped: Array.isArray(book?.dropped) ? book.dropped : [], kept };
     }
   }
   if (books && 'betway' in books) issues.push('Betway is not a no-login desk and was ignored.');

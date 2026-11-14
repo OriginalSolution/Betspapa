@@ -1,3 +1,4 @@
+import { priceInRange } from '../oddsRange.mjs';
 import { labelFor } from '../occurrence.mjs';
 
 /** Decide which real creatives exist. Never invents a code or a price under 1.20. */
@@ -44,7 +45,7 @@ function deskCodes(books) {
 function legsOf(slip) {
   return (slip?.legs || [])
     .map((leg) => {
-      const odds = priced(leg.odds);
+      const odds = priceInRange(leg.market, leg.odds, leg) ? Math.round(Number(leg.odds) * 100) / 100 : null;
       const hit = hitPercent(leg);
       if (odds == null || hit == null || hit < 80) return null;
       return {

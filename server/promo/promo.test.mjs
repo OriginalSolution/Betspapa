@@ -9,7 +9,7 @@ const engine = {
   master: {
     bookedAt: '2026-11-13T16:57:00.000Z',
     legs: [
-      { eventId: 'sr:match:1', market: 'over15', match: 'Heart of Lions vs Dreams FC', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.68, occurrence: 84, sample: '8/10' },
+      { eventId: 'sr:match:1', market: 'over15', match: 'Heart of Lions vs Dreams FC', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.28, occurrence: 84, sample: '8/10' },
       { eventId: 'sr:match:2', market: 'home', match: 'Short vs Price', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.08, occurrence: 90, sample: '9/10' },
     ],
     books: {
@@ -62,13 +62,13 @@ test('a huge master is replaced by a real 4-to-8 leg code', () => {
   const huge = {
     master: {
       bookedAt: '2026-11-13T16:57:00.000Z',
-      legs: [{ eventId: 'sr:match:1', market: 'over15', match: 'A vs B', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.4, occurrence: 90, sample: '9/10' }],
+      legs: [{ eventId: 'sr:match:1', market: 'over25', match: 'A vs B', kickoff: '2026-11-14T15:00:00.000Z', odds: 1.4, occurrence: 90, sample: '9/10' }],
       books: { sportybet: { parts: [{ code: 'BIGMASTER', totalOdds: 47280.9, legs: 30 }] } },
     },
     trends: [
       {
         label: 'Double chance 12',
-        legs: [{ eventId: 'sr:match:9', market: 'dc-12', match: 'Kosovo vs Israel', kickoff: '2026-11-14T17:00:00.000Z', odds: 1.4, occurrence: 88, sample: '8/10' }],
+        legs: [{ eventId: 'sr:match:9', market: 'dc-12', match: 'Kosovo vs Israel', kickoff: '2026-11-14T17:00:00.000Z', odds: 1.22, occurrence: 88, sample: '8/10' }],
         books: { sportybet: { parts: [{ code: 'SMALL88', totalOdds: 5.62, legs: 8, matches: ['sr:match:9'] }] } },
       },
     ],
