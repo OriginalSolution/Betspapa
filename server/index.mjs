@@ -294,7 +294,11 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/health') {
     const watch = guardian.status();
-    send(req, res, 200, { ok: true, mode: config.mode, fixtures: 'live', push: fcmConfigured(), guardian: watch.ok ? 'ok' : 'attention' });
+    send(req, res, 200, { ok: true, mode: config.mode, provider: config.provider, fixtures: 'live', push: fcmConfigured(), guardian: watch.ok ? 'ok' : 'attention' });
+    return;
+  }
+  if (url.pathname === '/api/guardian') {
+    send(req, res, 200, guardian.status());
     return;
   }
   if (url.pathname === '/api/engine') {
@@ -379,6 +383,10 @@ async function handleApi(req, res, url) {
   }
   if (config.mode !== 'live') {
     send(req, res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
+    return;
+  }
+  if (url.pathname.startsWith('/api/matches') && !config.footballData) {
+    send(req, res, 409, { error: 'FOOTBALL_DATA_API_KEY is not set. Live scores and pushes use SportyBet.' });
     return;
   }
 
