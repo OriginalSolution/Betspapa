@@ -1428,6 +1428,15 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   text-overflow: ellipsis;
 }
 .tip-extra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.exception-chip {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 750;
+  color: #3a2a04;
+  background: var(--gold);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
 .held-chip {
   font-style: normal;
   font-size: 10px;

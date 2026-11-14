@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { boardDirty, priceInRange, priceNearRange, projectSlip, serveBoard } from './oddsRange.mjs';
+import { assertBookingRanges, boardDirty, priceInRange, priceNearRange, projectSlip, rangeViolations, serveBoard } from './oddsRange.mjs';
 
 const future = new Date(Date.now() + 3600_000).toISOString();
 const past = new Date(Date.now() - 3600_000).toISOString();
@@ -21,16 +21,43 @@ test('ranges are inclusive and unlisted markets are excluded', () => {
   assert.equal(priceInRange('over05', 1.2), false);
 });
 
-test('a 100% record the opponent agrees with may reach 1.60', () => {
-  const perfect = { opponentHeld: true, sample: '10/10' };
-  const plain = { opponentHeld: false, sample: '10/10' };
+test('the 1.60 ceiling needs 10/10 on both sides, not an 80% held flag', () => {
+  const perfect = { sample: '10/10', opponentSample: '10/10' };
+  const heldOnly = { opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
   assert.equal(priceInRange('over15', 1.55, perfect), true);
   assert.equal(priceInRange('over15', 1.6, perfect), true);
   assert.equal(priceInRange('over15', 1.61, perfect), false);
-  assert.equal(priceInRange('over15', 1.55, plain), false);
-  assert.equal(priceInRange('over15', 1.55, { opponentHeld: true, sample: '9/10' }), false);
-  assert.equal(priceNearRange('over15', 1.4, plain), true);
-  assert.equal(priceNearRange('over15', 1.25, plain), false);
+  assert.equal(priceInRange('over15', 1.34, heldOnly), false);
+  assert.equal(priceInRange('dc-12', 1.27, heldOnly), false);
+  assert.equal(priceInRange('dc-12', 1.28, { opponentHeld: true, sample: '10/10' }), false);
+  assert.equal(priceInRange('home-score', 1.52, heldOnly), false);
+  assert.equal(priceInRange('away-score', 1.33, heldOnly), false);
+  assert.equal(priceInRange('over25', 1.51, heldOnly), false);
+  assert.equal(priceInRange('home-score', 1.52, perfect), true);
+  assert.equal(priceInRange('dc-12', 1.27, perfect), true);
+  assert.equal(rangeViolations([{ market: 'dc-12', odds: 1.27, sample: '10/10', opponentSample: '8/10', match: 'A vs B' }]).length, 1);
+  assert.equal(rangeViolations([{ market: 'dc-12', odds: 1.22, sample: '8/10' }]).length, 0);
+  assert.throws(() => assertBookingRanges([{ market: 'over15', odds: 1.34, sample: '10/10', opponentHeld: true }]), /blocked booking/);
+});
+
+test('listed markets keep the published bands', () => {
+  const bands = {
+    home: [1.2, 1.49],
+    away: [1.2, 1.49],
+    'dnb-home': [1.2, 1.33],
+    'dnb-away': [1.2, 1.33],
+    'home-over15': [1.2, 1.49],
+    'away-over15': [1.2, 1.49],
+    'btts-no': [1.2, 1.49],
+    under15: [1.2, 1.3],
+    under25: [1.2, 1.49],
+    under35: [1.2, 1.6],
+  };
+  for (const [market, [min, max]] of Object.entries(bands)) {
+    assert.equal(priceInRange(market, min), true, market);
+    assert.equal(priceInRange(market, max), true, market);
+    assert.equal(priceInRange(market, Math.round((max + 0.02) * 100) / 100), false, market);
+  }
 });
 
 test('a kicked-off or out-of-range leg leaves the slip and its code', () => {

@@ -3,13 +3,16 @@
  * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
 import { labelFor } from './occurrence.mjs';
-import { legOpen, priceInRange, priceNearRange, projectSlip } from './oddsRange.mjs';
+import { assertBookingRanges, legOpen, priceInRange, priceNearRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
 
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
+/** One usable code. The top legs by hit rate, then the earliest kickoff. */
+export const CODE_LIMIT = 18;
+export const SLIP_CONCURRENCY = 4;
 
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
@@ -29,6 +32,15 @@ function cacheFresh(entry, legs) {
     }
   }
   return true;
+}
+
+/** The legs that go on one code. Strict range, or a real 10/10 exception, then the cap. */
+export function codeLegs(legs, limit = CODE_LIMIT) {
+  return (Array.isArray(legs) ? legs : [])
+    .filter((leg) => priceInRange(leg?.market, leg?.odds, leg) && !rangeViolations([leg]).length)
+    .slice()
+    .sort((a, b) => legRate(b) - legRate(a) || String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.eventId).localeCompare(String(b.eventId)) || String(a.market).localeCompare(String(b.market)))
+    .slice(0, limit);
 }
 
 export function legRate(leg) {
@@ -61,12 +73,13 @@ export function tierSlips(legs) {
       legs: ordered,
     });
     for (const group of trendGroups(ordered)) {
+      const title = `${tier.label} ${labelFor(group.market)}`;
       slips.push({
         id: `tier:${tier.id}:${group.market}`,
         tier: tier.id,
         market: group.market,
-        name: `${tier.label} ${group.label}`,
-        label: group.label,
+        name: title,
+        label: title,
         legs: group.legs,
       });
     }
@@ -103,6 +116,8 @@ function legView(leg) {
     sample: leg.sample ?? null,
     form: form.length ? form : null,
     opponentHeld: leg.opponentHeld === true ? true : null,
+    opponentSample: leg.opponentSample || null,
+    exception: leg.exception === true ? true : null,
     inRangeDesks: Array.isArray(leg.inRangeDesks) ? leg.inRangeDesks : null,
   };
 }
@@ -112,60 +127,101 @@ function legView(leg) {
  * selections, so a trend identical to the master slip shares its codes and is never
  * booked twice. A desk that keeps failing is retried at most MAX_ATTEMPTS times per hour.
  */
-export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gapMs = 0, pause, log = () => {}, onProgress = null }) {
-  const nextCache = {};
+async function pool(jobs, limit) {
+  const queue = jobs.slice();
+  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await queue.shift()();
+  });
+  await Promise.all(workers);
+}
+
+function hasCode(books) {
+  return Object.values(books || {}).some((book) => (book?.parts || []).some((part) => part?.code));
+}
+
+export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gapMs = 0, pause, log = () => {}, onProgress = null, concurrency = 1 }) {
+  const nextCache = { ...cache };
+  const inflight = new Map();
   const issues = [];
-  const results = [];
+  const results = new Array(slips.length);
   let booked = 0;
   const clockOf = typeof now === 'function' ? now : () => now;
-  for (const slip of slips) {
+  const list = Array.isArray(slips) ? slips : [];
+
+  async function bookOne(slip, index) {
     const clock = clockOf();
-    const legs = bookableLegs(slip.legs, new Date(clock));
+    const open = bookableLegs(slip.legs, new Date(clock));
+    const legs = codeLegs(open);
+    const violations = rangeViolations(legs);
+    if (violations.length) {
+      const message = `${slip.name}: blocked, ${violations.length} legs outside the odds range.`;
+      issues.push(message);
+      log('error', message);
+      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
+      return;
+    }
+    try {
+      assertBookingRanges(legs);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Range check blocked booking.';
+      issues.push(`${slip.name}: ${message}`);
+      log('error', message);
+      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
+      return;
+    }
     const key = selectionKey(legs);
     if (!key) {
-      results.push({ ...slip, legs, key, books: {}, bookedAt: null });
-      continue;
+      results[index] = { ...slip, legs: open, key, books: {}, bookedAt: null };
+      return;
     }
-    let entry = nextCache[key] || cache[key] || { books: {}, attempts: {}, lastAttemptAt: 0, bookedAt: null };
+    let entry = nextCache[key] || { books: {}, attempts: {}, lastAttemptAt: 0, bookedAt: null };
     if (!cacheFresh(entry, legs)) entry = { books: {}, attempts: entry.attempts || {}, lastAttemptAt: 0, bookedAt: null };
     if (clock - (entry.lastAttemptAt || 0) > ATTEMPT_RESET_MS) entry = { ...entry, attempts: {} };
     const checked = inspectBooks(entry.books);
     for (const issue of checked.issues) issues.push(`${slip.name}: ${issue}`);
     const desks = checked.retry.filter((desk) => (entry.attempts[desk] || 0) < MAX_ATTEMPTS);
-    let books = checked.books;
-    if (desks.length && !nextCache[key]) {
-      if (booked > 0 && gapMs && pause) await pause(gapMs);
+    if (desks.length && !inflight.has(key)) {
       booked += 1;
-      try {
-        const fresh = await book(legs, desks);
-        const again = inspectBooks({ ...books, ...fresh });
-        books = again.books;
-        const attempts = { ...entry.attempts };
-        for (const desk of desks) attempts[desk] = again.retry.includes(desk) ? (attempts[desk] || 0) + 1 : 0;
-        entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString() };
-        const missing = again.retry.filter((desk) => desks.includes(desk));
-        if (missing.length) {
-          const message = `${slip.name}: no real code yet from ${missing.join(', ')}.`;
+      const run = (async () => {
+        if (booked > 1 && gapMs && pause && concurrency <= 1) await pause(gapMs);
+        let books = checked.books;
+        try {
+          const fresh = await book(legs, desks);
+          const again = inspectBooks({ ...books, ...fresh });
+          books = again.books;
+          const attempts = { ...entry.attempts };
+          for (const desk of desks) attempts[desk] = again.retry.includes(desk) ? (attempts[desk] || 0) + 1 : 0;
+          entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString() };
+          const missing = again.retry.filter((desk) => desks.includes(desk));
+          if (missing.length) {
+            const message = `${slip.name}: no real code yet from ${missing.join(', ')}.`;
+            issues.push(message);
+            log('error', message);
+          } else {
+            log('log', `${slip.name}: booked ${legs.length} legs on ${desks.join(', ')}.`);
+          }
+        } catch (error) {
+          const message = `${slip.name}: booking failed: ${error instanceof Error ? error.message : error}`;
           issues.push(message);
           log('error', message);
-        } else {
-          log('log', `${slip.name}: booked ${legs.length} legs on ${desks.join(', ')}.`);
+          entry = { ...entry, lastAttemptAt: clock };
         }
-      } catch (error) {
-        const message = `${slip.name}: booking failed: ${error instanceof Error ? error.message : error}`;
-        issues.push(message);
-        log('error', message);
-        entry = { ...entry, lastAttemptAt: clock };
-      }
+        nextCache[key] = entry;
+        return entry;
+      })();
+      inflight.set(key, run);
+      entry = await run;
+    } else if (inflight.has(key)) {
+      entry = await inflight.get(key);
     } else {
-      entry = { ...entry, books };
+      entry = { ...entry, books: checked.books };
+      nextCache[key] = entry;
     }
-    nextCache[key] = entry;
-    results.push({ ...slip, legs, key, books: entry.books, bookedAt: entry.bookedAt });
-    if (onProgress && (entry.books && Object.values(entry.books).some((book) => (book?.parts || []).some((part) => part?.code)))) {
-      onProgress({ results: results.slice(), cache: { ...nextCache }, issues: issues.slice() });
-    }
+    results[index] = { ...slip, legs: open, key, books: entry.books, bookedAt: entry.bookedAt };
+    if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
   }
+
+  await pool(list.map((slip, index) => () => bookOne(slip, index)), Math.max(1, concurrency));
   return { results, cache: nextCache, issues };
 }
 

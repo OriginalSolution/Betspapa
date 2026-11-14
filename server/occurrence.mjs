@@ -215,6 +215,39 @@ function formRowsFor(market, homeRows, awayRows) {
   return awayRate.sample > homeRate.sample ? awayList : homeList;
 }
 
+function tenText(record) {
+  if (!record) return null;
+  return `${record.hits}/${record.sample}`;
+}
+
+/**
+ * The backed side and the opponent, each on this same market.
+ * Home lines use the away side's away games. Match lines need both teams.
+ */
+export function mirroredRecords(market, homeRows, awayRows) {
+  let teamRows;
+  let opponentRows;
+  if (market.scope === 'home') {
+    teamRows = venue(homeRows, 'home');
+    opponentRows = venue(awayRows, 'away');
+  } else if (market.scope === 'away') {
+    teamRows = venue(awayRows, 'away');
+    opponentRows = venue(homeRows, 'home');
+  } else {
+    teamRows = market.scope === 'venue-either' ? venue(homeRows, 'home') : homeRows;
+    opponentRows = market.scope === 'venue-either' ? venue(awayRows, 'away') : awayRows;
+  }
+  const team = rateOf(teamRows, market.hit);
+  const opponent = rateOf(opponentRows, market.hit);
+  const teamSample = tenText(team);
+  const opponentSample = tenText(opponent);
+  return {
+    teamSample,
+    opponentSample,
+    exception: teamSample === '10/10' && opponentSample === '10/10',
+  };
+}
+
 /**
  * Form is the backed side's real last five. The opponent check passes only when
  * the other side's recent matches also clear 80% for this market. A short sample
@@ -279,13 +312,17 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
       beforeRange += 1;
       const price = Number(event.odds?.[market.oddsKey]);
       const explained = explainTip(market, homeRows, awayRows);
+      const mirror = mirroredRecords(market, homeRows, awayRows);
+      const sample = `${rate.hits}/${rate.sample}`;
       const draft = {
         market: market.id,
         odds: price,
-        sample: `${rate.hits}/${rate.sample}`,
+        sample,
         rate: rate.rate,
         occurrence: percent(rate.rate),
         opponentHeld: explained.opponentHeld,
+        opponentSample: mirror.opponentSample,
+        exception: sample === '10/10' && mirror.exception,
       };
       if (!Number.isFinite(price) || price <= 1 || (!priceInRange(market.id, price, draft) && !priceNearRange(market.id, price, draft))) {
         unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
@@ -302,12 +339,14 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         awayScore: null,
         finished: false,
         occurrence: percent(rate.rate),
-        sample: `${rate.hits}/${rate.sample}`,
+        sample,
         hits: rate.hits,
         played: rate.sample,
         rate: rate.rate,
         form: explained.form,
         opponentHeld: explained.opponentHeld,
+        opponentSample: mirror.opponentSample,
+        exception: draft.exception,
       });
     }
     if (measured.length) byEvent[String(event.eventId)] = measured;

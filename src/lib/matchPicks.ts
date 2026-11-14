@@ -27,6 +27,8 @@ export type PickChip = {
   form: FormMark[] | null;
   /** True when the engine's opponent-side check passed. */
   opponentHeld: boolean;
+  /** True when this price is allowed only because both sides are 10/10. */
+  exception: boolean;
 };
 
 export type MatchPickCard = {
@@ -113,6 +115,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
       opponentName: opponent,
       form: leg.form?.length ? leg.form : null,
       opponentHeld: leg.opponentHeld === true,
+      exception: leg.exception === true,
     });
   }
   return chips;

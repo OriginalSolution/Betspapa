@@ -35,11 +35,34 @@ const BP_MARKETS = {
 const eventCache = new Map();
 const priceCache = new Map();
 let offerCache = null;
+const ONE_CODE = 18;
+const DESK_LIMIT = 2;
+const deskLanes = new Map();
+
+function lane(name) {
+  if (!deskLanes.has(name)) {
+    let active = 0;
+    const waiting = [];
+    deskLanes.set(name, async (fn) => {
+      if (active >= DESK_LIMIT) await new Promise((resolve) => waiting.push(resolve));
+      active += 1;
+      try {
+        return await fn();
+      } finally {
+        active -= 1;
+        const next = waiting.shift();
+        if (next) next();
+      }
+    });
+  }
+  return deskLanes.get(name);
+}
 
 export function resetBookerCache() {
   eventCache.clear();
   priceCache.clear();
   offerCache = null;
+  deskLanes.clear();
 }
 
 function product(values) {
@@ -429,7 +452,7 @@ function withoutKept(booked) {
 
 async function placeChunk(group, fn) {
   const result = await fn(group);
-  if (!wholeSlipRefused(result, group)) {
+  if (!wholeSlipRefused(result, group) || group.length <= ONE_CODE) {
     const taken = withoutKept(result?.booked);
     return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept };
   }
@@ -508,7 +531,7 @@ export async function bookAll(legs, request, onBook, only) {
     runners.map(async ([name, run]) => {
       let result;
       try {
-        const done = open.length ? await run(open) : { parts: [], dropped: [], kept: [] };
+        const done = await lane(name)(async () => (open.length ? await run(open) : { parts: [], dropped: [], kept: [] }));
         const parts = done.parts.map((part) => withLink(name, part));
         const dropped = [...closed, ...done.dropped];
         const kept = done.kept || [];

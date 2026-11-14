@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bookAll, resetBookerCache } from './bookers.mjs';
-import { bookSlips, bookableLegs, trendGroups } from './slips.mjs';
+import { CODE_LIMIT, bookSlips, bookableLegs, codeLegs, tierSlips, trendGroups } from './slips.mjs';
 
 const now = new Date('2026-11-13T10:00:00.000Z');
 const leg = (id, market, odds = 1.3) => ({ eventId: `sr:match:${id}`, market, odds, match: `T${id} vs U${id}`, kickoff: '2026-11-13T18:00:00.000Z', status: 'open' });
@@ -9,6 +9,30 @@ const leg = (id, market, odds = 1.3) => ({ eventId: `sr:match:${id}`, market, od
 test('drops legs under 1.20 and started games, keeps exactly 1.20', () => {
   const legs = bookableLegs([leg(1, 'over15', 1.05), leg(2, 'over15', 1.2), { ...leg(3, 'home'), kickoff: '2026-11-13T09:00:00.000Z' }], now);
   assert.deepEqual(legs.map((row) => row.eventId), ['sr:match:2']);
+});
+
+test('a tier code is capped and labelled once, without a second 80% prefix', () => {
+  const rows = Array.from({ length: 25 }, (_, index) => ({
+    ...leg(index + 1, 'dc-12', 1.22),
+    occurrence: index < 3 ? 100 : 80,
+    sample: index < 3 ? '10/10' : '8/10',
+    kickoff: `2026-11-13T${String(18 + (index % 5)).padStart(2, '0')}:00:00.000Z`,
+  }));
+  const chosen = codeLegs(rows);
+  assert.equal(chosen.length, CODE_LIMIT);
+  assert.equal(chosen[0].occurrence, 100);
+  assert.ok(chosen.every((row) => row.odds === 1.22));
+  const wide = { ...leg(99, 'dc-12', 1.28), opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
+  assert.equal(codeLegs([wide, ...rows]).some((row) => row.eventId === 'sr:match:99'), false);
+  const slips = tierSlips([
+    { ...leg(1, 'dc-12', 1.22), occurrence: 80, rate: 0.8 },
+    { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },
+  ]);
+  assert.equal(slips.find((slip) => slip.id === 'tier:100:dc-12'), undefined);
+  assert.equal(slips.find((slip) => slip.id === 'tier:100:over15').label, '100% Over 1.5 goals');
+  const eighty = slips.find((slip) => slip.id === 'tier:80:dc-12');
+  assert.equal(eighty.label, '80%+ Double chance 12');
+  assert.equal(eighty.name, '80%+ Double chance 12');
 });
 
 test('groups qualifying legs into one trend per market, biggest first', () => {
