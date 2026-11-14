@@ -106,9 +106,25 @@ export function restartSnapshot(full, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   const keep = (slip) => {
     if (!slip) return null;
-    const future = (slip.legs || []).filter((leg) => Date.parse(leg.kickoff) >= clock).slice(0, 3);
+    const future = (slip.legs || []).filter((leg) => Date.parse(leg.kickoff) >= clock);
+    const futureIds = new Set(future.map((leg) => leg.eventId));
     const slim = slimSlip(slip, { includeLegs: false });
-    return slim ? { ...slim, legs: future.map(slimLeg) } : null;
+    if (!slim) return null;
+    const needed = new Set();
+    const books = {};
+    for (const [desk, book] of Object.entries(slim.books || {})) {
+      const parts = [];
+      for (const part of book.parts || []) {
+        const listed = Array.isArray(part.matches) ? part.matches : [];
+        const matches = listed.filter((id) => futureIds.has(id));
+        if (listed.length && !matches.length) continue;
+        for (const id of matches) needed.add(id);
+        parts.push({ ...part, matches, legs: matches.length || future.length });
+      }
+      books[desk] = { ...book, parts };
+    }
+    const legs = (needed.size ? future.filter((leg) => needed.has(leg.eventId)) : future.slice(0, 18)).map(slimLeg);
+    return { ...slim, books, legs };
   };
   const state = full || {};
   return {
