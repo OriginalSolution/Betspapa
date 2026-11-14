@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { AlertSetupProvider } from './components/AlertSetup';
@@ -42,6 +42,11 @@ export function App() {
     ? matches.find((item) => location.pathname === `/match/${item.id}`)
     : undefined;
   const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : titles[location.pathname] ?? 'Betspapa';
+  const kept = ['/', '/picks', '/trends', '/slips', '/following'];
+  const [seen, setSeen] = useState<string[]>(() => [location.pathname]);
+  useEffect(() => {
+    setSeen((current) => (current.includes(location.pathname) ? current : [...current, location.pathname]));
+  }, [location.pathname]);
 
   useEffect(() => {
     document.title = `${title} · Betspapa`;
@@ -107,20 +112,42 @@ export function App() {
         <div className="center">
           <TopBar title={title} />
           <main className="main">
+            {seen.includes('/') && (
+              <div hidden={location.pathname !== '/'}>
+                <TodayPage />
+              </div>
+            )}
+            {seen.includes('/picks') && (
+              <div hidden={location.pathname !== '/picks'}>
+                <PicksPage />
+              </div>
+            )}
+            {seen.includes('/trends') && (
+              <div hidden={location.pathname !== '/trends'}>
+                <TrendsPage />
+              </div>
+            )}
+            {seen.includes('/slips') && (
+              <div hidden={location.pathname !== '/slips'}>
+                <SlipsPage />
+              </div>
+            )}
+            {seen.includes('/following') && (
+              <div hidden={location.pathname !== '/following'}>
+                <FollowingPage />
+              </div>
+            )}
+            {!kept.includes(location.pathname) && (
             <Routes>
-              <Route path="/" element={<TodayPage />} />
               <Route path="/live" element={<LivePage />} />
-              <Route path="/picks" element={<PicksPage />} />
-              <Route path="/trends" element={<TrendsPage />} />
-              <Route path="/slips" element={<SlipsPage />} />
               <Route path="/rankings" element={<RankingsPage />} />
               <Route path="/lists" element={<ListsPage />} />
               <Route path="/more" element={<MorePage />} />
-              <Route path="/following" element={<FollowingPage />} />
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/match/:id" element={<MatchPage />} />
             </Routes>
+            )}
           </main>
         </div>
         <Rail />

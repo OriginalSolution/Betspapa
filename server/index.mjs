@@ -8,7 +8,7 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { getConfig } from './config.mjs';
-import { engineNeedsRepair, getCachedEvents, getEngineSchedule, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineSchedule, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
@@ -302,7 +302,8 @@ async function handleApi(req, res, url) {
       send(req, res, 405, { error: 'Method not allowed' });
       return;
     }
-    send(req, res, 200, getEngineState());
+    const full = getEngineState();
+    send(req, res, 200, url.searchParams.get('view') === 'app' ? appEngineState(full) : full);
     return;
   }
   if (url.pathname === '/api/config') {

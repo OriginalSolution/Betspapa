@@ -50,6 +50,70 @@ function publicState(state, now = new Date()) {
   };
 }
 
+function slimLeg(leg) {
+  return {
+    eventId: leg.eventId,
+    market: leg.market,
+    match: leg.match,
+    kickoff: leg.kickoff,
+    odds: leg.odds,
+    occurrence: leg.occurrence ?? null,
+    sample: leg.sample ?? null,
+    form: Array.isArray(leg.form) ? leg.form : null,
+    opponentHeld: leg.opponentHeld === true ? true : null,
+    opponentSample: leg.opponentSample || null,
+    exception: leg.exception === true ? true : null,
+  };
+}
+
+function slimBooks(books) {
+  const next = {};
+  for (const [desk, book] of Object.entries(books || {})) {
+    if (!book || typeof book !== 'object') continue;
+    next[desk] = {
+      parts: (book.parts || []).filter((part) => part?.code).map((part) => ({
+        code: part.code,
+        link: part.link || '',
+        totalOdds: part.totalOdds ?? null,
+        legs: part.legs || 0,
+        matches: Array.isArray(part.matches) ? part.matches : [],
+      })),
+      error: book.error || null,
+      dropped: [],
+    };
+  }
+  return next;
+}
+
+function slimSlip(slip, { cap = 0, includeLegs = true } = {}) {
+  if (!slip) return null;
+  const legs = Array.isArray(slip.legs) ? slip.legs : [];
+  const shown = !includeLegs ? [] : cap > 0 ? legs.slice(0, cap) : legs;
+  return {
+    id: slip.id,
+    name: slip.name || slip.label || slip.id,
+    label: slip.label || slip.name || slip.id,
+    market: slip.market || null,
+    legCount: slip.legCount ?? legs.length,
+    bookedAt: slip.bookedAt || null,
+    books: slimBooks(slip.books),
+    legs: shown.map(slimLeg),
+  };
+}
+
+/** The phone board. Tier slips keep their codes and drop the duplicated leg lists. */
+export function appEngineState(full) {
+  const state = full || {};
+  return {
+    updatedAt: state.updatedAt || null,
+    legCount: state.legCount ?? state.master?.legCount ?? 0,
+    master: slimSlip(state.master, { cap: 18 }),
+    trends: (state.trends || []).map((slip) => slimSlip(slip)),
+    tiers: (state.tiers || []).map((slip) => slimSlip(slip, { includeLegs: false })),
+    issues: Array.isArray(state.issues) ? state.issues.slice(0, 6) : [],
+  };
+}
+
 function slipHasCode(slip) {
   const books = slip?.books || {};
   return Object.values(books).some((book) => (book?.parts || []).some((part) => part?.code));

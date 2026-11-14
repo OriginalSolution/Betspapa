@@ -7,18 +7,14 @@ import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestC
 import {
   DESK_NAMES,
   DESKS,
-  ENGINE_POLL_MS,
-  fetchEngine,
-  readEngineCache,
-  writeEngineCache,
   type DeskId,
-  type EngineState,
 } from '../lib/engineSlips';
 import { cx, kickoffClock } from '../lib/format';
 import { isLiveStatus } from '../lib/group';
 import { backedSide, tipsFromEngine, type PickTip } from '../lib/matchPicks';
 import { marketCodeCards, masterParts, shortMarket, type CodePart, type MarketCodeCard } from '../lib/trendDesk';
 import type { Team } from '../types';
+import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 import { FollowedTrends } from './FollowingPage';
@@ -37,30 +33,8 @@ function useReducedMotion() {
   return reduced;
 }
 
-function useEngineTrends(refreshKey: number | null) {
-  const [state, setState] = useState<EngineState | null>(() => readEngineCache());
-  const [problem, setProblem] = useState<string | null>(null);
-  useEffect(() => {
-    let stop = false;
-    const pull = async () => {
-      try {
-        const next = await fetchEngine();
-        if (stop) return;
-        writeEngineCache(next);
-        setState(next);
-        setProblem(null);
-      } catch (error) {
-        if (!stop) setProblem(error instanceof Error ? error.message : 'Could not load trends');
-      }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), ENGINE_POLL_MS);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, [refreshKey]);
-  return { state, problem };
+function useEngineTrends(_refreshKey: number | null) {
+  return useEngineBoard();
 }
 
 async function copyText(value: string) {

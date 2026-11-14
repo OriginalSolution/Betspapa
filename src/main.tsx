@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { installCheerUnlock } from './lib/cheer';
 import { registerServiceWorker } from './lib/notify';
+import { EngineProvider } from './state/engine';
 import { ProductProvider } from './state/product';
 import { StoreProvider } from './state/store';
 import './styles.css';
@@ -18,9 +19,11 @@ createRoot(root).render(
   <StrictMode>
     <BrowserRouter>
       <StoreProvider>
-        <ProductProvider>
-          <App />
-        </ProductProvider>
+        <EngineProvider>
+          <ProductProvider>
+            <App />
+          </ProductProvider>
+        </EngineProvider>
       </StoreProvider>
     </BrowserRouter>
   </StrictMode>,

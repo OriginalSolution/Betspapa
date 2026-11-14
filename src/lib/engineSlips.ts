@@ -3,12 +3,12 @@ import { publishableOdds } from './oddsFloor';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 
 /** Production engine. It is not origin-locked. Codes only come from this payload. */
-export const ENGINE_URL = 'https://api.betspapa.com/api/engine';
+export const ENGINE_URL = 'https://api.betspapa.com/api/engine?view=app';
 
 /** Poll while the Slips tab is open. */
 export const ENGINE_POLL_MS = 3 * 60 * 1000;
 
-const CACHE_KEY = 'betspapa.engine.v1';
+const CACHE_KEY = 'betspapa.engine.app.v2';
 const CODE = /^[A-Za-z0-9]{4,16}$/;
 const HOSTS: Record<DeskId, string> = {
   sportybet: 'https://www.sportybet.com/',
@@ -280,12 +280,17 @@ export function writeEngineCache(state: EngineState): void {
     return;
   }
   memory = state;
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(state));
-  } catch {
-    /* the in-memory copy still serves this session */
-  }
   for (const listener of listeners) listener();
+  const persist = () => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(memory));
+    } catch {
+      /* the in-memory copy still serves this session */
+    }
+  };
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+  if (typeof idle === 'function') idle(() => persist());
+  else window.setTimeout(persist, 0);
 }
 
 function engineHasRows(state: EngineState): boolean {
@@ -322,7 +327,7 @@ export async function fetchEngine(): Promise<EngineState> {
     return finish(parseEngine(readJsonBody(response.data)));
   }
   try {
-    const local = await fetch('/api/engine');
+    const local = await fetch('/api/engine?view=app');
     if (local.ok) {
       const state = parseEngine(await local.json());
       if (engineHasRows(state)) return finish(state);

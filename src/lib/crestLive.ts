@@ -3,7 +3,7 @@
  * TheSportsDB, then Wikidata, then Wikipedia, then a national-team flag.
  */
 import { allowedImageUrl, flagUrl, isNationalSide, pickBest, searchQueries, sportsDbCandidates, wikidataCandidates } from './crestMatch.mjs';
-import { lookupCrest, rememberCrest, type CrestContext } from './crests';
+import { cachedCrest, lookupCrest, rememberCrest, type CrestContext } from './crests';
 
 const USER_AGENT = 'Betspapa/0.3.8 (crest resolver; https://github.com/OriginalSolution/Betspapa)';
 const SPORTSDB = 'https://www.thesportsdb.com/api/v1/json/123';
@@ -89,17 +89,9 @@ async function wikidataCrest(name: string, context: CrestContext, fetchImpl: typ
   return badge && allowedImageUrl(badge) ? badge : null;
 }
 
-const missing = new Map<string, Promise<string | null>>();
-
-/** One lookup per club name. A miss stays empty so the shield is not a letter badge. */
+/** The bundled crest map only. List screens do not wait on Wikipedia or SportsDB. */
 export function resolveMissingCrest(name: string): Promise<string | null> {
-  const key = name.trim().toLowerCase();
-  if (!key) return Promise.resolve(null);
-  const pending = missing.get(key);
-  if (pending) return pending;
-  const job = lookupCrestChain(name).catch(() => null);
-  missing.set(key, job);
-  return job;
+  return Promise.resolve(cachedCrest(name) || null);
 }
 
 export async function lookupCrestChain(name: string, fetchImpl: typeof fetch = fetch, context: CrestContext = {}): Promise<string | null> {

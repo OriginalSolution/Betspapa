@@ -6,7 +6,7 @@ import { ErrorBanner, FilterChips } from '../components/Chrome';
 import { TodayBoard, TodaySortBar, WeekStrip, type TodaySort } from '../components/TodayBoard';
 import { scopeLabel, TodaySearch } from '../components/TodaySearch';
 import { CapacitorHttp } from '@capacitor/core';
-import { ENGINE_POLL_MS, fetchEngine, readEngineCache, subscribeEngine, writeEngineCache, type EngineState } from '../lib/engineSlips';
+import { useEngineBoard } from '../state/engine';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
@@ -73,34 +73,14 @@ function PromoCarousel() {
 }
 
 function useEngine() {
-  const [state, setState] = useState<EngineState | null>(() => readEngineCache());
-  useEffect(() => subscribeEngine(() => setState(readEngineCache())), []);
-  useEffect(() => {
-    let stop = false;
-    const pull = async () => {
-      try {
-        const next = await fetchEngine();
-        if (stop) return;
-        writeEngineCache(next);
-        setState(next);
-      } catch {
-        /* cards stay up without a trend chip */
-      }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), ENGINE_POLL_MS);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-  return state;
+  return useEngineBoard().state;
 }
 
 export function TodayPage() {
   const { matches, loading, ready, feedNote, refresh } = useStore();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<BoardFilter>('all');
+  const [visible, setVisible] = useState(30);
   const [sort, setSort] = useState<TodaySort>('kickoff');
   const engine = useEngine();
   const [query, setQuery] = useState('');
@@ -162,7 +142,14 @@ export function TodayPage() {
               }
             />
           ) : (
-            <TodayBoard matches={shown} sort={sort} engine={engine} />
+            <>
+              <TodayBoard matches={shown.slice(0, visible)} sort={sort} engine={engine} />
+              {visible < shown.length && (
+                <button type="button" className="btn btn-quiet" onClick={() => setVisible((count) => count + 30)}>
+                  Show more
+                </button>
+              )}
+            </>
           )}
         </>
       )}
