@@ -10,8 +10,9 @@ import { selectionKey } from './selection.mjs';
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
-/** One usable code. The top legs by hit rate, then the earliest kickoff. */
+/** One usable code. Prefer this many legs, and never more than the max. */
 export const CODE_LIMIT = 18;
+export const CODE_MAX = 20;
 export const SLIP_CONCURRENCY = 4;
 
 export function bookableLegs(legs, now = new Date()) {
@@ -34,13 +35,65 @@ function cacheFresh(entry, legs) {
   return true;
 }
 
+function byConfidence(a, b) {
+  return legRate(b) - legRate(a) || String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.eventId).localeCompare(String(b.eventId)) || String(a.market).localeCompare(String(b.market));
+}
+
 /** The legs that go on one code. Strict published band only, then the cap. */
 export function codeLegs(legs, limit = CODE_LIMIT) {
   return (Array.isArray(legs) ? legs : [])
     .filter((leg) => strictInRange(leg?.market, leg?.odds))
     .slice()
-    .sort((a, b) => legRate(b) - legRate(a) || String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.eventId).localeCompare(String(b.eventId)) || String(a.market).localeCompare(String(b.market)))
+    .sort(byConfidence)
     .slice(0, limit);
+}
+
+/**
+ * Order a tier so its first code is not the same slip as the tier above.
+ * 90%+ leads with the 90–99% band and mixes in 100% legs.
+ * 80%+ leads with the 80–89% band and mixes in the higher bands.
+ */
+export function orderForTier(legs, tier) {
+  const rows = (Array.isArray(legs) ? legs : []).filter((leg) => strictInRange(leg?.market, leg?.odds));
+  const bandMax = tier === '90' ? 0.995 : tier === '80' ? 0.9 : null;
+  if (bandMax == null) return rows.slice().sort(byConfidence);
+  const priority = [];
+  const higher = [];
+  for (const leg of rows) (legRate(leg) + 1e-12 < bandMax ? priority : higher).push(leg);
+  priority.sort(byConfidence);
+  higher.sort(byConfidence);
+  if (!priority.length || !higher.length) return [...priority, ...higher];
+  const mixed = [];
+  let band = 0;
+  let above = 0;
+  while (band < priority.length || above < higher.length) {
+    for (let step = 0; step < 2 && band < priority.length; step += 1) mixed.push(priority[band++]);
+    if (above < higher.length) mixed.push(higher[above++]);
+  }
+  return mixed;
+}
+
+/** Split an ordered list into codes of about 12–20 legs, covering every leg. */
+export function packGroups(legs, target = CODE_LIMIT, max = CODE_MAX) {
+  const groups = [];
+  let index = 0;
+  const rows = Array.isArray(legs) ? legs : [];
+  while (index < rows.length) {
+    const remaining = rows.length - index;
+    if (remaining <= max) {
+      groups.push(rows.slice(index));
+      break;
+    }
+    const take = Math.min(target, remaining);
+    groups.push(rows.slice(index, index + take));
+    index += take;
+  }
+  return groups;
+}
+
+/** Every in-range leg on a tier, in that tier's order, packed into bookable codes. */
+export function codeGroups(legs, tier) {
+  return packGroups(orderForTier(legs, tier));
 }
 
 export function legRate(leg) {
@@ -139,6 +192,38 @@ function hasCode(books) {
   return Object.values(books || {}).some((book) => (book?.parts || []).some((part) => part?.code));
 }
 
+function mergeBooks(list) {
+  const out = {};
+  for (const books of list) {
+    for (const [desk, book] of Object.entries(books || {})) {
+      if (!book || typeof book !== 'object') continue;
+      const prev = out[desk] || { parts: [], dropped: [], kept: [], error: null };
+      const parts = [...(prev.parts || []), ...(book.parts || [])];
+      out[desk] = {
+        parts,
+        dropped: [...(prev.dropped || []), ...(book.dropped || [])],
+        kept: [...(prev.kept || []), ...(book.kept || [])],
+        error: parts.length ? null : book.error || prev.error || null,
+      };
+    }
+  }
+  return out;
+}
+
+function reasonSummary(rows) {
+  const counts = new Map();
+  for (const row of rows || []) {
+    const reason = String(row?.reason || 'unknown').replace(/\s+/g, ' ').trim().slice(0, 100) || 'unknown';
+    counts.set(reason, (counts.get(reason) || 0) + 1);
+  }
+  if (!counts.size) return 'no drop recorded';
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([reason, count]) => `${count} × ${reason}`)
+    .join('; ');
+}
+
 export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gapMs = 0, pause, log = () => {}, onProgress = null, concurrency = 1 }) {
   const nextCache = { ...cache };
   const inflight = new Map();
@@ -148,38 +233,16 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
   const clockOf = typeof now === 'function' ? now : () => now;
   const list = Array.isArray(slips) ? slips : [];
 
-  async function bookOne(slip, index) {
-    const clock = clockOf();
-    const open = bookableLegs(slip.legs, new Date(clock));
-    const legs = codeLegs(open);
-    const violations = rangeViolations(legs);
-    if (violations.length) {
-      const message = `${slip.name}: blocked, ${violations.length} legs outside the odds range.`;
-      issues.push(message);
-      log('error', message);
-      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
-      return;
-    }
-    try {
-      assertBookingRanges(legs);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Range check blocked booking.';
-      issues.push(`${slip.name}: ${message}`);
-      log('error', message);
-      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
-      return;
-    }
+  async function bookSelection(legs, label, allow) {
     const key = selectionKey(legs);
-    if (!key) {
-      results[index] = { ...slip, legs: open, key, books: {}, bookedAt: null };
-      return;
-    }
+    if (!key) return { key, books: {}, bookedAt: null };
+    const clock = clockOf();
     let entry = nextCache[key] || { books: {}, attempts: {}, lastAttemptAt: 0, bookedAt: null };
     if (!cacheFresh(entry, legs)) entry = { books: {}, attempts: entry.attempts || {}, lastAttemptAt: 0, bookedAt: null };
     if (clock - (entry.lastAttemptAt || 0) > ATTEMPT_RESET_MS) entry = { ...entry, attempts: {} };
     const checked = inspectBooks(entry.books);
-    for (const issue of checked.issues) issues.push(`${slip.name}: ${issue}`);
-    const desks = checked.retry.filter((desk) => (entry.attempts[desk] || 0) < MAX_ATTEMPTS);
+    for (const issue of checked.issues) issues.push(`${label}: ${issue}`);
+    const desks = checked.retry.filter((desk) => (entry.attempts[desk] || 0) < MAX_ATTEMPTS && (!allow || allow.includes(desk)));
     if (desks.length && !inflight.has(key)) {
       booked += 1;
       const run = (async () => {
@@ -194,14 +257,14 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
           entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString() };
           const missing = again.retry.filter((desk) => desks.includes(desk));
           if (missing.length) {
-            const message = `${slip.name}: no real code yet from ${missing.join(', ')}.`;
+            const message = `${label}: no real code yet from ${missing.join(', ')}.`;
             issues.push(message);
             log('error', message);
           } else {
-            log('log', `${slip.name}: booked ${legs.length} legs on ${desks.join(', ')}.`);
+            log('log', `${label}: booked ${legs.length} legs on ${desks.join(', ')}.`);
           }
         } catch (error) {
-          const message = `${slip.name}: booking failed: ${error instanceof Error ? error.message : error}`;
+          const message = `${label}: booking failed: ${error instanceof Error ? error.message : error}`;
           issues.push(message);
           log('error', message);
           entry = { ...entry, lastAttemptAt: clock };
@@ -217,8 +280,97 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
       entry = { ...entry, books: checked.books };
       nextCache[key] = entry;
     }
-    results[index] = { ...slip, legs: open, key, books: entry.books, bookedAt: entry.bookedAt };
-    if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
+    return entry;
+  }
+
+  async function bookPawa(flat, slip) {
+    const clock = clockOf();
+    const key = `pawa:${slip.id}:${selectionKey(flat)}`;
+    let entry = nextCache[key];
+    if (entry && cacheFresh(entry, flat)) return entry;
+    const parts = [];
+    const dropped = [];
+    const kept = [];
+    let rest = flat.slice();
+    let part = 0;
+    try {
+      while (rest.length && part < 40) {
+        part += 1;
+        const fresh = await book(rest, ['betpawa']);
+        const bookP = fresh?.betpawa || {};
+        const keptN = (bookP.kept || []).length;
+        const scanned = Number(bookP.scanned) || 0;
+        const label = `${slip.name} part ${part}`;
+        log('log', `${label}: betPawa kept ${keptN} of ${scanned || rest.length} looked at. ${reasonSummary(bookP.dropped)}`);
+        parts.push(...(bookP.parts || []));
+        dropped.push(...(bookP.dropped || []));
+        kept.push(...(bookP.kept || []));
+        const seen = new Set();
+        for (const row of [...(bookP.kept || []), ...(bookP.dropped || [])]) {
+          if (row?.eventId) seen.add(row.eventId);
+        }
+        const before = rest.length;
+        rest = rest.filter((leg) => !seen.has(leg.eventId));
+        if (rest.length === before || !keptN) break;
+      }
+    } catch (error) {
+      const message = `${slip.name}: betPawa booking failed: ${error instanceof Error ? error.message : error}`;
+      issues.push(message);
+      log('error', message);
+    }
+    const checked = inspectBooks({ betpawa: { parts, dropped, kept, error: parts.length ? null : 'No open selections on betPawa.' } });
+    entry = { books: { betpawa: checked.books.betpawa }, bookedAt: parts.length ? new Date(clock).toISOString() : null };
+    nextCache[key] = entry;
+    return entry;
+  }
+
+  async function bookOne(slip, index) {
+    const clock = clockOf();
+    const open = bookableLegs(slip.legs, new Date(clock));
+    const groups = slip.tier ? codeGroups(open, slip.tier) : [codeLegs(open)];
+    const flat = groups.flat();
+    const violations = rangeViolations(flat);
+    if (violations.length) {
+      const message = `${slip.name}: blocked, ${violations.length} legs outside the odds range.`;
+      issues.push(message);
+      log('error', message);
+      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
+      return;
+    }
+    try {
+      assertBookingRanges(flat);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Range check blocked booking.';
+      issues.push(`${slip.name}: ${message}`);
+      log('error', message);
+      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
+      return;
+    }
+    if (!flat.length) {
+      results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
+      return;
+    }
+    if (!slip.tier) {
+      const entry = await bookSelection(groups[0], slip.name);
+      results[index] = { ...slip, legs: open, key: entry.key, books: entry.books, bookedAt: entry.bookedAt };
+      if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
+      return;
+    }
+    const pieces = [];
+    let bookedAt = null;
+    for (let part = 0; part < groups.length; part += 1) {
+      const label = groups.length > 1 ? `${slip.name} part ${part + 1}/${groups.length}` : slip.name;
+      const entry = await bookSelection(groups[part], label, ['sportybet', 'footballcom', 'msport', 'betika']);
+      pieces.push(entry.books);
+      if (entry.bookedAt) bookedAt = entry.bookedAt;
+      if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
+    }
+    const pawa = await bookPawa(flat, slip);
+    if (pawa.bookedAt) bookedAt = pawa.bookedAt;
+    pieces.push(pawa.books);
+    const books = mergeBooks(pieces);
+    results[index] = { ...slip, legs: open, key: selectionKey(groups[0]), books, bookedAt };
+    if (onProgress && hasCode(books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
   }
 
   await pool(list.map((slip, index) => () => bookOne(slip, index)), Math.max(1, concurrency));
