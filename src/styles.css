@@ -564,6 +564,29 @@ img.crest { display: inline-block; padding: 1px; }
 .trend-monitor li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .trend-monitor strong { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 14px; }
 .trend-monitor span { color: var(--muted); font-size: 12px; font-weight: 700; text-align: right; }
+.follow-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.follow-card { background: var(--surface); border-radius: 16px; padding: 12px 12px 8px; }
+.follow-card header { display: flex; gap: 10px; align-items: center; }
+.follow-card header strong { display: block; font-size: 14px; letter-spacing: -0.02em; }
+.follow-card header span { color: var(--muted); font-size: 12px; }
+.follow-crests { display: flex; flex: none; }
+.follow-crests .crest + .crest { margin-left: -8px; }
+.follow-chip {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 4px 12px 4px 4px;
+  font-size: 13px;
+}
+.follow-chip .hit-ring { width: 36px; height: 36px; }
+.follow-chip .hit-ring b { font-size: 10px; }
+.follow-chip b { margin-left: auto; color: var(--muted); font-weight: 650; }
+.follow-trends .code-card { border-left: 3px solid var(--red); }
+.code-line { margin: 6px 0 0; font-size: 13px; }
+.code-actions { display: flex; gap: 6px; }
 .inbox { list-style: none; margin: 0; padding: 8px 0 0; }
 .inbox-swipe { position: relative; overflow: hidden; }
 .inbox-delete {

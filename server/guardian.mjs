@@ -42,21 +42,35 @@ function slipList(state) {
 }
 
 /** What is wrong with the public board, and which repairs are safe to try. */
-export function inspectEngine(state, now = Date.now(), { maxAgeMs = 20 * 60 * 1000, feedMaxMs = 30 * 60 * 1000 } = {}) {
+function hasOpenLegs(state, now) {
+  return slipList(state).some((slip) =>
+    (slip.legs || []).some((leg) => {
+      const kick = Date.parse(leg.kickoff || '');
+      return Number.isFinite(kick) && kick >= now;
+    }),
+  );
+}
+
+export function inspectEngine(state, now = Date.now(), { maxAgeMs = 20 * 60 * 1000, feedMaxMs = 30 * 60 * 1000, booking = false } = {}) {
   const issues = [];
   const actions = new Set();
+  const fedAt = Date.parse(state?.feedAt || '');
+  const feedFresh = Number.isFinite(fedAt) && now - fedAt < 10 * 60 * 1000;
+  const working = Boolean(booking) && (hasOpenLegs(state, now) || feedFresh);
   if (!state || !boardHasCodes(state)) {
-    issues.push({ code: 'empty-board', level: 'attention', message: 'The booked board has no codes.' });
-    actions.add('restore');
-    actions.add('rerun');
+    if (!working) {
+      issues.push({ code: 'empty-board', level: 'attention', message: 'The booked board has no codes.' });
+      actions.add('restore');
+      actions.add('rerun');
+    }
   }
   const updated = Date.parse(state?.updatedAt || '');
-  if (state?.updatedAt && Number.isFinite(updated) && now - updated > maxAgeMs) {
+  if (!booking && state?.updatedAt && Number.isFinite(updated) && now - updated > maxAgeMs) {
     issues.push({ code: 'stale-cycle', level: 'warn', message: 'The last booking cycle is older than 20 minutes.' });
     actions.add('rerun');
   }
   const fed = Date.parse(state?.feedAt || '');
-  if (!state?.feedAt || !Number.isFinite(fed) || now - fed > feedMaxMs) {
+  if (!booking && (!state?.feedAt || !Number.isFinite(fed) || now - fed > feedMaxMs)) {
     issues.push({ code: 'stale-feed', level: 'warn', message: 'The fixture feed is missing or older than 30 minutes.' });
     actions.add('rerun');
   }
@@ -178,7 +192,8 @@ export function createGuardian(options = {}) {
     running = true;
     try {
       const state = options.getState ? options.getState() : null;
-      const verdict = inspectEngine(state, nowFn().getTime());
+      const booking = Boolean(options.booking?.());
+      const verdict = inspectEngine(state, nowFn().getTime(), { booking });
       lastCheckAt = nowFn().toISOString();
       let fixes = [];
       if (!verdict.ok) {
@@ -188,7 +203,7 @@ export function createGuardian(options = {}) {
           logIncident({ code: 'repair-failed', level: 'attention', message: error instanceof Error ? error.message : 'Repair failed.', fixed: false });
         }
         const after = options.getState ? options.getState() : state;
-        const still = inspectEngine(after, Date.now());
+        const still = inspectEngine(after, Date.now(), { booking: Boolean(options.booking?.()) });
         for (const issue of verdict.issues.filter((item) => item.level !== 'info')) {
           logIncident({ ...issue, fixed: !still.issues.some((item) => item.code === issue.code), fix: fixes.join(' ') });
         }
@@ -262,7 +277,7 @@ export function createGuardian(options = {}) {
 
   function status() {
     const state = options.getState ? options.getState() : null;
-    const verdict = inspectEngine(state || {}, Date.now());
+    const verdict = inspectEngine(state || {}, Date.now(), { booking: Boolean(options.booking?.()) });
     const attention = incidents.filter((item) => item.level === 'attention' && !item.fixed);
     return {
       name: 'Papa Guardian',

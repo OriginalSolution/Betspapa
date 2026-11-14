@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CodeStrip } from '../components/CodeStrip';
 import { bookGroups, legsForTier, tierFallback, type BookedGroup, type BookLeg } from '../lib/bookFollow';
+import { groupFollowMatches, type FollowRow } from '../lib/followCards';
 import { marketCodeLabel, partsFromBook, type CodeTier } from '../lib/pickCodes';
 import { Link } from 'react-router-dom';
 import { DateBar, ErrorBanner } from '../components/Chrome';
@@ -8,8 +9,8 @@ import { Crest } from '../components/Crest';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
 import { followIsStale } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { fetchEngine, readEngineCache, writeEngineCache, type DeskId, type EngineState } from '../lib/engineSlips';
-import { cx, kickoffWhen } from '../lib/format';
+import { DESK_NAMES, fetchEngine, marketLabel, readEngineCache, showOdds, writeEngineCache, type DeskId, type EngineState } from '../lib/engineSlips';
+import { cx, kickoffWhen, scoreDash, statusLine } from '../lib/format';
 import { isFollowed } from '../lib/group';
 import { fetchSportyWindow } from '../data/remote';
 import { faceForFollow, factFromFace, splitFollowId, type TrendFact } from '../lib/trendFace';
@@ -46,6 +47,23 @@ function rememberTrendFacts(facts: TrendFact[]) {
   } catch {
     /* the names still render this session */
   }
+}
+
+function SampleRing({ sample }: { sample: string }) {
+  const [hits, total] = sample.split('/').map(Number);
+  const rate = total ? hits / total : 0;
+  const radius = 16;
+  const turn = 2 * Math.PI * radius;
+  const dash = turn * Math.min(1, Math.max(0, rate));
+  return (
+    <span className={cx('hit-ring', rate >= 0.9 ? 'is-hot' : 'is-warm')} aria-label={`${sample} hit rate`}>
+      <svg viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r={radius} className="hit-track" />
+        <circle cx="20" cy="20" r={radius} className="hit-value" strokeDasharray={`${dash} ${turn - dash}`} />
+      </svg>
+      <b>{sample}</b>
+    </span>
+  );
 }
 
 function withCrest(team: Team | null, catalog: CrestCatalog): Team | null {
@@ -231,6 +249,38 @@ export function FollowedTrends() {
   const chosen = booked.find((group) => group.id === (activeMarket || 'all'));
   const chosenParts = partsFromBook(chosen?.books?.[desk], chosen?.bookedAt || null);
   const emptyNote = chosenParts.parts.length ? '' : chosen?.reason || booking.note;
+  const cards = useMemo(() => {
+    const rows: FollowRow[] = [];
+    for (const face of faces) {
+      const parsed = splitFollowId(face.id);
+      if (!parsed || !face.home || !face.away || face.status === 'won' || face.status === 'bust') continue;
+      if (activeMarket && parsed.market !== activeMarket) continue;
+      const match = known.find((item) => item.id === parsed.matchId);
+      const live = match?.status === 'live' || match?.status === 'halftime';
+      const kick = Date.parse(face.kickoff);
+      if (Number.isFinite(kick) && kick < Date.now() && !live) continue;
+      const engineLeg = [...(engine?.tiers || []), ...(engine?.trends || []), ...(engine?.master ? [engine.master] : [])]
+        .flatMap((slip) => slip.legs)
+        .find((leg) => leg.eventId === parsed.matchId && leg.market === parsed.market);
+      const odds = Number(picks.find((item) => item.id === face.id)?.odds ?? engineLeg?.odds);
+      rows.push({
+        id: face.id,
+        eventId: parsed.matchId,
+        market: parsed.market,
+        marketLabel: face.marketLabel || marketLabel(parsed.market),
+        odds: Number.isFinite(odds) ? odds : null,
+        sample: engineLeg?.sample || '',
+        home: face.home,
+        away: face.away,
+        kickoff: face.kickoff,
+      });
+    }
+    return groupFollowMatches(rows);
+  }, [faces, known, activeMarket, engine, picks]);
+  const followCount = (activeMarket ? openLegs.filter((leg) => leg.market === activeMarket) : openLegs).length;
+  const codeLine = chosenParts.parts.length
+    ? `${chosenParts.parts.length === 1 ? 'One' : String(chosenParts.parts.length)} ${DESK_NAMES[desk]} ${chosenParts.parts.length === 1 ? 'code' : 'codes'} for your ${followCount} open ${followCount === 1 ? 'follow' : 'follows'}.`
+    : '';
   if (!trendFollows.length) return null;
   return (
     <section className="panel follow-trends">
@@ -238,9 +288,10 @@ export function FollowedTrends() {
       <CodeStrip
         desk={desk}
         tier={tier}
-        title={activeMarket ? marketCodeLabel(activeMarket) : `${tier === '100' ? '100%' : tier === '90' ? '90%+' : '80%+'} followed`}
+        title={`${DESK_NAMES[desk]} code`}
         parts={chosenParts.parts}
         bookedAt={chosenParts.bookedAt}
+        line={codeLine}
         note={emptyNote}
         onDesk={setDesk}
         onTier={(next) => {
@@ -262,6 +313,43 @@ export function FollowedTrends() {
           ))}
         </div>
       )}
+      <ul className="follow-cards">
+        {cards.map((card) => {
+          const lead = faces.find((face) => splitFollowId(face.id)?.matchId === card.eventId);
+          const home = withCrest(lead?.homeTeam || null, catalog);
+          const away = withCrest(lead?.awayTeam || null, catalog);
+          const match = known.find((item) => item.id === card.eventId);
+          const live = match?.status === 'live' || match?.status === 'halftime';
+          const score = live ? scoreDash(match?.homeScore ?? null, match?.awayScore ?? null) : '';
+          const when = live && match ? [score, statusLine(match)].filter(Boolean).join(' · ') : kickoffWhen(card.kickoff, today);
+          return (
+            <li key={card.eventId} className="follow-card">
+              <header>
+                <span className="follow-crests">
+                  {home && <Crest team={home} size={28} />}
+                  {away && <Crest team={away} size={28} />}
+                </span>
+                <div>
+                  <strong>
+                    {card.home} vs {card.away}
+                  </strong>
+                  {when && <span>{when}</span>}
+                </div>
+              </header>
+              {card.chips.map((chip) => {
+                const price = showOdds(chip.odds);
+                return (
+                  <div className="follow-chip" key={chip.id}>
+                    {chip.sample && <SampleRing sample={chip.sample} />}
+                    <span>{chip.marketLabel}</span>
+                    {price && <b>{price}</b>}
+                  </div>
+                );
+              })}
+            </li>
+          );
+        })}
+      </ul>
       <div className="inbox-tools">
         <button
           type="button"
@@ -289,27 +377,6 @@ export function FollowedTrends() {
         )}
         <p>{confirm ? 'Hit, bust, and finished trends will be unfollowed. Upcoming and live follows stay.' : 'Settled and past trends can leave this list.'}</p>
       </div>
-      <ul className="trend-monitor">
-        {faces.filter((face) => face.home && face.away).map((face) => {
-          const home = withCrest(face.homeTeam, catalog);
-          const away = withCrest(face.awayTeam, catalog);
-          const when = kickoffWhen(face.kickoff, today);
-          const status = face.status === 'won' ? 'Hit' : face.status === 'bust' ? 'Bust' : face.status === 'open' ? 'Open' : '';
-          const named = Boolean((home && away) || face.home || face.away);
-          const title = home && away ? `${face.home} vs ${face.away}` : face.home || face.away || face.marketLabel || 'Trend';
-          const detail = [named ? face.marketLabel : '', when, status].filter(Boolean).join(' · ');
-          return (
-            <li key={face.id}>
-              <strong>
-                {home && <Crest team={home} size={18} />}
-                {away && <Crest team={away} size={18} />}
-                {title}
-              </strong>
-              {detail && <span>{detail}</span>}
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }

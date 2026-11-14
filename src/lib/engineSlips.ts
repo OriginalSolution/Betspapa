@@ -343,7 +343,7 @@ export function marketLabel(market: string | null | undefined): string {
   return MARKET_LABELS[market] || market;
 }
 
-/** A price under 1.20 is not shown. 1.20 stays. */
+/** A price under 1.18 is not shown. 1.18 stays. */
 export function showOdds(value: number | null | undefined): string | null {
   if (typeof value !== 'number' || !publishableOdds(value)) return null;
   return value.toFixed(2);

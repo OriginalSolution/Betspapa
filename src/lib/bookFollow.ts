@@ -1,6 +1,7 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 import type { DeskId, EngineBook } from './engineSlips';
+import { MIN_PUBLISHED_ODDS } from './oddsFloor';
 import { tierMin, TIER_LABEL, type CodeTier } from './pickCodes';
 
 export type BookLeg = {
@@ -50,7 +51,7 @@ export function legsForTier(legs: BookLeg[], tier: CodeTier, market: string | nu
     if (rate + 1e-12 < min) return false;
     if (market && leg.market !== market) return false;
     if (leg.status === 'won' || leg.status === 'bust') return false;
-    if (!Number.isFinite(leg.odds) || leg.odds < 1.2) return false;
+    if (!Number.isFinite(leg.odds) || leg.odds < MIN_PUBLISHED_ODDS) return false;
     const kick = Date.parse(leg.kickoff);
     return Number.isFinite(kick) && kick >= now;
   });

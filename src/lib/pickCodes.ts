@@ -26,7 +26,7 @@ export function tierSlip(state: EngineState | null, tier: CodeTier, market: stri
   return null;
 }
 
-export type CodePartView = { code: string; legs: number; odds: string | null; index: number; total: number };
+export type CodePartView = { code: string; link: string; legs: number; odds: string | null; index: number; total: number };
 
 export function slipParts(slip: EngineSlip | null, desk: DeskId): { parts: CodePartView[]; bookedAt: string | null } {
   const book = deskBook(slip, desk);
@@ -34,6 +34,7 @@ export function slipParts(slip: EngineSlip | null, desk: DeskId): { parts: CodeP
     .filter((part) => part.code)
     .map((part, index, all) => ({
       code: part.code,
+      link: part.link,
       legs: part.legs,
       odds: showOdds(part.totalOdds),
       index: index + 1,
@@ -51,6 +52,7 @@ export function partsFromBook(book: EngineBook | undefined, bookedAt: string | n
     .filter((part) => part.code)
     .map((part, index, all) => ({
       code: part.code,
+      link: part.link,
       legs: part.legs,
       odds: showOdds(part.totalOdds),
       index: index + 1,

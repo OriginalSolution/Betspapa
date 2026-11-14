@@ -156,7 +156,7 @@ export function PicksPage() {
       {state && shown.length === 0 && (
         <div className="empty">
           <h2>No picks on this board</h2>
-          <p>Picks appear when an 80% trend has a price of 1.20 or higher.</p>
+          <p>Picks appear when an 80% trend has a price of 1.18 or higher.</p>
         </div>
       )}
       {selected.length > 0 && total != null && (
