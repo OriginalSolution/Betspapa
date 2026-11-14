@@ -74,7 +74,8 @@ test('a kicked-off or out-of-range leg leaves the slip and its code', () => {
   };
   const shown = projectSlip(slip);
   assert.deepEqual(shown.legs.map((leg) => leg.eventId), ['sr:match:1']);
-  assert.equal(shown.books.sportybet.parts.length, 0);
+  assert.equal(shown.books.sportybet.parts[0].code, 'OLD');
+  assert.deepEqual(shown.books.sportybet.parts[0].matches, ['sr:match:1']);
   assert.equal(boardDirty({ master: slip, trends: [], tiers: [] }), true);
   assert.equal(boardDirty({ master: shown, trends: [], tiers: [] }), false);
 });
