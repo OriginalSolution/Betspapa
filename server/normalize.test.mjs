@@ -58,9 +58,12 @@ test('provider dates and range filter use instants', () => {
   assert.equal(filterByRange(matches, '2026-11-10T00:00:00.000Z', '2026-11-10T23:59:59.000Z').length, 1);
 });
 
-test('config stays in demo without a token and goes live with one', () => {
-  assert.equal(getConfig({}).mode, 'demo');
+test('the server is live on SportyBet unless demo mode is forced', () => {
+  assert.equal(getConfig({}).mode, 'live');
+  assert.equal(getConfig({}).provider, 'SportyBet');
+  assert.equal(getConfig({}).footballData, false);
   assert.equal(getConfig({ FOOTBALL_DATA_API_KEY: 'abc', DATA_MODE: 'live' }).mode, 'live');
+  assert.equal(getConfig({ FOOTBALL_DATA_API_KEY: 'abc' }).footballData, true);
   assert.equal(getConfig({ FOOTBALL_DATA_API_KEY: 'abc', DATA_MODE: 'demo' }).mode, 'demo');
-  assert.equal(getConfig({ DATA_MODE: 'live' }).mode, 'demo');
+  assert.equal(getConfig({ DATA_MODE: 'live' }).mode, 'live');
 });

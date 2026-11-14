@@ -764,7 +764,7 @@ export function startPushWatch(options = {}) {
     }
     if (fcmConfigured() && !announced) {
       announced = true;
-      log(`FCM HTTP v1 is on for project ${account.project_id}.`);
+      log(`FCM HTTP v1 is on for project ${account.project_id}. Devices registered: ${book.list().length}. The list is on this instance disk and resets when the service restarts.`);
     }
     let payload;
     try {

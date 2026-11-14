@@ -293,11 +293,11 @@ function TrendSlip({
           {picksLabel(count)}
           {odds.length ? ` · ${odds.join(' · ')}` : ''}
         </p>
-        {codes.length > 0 && (
-          <button type="button" className="btn btn-quiet btn-tiny" onClick={() => onCopy(copyId, codes.join('\n'))}>
-            {copied === copyId ? 'Copied' : 'Copy'}
+        {book.parts.map((part, index) => (
+          <button key={part.code} type="button" className="btn btn-quiet btn-tiny" onClick={() => onCopy(`${copyId}:${part.code}`, part.code)}>
+            {copied === `${copyId}:${part.code}` ? 'Copied' : book.parts.length > 1 ? `Copy ${index + 1}` : 'Copy'}
           </button>
-        )}
+        ))}
       </div>
       {open && (
         <ul className="slip-legs">

@@ -391,14 +391,15 @@ function MarketCard({ card, desk, copied, onCopy }: { card: MarketCodeCard; desk
   return (
     <article className="trend-ccard" data-market-code={code || ''}>
       <b>{card.label}</b>
-      {card.codes.length > 1 && (
-        <p className="trend-part-label">
-          Part 1/{card.codes.length}
-        </p>
-      )}
-      <p className="trend-card-code">{code || 'No code this cycle'}</p>
       <p>{bits.join(' · ')}</p>
-      {code && <CopyButton id={id} value={card.codes.join('\n')} copied={copied} onCopy={onCopy} />}
+      {card.codes.length === 0 && <p className="trend-card-code">No code this cycle</p>}
+      {card.codes.map((item, index) => (
+        <div key={item}>
+          {card.codes.length > 1 && <p className="trend-part-label">Part {index + 1}/{card.codes.length}</p>}
+          <p className="trend-card-code">{item}</p>
+          <CopyButton id={`${id}:${item}`} value={item} copied={copied} onCopy={onCopy} />
+        </div>
+      ))}
     </article>
   );
 }

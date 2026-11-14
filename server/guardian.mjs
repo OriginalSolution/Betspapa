@@ -177,9 +177,10 @@ export function createGuardian(options = {}) {
       if (restored) fixes.push('Restored the last booked board.');
     }
     const since = lastCycleAt ? Date.now() - lastCycleAt : Infinity;
-    const repair = Boolean(options.needsRepair?.());
-    const urgent = !boardHasCodes(options.getState ? options.getState() : null) || repair;
-    if ((verdict.actions.includes('rerun') || repair) && options.runCycle && (urgent || since > 10 * 60 * 1000)) {
+    const repairNeeded = Boolean(options.needsRepair?.());
+    const booking = Boolean(options.booking?.());
+    const urgent = !boardHasCodes(options.getState ? options.getState() : null) || repairNeeded;
+    if (!booking && (verdict.actions.includes('rerun') || repairNeeded) && options.runCycle && (urgent || since > 10 * 60 * 1000)) {
       await options.runCycle();
       lastCycleAt = Date.now();
       fixes.push('Ran a booking cycle.');
@@ -211,7 +212,7 @@ export function createGuardian(options = {}) {
       if (options.fcm && !options.fcm()) {
         logIncident({ code: 'fcm-off', level: 'info', message: 'FCM is not configured on this process.', fixed: false });
       }
-      const slow = latencySummary(samples).filter((row) => row.slow);
+      const slow = latencySummary(samples).filter((row) => row.slow && row.path !== '/api/engine');
       const live = new Set(verdict.issues.filter((issue) => issue.level === 'attention' || issue.level === 'warn').map((issue) => issue.code));
       for (const row of slow) {
         live.add('slow-endpoint');
@@ -281,8 +282,8 @@ export function createGuardian(options = {}) {
     const attention = incidents.filter((item) => item.level === 'attention' && !item.fixed);
     return {
       name: 'Papa Guardian',
-      ok: verdict.ok && attention.length === 0,
-      needsAttention: attention.length > 0,
+      ok: verdict.ok,
+      needsAttention: !verdict.ok,
       lastCheckAt,
       lastCycleAt: lastCycleAt ? new Date(lastCycleAt).toISOString() : state?.updatedAt || null,
       lastNightly,

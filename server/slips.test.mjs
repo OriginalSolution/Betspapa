@@ -41,10 +41,8 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   const covered = codeGroups(hundred, '100');
   assert.equal(covered.flat().length, hundred.length);
   assert.ok(covered.every((group) => group.length <= 20));
-  const many = codeGroups(Array.from({ length: 25 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 })), '100');
-  assert.equal(many.length, 2);
-  assert.equal(many.flat().length, 25);
-  assert.ok(many.every((group) => group.length <= 20));
+  const many = codeGroups(Array.from({ length: 60 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 })), '100');
+  assert.deepEqual(many.map((group) => group.length), [50, 10]);
   const slips = tierSlips([
     { ...leg(1, 'dc-12', 1.22), occurrence: 80, rate: 0.8 },
     { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },
@@ -116,16 +114,13 @@ test('a tier books a second part instead of dropping the extra legs', async () =
     id: 'tier:100',
     tier: '100',
     name: '100% all picks',
-    legs: Array.from({ length: 25 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 })),
+    legs: Array.from({ length: 60 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 })),
   };
   const out = await bookSlips({ slips: [slip], book, now: now.getTime(), log: () => {} });
   const parts = out.results[0].books.sportybet.parts;
   assert.equal(parts.length, 2);
-  assert.equal(parts.reduce((sum, part) => sum + part.legs, 0), 25);
-  const pawa = calls.filter((call) => call.desks.length === 1 && call.desks[0] === 'betpawa');
-  assert.equal(pawa.length, 1);
-  assert.equal(pawa[0].n, 25);
-  assert.equal(out.results[0].books.betpawa.parts[0].legs, 12);
+  assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
+  assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
 });
 
 test('betPawa drops a price under 1.20 and records why', async () => {

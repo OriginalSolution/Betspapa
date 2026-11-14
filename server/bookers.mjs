@@ -7,7 +7,14 @@ const FOOTBALL_SHARE = 'https://www.football.com/api/gh/orders/share';
 const MSPORT_SHARE = 'https://www.msport.com/api/gh/orders/real-sports/order/share';
 const BETIKA_SHARE = 'https://api.betika.com.gh/v2/share/';
 const BETPAWA = 'https://www.betpawa.com.gh/api/sportsbook/';
-const CHUNK = 30;
+/** Selections one share code can hold. SportyBet and Football.com take 50. The others are smaller. */
+export const DESK_MAX = {
+  sportybet: 50,
+  footballcom: 50,
+  msport: 30,
+  betika: 20,
+  betpawa: 20,
+};
 
 const LINKS = {
   sportybet: (code) => `https://www.sportybet.com/gh/?shareCode=${code}`,
@@ -35,7 +42,6 @@ const BP_MARKETS = {
 const eventCache = new Map();
 const priceCache = new Map();
 let offerCache = null;
-const ONE_CODE = 18;
 const DESK_LIMIT = 2;
 const deskLanes = new Map();
 
@@ -70,9 +76,10 @@ function product(values) {
   return Math.round(total * 100) / 100;
 }
 
-function chunks(list) {
+function chunks(list, size) {
   const out = [];
-  for (let index = 0; index < list.length; index += CHUNK) out.push(list.slice(index, index + CHUNK));
+  const width = Math.max(1, size);
+  for (let index = 0; index < list.length; index += width) out.push(list.slice(index, index + width));
   return out;
 }
 
@@ -265,9 +272,21 @@ function betikaRowKey(row) {
 }
 
 async function betikaTry(legs, request) {
-  let group = legs.filter((leg) => leg.marketId && leg.outcomeId);
   const dropped = [];
-  if (!group.length) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Market not supported on Betika.')) };
+  const supported = [];
+  for (const leg of legs) {
+    if (!leg.marketId || !leg.outcomeId) {
+      dropped.push(drop(leg, 'Market not supported on Betika.'));
+      continue;
+    }
+    if (leg.market === 'sh-over05' || String(leg.marketId) === '90') {
+      dropped.push(drop(leg, 'Betika does not list second-half over 0.5.'));
+      continue;
+    }
+    supported.push(leg);
+  }
+  let group = supported;
+  if (!group.length) return { booked: null, dropped };
   const encode = (groupToBook) =>
     request('POST', `${BETIKA_SHARE}encode`, {
       body: {
@@ -401,7 +420,7 @@ async function betpawaTry(legs, request) {
   const seen = new Set();
   let scanned = 0;
   for (const leg of legs) {
-    if (chosen.length >= 20) break;
+    if (chosen.length >= DESK_MAX.betpawa) break;
     scanned += 1;
     if (seen.has(leg.eventId)) {
       dropped.push(drop(leg, 'betPawa takes one selection per match on a shared slip.'));
@@ -454,29 +473,36 @@ function withoutKept(booked) {
   return { part: part.code ? part : null, kept };
 }
 
-async function placeChunk(group, fn) {
+async function placeChunk(group, fn, max) {
   const result = await fn(group);
-  if (!wholeSlipRefused(result, group) || group.length <= ONE_CODE) {
+  if (!wholeSlipRefused(result, group) || group.length <= max) {
     const taken = withoutKept(result?.booked);
-    return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept };
+    return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept, scanned: result?.scanned || 0 };
   }
   const mid = Math.ceil(group.length / 2);
-  const left = await placeChunk(group.slice(0, mid), fn);
-  const right = await placeChunk(group.slice(mid), fn);
-  return { parts: [...left.parts, ...right.parts], dropped: [...left.dropped, ...right.dropped], kept: [...left.kept, ...right.kept] };
+  const left = await placeChunk(group.slice(0, mid), fn, max);
+  const right = await placeChunk(group.slice(mid), fn, max);
+  return {
+    parts: [...left.parts, ...right.parts],
+    dropped: [...left.dropped, ...right.dropped],
+    kept: [...left.kept, ...right.kept],
+    scanned: (left.scanned || 0) + (right.scanned || 0),
+  };
 }
 
-async function chunked(legs, fn) {
+async function chunked(legs, fn, max) {
   const parts = [];
   const dropped = [];
   const kept = [];
-  for (const chunk of chunks(legs)) {
-    const placed = await placeChunk(chunk, fn);
+  let scanned = 0;
+  for (const chunk of chunks(legs, max)) {
+    const placed = await placeChunk(chunk, fn, max);
     parts.push(...placed.parts);
     dropped.push(...placed.dropped);
     kept.push(...(placed.kept || []));
+    scanned += placed.scanned || 0;
   }
-  return { parts, dropped, kept };
+  return { parts, dropped, kept, scanned };
 }
 
 function withLink(name, booked) {
@@ -524,15 +550,11 @@ export async function bookAll(legs, request, onBook, only) {
   const closed = mapped.filter((leg) => !stillOffered(index, leg)).map((leg) => drop(leg, 'Closed or suspended in the latest price scan.'));
   const allowed = Array.isArray(only) ? new Set(only) : null;
   const runners = [
-    ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request))],
-    ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request))],
-    ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request))],
-    ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request))],
-    ['betpawa', async (group) => {
-      const result = await betpawaTry(group, request);
-      const taken = withoutKept(result?.booked);
-      return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept, scanned: result?.scanned || 0 };
-    }],
+    ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request), DESK_MAX.sportybet)],
+    ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request), DESK_MAX.footballcom)],
+    ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request), DESK_MAX.msport)],
+    ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request), DESK_MAX.betika)],
+    ['betpawa', (group) => chunked(group, (chunk) => betpawaTry(chunk, request), DESK_MAX.betpawa)],
   ].filter(([name]) => !allowed || allowed.has(name));
   const books = {};
   await Promise.all(

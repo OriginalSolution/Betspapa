@@ -10,9 +10,10 @@ import { selectionKey } from './selection.mjs';
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
-/** One usable code. Prefer this many legs, and never more than the max. */
+/** One code on the master and trends. Tier parts use PART_SIZE. */
 export const CODE_LIMIT = 18;
-export const CODE_MAX = 20;
+/** SportyBet accepts 50 selections. Tier and market slips are booked in blocks of this size. */
+export const PART_SIZE = 50;
 export const SLIP_CONCURRENCY = 4;
 
 export function bookableLegs(legs, now = new Date()) {
@@ -49,9 +50,9 @@ export function codeLegs(legs, limit = CODE_LIMIT) {
 }
 
 /**
- * Order a tier so its first code is not the same slip as the tier above.
- * 90%+ leads with the 90–99% band and mixes in 100% legs.
- * 80%+ leads with the 80–89% band and mixes in the higher bands.
+ * 90%+ leads with the 90–99% band, then 100%.
+ * 80%+ leads with the 80–89% band, then the higher bands.
+ * Inside a band the best hit rate comes first, then the earliest kickoff.
  */
 export function orderForTier(legs, tier) {
   const rows = (Array.isArray(legs) ? legs : []).filter((leg) => strictInRange(leg?.market, leg?.odds));
@@ -62,32 +63,15 @@ export function orderForTier(legs, tier) {
   for (const leg of rows) (legRate(leg) + 1e-12 < bandMax ? priority : higher).push(leg);
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  if (!priority.length || !higher.length) return [...priority, ...higher];
-  const mixed = [];
-  let band = 0;
-  let above = 0;
-  while (band < priority.length || above < higher.length) {
-    for (let step = 0; step < 2 && band < priority.length; step += 1) mixed.push(priority[band++]);
-    if (above < higher.length) mixed.push(higher[above++]);
-  }
-  return mixed;
+  return [...priority, ...higher];
 }
 
-/** Split an ordered list into codes of about 12–20 legs, covering every leg. */
-export function packGroups(legs, target = CODE_LIMIT, max = CODE_MAX) {
+/** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
+export function packGroups(legs, size = PART_SIZE) {
   const groups = [];
-  let index = 0;
   const rows = Array.isArray(legs) ? legs : [];
-  while (index < rows.length) {
-    const remaining = rows.length - index;
-    if (remaining <= max) {
-      groups.push(rows.slice(index));
-      break;
-    }
-    const take = Math.min(target, remaining);
-    groups.push(rows.slice(index, index + take));
-    index += take;
-  }
+  const width = Math.max(1, size);
+  for (let index = 0; index < rows.length; index += width) groups.push(rows.slice(index, index + width));
   return groups;
 }
 
@@ -283,45 +267,13 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     return entry;
   }
 
-  async function bookPawa(flat, slip) {
-    const clock = clockOf();
-    const key = `pawa:${slip.id}:${selectionKey(flat)}`;
-    let entry = nextCache[key];
-    if (entry && cacheFresh(entry, flat)) return entry;
-    const parts = [];
-    const dropped = [];
-    const kept = [];
-    let rest = flat.slice();
-    let part = 0;
-    try {
-      while (rest.length && part < 40) {
-        part += 1;
-        const fresh = await book(rest, ['betpawa']);
-        const bookP = fresh?.betpawa || {};
-        const keptN = (bookP.kept || []).length;
-        const scanned = Number(bookP.scanned) || 0;
-        const label = `${slip.name} part ${part}`;
-        log('log', `${label}: betPawa kept ${keptN} of ${scanned || rest.length} looked at. ${reasonSummary(bookP.dropped)}`);
-        parts.push(...(bookP.parts || []));
-        dropped.push(...(bookP.dropped || []));
-        kept.push(...(bookP.kept || []));
-        const seen = new Set();
-        for (const row of [...(bookP.kept || []), ...(bookP.dropped || [])]) {
-          if (row?.eventId) seen.add(row.eventId);
-        }
-        const before = rest.length;
-        rest = rest.filter((leg) => !seen.has(leg.eventId));
-        if (rest.length === before || !keptN) break;
-      }
-    } catch (error) {
-      const message = `${slip.name}: betPawa booking failed: ${error instanceof Error ? error.message : error}`;
-      issues.push(message);
-      log('error', message);
-    }
-    const checked = inspectBooks({ betpawa: { parts, dropped, kept, error: parts.length ? null : 'No open selections on betPawa.' } });
-    entry = { books: { betpawa: checked.books.betpawa }, bookedAt: parts.length ? new Date(clock).toISOString() : null };
-    nextCache[key] = entry;
-    return entry;
+  function logPawa(label, books) {
+    const bookP = books?.betpawa;
+    if (!bookP) return;
+    const keptN = (bookP.kept || []).length;
+    const scanned = Number(bookP.scanned) || (bookP.kept || []).length + (bookP.dropped || []).length;
+    if (!scanned && !keptN) return;
+    log('log', `${label}: betPawa kept ${keptN} of ${scanned} looked at. ${reasonSummary(bookP.dropped)}`);
   }
 
   async function bookOne(slip, index) {
@@ -360,17 +312,14 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     let bookedAt = null;
     for (let part = 0; part < groups.length; part += 1) {
       const label = groups.length > 1 ? `${slip.name} part ${part + 1}/${groups.length}` : slip.name;
-      const entry = await bookSelection(groups[part], label, ['sportybet', 'footballcom', 'msport', 'betika']);
+      const entry = await bookSelection(groups[part], label);
+      logPawa(label, entry.books);
       pieces.push(entry.books);
       if (entry.bookedAt) bookedAt = entry.bookedAt;
-      if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
+      const books = mergeBooks(pieces);
+      results[index] = { ...slip, legs: open, key: selectionKey(groups[0]), books, bookedAt };
+      if (onProgress && hasCode(books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
     }
-    const pawa = await bookPawa(flat, slip);
-    if (pawa.bookedAt) bookedAt = pawa.bookedAt;
-    pieces.push(pawa.books);
-    const books = mergeBooks(pieces);
-    results[index] = { ...slip, legs: open, key: selectionKey(groups[0]), books, bookedAt };
-    if (onProgress && hasCode(books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
   }
 
   await pool(list.map((slip, index) => () => bookOne(slip, index)), Math.max(1, concurrency));
