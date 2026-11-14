@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CodeStrip } from '../components/CodeStrip';
-import { bookGroups, legsForTier, type BookedGroup, type BookLeg } from '../lib/bookFollow';
+import { bookGroups, legsForTier, tierFallback, type BookedGroup, type BookLeg } from '../lib/bookFollow';
 import { marketCodeLabel, partsFromBook, type CodeTier } from '../lib/pickCodes';
 import { Link } from 'react-router-dom';
 import { DateBar, ErrorBanner } from '../components/Chrome';
 import { Crest } from '../components/Crest';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
-import { staleTrendIds } from '../lib/alerts';
+import { followIsStale } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { fetchEngine, readEngineCache, writeEngineCache, type DeskId, type EngineState } from '../lib/engineSlips';
 import { cx, kickoffWhen } from '../lib/format';
@@ -154,7 +154,6 @@ export function FollowedTrends() {
     rememberTrendFacts(next);
     setFacts(readTrendFacts());
   }, [faces]);
-  const stale = staleTrendIds(trendFollows, picks, matches, Date.now());
   const [desk, setDesk] = useState<DeskId>('sportybet');
   const [tier, setTier] = useState<CodeTier>('80');
   const [focusMarket, setFocusMarket] = useState<string | null>(null);
@@ -171,37 +170,41 @@ export function FollowedTrends() {
       const odds = Number(pick?.odds ?? engineLeg?.odds);
       const occurrence = engineLeg?.occurrence;
       const rate = typeof occurrence === 'number' ? (occurrence > 1 ? occurrence / 100 : occurrence) : pick?.rate;
-      if (!face.kickoff) continue;
+      if (!face.home || !face.away || !face.kickoff) continue;
+      if (face.status === 'won' || face.status === 'bust') continue;
       legs.push({
         eventId: parsed.matchId,
         market: parsed.market,
         odds,
         kickoff: face.kickoff,
-        match: face.home && face.away ? `${face.home} vs ${face.away}` : '',
+        match: `${face.home} vs ${face.away}`,
         rate: typeof rate === 'number' ? rate : 0.8,
+        status: face.status,
       });
     }
     return legs;
   }, [faces, picks, engine]);
-  const openLegs = useMemo(() => legsForTier(sourceLegs, tier, null), [sourceLegs, tier]);
+  const stale = trendFollows.filter((id) => followIsStale(id, picks, matches, Date.now(), faces.find((face) => face.id === id)));
+  const booking = useMemo(() => tierFallback(sourceLegs, tier), [sourceLegs, tier]);
+  const openLegs = booking.legs;
   const markets = useMemo(() => [...new Set(openLegs.map((leg) => leg.market))], [openLegs]);
   const activeMarket = focusMarket && markets.includes(focusMarket) ? focusMarket : null;
   const requestKey = useMemo(
     () =>
       JSON.stringify(
-        [{ id: 'all', legs: openLegs }, ...markets.map((id) => ({ id, legs: legsForTier(sourceLegs, tier, id) }))].map((group) => ({
+        [{ id: 'all', legs: openLegs }, ...markets.map((id) => ({ id, legs: legsForTier(sourceLegs, booking.tier, id) }))].map((group) => ({
           id: group.id,
           legs: group.legs.map((leg) => `${leg.eventId}:${leg.market}:${leg.odds}`),
         })),
       ),
-    [openLegs, markets, sourceLegs, tier],
+    [openLegs, markets, sourceLegs, booking.tier],
   );
   useEffect(() => {
     const groups = JSON.parse(requestKey) as Array<{ id: string; legs: string[] }>;
     const payload = groups
       .map((group) => ({
         id: group.id,
-        legs: (group.id === 'all' ? openLegs : legsForTier(sourceLegs, tier, group.id)).filter((leg) =>
+        legs: (group.id === 'all' ? openLegs : legsForTier(sourceLegs, booking.tier, group.id)).filter((leg) =>
           group.legs.includes(`${leg.eventId}:${leg.market}:${leg.odds}`),
         ),
       }))
@@ -224,9 +227,10 @@ export function FollowedTrends() {
       stop = true;
       window.clearTimeout(timer);
     };
-  }, [requestKey, openLegs, sourceLegs, tier]);
+  }, [requestKey, openLegs, sourceLegs, booking.tier]);
   const chosen = booked.find((group) => group.id === (activeMarket || 'all'));
   const chosenParts = partsFromBook(chosen?.books?.[desk], chosen?.bookedAt || null);
+  const emptyNote = chosenParts.parts.length ? '' : chosen?.reason || booking.note;
   if (!trendFollows.length) return null;
   return (
     <section className="panel follow-trends">
@@ -237,6 +241,7 @@ export function FollowedTrends() {
         title={activeMarket ? marketCodeLabel(activeMarket) : `${tier === '100' ? '100%' : tier === '90' ? '90%+' : '80%+'} followed`}
         parts={chosenParts.parts}
         bookedAt={chosenParts.bookedAt}
+        note={emptyNote}
         onDesk={setDesk}
         onTier={(next) => {
           setTier(next);
@@ -271,7 +276,7 @@ export function FollowedTrends() {
               setConfirm(true);
               return;
             }
-            clearStaleTrends();
+            clearStaleTrends(stale);
             setConfirm(false);
           }}
         >
@@ -285,7 +290,7 @@ export function FollowedTrends() {
         <p>{confirm ? 'Hit, bust, and finished trends will be unfollowed. Upcoming and live follows stay.' : 'Settled and past trends can leave this list.'}</p>
       </div>
       <ul className="trend-monitor">
-        {faces.map((face) => {
+        {faces.filter((face) => face.home && face.away).map((face) => {
           const home = withCrest(face.homeTeam, catalog);
           const away = withCrest(face.awayTeam, catalog);
           const when = kickoffWhen(face.kickoff, today);

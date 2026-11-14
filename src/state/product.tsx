@@ -41,7 +41,7 @@ type Product = {
   pickListed: (pick: PickView, list: 'black' | 'green') => boolean;
   trendFollows: string[];
   toggleTrend: (id: string) => void;
-  clearStaleTrends: () => number;
+  clearStaleTrends: (ids?: string[]) => number;
 };
 
 const ProductContext = createContext<Product | null>(null);
@@ -284,8 +284,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       pickListed: (pick, list) => (list === 'black' ? isBlacklisted(pick, lists) : isGreenlisted(pick, lists)),
       trendFollows,
       toggleTrend: (id) => setTrendFollows((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id])),
-      clearStaleTrends: () => {
-        const drop = new Set(staleTrendIds(trendFollows, picks, matches, Date.now()));
+      clearStaleTrends: (ids?: string[]) => {
+        const drop = new Set(ids?.length ? ids : staleTrendIds(trendFollows, picks, matches, Date.now()));
         if (!drop.size) return 0;
         setTrendFollows((current) => current.filter((id) => !drop.has(id)));
         return drop.size;

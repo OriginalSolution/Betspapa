@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { allowBooking, bookGroups, prepareLegs, resetBookingLimits } from './bookOnDemand.mjs';
+import { allowBooking, bookGroups, emptyBookReason, prepareLegs, resetBookingLimits } from './bookOnDemand.mjs';
 
 const future = '2026-11-13T22:00:00.000Z';
 const now = new Date('2026-11-13T18:00:00.000Z');
@@ -17,6 +17,7 @@ test('on-demand booking drops a short price and a kicked-off leg, then reuses th
     now,
   );
   assert.deepEqual(legs.map((leg) => leg.eventId), ['sr:match:1']);
+  assert.match(emptyBookReason([{ kickoff: '2026-11-13T12:00:00.000Z', market: 'over25', odds: 1.4 }], now), /kicked off/);
   let calls = 0;
   const request = async (method, url) => {
     calls += 1;
