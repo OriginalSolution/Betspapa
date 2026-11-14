@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
-import { boardDirty, projectBoard } from './oddsRange.mjs';
+import { boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { bookSlips, bookableLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
@@ -33,7 +33,7 @@ function emptyState() {
 }
 
 function publicState(state, now = new Date()) {
-  const view = projectBoard(state, now);
+  const view = serveBoard(state, now);
   return {
     updatedAt: view.updatedAt,
     feedAt: view.feedAt,
@@ -232,22 +232,46 @@ export function createEngine(options = {}) {
     const tiers = tierSlips(legs);
     issues.push(`80%+ occurrence: ${legs.length} picks across ${trends.length} markets, ${chosen.length} on the master slip.`);
     issues.push(...board.notes);
-    if (!legs.length) log('log', 'No open 80%+ legs to book.');
-    else log('log', issues.find((line) => line.startsWith('80%+ occurrence')) || '');
+    if (!legs.length) {
+      issues.push('No open picks. Finished matches are not shown.');
+      log('log', 'No open 80%+ legs to book.');
+    } else log('log', issues.find((line) => line.startsWith('80%+ occurrence')) || '');
+    const before = state;
+    const beforeOpen = [before.master, ...(before.trends || []), ...(before.tiers || [])].some((slip) =>
+      (slip?.legs || []).some((leg) => new Date(leg.kickoff).getTime() >= now.getTime()),
+    );
+    const preview = projectBoard({
+      ...state,
+      updatedAt: new Date().toISOString(),
+      feedAt: state.feedAt,
+      events,
+      legs: settled.legs,
+      books: {},
+      master,
+      trends,
+      tiers,
+      occurrenceByEvent: board.byEvent,
+      settlement: settled.status,
+      cycleNotes: issues,
+      issues: issues.slice(0, 40),
+    }, now);
+    if (legs.length || !beforeOpen) save(preview);
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
+    const bookNow = () => (options.now ? options.now() : new Date()).getTime();
+    const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
     const booking = await bookSlips({
       slips: [master, ...trends, ...tiers],
-      cache: state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : state.slipKey ? { [state.slipKey]: { books: state.books || {}, attempts: {}, lastAttemptAt: 0, bookedAt: state.updatedAt } } : {},
+      cache: priorCache,
       book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
-      now: () => (options.now ? options.now() : new Date()).getTime(),
+      now: bookNow,
       gapMs: options.slipGapMs ?? 4000,
       pause,
       log,
     });
     issues.push(...booking.issues);
-    const [masterResult, ...rest] = booking.results;
-    const trendResults = rest.slice(0, trends.length);
-    const tierResults = rest.slice(trends.length);
+    const [masterResult, ...restResults] = booking.results;
+    const trendResults = restResults.slice(0, trends.length);
+    const tierResults = restResults.slice(trends.length);
     const key = masterResult?.key;
     const clock = options.now ? options.now() : new Date();
     const books = inspectBooks(masterResult?.books).books;
@@ -258,6 +282,8 @@ export function createEngine(options = {}) {
     const next = {
       ...state,
       updatedAt: new Date().toISOString(),
+      feedAt: state.feedAt,
+      events,
       slipKey: key,
       legs: settled.legs,
       books,
@@ -268,9 +294,9 @@ export function createEngine(options = {}) {
       occurrenceByEvent: board.byEvent,
       settlement: settled.status,
       cycleNotes: issues,
-      issues: [...issues, ...(state.issues || [])].slice(0, 40),
+      issues: issues.slice(0, 40),
     };
-    const kept = projectBoard(preserveBoard(state, next, now), now);
+    const kept = projectBoard(preserveBoard(before, next, now), now);
     save(kept);
     if (boardHasCodes(kept)) {
       const publish = options.publishSnapshot || publishEngineSnapshot;
@@ -313,6 +339,13 @@ export function createEngine(options = {}) {
       const loadSnapshot = options.loadSnapshot || loadEngineSnapshot;
       const remote = await loadSnapshot();
       if (!remote || !boardHasCodes(remote)) return false;
+      const open = [remote.master, ...(remote.trends || []), ...(remote.tiers || [])]
+        .filter(Boolean)
+        .some((slip) => (slip.legs || []).some((leg) => new Date(leg.kickoff).getTime() >= (options.now ? options.now() : new Date()).getTime()));
+      if (!open) {
+        log('log', 'Skipped a finished board. Finished matches are not shown.');
+        return false;
+      }
       state = {
         ...emptyState(),
         ...remote,
