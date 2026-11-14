@@ -35,7 +35,8 @@ export async function loadEngineSnapshot(fetchImpl = fetch) {
 
 export async function publishEngineSnapshot(state, fetchImpl = fetch) {
   const key = token();
-  if (!key || !state) return false;
+  if (!state) return { ok: false, error: 'empty board' };
+  if (!key) return { ok: false, error: 'no snapshot token' };
   const path = `https://api.github.com/repos/${REPO}/contents/${FILE}`;
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -59,8 +60,10 @@ export async function publishEngineSnapshot(state, fetchImpl = fetch) {
     };
     if (sha) body.sha = sha;
     const saved = await fetchImpl(path, { method: 'PUT', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(12_000) });
-    return saved.ok;
-  } catch {
-    return false;
+    if (saved.ok) return { ok: true, error: '' };
+    const text = await saved.text();
+    return { ok: false, error: `${saved.status} ${text.slice(0, 160)}` };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'snapshot failed' };
   }
 }

@@ -101,6 +101,28 @@ function slimSlip(slip, { cap = 0, includeLegs = true } = {}) {
   };
 }
 
+/** A small copy of a booked board. Enough codes and future kickoffs to restore, small enough to store. */
+export function restartSnapshot(full, now = new Date()) {
+  const clock = now instanceof Date ? now.getTime() : Number(now);
+  const keep = (slip) => {
+    if (!slip) return null;
+    const future = (slip.legs || []).filter((leg) => Date.parse(leg.kickoff) >= clock).slice(0, 3);
+    const slim = slimSlip(slip, { includeLegs: false });
+    return slim ? { ...slim, legs: future.map(slimLeg) } : null;
+  };
+  const state = full || {};
+  return {
+    updatedAt: state.updatedAt || null,
+    feedAt: state.feedAt || null,
+    legCount: state.legCount ?? state.master?.legCount ?? 0,
+    books: slimBooks(state.books),
+    master: keep(state.master),
+    trends: (state.trends || []).map(keep).filter(Boolean),
+    tiers: (state.tiers || []).map(keep).filter(Boolean),
+    issues: Array.isArray(state.issues) ? state.issues.slice(0, 4) : [],
+  };
+}
+
 /** The phone board. Tier slips keep their codes and drop the duplicated leg lists. */
 export function appEngineState(full) {
   const state = full || {};
@@ -174,6 +196,7 @@ export function createEngine(options = {}) {
   });
   let state = load();
   let running = null;
+  let publishChain = Promise.resolve();
   let timer = null;
   let kick = null;
   let nextRunAt = null;
@@ -214,11 +237,12 @@ export function createEngine(options = {}) {
     save(next);
     if (!boardHasCodes(next)) return;
     const publish = options.publishSnapshot || publishEngineSnapshot;
-    void Promise.resolve(publish(appEngineState(publicState(next, now))))
-      .then((ok) => {
-        if (ok === false) log('error', 'Could not store the booked board for the next restart.');
-      })
-      .catch((error) => log('error', `Could not store the booked board: ${error instanceof Error ? error.message : error}`));
+    const body = restartSnapshot(publicState(next, now), now);
+    publishChain = publishChain.then(async () => {
+      const result = await publish(body);
+      if (!result || result.ok === false) log('error', `Could not store the booked board: ${result?.error || 'refused'}`);
+      else log('log', 'Stored the booked board for the next restart.');
+    }).catch((error) => log('error', `Could not store the booked board: ${error instanceof Error ? error.message : error}`));
   }
 
   async function fetchFeed() {
@@ -376,12 +400,7 @@ export function createEngine(options = {}) {
           issues: [...issues, ...progress.issues].slice(0, 40),
         };
         const nextBoard = projectBoard(partial, clock);
-        if (boardHasCodes(before)) {
-          const publish = options.publishSnapshot || publishEngineSnapshot;
-          void Promise.resolve(publish(appEngineState(publicState(nextBoard, clock)))).catch(() => {});
-        } else {
-          remember(nextBoard, clock);
-        }
+        if (!boardHasCodes(before)) remember(nextBoard, clock);
       },
         });
       }
