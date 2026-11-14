@@ -405,7 +405,7 @@ export function createEngine(options = {}) {
           issues: [...issues, ...progress.issues].slice(0, 40),
         };
         const nextBoard = projectBoard(partial, clock);
-        if (!boardHasCodes(before)) remember(nextBoard, clock);
+        if (boardHasCodes(nextBoard)) remember(nextBoard, clock);
       },
         });
       }
