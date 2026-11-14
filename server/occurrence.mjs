@@ -3,7 +3,7 @@
  * A line qualifies at 80% or better over the last 10 relevant games, with at
  * least 8 of those games scored. The hit rules match the app's settle().
  */
-import { MIN_ODDS, priceInRange, priceNearRange } from './oddsRange.mjs';
+import { MIN_ODDS, strictInRange } from './oddsRange.mjs';
 import { isSimulated } from './upcoming.mjs';
 
 export const WINDOW = 10;
@@ -324,7 +324,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         opponentSample: mirror.opponentSample,
         exception: sample === '10/10' && mirror.opponentSample === '10/10',
       };
-      if (!Number.isFinite(price) || price <= 1 || (!priceInRange(market.id, price, draft) && !priceNearRange(market.id, price, draft))) {
+      if (!strictInRange(market.id, price)) {
         unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
         continue;
       }

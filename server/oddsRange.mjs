@@ -1,7 +1,7 @@
 /**
  * One odds table for every pick, tip, slip, flyer, notification, and booked leg.
  * Ranges are inclusive. A market that is not listed is not shown and not booked.
- * A 100% record whose opponent also agrees may use a ceiling of 1.60.
+ * The board and the codes use this band only. A tagged 10/10 price above the band is not listed.
  */
 
 export const PERFECT_CEILING = 1.6;
@@ -85,6 +85,11 @@ function ceiling(range, leg) {
   return { max: range.max, exclusive: Boolean(range.maxExclusive) };
 }
 
+/** The published band, with no 1.60 exception. */
+export function strictInRange(market, price) {
+  return priceInRange(market, price, null);
+}
+
 export function priceInRange(market, price, leg) {
   const range = ODDS_RANGES[String(market || '')];
   if (!range) return false;
@@ -129,14 +134,14 @@ function keptPrices(slip, leg) {
     const book = slip?.books?.[desk];
     const kept = (book?.kept || []).find((item) => item?.eventId === leg.eventId && item?.market === leg.market);
     const price = Number(kept?.odds);
-    if (Number.isFinite(price) && priceInRange(leg.market, price, leg)) rows.push({ desk, odds: Math.round(price * 100) / 100 });
+    if (Number.isFinite(price) && strictInRange(leg.market, price)) rows.push({ desk, odds: Math.round(price * 100) / 100 });
   }
   return rows;
 }
 
 function shownLeg(slip, leg) {
   const kept = keptPrices(slip, leg);
-  if (priceInRange(leg.market, leg.odds, leg)) {
+  if (strictInRange(leg.market, leg.odds)) {
     const dropped = new Set();
     for (const desk of DESKS) {
       const book = slip?.books?.[desk];
@@ -169,12 +174,12 @@ export function projectSlip(slip, now = Date.now()) {
   for (const [desk, book] of Object.entries(slip.books || {})) {
     if (!book || typeof book !== 'object') continue;
     const parts = (book.parts || []).filter((part) => {
-      const matches = Array.isArray(part?.matches) ? part.matches : null;
-      if (matches && matches.length) return matches.every((id) => openIds.has(id));
+      const matches = Array.isArray(part?.matches) ? part.matches : [];
+      if (matches.length) return matches.every((id) => openIds.has(id));
       const count = Number(part?.legs);
       if (Number.isFinite(count) && count > legs.length) return false;
       if (removed) return false;
-      return true;
+      return Boolean(part?.code);
     });
     books[desk] = {
       ...book,
