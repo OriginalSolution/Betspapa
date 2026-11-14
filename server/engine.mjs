@@ -267,11 +267,13 @@ export function createEngine(options = {}) {
       pause,
       log,
       onProgress: (progress) => {
-        const [masterResult, ...restResults] = progress.results;
-        const trendResults = restResults.slice(0, trends.length);
-        const tierResults = restResults.slice(trends.length);
-        const key = masterResult?.key;
+        const booked = new Map(progress.results.map((slip) => [slip.id, slip]));
+        const key = booked.get('master')?.key || progress.results[0]?.key;
         const clock = options.now ? options.now() : new Date();
+        const viewOf = (slip) => {
+          const done = booked.get(slip.id);
+          return done ? slipView(done, key, clock) : slip;
+        };
         const partial = {
           ...state,
           updatedAt: new Date().toISOString(),
@@ -279,10 +281,10 @@ export function createEngine(options = {}) {
           events,
           slipKey: key,
           legs: settled.legs,
-          books: inspectBooks(masterResult?.books).books,
-          master: masterResult ? slipView(masterResult, key, clock) : null,
-          trends: trendResults.map((trend) => slipView(trend, key, clock)),
-          tiers: tierResults.map((trend) => slipView(trend, key, clock)),
+          books: inspectBooks(booked.get('master')?.books).books,
+          master: master ? viewOf(master) : null,
+          trends: trends.map(viewOf),
+          tiers: tiers.map(viewOf),
           slipCache: progress.cache,
           occurrenceByEvent: board.byEvent,
           settlement: settled.status,
