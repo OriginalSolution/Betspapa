@@ -359,7 +359,9 @@ export function createEngine(options = {}) {
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
-    const queue = [...tiers, ...trends, master];
+    const headlines = tiers.filter((slip) => !slip.market);
+    const markets = tiers.filter((slip) => slip.market);
+    const queue = [...headlines, ...markets, ...trends, master];
     const payload = queue.flatMap((slip) => {
       const open = bookableLegs(slip.legs, now);
       return (slip.tier ? codeGroups(open, slip.tier) : [codeLegs(open)]).flat();
