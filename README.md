@@ -1,5 +1,7 @@
 # Betspapa
 
+**Hand-off:** bots and other accounts should start with [HANDOFF.md](./HANDOFF.md) (current state, services, secret locations, rules, and how to build, deploy, and ship an APK).
+
 Football matchday board. Today is a week of roomy kick-off cards, with Live and Following views, a match timeline, and alerts for kick-off, goals, red cards, half-time and full-time.
 
 Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club names identify fixtures. The board is today’s real kickoffs and prices. There is no simulated matchday.
