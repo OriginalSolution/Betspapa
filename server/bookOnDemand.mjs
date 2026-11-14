@@ -47,6 +47,17 @@ export function prepareLegs(rows, now = new Date()) {
   return out;
 }
 
+export function emptyBookReason(rows, now = new Date()) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return 'No open follows to book.';
+  const clock = now instanceof Date ? now.getTime() : new Date(now).getTime();
+  const open = list.filter((row) => legOpen({ kickoff: row?.kickoff }, clock));
+  if (!open.length) return 'Every follow has kicked off, so nothing is on the code.';
+  const priced = open.filter((row) => priceInRange(row?.market, row?.odds, row));
+  if (!priced.length) return 'None of these follows are inside the odds range.';
+  return 'No open follows left to book.';
+}
+
 export function allowBooking(ip, now = Date.now()) {
   const key = String(ip || 'local');
   const recent = (hits.get(key) || []).filter((at) => now - at < WINDOW_MS);
@@ -71,7 +82,14 @@ export async function bookGroups(groups, request, now = new Date(), ip = 'local'
     const legs = prepareLegs(group?.legs, now);
     const key = selectionKey(legs);
     if (!key) {
-      booked.push({ id: String(group?.id || ''), key: '', books: {}, bookedAt: null, legCount: 0 });
+      booked.push({
+        id: String(group?.id || ''),
+        key: '',
+        books: {},
+        bookedAt: null,
+        legCount: 0,
+        reason: emptyBookReason(group?.legs, now),
+      });
       continue;
     }
     const hit = cache.get(key);

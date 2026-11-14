@@ -29,6 +29,7 @@ export function CodeStrip({
   parts,
   bookedAt,
   note,
+  line,
   onDesk,
   onTier,
 }: {
@@ -38,6 +39,7 @@ export function CodeStrip({
   parts: CodePartView[];
   bookedAt: string | null;
   note?: string;
+  line?: string;
   onDesk: (desk: DeskId) => void;
   onTier: (tier: CodeTier) => void;
 }) {
@@ -62,6 +64,7 @@ export function CodeStrip({
       </div>
       <div className="code-card">
         <p className="code-card-title">{title}</p>
+        {line && <p className="code-line">{line}</p>}
         {parts.length === 0 && <p className="trend-nocode">{note || 'No code yet'}</p>}
         {parts.map((part) => {
           const bits = [`${part.legs} ${part.legs === 1 ? 'leg' : 'legs'}`, part.odds, when ? `booked ${when}` : ''].filter(Boolean);
@@ -77,16 +80,23 @@ export function CodeStrip({
               </p>
               <div className="code-part-row">
                 <span>{bits.join(' · ')}</span>
-                <button
-                  type="button"
-                  className={cx('btn', 'btn-tiny', copied === part.code && 'is-on')}
-                  onClick={() => {
-                    void copyText(part.code);
-                    setCopied(part.code);
-                  }}
-                >
-                  {copied === part.code ? 'Copied' : 'Copy'}
-                </button>
+                <span className="code-actions">
+                  <button
+                    type="button"
+                    className={cx('btn', 'btn-tiny', copied === part.code && 'is-on')}
+                    onClick={() => {
+                      void copyText(part.code);
+                      setCopied(part.code);
+                    }}
+                  >
+                    {copied === part.code ? 'Copied' : 'Copy'}
+                  </button>
+                  {part.link && (
+                    <a className="btn btn-tiny" href={part.link} target="_blank" rel="noreferrer">
+                      Load
+                    </a>
+                  )}
+                </span>
               </div>
             </div>
           );

@@ -80,6 +80,24 @@ function isStaleAlert(item: InboxItem, match: Match | undefined, start: number):
  * A trend that is not on the current board is left alone. It may be for another day.
  * Upcoming and live follows are kept.
  */
+/** A follow that has settled, kicked off, or has no teams left to show. A live match stays. */
+export function followIsStale(
+  id: string,
+  picks: PickView[],
+  matches: Match[],
+  now: number,
+  face?: { home?: string; away?: string; kickoff?: string; status?: string | null },
+): boolean {
+  if (face && !face.home && !face.away) return true;
+  if (face?.status === 'won' || face?.status === 'bust') return true;
+  const parsed = id.match(/^(sr:match:\d+):/);
+  const match = parsed ? matches.find((item) => item.id === parsed[1]) : undefined;
+  if (match && (match.status === 'live' || match.status === 'halftime')) return false;
+  const kick = Date.parse(face?.kickoff || match?.utcDate || '');
+  if (Number.isFinite(kick) && kick < now) return true;
+  return staleTrendIds([id], picks, matches, now).includes(id);
+}
+
 export function staleTrendIds(followedIds: string[], picks: PickView[], matches: Match[], now: number): string[] {
   const start = startOfLocalDay(now);
   const byPick = new Map(picks.map((pick) => [pick.id, pick]));

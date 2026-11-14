@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildPicks, settle } from '../data/board';
 import { defaultSettings, type Follows, type Match, type Settings } from '../types';
-import { followedNotices, matchIdFromTrendAlert, alertTarget, staleAlertIds, staleTrendIds, trendHitNotices } from './alerts';
+import { followIsStale, followedNotices, matchIdFromTrendAlert, alertTarget, staleAlertIds, staleTrendIds, trendHitNotices } from './alerts';
 
 function match(patch: Partial<Match> = {}): Match {
   return {
@@ -124,5 +124,9 @@ describe('clearing old alerts and trends', () => {
     expect(hit.status).toBe('won');
     expect(open.status).toBe('open');
     expect(staleTrendIds([hit.id, open.id, away], picks, [live, later], now)).toEqual([hit.id]);
+    expect(followIsStale(hit.id, picks, [live, later], now, { home: 'A', away: 'B', kickoff: live.utcDate, status: 'won' })).toBe(true);
+    expect(followIsStale(open.id, picks, [live, later], now, { home: 'A', away: 'B', kickoff: later.utcDate, status: 'open' })).toBe(false);
+    expect(followIsStale('sr:match:9:over15', [], [], now, { home: '', away: '', kickoff: '', status: null })).toBe(true);
+    expect(followIsStale(live.id + ':over15', picks, [live], now, { home: 'A', away: 'B', kickoff: live.utcDate, status: 'open' })).toBe(false);
   });
 });

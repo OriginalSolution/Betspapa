@@ -112,7 +112,7 @@ function legView(leg) {
  * selections, so a trend identical to the master slip shares its codes and is never
  * booked twice. A desk that keeps failing is retried at most MAX_ATTEMPTS times per hour.
  */
-export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gapMs = 0, pause, log = () => {} }) {
+export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gapMs = 0, pause, log = () => {}, onProgress = null }) {
   const nextCache = {};
   const issues = [];
   const results = [];
@@ -162,6 +162,9 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     }
     nextCache[key] = entry;
     results.push({ ...slip, legs, key, books: entry.books, bookedAt: entry.bookedAt });
+    if (onProgress && (entry.books && Object.values(entry.books).some((book) => (book?.parts || []).some((part) => part?.code)))) {
+      onProgress({ results: results.slice(), cache: { ...nextCache }, issues: issues.slice() });
+    }
   }
   return { results, cache: nextCache, issues };
 }

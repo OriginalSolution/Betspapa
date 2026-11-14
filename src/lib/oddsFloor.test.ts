@@ -20,21 +20,22 @@ function match(): Match {
     htAway: null,
     events: [],
     venue: null,
-    odds: { home: 1.19, draw: 3.4, away: 4.2, 'over-15': 1.08, 'over-25': 1.2, 'over-35': 1.22 },
+    odds: { home: 1.17, draw: 3.4, away: 4.2, 'over-15': 1.08, 'over-25': 1.2, 'over-35': 1.22 },
     feed: 'sporty',
   };
 }
 
 describe('odds floor', () => {
-  it('keeps 1.20 and drops anything shorter from picks, trends, slips, and hit alerts', () => {
+  it('keeps 1.18 and drops anything shorter from picks, trends, slips, and hit alerts', () => {
+    expect(publishableOdds(1.18)).toBe(true);
     expect(publishableOdds(1.2)).toBe(true);
-    expect(publishableOdds(1.199)).toBe(false);
+    expect(publishableOdds(1.179)).toBe(false);
     expect(publishableOdds(1.01)).toBe(false);
     expect(publishableOdds(1.04)).toBe(false);
     expect(publishableOdds(1.08)).toBe(false);
     const picks = buildPicks([match()]);
     expect(picks.length).toBeGreaterThan(0);
-    expect(picks.every((pick) => pick.odds >= 1.2)).toBe(true);
+    expect(picks.every((pick) => pick.odds >= 1.18)).toBe(true);
     expect(picks.some((pick) => pick.market === 'over25' && pick.odds === 1.2)).toBe(true);
     expect(picks.some((pick) => pick.market === 'over15' || pick.market === 'home')).toBe(false);
     const heavy = match();

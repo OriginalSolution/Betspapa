@@ -61,10 +61,11 @@ describe('engine slips', () => {
     expect(deskBook(state.master, 'betpawa').parts).toEqual([]);
   });
 
-  it('hides prices under 1.20 and prefers the trend code for a leg', () => {
+  it('hides prices under 1.18 and prefers the trend code for a leg', () => {
     const state = parseEngine(payload);
+    expect(showOdds(1.18)).toBe('1.18');
     expect(showOdds(1.2)).toBe('1.20');
-    expect(showOdds(1.19)).toBeNull();
+    expect(showOdds(1.17)).toBeNull();
     expect(visibleLegs(state.master).map((leg) => leg.eventId)).toEqual(['sr:match:1']);
     expect(visibleLegs(state.master)[0]?.occurrence).toBe(90);
     expect(visibleLegs(state.master)[0]?.sample).toBe('9/10');

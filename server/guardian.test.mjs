@@ -42,6 +42,25 @@ test('an empty board is restored and rebooked, a fresh board is left alone', asy
   assert.deepEqual(calls, ['restore', 'rerun']);
 });
 
+test('a cycle that is still booking is not an empty or stale board', () => {
+  const now = Date.now();
+  const open = {
+    updatedAt: new Date(now - 40 * 60 * 1000).toISOString(),
+    feedAt: new Date(now).toISOString(),
+    books: {},
+    master: { id: 'master', legs: [{ market: 'over15', odds: 1.25, kickoff: new Date(now + 3_600_000).toISOString() }], books: {} },
+    trends: [],
+    tiers: [],
+  };
+  const working = inspectEngine(open, now, { booking: true });
+  assert.equal(working.ok, true);
+  assert.equal(working.issues.some((issue) => issue.code === 'empty-board' || issue.code === 'stale-cycle'), false);
+  const idle = inspectEngine(open, now, { booking: false });
+  assert.equal(idle.ok, false);
+  assert.ok(idle.issues.some((issue) => issue.code === 'empty-board'));
+  assert.ok(idle.issues.some((issue) => issue.code === 'stale-cycle'));
+});
+
 test('latency percentiles flag a slow endpoint only after enough samples', () => {
   assert.equal(percentile([10, 20, 30, 100], 50), 20);
   const rows = latencySummary([

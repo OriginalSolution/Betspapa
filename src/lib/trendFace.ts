@@ -63,9 +63,12 @@ export function faceForFollow(
   const market = pick?.market || parsed?.market || '';
   const match = matchId ? (sources.matches || []).find((item) => item.id === matchId) : undefined;
   const fact = sources.facts?.[id];
-  const leg = (sources.engine?.trends || [])
-    .flatMap((trend) => trend.legs)
-    .find((item) => item.eventId === matchId && (!market || item.market === market));
+  const slips = [
+    ...(sources.engine?.trends || []),
+    ...(sources.engine?.tiers || []),
+    ...(sources.engine?.master ? [sources.engine.master] : []),
+  ];
+  const leg = slips.flatMap((trend) => trend.legs).find((item) => item.eventId === matchId && (!market || item.market === market));
   const [legHome, legAway] = splitMatch(leg?.match || '');
   const homeName = match?.home.shortName || fact?.home || legHome || '';
   const awayName = match?.away.shortName || fact?.away || legAway || '';

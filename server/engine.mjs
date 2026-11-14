@@ -246,7 +246,6 @@ export function createEngine(options = {}) {
       feedAt: state.feedAt,
       events,
       legs: settled.legs,
-      books: {},
       master,
       trends,
       tiers,
@@ -267,6 +266,31 @@ export function createEngine(options = {}) {
       gapMs: options.slipGapMs ?? 4000,
       pause,
       log,
+      onProgress: (progress) => {
+        const [masterResult, ...restResults] = progress.results;
+        const trendResults = restResults.slice(0, trends.length);
+        const tierResults = restResults.slice(trends.length);
+        const key = masterResult?.key;
+        const clock = options.now ? options.now() : new Date();
+        const partial = {
+          ...state,
+          updatedAt: new Date().toISOString(),
+          feedAt: state.feedAt,
+          events,
+          slipKey: key,
+          legs: settled.legs,
+          books: inspectBooks(masterResult?.books).books,
+          master: masterResult ? slipView(masterResult, key, clock) : null,
+          trends: trendResults.map((trend) => slipView(trend, key, clock)),
+          tiers: tierResults.map((trend) => slipView(trend, key, clock)),
+          slipCache: progress.cache,
+          occurrenceByEvent: board.byEvent,
+          settlement: settled.status,
+          cycleNotes: [...issues, ...progress.issues],
+          issues: [...issues, ...progress.issues].slice(0, 40),
+        };
+        save(projectBoard(partial, clock));
+      },
     });
     issues.push(...booking.issues);
     const [masterResult, ...restResults] = booking.results;
