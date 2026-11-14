@@ -79,6 +79,23 @@ test('a kicked-off or out-of-range leg leaves the slip and its code', () => {
   assert.equal(boardDirty({ master: shown, trends: [], tiers: [] }), false);
 });
 
+test('a 1.27 double chance 12 leaves the leg list even when both samples are 10/10', () => {
+  const perfect = { sample: '10/10', opponentSample: '10/10', exception: true };
+  const slip = {
+    id: 'tier:100:dc-12',
+    legs: [
+      { eventId: 'sr:match:1', market: 'dc-12', odds: 1.22, kickoff: future, match: 'A vs B' },
+      { eventId: 'sr:match:2', market: 'dc-12', odds: 1.27, kickoff: future, match: 'C vs D', ...perfect },
+    ],
+    books: {
+      sportybet: { parts: [{ code: 'CN7MDY', legs: 1, matches: ['sr:match:1'] }], dropped: [], kept: [] },
+    },
+  };
+  const shown = projectSlip(slip);
+  assert.deepEqual(shown.legs.map((leg) => leg.eventId), ['sr:match:1']);
+  assert.equal(shown.books.sportybet.parts[0].code, 'CN7MDY');
+});
+
 test('a finished board is not served, and the note says so', () => {
   const served = serveBoard({
     updatedAt: '2026-11-13T20:48:52.783Z',

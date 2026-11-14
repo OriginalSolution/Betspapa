@@ -24,6 +24,9 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   assert.ok(chosen.every((row) => row.odds === 1.22));
   const wide = { ...leg(99, 'dc-12', 1.28), opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
   assert.equal(codeLegs([wide, ...rows]).some((row) => row.eventId === 'sr:match:99'), false);
+  const tagged = { ...leg(98, 'dc-12', 1.27), sample: '10/10', opponentSample: '10/10', exception: true };
+  assert.equal(bookableLegs([tagged, leg(2, 'dc-12', 1.22)], now).some((row) => row.eventId === 'sr:match:98'), false);
+  assert.equal(codeLegs([tagged, ...rows]).some((row) => row.eventId === 'sr:match:98'), false);
   const slips = tierSlips([
     { ...leg(1, 'dc-12', 1.22), occurrence: 80, rate: 0.8 },
     { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },

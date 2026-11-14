@@ -3,7 +3,7 @@
  * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
 import { labelFor } from './occurrence.mjs';
-import { assertBookingRanges, legOpen, priceInRange, priceNearRange, projectSlip, rangeViolations } from './oddsRange.mjs';
+import { assertBookingRanges, legOpen, projectSlip, rangeViolations, strictInRange } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
 
@@ -17,7 +17,7 @@ export const SLIP_CONCURRENCY = 4;
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && (priceInRange(leg.market, leg.odds, leg) || priceNearRange(leg.market, leg.odds, leg)),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && strictInRange(leg.market, leg.odds),
   );
 }
 
@@ -34,10 +34,10 @@ function cacheFresh(entry, legs) {
   return true;
 }
 
-/** The legs that go on one code. Strict range, or a real 10/10 exception, then the cap. */
+/** The legs that go on one code. Strict published band only, then the cap. */
 export function codeLegs(legs, limit = CODE_LIMIT) {
   return (Array.isArray(legs) ? legs : [])
-    .filter((leg) => priceInRange(leg?.market, leg?.odds, leg) && !rangeViolations([leg]).length)
+    .filter((leg) => strictInRange(leg?.market, leg?.odds))
     .slice()
     .sort((a, b) => legRate(b) - legRate(a) || String(a.kickoff).localeCompare(String(b.kickoff)) || String(a.eventId).localeCompare(String(b.eventId)) || String(a.market).localeCompare(String(b.market)))
     .slice(0, limit);
