@@ -109,14 +109,14 @@ test('a followed trend pushes when it lands, and a price under 1.20 does not', (
   const after = [{ id: 'sr:match:1', home: 'Hearts', away: 'Kotoko', status: 'live', homeScore: 2, awayScore: 0, htHome: null, htAway: null }];
   const device = acceptDevice({
     token: 'fcm-token-value-that-is-long-enough',
-    trends: ['sr:match:1:over05', 'sr:match:1:over15'],
+    trends: ['sr:match:1:over15', 'sr:match:1:home'],
     bookings: [
-      { id: 'sr:match:1:over05', odds: 1.2 },
-      { id: 'sr:match:1:over15', odds: 1.19 },
+      { id: 'sr:match:1:over15', odds: 1.25 },
+      { id: 'sr:match:1:home', odds: 1.6 },
     ],
   }).device;
   const notes = trendNotes(before, after, device);
-  assert.deepEqual(notes.map((note) => note.id), ['trend:sr:match:1:over05:hit']);
+  assert.deepEqual(notes.map((note) => note.id), ['trend:sr:match:1:over15:hit']);
   assert.equal(notes[0].kind, 'win');
-  assert.equal(notes[0].title.includes('Over 0.5'), true);
+  assert.equal(notes[0].title.includes('Over 1.5'), true);
 });

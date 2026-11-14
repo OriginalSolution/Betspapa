@@ -16,7 +16,7 @@ const events = [
     kickoff: '2026-11-10T18:00:00.000Z',
     tournament: 'Nations League',
     country: 'International',
-    odds: { home: 1.9, draw: 3.4, away: 4.2, 'over-15': 1.22, 'over-25': 1.08 },
+    odds: { home: 1.4, draw: 3.4, away: 4.2, 'over-15': 1.22, 'over-25': 1.08 },
   },
 ];
 
@@ -129,7 +129,7 @@ test('boot restores a booked snapshot and a failed cycle does not clear it', asy
       master: {
         id: 'master',
         legCount: 1,
-        legs: [{ eventId: 'sr:match:1', market: 'home', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.5 }],
+        legs: [{ eventId: 'sr:match:1', market: 'home', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.4 }],
         books: { sportybet: { parts: [{ code: 'KEEP1' }] } },
       },
       trends: [],

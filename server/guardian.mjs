@@ -5,6 +5,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { boardHasCodes } from './engine.mjs';
+import { priceInRange, rangeReason } from './oddsRange.mjs';
 
 const DESKS = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'];
 const ZONE = 'Africa/Accra';
@@ -61,8 +62,11 @@ export function inspectEngine(state, now = Date.now(), { maxAgeMs = 20 * 60 * 10
   }
   for (const slip of slipList(state)) {
     for (const leg of slip.legs || []) {
-      if (Number(leg.odds) < 1.2) {
-        issues.push({ code: 'short-price', level: 'attention', message: `${slip.id || 'slip'} still lists a price under 1.20.` });
+      if (leg.market && !priceInRange(leg.market, leg.odds, leg)) {
+        issues.push({ code: 'out-of-range', level: 'attention', message: `${slip.id || 'slip'} ${rangeReason(leg.market, leg.odds)}` });
+        actions.add('rerun');
+      } else if (!leg.market && Number(leg.odds) > 0 && Number(leg.odds) < 1.18) {
+        issues.push({ code: 'out-of-range', level: 'attention', message: `${slip.id || 'slip'} still lists a price under 1.18.` });
         actions.add('rerun');
       }
       const kick = Date.parse(leg.kickoff || '');
@@ -110,12 +114,20 @@ export function selfTestEngine() {
   const fresh = inspectEngine({
     updatedAt: new Date().toISOString(),
     feedAt: new Date().toISOString(),
-    master: { id: 'master', legs: [{ odds: 1.4, kickoff: new Date(Date.now() + 3600_000).toISOString() }], books: { sportybet: { parts: [{ code: 'ABCD12' }] } } },
+    master: { id: 'master', legs: [{ market: 'over25', odds: 1.4, kickoff: new Date(Date.now() + 3600_000).toISOString() }], books: { sportybet: { parts: [{ code: 'ABCD12' }] } } },
     trends: [],
     tiers: [],
     books: { sportybet: { parts: [{ code: 'ABCD12' }] } },
   });
   checks.push({ name: 'a fresh coded board is healthy', ok: fresh.ok });
+  const wide = inspectEngine({
+    updatedAt: new Date().toISOString(),
+    feedAt: new Date().toISOString(),
+    master: { id: 'master', legs: [{ market: 'over15', odds: 1.55, kickoff: new Date(Date.now() + 3600_000).toISOString() }], books: {} },
+    trends: [],
+    tiers: [],
+  });
+  checks.push({ name: 'an out-of-range leg fails the check', ok: !wide.ok && wide.issues.some((issue) => issue.code === 'out-of-range') });
   checks.push({ name: 'percentiles are ordered', ok: percentile([10, 20, 30, 40], 95) >= percentile([10, 20, 30, 40], 50) });
   return { ok: checks.every((check) => check.ok), checks };
 }
@@ -151,8 +163,9 @@ export function createGuardian(options = {}) {
       if (restored) fixes.push('Restored the last booked board.');
     }
     const since = lastCycleAt ? Date.now() - lastCycleAt : Infinity;
-    const urgent = !boardHasCodes(options.getState ? options.getState() : null);
-    if (verdict.actions.includes('rerun') && options.runCycle && (urgent || since > 10 * 60 * 1000)) {
+    const repair = Boolean(options.needsRepair?.());
+    const urgent = !boardHasCodes(options.getState ? options.getState() : null) || repair;
+    if ((verdict.actions.includes('rerun') || repair) && options.runCycle && (urgent || since > 10 * 60 * 1000)) {
       await options.runCycle();
       lastCycleAt = Date.now();
       fixes.push('Ran a booking cycle.');
@@ -184,8 +197,13 @@ export function createGuardian(options = {}) {
         logIncident({ code: 'fcm-off', level: 'info', message: 'FCM is not configured on this process.', fixed: false });
       }
       const slow = latencySummary(samples).filter((row) => row.slow);
+      const live = new Set(verdict.issues.filter((issue) => issue.level === 'attention' || issue.level === 'warn').map((issue) => issue.code));
       for (const row of slow) {
+        live.add('slow-endpoint');
         logIncident({ code: 'slow-endpoint', level: 'attention', message: `${row.path} p95 is ${row.p95}ms.`, fixed: false });
+      }
+      for (const item of incidents) {
+        if (!live.has(item.code)) item.fixed = true;
       }
       if (nightlyDue(lastNightly, nowFn())) await nightly();
       return status();

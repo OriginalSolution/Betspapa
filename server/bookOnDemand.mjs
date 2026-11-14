@@ -4,7 +4,7 @@
  */
 import { bookAll } from './bookers.mjs';
 import { selectionKey } from './selection.mjs';
-import { MIN_ODDS } from './slips.mjs';
+import { legOpen, priceInRange } from './oddsRange.mjs';
 
 const MAX_LEGS = 40;
 const MAX_GROUPS = 12;
@@ -30,8 +30,8 @@ export function prepareLegs(rows, now = new Date()) {
     const odds = Number(row?.odds);
     const kick = Date.parse(row?.kickoff || '');
     if (!/^sr:match:\d+$/.test(eventId) || !market) continue;
-    if (!Number.isFinite(odds) || odds < MIN_ODDS) continue;
-    if (!Number.isFinite(kick) || kick < clock) continue;
+    if (!Number.isFinite(odds) || !priceInRange(market, odds, row)) continue;
+    if (!legOpen({ kickoff: row?.kickoff }, clock)) continue;
     const key = `${eventId}|${market}`;
     if (seen.has(key)) continue;
     seen.add(key);

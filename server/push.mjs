@@ -11,6 +11,7 @@
  * emitted only when those fields are present on a row.
  */
 import { createSign } from 'node:crypto';
+import { priceInRange } from './oddsRange.mjs';
 import { cleanCountry } from './geo.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -195,6 +196,7 @@ const TREND_LABELS = {
   'fh-away': 'First-half away win',
   'fh-over05': 'First-half over 0.5',
   'fh-over15': 'First-half over 1.5',
+  'sh-over05': 'Second-half over 0.5',
 };
 
 function bothSrl(home, away) {
@@ -434,7 +436,7 @@ export function trendNotes(previous, next, device) {
     if (settleTrend(market, before) === 'won') continue;
     if (settleTrend(market, match) !== 'won') continue;
     const odds = oddsOf(device, id);
-    if (odds != null && odds < MIN_ODDS) continue;
+    if (odds != null && !priceInRange(market, odds)) continue;
     notes.push({
       id: `trend:${id}:hit`,
       matchId,

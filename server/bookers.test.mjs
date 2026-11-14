@@ -44,11 +44,11 @@ test('books an open SportyBet slip, splits a long slip, and reports the other de
     }
     if (url.includes('football.com')) return { bizCode: 19999, message: 'closed' };
     if (url.includes('msport.com')) {
-      if (method === 'GET') return { data: { bettableBetSlip: [{ outcome: { odds: '1.50' } }] } };
+      if (method === 'GET') return { data: { bettableBetSlip: [{ event: { eventId: 'sr:match:1' }, market: { id: '18', specifiers: 'total=1.5' }, outcome: { id: '12', odds: '1.25' } }] } };
       return { bizCode: 10000, data: { shareCode: 'MS1' } };
     }
     if (url.includes('betika.com')) {
-      if (url.includes('decode')) return { data: [{ valid: '1', odd_value: '1.5', parent_match_id: '1' }, { valid: '0', odd_value: '1.2', parent_match_id: '2' }] };
+      if (url.includes('decode')) return { data: [{ valid: '1', odd_value: '1.28', parent_match_id: '1', sub_type_id: '18', special_bet_value: 'total=1.5', outcome_id: '12' }, { valid: '0', odd_value: '1.2', parent_match_id: '2', sub_type_id: '18', special_bet_value: 'total=1.5', outcome_id: '12' }] };
       return { code: 'BK1' };
     }
     if (url.includes('betpawa.com')) return url.includes('search') ? { events: [] } : {};
@@ -57,8 +57,8 @@ test('books an open SportyBet slip, splits a long slip, and reports the other de
 
   const closed = await bookAll(
     [
-      { eventId: 'sr:match:1', market: 'over15', odds: 1.04, match: 'A vs B' },
-      { eventId: 'sr:match:2', market: 'over15', odds: 1.04, match: 'C vs D' },
+      { eventId: 'sr:match:1', market: 'over15', odds: 1.25, match: 'A vs B' },
+      { eventId: 'sr:match:2', market: 'over15', odds: 1.25, match: 'C vs D' },
     ],
     request,
   );

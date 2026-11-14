@@ -203,7 +203,7 @@ test('the operator snapshot counts devices and does not reveal a token', () => {
   assert.equal(overview.status.engine, 'OPEN');
   assert.equal(overview.status.fcm, true);
   assert.equal(overview.status.feed, 12);
-  assert.equal(overview.status.oddsFloor, 1.2);
+  assert.equal(overview.status.oddsFloor, 1.18);
   assert.equal(overview.status.cycleMinutes, 15);
   assert.equal(overview.trends.markets, 1);
   assert.equal(overview.trends.droppedUnderFloor, 3);
@@ -445,7 +445,7 @@ test('admin routes require the session, throttle failures, and store a device wi
     assert.equal(open.installs.ghana, 1);
     assert.equal(open.installs.devices, 1);
     assert.equal(open.push.latestTail, TOKEN.slice(-6));
-    assert.equal(open.status.oddsFloor, 1.2);
+    assert.equal(open.status.oddsFloor, 1.18);
 
     const tested = await httpAsk({
       method: 'POST',

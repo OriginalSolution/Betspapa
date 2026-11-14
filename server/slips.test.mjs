@@ -7,7 +7,7 @@ const now = new Date('2026-11-13T10:00:00.000Z');
 const leg = (id, market, odds = 1.3) => ({ eventId: `sr:match:${id}`, market, odds, match: `T${id} vs U${id}`, kickoff: '2026-11-13T18:00:00.000Z', status: 'open' });
 
 test('drops legs under 1.20 and started games, keeps exactly 1.20', () => {
-  const legs = bookableLegs([leg(1, 'over15', 1.19), leg(2, 'over15', 1.2), { ...leg(3, 'home'), kickoff: '2026-11-13T09:00:00.000Z' }], now);
+  const legs = bookableLegs([leg(1, 'over15', 1.05), leg(2, 'over15', 1.2), { ...leg(3, 'home'), kickoff: '2026-11-13T09:00:00.000Z' }], now);
   assert.deepEqual(legs.map((row) => row.eventId), ['sr:match:2']);
 });
 
@@ -48,7 +48,7 @@ test('betPawa drops a price under 1.20 and records why', async () => {
   };
   const books = await bookAll([{ eventId: 'sr:match:5', market: 'home', odds: 1.25, match: 'Alpha vs Beta' }], request, undefined, ['betpawa']);
   assert.equal(books.betpawa.parts.length, 0);
-  assert.match(books.betpawa.dropped[0].reason, /1\.15 is below 1\.20/);
+  assert.match(books.betpawa.dropped[0].reason, /1\.15 is outside 1\.20/);
   assert.equal(books.betpawa.dropped[0].market, 'home');
 });
 

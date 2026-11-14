@@ -34,6 +34,7 @@ export const SELECTIONS = {
   'fh-away': { marketId: '60', outcomeId: '3', specifier: null },
   'fh-over05': { marketId: '68', outcomeId: '12', specifier: 'total=0.5' },
   'fh-over15': { marketId: '68', outcomeId: '12', specifier: 'total=1.5' },
+  'sh-over05': { marketId: '90', outcomeId: '12', specifier: 'total=0.5' },
   'corners-over75': { marketId: '166', outcomeId: '12', specifier: 'total=7.5' },
   'corners-over85': { marketId: '166', outcomeId: '12', specifier: 'total=8.5' },
   'corners-over95': { marketId: '166', outcomeId: '12', specifier: 'total=9.5' },
@@ -60,6 +61,10 @@ export function toSelection(leg) {
     market: String(leg.market),
     odds: Number.isFinite(odds) && odds > 1 ? odds : 1,
     match,
+    sample: leg.sample,
+    rate: leg.rate,
+    occurrence: leg.occurrence,
+    opponentHeld: leg.opponentHeld === true,
   };
 }
 

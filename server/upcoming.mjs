@@ -10,7 +10,7 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const CACHE_TTL_MS = 5 * 60_000;
 const STALE_MS = 60 * 60_000;
-export const CATALOGUE_MARKETS = '1,10,11,18,19,20,29,31,32,60,68';
+export const CATALOGUE_MARKETS = '1,10,11,18,19,20,29,31,32,60,68,90';
 const EXTRA_MARKETS = '166,800063';
 
 const cache = { loadedAt: 0, events: [], pending: null };
@@ -67,6 +67,7 @@ export function parseOdds(markets = []) {
         if (oid === '2' || desc === 'draw') odds['fh-draw'] = value;
         if (oid === '3' || desc === 'away') odds['fh-away'] = value;
       } else if (id === '68') writeTotal(odds, 'fh', market.specifier, outcome);
+      else if (id === '90') writeTotal(odds, 'sh', market.specifier, outcome);
       else if (id === '31' && (oid === '74' || desc === 'yes')) odds['home-clean'] = value;
       else if (id === '32' && (oid === '74' || desc === 'yes')) odds['away-clean'] = value;
       else if (id === '166') writeTotal(odds, 'corners', market.specifier, outcome);

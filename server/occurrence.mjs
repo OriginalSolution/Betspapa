@@ -3,6 +3,7 @@
  * A line qualifies at 80% or better over the last 10 relevant games, with at
  * least 8 of those games scored. The hit rules match the app's settle().
  */
+import { MIN_ODDS, priceInRange, priceNearRange } from './oddsRange.mjs';
 import { isSimulated } from './upcoming.mjs';
 
 export const WINDOW = 10;
@@ -10,7 +11,7 @@ export const MIN_SAMPLE = 8;
 export const THRESHOLD = 0.8;
 /** Tie-break when two markets hit equally often: the price nearer a normal leg. */
 export const SENSIBLE_ODDS = 1.8;
-export const MIN_ODDS = 1.2;
+export { MIN_ODDS };
 
 const EVENT_ID = /^sr:match:\d+$/;
 
@@ -45,6 +46,12 @@ function half(row) {
   const team = row.teamIsHome ? row.htHome : row.htAway;
   const opp = row.teamIsHome ? row.htAway : row.htHome;
   return { team, opp, total: row.htHome + row.htAway };
+}
+
+function secondHalfTotal(row) {
+  const score = scores(row);
+  if (!score || !Number.isFinite(row?.htHome) || !Number.isFinite(row?.htAway)) return null;
+  return score.total - (row.htHome + row.htAway);
 }
 
 function cornerTotal(row) {
@@ -129,6 +136,7 @@ export const OCCURRENCE_MARKETS = [
   { id: 'fh-away', label: 'First-half away win', oddsKey: 'fh-away', scope: 'away', hit: (row) => { const ht = half(row); return ht ? ht.team > ht.opp : null; } },
   { id: 'fh-over05', label: 'First-half over 0.5', oddsKey: 'fh-over-05', scope: 'either', hit: lineHit((row) => half(row)?.total ?? null, 0.5, true) },
   { id: 'fh-over15', label: 'First-half over 1.5', oddsKey: 'fh-over-15', scope: 'either', hit: lineHit((row) => half(row)?.total ?? null, 1.5, true) },
+  { id: 'sh-over05', label: 'Second-half over 0.5', oddsKey: 'sh-over-05', scope: 'either', hit: lineHit(secondHalfTotal, 0.5, true) },
   { id: 'corners-over75', label: 'Over 7.5 corners', oddsKey: 'corners-over-75', scope: 'either', hit: lineHit(cornerTotal, 7.5, true) },
   { id: 'corners-over85', label: 'Over 8.5 corners', oddsKey: 'corners-over-85', scope: 'either', hit: lineHit(cornerTotal, 8.5, true) },
   { id: 'corners-over95', label: 'Over 9.5 corners', oddsKey: 'corners-over-95', scope: 'either', hit: lineHit(cornerTotal, 9.5, true) },
@@ -241,7 +249,8 @@ function percent(rate) {
 }
 
 /**
- * One leg per open fixture per market at or above 80%, with a price of at least 1.20.
+ * One leg per open fixture per market at or above 80%, inside the odds table.
+ * A price just outside the band is kept so another book can still price it.
  * `byEvent` also keeps cooler measured rates so the app can show the same record.
  */
 export function buildOccurrenceBoard(events, histories, now = new Date()) {
@@ -267,11 +276,19 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
       measured.push({ market: market.id, hits: rate.hits, sample: rate.sample, rate: rate.hits / rate.sample });
       if (rate.rate + 1e-12 < THRESHOLD) continue;
       const price = Number(event.odds?.[market.oddsKey]);
-      if (!Number.isFinite(price) || price < MIN_ODDS) {
+      const explained = explainTip(market, homeRows, awayRows);
+      const draft = {
+        market: market.id,
+        odds: price,
+        sample: `${rate.hits}/${rate.sample}`,
+        rate: rate.rate,
+        occurrence: percent(rate.rate),
+        opponentHeld: explained.opponentHeld,
+      };
+      if (!Number.isFinite(price) || price <= 1 || (!priceInRange(market.id, price, draft) && !priceNearRange(market.id, price, draft))) {
         unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
         continue;
       }
-      const explained = explainTip(market, homeRows, awayRows);
       legs.push({
         eventId: String(event.eventId),
         market: market.id,
@@ -302,7 +319,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
       .map(([id, count]) => `${labelFor(id)} ${count}`)
       .join(', ');
     const total = [...unpriced.values()].reduce((sum, count) => sum + count, 0);
-    notes.push(`${total} lines were at 80%+ but had no price at or above 1.20 (${detail}).`);
+    notes.push(`${total} lines were at 80%+ but outside the odds range (${detail}).`);
   }
   return { legs, byEvent, notes };
 }
