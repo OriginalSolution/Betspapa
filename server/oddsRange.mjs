@@ -173,14 +173,20 @@ export function projectSlip(slip, now = Date.now()) {
   const books = {};
   for (const [desk, book] of Object.entries(slip.books || {})) {
     if (!book || typeof book !== 'object') continue;
-    const parts = (book.parts || []).filter((part) => {
-      const matches = Array.isArray(part?.matches) ? part.matches : [];
-      if (matches.length) return matches.every((id) => openIds.has(id));
+    const parts = [];
+    for (const part of book.parts || []) {
+      const listed = Array.isArray(part?.matches) ? part.matches : [];
+      if (listed.length) {
+        const matches = listed.filter((id) => openIds.has(id));
+        if (!matches.length) continue;
+        parts.push({ ...part, matches, legs: matches.length });
+        continue;
+      }
       const count = Number(part?.legs);
-      if (Number.isFinite(count) && count > legs.length) return false;
-      if (removed) return false;
-      return Boolean(part?.code);
-    });
+      if (Number.isFinite(count) && count > legs.length) continue;
+      if (removed || !part?.code) continue;
+      parts.push(part);
+    }
     books[desk] = {
       ...book,
       parts,
