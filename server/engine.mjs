@@ -139,17 +139,19 @@ export function preserveBoard(previous, next, now = new Date()) {
   if (!boardHasCodes(previous)) return next;
   const master = stillOpen(previous.master, now);
   const trends = (previous.trends || []).map((trend) => stillOpen(trend, now)).filter((trend) => (trend?.legs || []).length || slipHasCode(trend));
+  const tierRows = (previous.tiers || []).map((tier) => stillOpen(tier, now)).filter((tier) => (tier?.legs || []).length || slipHasCode(tier));
   const legs = (previous.legs || []).filter((leg) => {
     const kick = new Date(leg.kickoff).getTime();
     return Number.isFinite(kick) && kick >= now.getTime();
   });
-  if (!(master?.legs || []).length && !trends.some((trend) => (trend.legs || []).length)) return next;
+  const openLegs = (master?.legs || []).length || trends.some((trend) => (trend.legs || []).length) || tierRows.some((tier) => (tier.legs || []).length);
+  if (!openLegs) return next;
   return {
     ...next,
     books: previous.books,
     master,
     trends,
-    tiers: previous.tiers || [],
+    tiers: tierRows.length ? tierRows : previous.tiers || [],
     legs,
     slipKey: previous.slipKey,
     slipCache: previous.slipCache,
@@ -206,6 +208,17 @@ export function createEngine(options = {}) {
     } catch (error) {
       log('error', `Could not store engine state: ${error.message}`);
     }
+  }
+
+  function remember(next, now = new Date()) {
+    save(next);
+    if (!boardHasCodes(next)) return;
+    const publish = options.publishSnapshot || publishEngineSnapshot;
+    void Promise.resolve(publish(appEngineState(publicState(next, now))))
+      .then((ok) => {
+        if (ok === false) log('error', 'Could not store the booked board for the next restart.');
+      })
+      .catch((error) => log('error', `Could not store the booked board: ${error instanceof Error ? error.message : error}`));
   }
 
   async function fetchFeed() {
@@ -318,7 +331,7 @@ export function createEngine(options = {}) {
       cycleNotes: issues,
       issues: issues.slice(0, 40),
     }, now);
-    if (legs.length || !beforeOpen) save(preview);
+    if ((legs.length || !beforeOpen) && !boardHasCodes(before)) save(preview);
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
@@ -362,7 +375,13 @@ export function createEngine(options = {}) {
           cycleNotes: [...issues, ...progress.issues],
           issues: [...issues, ...progress.issues].slice(0, 40),
         };
-        save(projectBoard(partial, clock));
+        const nextBoard = projectBoard(partial, clock);
+        if (boardHasCodes(before)) {
+          const publish = options.publishSnapshot || publishEngineSnapshot;
+          void Promise.resolve(publish(appEngineState(publicState(nextBoard, clock)))).catch(() => {});
+        } else {
+          remember(nextBoard, clock);
+        }
       },
         });
       }
@@ -399,11 +418,7 @@ export function createEngine(options = {}) {
       issues: issues.slice(0, 40),
     };
     const kept = projectBoard(preserveBoard(before, next, now), now);
-    save(kept);
-    if (boardHasCodes(kept)) {
-      const publish = options.publishSnapshot || publishEngineSnapshot;
-      void publish(publicState(kept, now)).catch(() => {});
-    }
+    remember(kept, now);
     if (options.crests !== false && !options.fetchImpl) {
       const fromDay = now.toISOString().slice(0, 10);
       const toDay = new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);

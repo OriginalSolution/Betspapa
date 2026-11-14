@@ -141,6 +141,21 @@ test('boot restores a booked snapshot and a failed cycle does not clear it', asy
   });
   assert.equal(await engine.restore(), true);
   assert.equal(engine.getState().books.sportybet.parts[0].code, 'KEEP1');
+  const finished = createEngine({
+    dir: mkdtempSync(join(tmpdir(), 'betspapa-engine-')),
+    fetchImpl: async () => { throw new Error('down'); },
+    loadHistories: async () => new Map(),
+    loadSnapshot: async () => ({
+      books: { sportybet: { parts: [{ code: 'OLD1' }] } },
+      master: { id: 'master', legs: [{ eventId: 'sr:match:9', market: 'home', kickoff: '2026-11-09T18:00:00.000Z', odds: 1.4 }], books: { sportybet: { parts: [{ code: 'OLD1' }] } } },
+      trends: [],
+      tiers: [],
+    }),
+    now: () => now,
+    log: () => {},
+  });
+  assert.equal(await finished.restore(), false);
+  assert.equal(finished.getState().books.sportybet, undefined);
   const after = await engine.run();
   assert.equal(after.books.sportybet.parts[0].code, 'KEEP1');
 });
