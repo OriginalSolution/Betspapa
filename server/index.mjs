@@ -517,6 +517,7 @@ export function createBetspapaServer() {
 const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invoked) {
   const server = createBetspapaServer();
+  restoreEngine().finally(() => {
   server.listen(port, '0.0.0.0', () => {
     console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
     loadUpcomingEvents()
@@ -532,4 +533,5 @@ if (invoked) {
   }, 60_000);
   promoTimer.unref?.();
 });
+  });
 }
