@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildOccurrenceBoard, explainTip, lastForm, masterPick, measureMarket, OCCURRENCE_MARKETS, rateOf } from './occurrence.mjs';
+import { buildOccurrenceBoard, explainTip, lastForm, masterPick, measureMarket, mirroredRecords, OCCURRENCE_MARKETS, rateOf } from './occurrence.mjs';
 
 const now = new Date('2026-11-13T12:00:00.000Z');
 
@@ -125,6 +125,14 @@ test('form and the opponent check come from the same history and stay quiet when
   assert.ok(both.form && both.form.length === 5);
   assert.equal(explainTip(over, homeRows, []).opponentHeld, null);
   assert.equal(explainTip(over, [], []).form, null);
+  const homePerfect = played(10, (index) => row({ matchId: index + 1, uts: 100 - index, teamIsHome: true, ftHome: 2, ftAway: 0 }));
+  const awayPerfect = played(10, (index) => row({ matchId: index + 20, uts: 100 - index, teamIsHome: false, ftHome: 0, ftAway: 2 }));
+  const score = OCCURRENCE_MARKETS.find((market) => market.id === 'home-score');
+  assert.equal(score.oddsKey, 'home-over-05');
+  assert.equal(OCCURRENCE_MARKETS.find((market) => market.id === 'away-score').oddsKey, 'away-over-05');
+  assert.equal(mirroredRecords(home, homePerfect, awayPerfect).exception, true);
+  assert.equal(mirroredRecords(home, homePerfect, awayRows).exception, false);
+  assert.equal(mirroredRecords(score, homePerfect, awayRows).exception, false);
 });
 
 test('a home trend uses home games only and ignores neutral grounds', () => {

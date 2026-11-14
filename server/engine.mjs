@@ -3,10 +3,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
-import { boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
+import { assertBookingRanges, boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
-import { bookSlips, bookableLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
+import { CODE_LIMIT, SLIP_CONCURRENCY, bookSlips, bookableLegs, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
 import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
 import { loadEngineSnapshot, publishEngineSnapshot } from './engineSnapshot.mjs';
 
@@ -258,14 +258,21 @@ export function createEngine(options = {}) {
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
-    const booking = await bookSlips({
-      slips: [master, ...trends, ...tiers],
-      cache: priorCache,
-      book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
-      now: bookNow,
-      gapMs: options.slipGapMs ?? 4000,
-      pause,
-      log,
+    const queue = [...tiers, ...trends, master];
+    const payload = queue.flatMap((slip) => codeLegs(bookableLegs(slip.legs, now)));
+    let booking = { results: queue.map((slip) => ({ ...slip, books: {}, bookedAt: null })), cache: priorCache, issues: [] };
+    try {
+      assertBookingRanges(payload);
+      if (request) {
+        booking = await bookSlips({
+          slips: queue,
+          cache: priorCache,
+          book: (slipLegs, desks) => bookAll(slipLegs.slice(0, CODE_LIMIT), request, undefined, desks),
+          now: bookNow,
+          gapMs: 0,
+          concurrency: options.slipConcurrency ?? SLIP_CONCURRENCY,
+          pause,
+          log,
       onProgress: (progress) => {
         const booked = new Map(progress.results.map((slip) => [slip.id, slip]));
         const key = booked.get('master')?.key || progress.results[0]?.key;
@@ -293,17 +300,22 @@ export function createEngine(options = {}) {
         };
         save(projectBoard(partial, clock));
       },
-    });
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Range check blocked booking.';
+      issues.push(message);
+      log('error', message);
+    }
     issues.push(...booking.issues);
-    const [masterResult, ...restResults] = booking.results;
-    const trendResults = restResults.slice(0, trends.length);
-    const tierResults = restResults.slice(trends.length);
+    const bookedById = new Map(booking.results.filter(Boolean).map((slip) => [slip.id, slip]));
+    const masterResult = bookedById.get('master');
     const key = masterResult?.key;
     const clock = options.now ? options.now() : new Date();
     const books = inspectBooks(masterResult?.books).books;
     const masterView = masterResult ? slipView(masterResult, key, clock) : null;
-    const trendViews = trendResults.map((trend) => slipView(trend, key, clock));
-    const tierViews = tierResults.map((trend) => slipView(trend, key, clock));
+    const trendViews = trends.map((trend) => slipView(bookedById.get(trend.id) || trend, key, clock));
+    const tierViews = tiers.map((trend) => slipView(bookedById.get(trend.id) || trend, key, clock));
 
     const next = {
       ...state,

@@ -86,6 +86,10 @@ export type EngineLeg = {
   form?: FormMark[] | null;
   /** True only when the opponent-side 80% check passed. Absent hides the chip. */
   opponentHeld?: boolean | null;
+  /** Opponent sample such as 10/10. Present when that mirrored record was measured. */
+  opponentSample?: string | null;
+  /** True only for a 10/10 record whose opponent is also 10/10, so the price may exceed the strict band. */
+  exception?: boolean | null;
 };
 
 export type EnginePart = {
@@ -215,6 +219,8 @@ function parseLeg(value: unknown): EngineLeg | null {
     sample: text(row.sample),
     form: form.length ? form : null,
     opponentHeld: row.opponentHeld === true ? true : null,
+    opponentSample: text(row.opponentSample),
+    exception: row.exception === true ? true : null,
   };
 }
 

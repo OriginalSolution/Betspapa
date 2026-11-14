@@ -112,7 +112,7 @@ export function PicksPage() {
       <CodeStrip
         desk={desk}
         tier={tier}
-        title={market === 'all' ? `${TIER_LABEL[tier]} master` : filters.find((item) => item.id === market)?.label || market}
+        title={market === 'all' ? `${TIER_LABEL[tier]} all picks` : `${TIER_LABEL[tier]} ${marketLabel(market)}`}
         parts={booked.parts}
         bookedAt={booked.bookedAt}
         note={state?.showingCached ? 'Showing the last booked board' : undefined}
@@ -276,9 +276,10 @@ function TipRow({
                 {clock ? ` - ${clock}` : ''}
               </em>
             </span>
-            {(tip.chip.form?.length || tip.chip.opponentHeld) && (
+            {(tip.chip.form?.length || tip.chip.opponentHeld || tip.chip.exception) && (
               <span className="tip-extra">
                 {tip.chip.form && tip.chip.form.length > 0 && <FormPips form={tip.chip.form} />}
+                {tip.chip.exception && <i className="exception-chip">Exception</i>}
                 {tip.chip.opponentHeld && <i className="held-chip">Held after opponent</i>}
               </span>
             )}

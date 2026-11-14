@@ -45,16 +45,38 @@ export function listedMarket(market) {
   return Object.prototype.hasOwnProperty.call(ODDS_RANGES, String(market || ''));
 }
 
-/** 100% on the backed side, and the opponent's recent record agrees. */
+function sampleText(value) {
+  return String(value || '').replace(/\s/g, '');
+}
+
+/**
+ * The 1.60 ceiling needs a 10/10 record on this exact market and a 10/10
+ * mirrored record from the opponent. An 80% "held" flag is not enough.
+ */
+export function validException(leg) {
+  return sampleText(leg?.sample) === '10/10' && sampleText(leg?.opponentSample) === '10/10';
+}
+
 export function perfectRecord(leg) {
-  if (!leg || leg.opponentHeld !== true) return false;
-  const sample = String(leg.sample || '').match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (sample && Number(sample[2]) > 0 && Number(sample[1]) === Number(sample[2])) return true;
-  const rate = Number(leg.rate);
-  if (Number.isFinite(rate) && (rate > 1 ? rate / 100 : rate) + 1e-12 >= 0.995) return true;
-  const occurrence = Number(leg.occurrence);
-  if (Number.isFinite(occurrence) && occurrence + 1e-9 >= 99.5) return true;
-  return false;
+  return validException(leg);
+}
+
+/** Legs that must not be shown or booked. A strict price is fine. A wider price needs the 10/10 pair. */
+export function rangeViolations(legs) {
+  return (Array.isArray(legs) ? legs : []).filter((leg) => {
+    if (priceInRange(leg?.market, leg?.odds, null)) return false;
+    return !(validException(leg) && priceInRange(leg.market, leg.odds, leg));
+  });
+}
+
+/** Refuse the booking set when any leg is outside the table without a real exception. */
+export function assertBookingRanges(legs) {
+  const bad = rangeViolations(legs);
+  if (!bad.length) return;
+  const sample = bad.slice(0, 6).map((leg) => `${leg.market} ${leg.odds}${leg.match ? ` ${leg.match}` : ''}`).join('; ');
+  const error = new Error(`Range check blocked booking. ${bad.length} legs are outside the table without a 10/10 exception (${sample}).`);
+  error.violations = bad;
+  throw error;
 }
 
 function ceiling(range, leg) {
