@@ -176,6 +176,52 @@ export function projectBoard(state, now = Date.now()) {
   };
 }
 
+const FINISHED_NOTE = 'No open picks. Finished matches are not shown.';
+
+function openIdsOf(state) {
+  const ids = new Set();
+  for (const slip of slipList(state)) {
+    for (const leg of slip?.legs || []) ids.add(leg.eventId);
+  }
+  return ids;
+}
+
+function booksForOpen(books, openIds) {
+  const next = {};
+  for (const [desk, book] of Object.entries(books || {})) {
+    if (!book || typeof book !== 'object') continue;
+    const parts = (book.parts || []).filter((part) => {
+      const matches = Array.isArray(part?.matches) ? part.matches : [];
+      if (!matches.length) return true;
+      return matches.every((id) => openIds.has(id));
+    });
+    const dropped = (book.dropped || []).filter((row) => !row?.eventId || openIds.has(row.eventId));
+    next[desk] = { ...book, parts, dropped };
+  }
+  return next;
+}
+
+/**
+ * What readers see. A stored board whose matches have all kicked off is not served.
+ * Codes, drops, and yesterday's notes go with it.
+ */
+export function serveBoard(state, now = Date.now()) {
+  const view = projectBoard(state, now);
+  const openIds = openIdsOf(view);
+  if (!openIds.size) {
+    return {
+      ...view,
+      books: {},
+      master: view.master ? { ...view.master, legs: [], legCount: 0, books: {} } : null,
+      trends: [],
+      tiers: [],
+      issues: [FINISHED_NOTE],
+      cycleNotes: [FINISHED_NOTE],
+    };
+  }
+  return { ...view, books: booksForOpen(view.books, openIds) };
+}
+
 function slipList(state) {
   return [state?.master, ...(state?.trends || []), ...(state?.tiers || [])].filter(Boolean);
 }

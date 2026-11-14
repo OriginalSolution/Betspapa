@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { boardDirty, priceInRange, priceNearRange, projectSlip } from './oddsRange.mjs';
+import { boardDirty, priceInRange, priceNearRange, projectSlip, serveBoard } from './oddsRange.mjs';
 
 const future = new Date(Date.now() + 3600_000).toISOString();
 const past = new Date(Date.now() - 3600_000).toISOString();
@@ -50,4 +50,24 @@ test('a kicked-off or out-of-range leg leaves the slip and its code', () => {
   assert.equal(shown.books.sportybet.parts.length, 0);
   assert.equal(boardDirty({ master: slip, trends: [], tiers: [] }), true);
   assert.equal(boardDirty({ master: shown, trends: [], tiers: [] }), false);
+});
+
+test('a finished board is not served, and the note says so', () => {
+  const served = serveBoard({
+    updatedAt: '2026-11-13T20:48:52.783Z',
+    books: { sportybet: { parts: [{ code: 'OLD', matches: ['sr:match:1'] }] } },
+    master: {
+      id: 'master',
+      legs: [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, kickoff: past, match: 'A vs B' }],
+      books: { sportybet: { parts: [{ code: 'OLD', matches: ['sr:match:1'] }] } },
+    },
+    trends: [],
+    tiers: [],
+    issues: ['27 lines were at 80%+ but had no price at or above 1.20.'],
+  });
+  assert.equal(served.legCount ?? served.master.legCount, 0);
+  assert.deepEqual(served.books, {});
+  assert.equal(served.master.books.sportybet, undefined);
+  assert.match(served.cycleNotes[0], /Finished matches are not shown/);
+  assert.equal(JSON.stringify(served).includes('1.20'), false);
 });

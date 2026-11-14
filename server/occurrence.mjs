@@ -257,6 +257,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
   const legs = [];
   const byEvent = {};
   let skippedNoTeam = 0;
+  let beforeRange = 0;
   const unpriced = new Map();
   for (const event of Array.isArray(events) ? events : []) {
     if (!isRealFixture(event) || !isOpenToday(event, now)) continue;
@@ -275,6 +276,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
       if (!rate) continue;
       measured.push({ market: market.id, hits: rate.hits, sample: rate.sample, rate: rate.hits / rate.sample });
       if (rate.rate + 1e-12 < THRESHOLD) continue;
+      beforeRange += 1;
       const price = Number(event.odds?.[market.oddsKey]);
       const explained = explainTip(market, homeRows, awayRows);
       const draft = {
@@ -311,6 +313,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
     if (measured.length) byEvent[String(event.eventId)] = measured;
   }
   const notes = [];
+  notes.push(`Range filter: ${beforeRange} lines at 80%+ before the price check, ${legs.length} inside the range.`);
   if (skippedNoTeam) notes.push(`${skippedNoTeam} real fixtures had no team id, so occurrence could not be computed.`);
   if (unpriced.size) {
     const detail = [...unpriced.entries()]
