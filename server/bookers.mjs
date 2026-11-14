@@ -1,5 +1,5 @@
 /** No-login Ghana share booking. Betway is omitted because it needs a logged-in account. */
-import { priceInRange, rangeReason } from './oddsRange.mjs';
+import { priceInRange, rangeReason, strictInRange } from './oddsRange.mjs';
 import { loadOfferIndex, stillOffered, toSelection } from './selection.mjs';
 
 const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
@@ -399,7 +399,10 @@ async function betpawaTry(legs, request) {
   const chosen = [];
   const dropped = [];
   const seen = new Set();
+  let scanned = 0;
   for (const leg of legs) {
+    if (chosen.length >= 20) break;
+    scanned += 1;
     if (seen.has(leg.eventId)) {
       dropped.push(drop(leg, 'betPawa takes one selection per match on a shared slip.'));
       continue;
@@ -409,19 +412,19 @@ async function betpawaTry(legs, request) {
       dropped.push(drop(leg, 'Not listed or not open on betPawa.'));
       continue;
     }
-    if (!priceInRange(leg.market, price[1], leg)) {
+    if (!strictInRange(leg.market, price[1])) {
       dropped.push(drop(leg, `betPawa price ${rangeReason(leg.market, price[1])}`));
       continue;
     }
     seen.add(leg.eventId);
     chosen.push({ id: price[0], odds: price[1], eventId: leg.eventId, market: leg.market });
   }
-  if (!chosen.length) return { booked: null, dropped };
+  if (!chosen.length) return { booked: null, dropped, scanned };
   const booked = await betpawaCall('POST', 'v3/booking-number', request, {
     selections: { selections: [{ type: chosen.length > 1 ? 'COMBO' : 'SINGLE', selections: chosen.map((row) => row.id) }] },
   });
   const code = booked?.code;
-  if (!code) return { booked: null, dropped: legs.map((leg) => drop(leg, 'betPawa refused the slip.')) };
+  if (!code) return { booked: null, dropped: legs.slice(0, scanned).map((leg) => drop(leg, 'betPawa refused the slip.')), scanned };
   const view = await betpawaCall('GET', `v3/booking-number/${code}`, request);
   const count = (view?.items || []).reduce((sum, item) => sum + (item.selections || []).length, 0) || chosen.length;
   return {
@@ -434,6 +437,7 @@ async function betpawaTry(legs, request) {
       kept: chosen.map((row) => keptRow(row, row.odds)),
     },
     dropped,
+    scanned,
   };
 }
 
@@ -524,7 +528,11 @@ export async function bookAll(legs, request, onBook, only) {
     ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request))],
     ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request))],
     ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request))],
-    ['betpawa', (group) => chunked(group, (chunk) => betpawaTry(chunk, request))],
+    ['betpawa', async (group) => {
+      const result = await betpawaTry(group, request);
+      const taken = withoutKept(result?.booked);
+      return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept, scanned: result?.scanned || 0 };
+    }],
   ].filter(([name]) => !allowed || allowed.has(name));
   const books = {};
   await Promise.all(
@@ -536,6 +544,7 @@ export async function bookAll(legs, request, onBook, only) {
         const dropped = [...closed, ...done.dropped];
         const kept = done.kept || [];
         result = parts.length ? { parts, error: null, dropped, kept } : { parts: [], error: 'No open selections on this bookmaker.', dropped, kept };
+        if (done.scanned != null) result.scanned = done.scanned;
       } catch (error) {
         result = { parts: [], error: publicError(error?.message || error), dropped: closed };
       }

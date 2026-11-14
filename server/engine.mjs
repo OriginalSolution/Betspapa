@@ -6,7 +6,7 @@ import { loadHistories } from './history.mjs';
 import { assertBookingRanges, boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
-import { CODE_LIMIT, SLIP_CONCURRENCY, bookSlips, bookableLegs, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
+import { SLIP_CONCURRENCY, bookSlips, bookableLegs, codeGroups, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
 import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
 import { loadEngineSnapshot, publishEngineSnapshot } from './engineSnapshot.mjs';
 
@@ -359,8 +359,13 @@ export function createEngine(options = {}) {
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
-    const queue = [...tiers, ...trends, master];
-    const payload = queue.flatMap((slip) => codeLegs(bookableLegs(slip.legs, now)));
+    const headlines = tiers.filter((slip) => !slip.market);
+    const markets = tiers.filter((slip) => slip.market);
+    const queue = [...headlines, ...markets, ...trends, master];
+    const payload = queue.flatMap((slip) => {
+      const open = bookableLegs(slip.legs, now);
+      return (slip.tier ? codeGroups(open, slip.tier) : [codeLegs(open)]).flat();
+    });
     let booking = { results: queue.map((slip) => ({ ...slip, books: {}, bookedAt: null })), cache: priorCache, issues: [] };
     try {
       assertBookingRanges(payload);
@@ -368,7 +373,7 @@ export function createEngine(options = {}) {
         booking = await bookSlips({
           slips: queue,
           cache: priorCache,
-          book: (slipLegs, desks) => bookAll(slipLegs.slice(0, CODE_LIMIT), request, undefined, desks),
+          book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
           now: bookNow,
           gapMs: 0,
           concurrency: options.slipConcurrency ?? SLIP_CONCURRENCY,
