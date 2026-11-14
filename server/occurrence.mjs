@@ -322,7 +322,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         occurrence: percent(rate.rate),
         opponentHeld: explained.opponentHeld,
         opponentSample: mirror.opponentSample,
-        exception: sample === '10/10' && mirror.exception,
+        exception: sample === '10/10' && mirror.opponentSample === '10/10',
       };
       if (!Number.isFinite(price) || price <= 1 || (!priceInRange(market.id, price, draft) && !priceNearRange(market.id, price, draft))) {
         unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);

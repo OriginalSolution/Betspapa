@@ -7,23 +7,19 @@ import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestC
 import {
   DESK_NAMES,
   DESKS,
-  ENGINE_POLL_MS,
   deskBook,
-  fetchEngine,
   marketLabel,
   picksLabel,
-  readEngineCache,
   showOdds,
   splitMatch,
   visibleLegs,
-  writeEngineCache,
   type DeskId,
   type EngineBook,
   type EngineSlip,
-  type EngineState,
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 import type { Team } from '../types';
+import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 
@@ -77,29 +73,7 @@ async function copyText(value: string) {
 }
 
 function useEngineSlips() {
-  const [state, setState] = useState<EngineState | null>(() => readEngineCache());
-  const [problem, setProblem] = useState<string | null>(null);
-  useEffect(() => {
-    let stop = false;
-    const pull = async () => {
-      try {
-        const next = await fetchEngine();
-        if (stop) return;
-        writeEngineCache(next);
-        setState(next);
-        setProblem(null);
-      } catch (error) {
-        if (!stop) setProblem(error instanceof Error ? error.message : 'Could not load slips');
-      }
-    };
-    void pull();
-    const timer = window.setInterval(() => void pull(), ENGINE_POLL_MS);
-    return () => {
-      stop = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-  return { state, problem };
+  return useEngineBoard();
 }
 
 export function SlipsPage() {
@@ -110,6 +84,7 @@ export function SlipsPage() {
   const { picks, slip } = useProduct();
   const { matches } = useStore();
   const [desk, setDesk] = useState<DeskId>(DESKS.includes(requested as DeskId) ? (requested as DeskId) : 'sportybet');
+  const [visible, setVisible] = useState(30);
   const [openTrend, setOpenTrend] = useState<string | null>(focus);
   const [dropsOpen, setDropsOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -189,7 +164,7 @@ export function SlipsPage() {
         {trends.length === 0 ? (
           <p className="lede">No trend codes yet.</p>
         ) : (
-          trends.map((trend) => (
+          trends.slice(0, visible).map((trend) => (
             <TrendSlip
               key={trend.id}
               trend={trend}
@@ -203,6 +178,11 @@ export function SlipsPage() {
               onCopy={copy}
             />
           ))
+        )}
+        {visible < trends.length && (
+          <button type="button" className="btn btn-quiet" onClick={() => setVisible((count) => count + 30)}>
+            Show more
+          </button>
         )}
       </section>
 

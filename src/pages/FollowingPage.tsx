@@ -9,12 +9,12 @@ import { Crest } from '../components/Crest';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
 import { followIsStale } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { DESK_NAMES, fetchEngine, marketLabel, readEngineCache, showOdds, writeEngineCache, type DeskId, type EngineState } from '../lib/engineSlips';
+import { DESK_NAMES, marketLabel, showOdds, type DeskId } from '../lib/engineSlips';
 import { cx, kickoffWhen, scoreDash, statusLine } from '../lib/format';
 import { isFollowed } from '../lib/group';
-import { fetchSportyWindow } from '../data/remote';
+import { useEngineBoard } from '../state/engine';
 import { faceForFollow, factFromFace, splitFollowId, type TrendFact } from '../lib/trendFace';
-import type { Match, Team } from '../types';
+import type { Team } from '../types';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 
@@ -119,43 +119,13 @@ export function FollowedTrends() {
   const { matches, today } = useStore();
   const { picks, trendFollows, clearStaleTrends } = useProduct();
   const [confirm, setConfirm] = useState(false);
-  const [catalogue, setCatalogue] = useState<Match[]>([]);
-  const [engine, setEngine] = useState<EngineState | null>(() => readEngineCache());
+  const { state: engine } = useEngineBoard();
   const [facts, setFacts] = useState<Record<string, TrendFact>>(() => readTrendFacts());
   const [catalog, setCatalog] = useState<CrestCatalog>(emptyCatalog);
   useEffect(() => {
     void loadCrestCatalog().then(setCatalog);
   }, []);
-  useEffect(() => {
-    let stop = false;
-    const from = '2000-01-01T00:00:00.000Z';
-    const to = '2100-01-01T00:00:00.000Z';
-    void fetchSportyWindow(from, to)
-      .then((rows) => {
-        if (!stop) setCatalogue(rows);
-      })
-      .catch(() => {
-        /* the board and any saved names still label a follow */
-      });
-    void fetchEngine()
-      .then((next) => {
-        if (stop) return;
-        writeEngineCache(next);
-        setEngine(next);
-      })
-      .catch(() => {
-        /* a cached engine leg can still name the row */
-      });
-    return () => {
-      stop = true;
-    };
-  }, []);
-  const known = useMemo(() => {
-    const byId = new Map<string, Match>();
-    for (const match of catalogue) byId.set(match.id, match);
-    for (const match of matches) byId.set(match.id, match);
-    return [...byId.values()];
-  }, [catalogue, matches]);
+  const known = matches;
   const faces = useMemo(
     () => trendFollows.map((id) => faceForFollow(id, { picks, matches: known, facts, engine })),
     [trendFollows, picks, known, facts, engine],

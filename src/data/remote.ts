@@ -149,11 +149,6 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
       lastError = error instanceof Error ? error.message : lastError;
     }
   }
-  try {
-    return read(await transport.direct(LIVE_FEED));
-  } catch (error) {
-    lastError = error instanceof Error ? error.message : lastError;
-  }
   throw new Error(lastError);
 }
 
