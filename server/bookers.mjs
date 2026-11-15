@@ -37,8 +37,13 @@ const BP_MARKETS = {
   32: ['3807', null, { 74: 'Yes', 76: 'No' }],
   60: ['3668', null, { 1: '1', 2: 'X', 3: '2' }],
   68: ['4958', 't', { 12: 'Over', 13: 'Under' }],
+  // 2nd half total. betPawa market type 4976, same quarter-goal handicap as the other totals (0.5 → 2).
+  90: ['4976', 't', { 12: 'Over', 13: 'Under' }],
   166: ['1096783', 't', { 12: 'Over', 13: 'Under' }],
 };
+
+/** Bump when a desk map changes, so slips that already used their hourly retries are asked again. */
+export const BOOKING_MAP_VERSION = 2;
 
 const eventCache = new Map();
 const priceCache = new Map();
@@ -280,6 +285,8 @@ async function betikaTry(legs, request) {
       dropped.push(drop(leg, 'Market not supported on Betika.'));
       continue;
     }
+    // Betika Ghana's prematch list has "1st half - total" (sub type 68) and no "2nd half - total".
+    // Encode with sub type 90 answers "odds have expired" on matches that do sell the full-time total.
     if (leg.market === 'sh-over05' || String(leg.marketId) === '90') {
       dropped.push(drop(leg, 'Betika does not list second-half over 0.5.'));
       continue;

@@ -2,6 +2,7 @@
  * One slip per 80%+ market, plus the master slip. Each distinct slip is booked
  * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
+import { BOOKING_MAP_VERSION } from './bookers.mjs';
 import { labelFor } from './occurrence.mjs';
 import { assertBookingRanges, legOpen, priceInRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
@@ -224,6 +225,8 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     let entry = nextCache[key] || { books: {}, attempts: {}, lastAttemptAt: 0, bookedAt: null };
     if (!cacheFresh(entry, legs)) entry = { books: {}, attempts: entry.attempts || {}, lastAttemptAt: 0, bookedAt: null };
     if (clock - (entry.lastAttemptAt || 0) > ATTEMPT_RESET_MS) entry = { ...entry, attempts: {} };
+    // A new desk map (for example second-half totals on betPawa) must be tried even if this hour's attempts are spent.
+    if ((entry.mapVersion || 1) !== BOOKING_MAP_VERSION) entry = { ...entry, attempts: {}, mapVersion: BOOKING_MAP_VERSION };
     const checked = inspectBooks(entry.books);
     for (const issue of checked.issues) issues.push(`${label}: ${issue}`);
     const desks = checked.retry.filter((desk) => (entry.attempts[desk] || 0) < MAX_ATTEMPTS && (!allow || allow.includes(desk)));
@@ -238,7 +241,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
           books = again.books;
           const attempts = { ...entry.attempts };
           for (const desk of desks) attempts[desk] = again.retry.includes(desk) ? (attempts[desk] || 0) + 1 : 0;
-          entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString() };
+          entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString(), mapVersion: BOOKING_MAP_VERSION };
           const missing = again.retry.filter((desk) => desks.includes(desk));
           if (missing.length) {
             const message = `${label}: no real code yet from ${missing.join(', ')}.`;
@@ -251,7 +254,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
           const message = `${label}: booking failed: ${error instanceof Error ? error.message : error}`;
           issues.push(message);
           log('error', message);
-          entry = { ...entry, lastAttemptAt: clock };
+          entry = { ...entry, lastAttemptAt: clock, mapVersion: BOOKING_MAP_VERSION };
         }
         nextCache[key] = entry;
         return entry;
@@ -261,7 +264,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     } else if (inflight.has(key)) {
       entry = await inflight.get(key);
     } else {
-      entry = { ...entry, books: checked.books };
+      entry = { ...entry, books: checked.books, mapVersion: BOOKING_MAP_VERSION };
       nextCache[key] = entry;
     }
     return entry;

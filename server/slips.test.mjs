@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bookAll, resetBookerCache } from './bookers.mjs';
 import { CODE_LIMIT, bookSlips, bookableLegs, codeGroups, codeLegs, tierSlips, trendGroups } from './slips.mjs';
+import { selectionKey } from './selection.mjs';
 
 const now = new Date('2026-11-13T10:00:00.000Z');
 const leg = (id, market, odds = 1.3) => ({ eventId: `sr:match:${id}`, market, odds, match: `T${id} vs U${id}`, kickoff: '2026-11-13T18:00:00.000Z', status: 'open' });
@@ -123,6 +124,53 @@ test('a tier books a second part instead of dropping the extra legs', async () =
   assert.equal(parts.length, 2);
   assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
   assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
+});
+
+test('betPawa books second-half over 0.5 from market type 4976', async () => {
+  resetBookerCache();
+  const seen = [];
+  const request = async (method, url, opts = {}) => {
+    if (url.includes('pcUpcomingEvents')) return {};
+    if (url.includes('betpawa') && url.includes('v3/search')) return { events: [{ id: 'E90', widgets: [{ type: 'SPORTRADAR', id: '90' }] }] };
+    if (url.includes('betpawa') && url.includes('v4/events/E90')) {
+      return { markets: [{ marketType: { id: '4976' }, row: [{ handicap: 2, prices: [{ name: 'Over', id: 'P90', odds: 1.2 }] }] }] };
+    }
+    if (method === 'POST' && url.includes('v3/booking-number')) {
+      seen.push(opts.body);
+      return { code: 'HALF90' };
+    }
+    if (url.includes('v3/booking-number/')) return { items: [{ selections: [{}] }] };
+    return {};
+  };
+  const books = await bookAll([{ eventId: 'sr:match:90', market: 'sh-over05', odds: 1.2, match: 'Alpha vs Beta' }], request, undefined, ['betpawa']);
+  assert.equal(books.betpawa.parts[0].code, 'HALF90');
+  assert.deepEqual(seen[0].selections.selections[0].selections, ['P90']);
+});
+
+test('a new booking map retries a desk that already used its hourly attempts', async () => {
+  const kick = '2026-11-13T18:00:00.000Z';
+  const row = { eventId: 'sr:match:90', market: 'sh-over05', odds: 1.2, match: 'Alpha vs Beta', kickoff: kick, status: 'open' };
+  const key = selectionKey(bookableLegs([row], now));
+  let desks = [];
+  const out = await bookSlips({
+    slips: [{ id: 'sh', name: '100% Second-half over 0.5', label: '100% Second-half over 0.5', legs: [row] }],
+    cache: {
+      [key]: {
+        books: { betpawa: { parts: [], error: 'No valid share code.', dropped: [{ eventId: 'sr:match:90', reason: 'Not listed or not open on betPawa.' }] } },
+        attempts: { betpawa: 3 },
+        lastAttemptAt: now.getTime(),
+        bookedAt: null,
+      },
+    },
+    book: async (_legs, asked) => {
+      desks = asked;
+      return { betpawa: { parts: [{ code: 'HALF90', link: 'https://www.betpawa.com.gh/share-betslip/HALF90', legs: 1 }], error: null, dropped: [] } };
+    },
+    now: now.getTime(),
+    log: () => {},
+  });
+  assert.ok(desks.includes('betpawa'));
+  assert.equal(out.results[0].books.betpawa.parts[0].code, 'HALF90');
 });
 
 test('betPawa drops a price under 1.20 and records why', async () => {

@@ -239,6 +239,26 @@ test('tiers and markets need a code on every desk, in parts the desk can hold', 
   assert.match(quiet.checks.find((row) => row.id === 'coverage').message, /no open legs/);
 });
 
+test('a desk that does not sell the market is not a missing code', () => {
+  const now = Date.now();
+  const future = new Date(now + 3_600_000).toISOString();
+  const leg = { eventId: 'sr:match:90', market: 'sh-over05', odds: 1.2, kickoff: future };
+  const books = codedBooks(1);
+  books.betika = {
+    parts: [],
+    error: 'No open selections on this bookmaker.',
+    dropped: [{ eventId: 'sr:match:90', market: 'sh-over05', reason: 'Betika does not list second-half over 0.5.' }],
+  };
+  const input = healthyInput(now);
+  input.state.trends = [{ id: '80:sh-over05', label: '80%+ Second-half over 0.5', market: 'sh-over05', legs: [leg], books }];
+  const ok = evaluateChecks(input);
+  assert.equal(ok.checks.find((row) => row.id === 'coverage').ok, true);
+  books.betika.dropped = [{ eventId: 'sr:match:90', market: 'sh-over05', reason: 'Not open on Betika (closed, started or unlisted).' }];
+  const closed = evaluateChecks(input);
+  assert.equal(closed.checks.find((row) => row.id === 'coverage').ok, false);
+  assert.match(closed.checks.find((row) => row.id === 'coverage').message, /Betika/);
+});
+
 test('a lost device list or a directory that is not persistent needs attention', () => {
   const kept = evaluateChecks({ ...healthyInput(), persistent: true, devices: 4, previousDevices: 4, restarted: true });
   assert.equal(kept.checks.find((row) => row.id === 'persist').ok, true);
