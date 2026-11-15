@@ -130,4 +130,40 @@ describe('match-first picks', () => {
     };
     expect(tipsFromEngine(fake, [simulated])).toEqual([]);
   });
+
+  it('keeps a pick both teams support and uses a marked-down grade instead of a 10/10 sample', () => {
+    expect(hitRate(100, '10/10', 0.9)).toBe(0.9);
+    expect(hitRate(60, '6/10', 0.6)).toBe(0.6);
+    const agreed = state();
+    agreed.trends = [
+      {
+        ...agreed.trends[1],
+        legs: [
+          {
+            eventId: 'sr:match:3',
+            market: 'over15',
+            match: 'Hearts vs Kotoko',
+            kickoff: '2026-11-13T15:00:00.000Z',
+            odds: 1.25,
+            occurrence: 60,
+            sample: '6/10',
+            rate: 0.6,
+            teamsAgree: true,
+            homeSample: '7/10',
+            awaySample: '6/10',
+          },
+        ],
+      },
+    ];
+    const tips = tipsFromEngine(agreed, board);
+    expect(tips.map((tip) => tip.chip.sample)).toEqual(['6/10']);
+    expect(tips[0]?.chip.teamsAgree).toBe(true);
+    expect(tips[0]?.chip.homeSample).toBe('7/10');
+    expect(bestTrendChip(agreed, board[0])).toBeNull();
+    const marked = state();
+    marked.trends[1].legs[0] = { ...marked.trends[1].legs[0], odds: 1.4, occurrence: 90, sample: '10/10', rate: 0.9, leagueRisk: 'penalise' };
+    const chip = bestTrendChip(marked, board[0]);
+    expect(chip?.rate).toBe(0.9);
+    expect(trendChipText(chip!)).toBe('Over 1.5 · 90% · 1.40');
+  });
 });

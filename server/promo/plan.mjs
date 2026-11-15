@@ -24,7 +24,11 @@ export function priced(odds) {
 
 export function hitPercent(leg) {
   const sample = String(leg?.sample || '').match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (sample && Number(sample[2]) > 0) return Math.round((Number(sample[1]) / Number(sample[2])) * 100);
+  const fromSample = sample && Number(sample[2]) > 0 ? (Number(sample[1]) / Number(sample[2])) * 100 : null;
+  const explicit = Number(leg?.rate);
+  const fromRate = Number.isFinite(explicit) ? (explicit > 1 ? explicit : explicit * 100) : null;
+  if (fromRate != null && (fromSample == null || fromRate + 1e-9 < fromSample)) return Math.round(fromRate);
+  if (fromSample != null) return Math.round(fromSample);
   const occurrence = Number(leg?.occurrence);
   if (!Number.isFinite(occurrence)) return null;
   return Math.round(occurrence > 1 ? occurrence : occurrence * 100);

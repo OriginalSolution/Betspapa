@@ -20,7 +20,7 @@ export const SLIP_CONCURRENCY = 4;
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && priceInRange(leg.market, leg.odds, leg),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && priceInRange(leg.market, leg.odds, leg),
   );
 }
 
@@ -61,10 +61,17 @@ export function orderForTier(legs, tier) {
   if (bandMax == null) return rows.slice().sort(byConfidence);
   const priority = [];
   const higher = [];
-  for (const leg of rows) (legRate(leg) + 1e-12 < bandMax ? priority : higher).push(leg);
+  const rescued = [];
+  for (const leg of rows) {
+    const rate = legRate(leg);
+    if (tier === '80' && leg.teamsAgree === true && rate + 1e-12 < 0.8) rescued.push(leg);
+    else if (rate + 1e-12 < bandMax) priority.push(leg);
+    else higher.push(leg);
+  }
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  return [...priority, ...higher];
+  rescued.sort(byConfidence);
+  return [...priority, ...higher, ...rescued];
 }
 
 /** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
@@ -99,7 +106,7 @@ const TIERS = [
 export function tierSlips(legs) {
   const slips = [];
   for (const tier of TIERS) {
-    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min);
+    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min || (tier.id === '80' && leg.teamsAgree === true));
     if (!rows.length) continue;
     const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
     slips.push({
@@ -152,10 +159,17 @@ function legView(leg) {
     odds: leg.odds,
     occurrence: leg.occurrence ?? null,
     sample: leg.sample ?? null,
+    rate: Number.isFinite(Number(leg.rate)) ? Number(leg.rate) : null,
     form: form.length ? form : null,
     opponentHeld: leg.opponentHeld === true ? true : null,
     opponentSample: leg.opponentSample || null,
     exception: leg.exception === true ? true : null,
+    teamsAgree: leg.teamsAgree === true ? true : null,
+    homeSample: leg.homeSample || null,
+    awaySample: leg.awaySample || null,
+    leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: leg.agreement || null,
+    reasons: Array.isArray(leg.reasons) ? leg.reasons.filter((line) => typeof line === 'string').slice(0, 8) : [],
     inRangeDesks: Array.isArray(leg.inRangeDesks) ? leg.inRangeDesks : null,
   };
 }

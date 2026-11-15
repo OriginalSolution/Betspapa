@@ -25,6 +25,8 @@ Betspapa is Riddim Boss's football matchday app: live scores, trends, picks, boo
 
 **Push:** Firebase Cloud Messaging (FCM HTTP v1). Data-only high-priority messages; the phone builds the Red Ticker UI itself. The on-phone poller is the fallback. See [docs/fcm.md](./docs/fcm.md).
 
+**Update 15 Nov 2026, grading:** package `3.1.0` publishes a code only after the trend, both teams' scoring records, and a league score from finished matches all pass. Reasons are on each pick. `server/leagueRisk.json` is an optional override and starts empty. See §8. It is not on the live API until this change is merged to `main`.
+
 **Update 15 Nov 2026:** the approved 1 GB disk `dsk-dbsgb0ei0phs73d2b210` is mounted at `/var/data` on `srv-dbr5crdckfvc73d8i51g`, and `ENGINE_DATA_DIR=/var/data` is set. Devices, the booked board, and promo state all live in that directory. Papa Guardian runs on boot and after every engine cycle. It switches the process to live mode, keeps the last booked board up, drops odds violators (the 1.60 exception only when both samples are 10/10), rebooks kicked-off legs and missing desk parts, and raises `guardian: "attention"` with a plain `reason` when it cannot fix something. `/api/health` includes a `checks` list. `/api/guardian` returns that status JSON.
 
 **Earlier incident:** device registrations had been stored on the ephemeral disk, so restarts wiped `devices.json` and pushes had nobody to send to. The owner approved the 1 GB disk (~$0.25/month) on 14 Nov 2026 at 1:49 PM Africa/Accra. It was not attached at 7:26 PM that day. It is attached now. Do not publish 0.4.9 until a restart leaves the device count unchanged.
@@ -42,7 +44,7 @@ A public `engine-data` branch stores `engine-state.json` so a restart can reload
 | Default branch | `main` |
 | Created | 15 Jul 2026, 10:37 PM Africa/Accra |
 | Node | `>=20` (CI uses 22) |
-| `package.json` version | `3.0.0` (this is not the Android version) |
+| `package.json` version | `3.1.0` (this is not the Android version). 3.1.0 gates booking on trend, team, and league research. |
 | Issues / wiki / projects | Enabled |
 | Pages | Enabled, source `main`, build type `workflow` (`.github/workflows/pages.yml`) |
 
@@ -264,6 +266,18 @@ Every pick or tip is inclusive of the bookmaker price, except where noted. A pic
 | Exception | Up to **1.60** only when that team is **10/10** on that exact market **and** the opponent's record on the mirrored market is also **10/10**. An 80% "held" flag is not enough |
 
 The implementation is `server/oddsRange.mjs` (`ODDS_RANGES`, `PERFECT_CEILING`, `validException`, `assertBookingRanges`). Keep this table and that file in sync.
+
+### Team check and league score (3.1.0)
+
+A code is published only when every leg passes the odds range, the 80% trend, the team check, and the league check. Reasons are on the leg. Anything left off is in `researchDrops` on `GET /api/engine`.
+
+`server/research.mjs` (`reviewPick`) does the work from data the process already has. No new API key.
+
+1. **Trend.** Hotter-side occurrence, last 10 games, at least 8 scored, at least 80%.
+2. **Teams.** Goals scored, goals conceded, over 1.5 / 2.5 / 3.5, both-teams-to-score, and the home/away split. Both sides must clear 60% on the market, and the scoring average must not contradict it. The grade is the weaker record. One missing sample leaves the trend in charge. A one-sided 10/10 is not booked. Home and away markets use games at that venue. An away side that wins away does not support a home win, so the old 1.60 "both 10/10" home-win case is not booked.
+3. **League.** Sportradar `stats_team_lastx` (the same feed as team history) is grouped by competition. The last 40 unique matches are the sample. With 12 or more, the pick is blocked when the league hits the market at least 12 points less often than `1 / odds`, or the hit rate is under 42%. A swing of 28 points between the two halves caps the grade at 90%. Under 12 matches, the league is not blocked. Settled picks go to `ENGINE_DATA_DIR/research-settled.json`. Once 8 share a league, market, and odds band, that band's win rate is the measure.
+
+`server/leagueRisk.json` is an optional override. It starts empty. It can exclude or markdown a band. It cannot publish a pick the results already blocked. `ENGINE_DATA_DIR/league-risk.json` or `LEAGUE_RISK_PATH` replaces the shipped file. Unknown market ids are named in the engine notes.
 
 ### Product and process rules
 
