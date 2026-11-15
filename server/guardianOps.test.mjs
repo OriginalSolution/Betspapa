@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync, utimesSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,7 +20,18 @@ import {
   shapeSample,
 } from './guardianOps.mjs';
 import { appendIncident } from './guardianOps.mjs';
-import { nextSpend, overCap, pathAllowed, parseProposal, spendCost } from '../scripts/ai-fixer.mjs';
+import {
+  instructions,
+  limitMonitorProposal,
+  monitorPatchAllowed,
+  nextSpend,
+  overCap,
+  pathAllowed,
+  main,
+  parseProposal,
+  spendCost,
+  writeIncident,
+} from '../scripts/ai-fixer.mjs';
 
 test('a cycle is hung only after twice its interval', () => {
   const start = 1_000;
@@ -165,4 +176,52 @@ test('three attention cycles ask for the fixer and a missing token only logs', a
   assert.equal(readIncidents(dataDir).some((row) => row.code === 'odds'), true);
   const quiet = await dispatchAttention({ code: 'coverage' }, {});
   assert.equal(quiet.sent, false);
+});
+
+test('a monitor status mismatch can be patched, and a real condition cannot', () => {
+  assert.equal(monitorPatchAllowed('**Problem:** answered 200 (expected 200)'), true);
+  assert.equal(monitorPatchAllowed('answered 502 (expected 200)'), false);
+  assert.equal(monitorPatchAllowed('answered 200 but body did not contain "guardian":"ok" (guardian is "attention")'), false);
+  const limited = limitMonitorProposal({
+    summary: 'name the failed condition',
+    files: [
+      { path: 'server/index.mjs', content: 'no' },
+      { path: '.github/monitor/checks.json', content: '{}' },
+      { path: '.github/monitor/monitor_lib.py', content: 'print(1)\n' },
+    ],
+  });
+  assert.deepEqual(limited.files.map((file) => file.path), ['.github/monitor/monitor_lib.py']);
+  assert.match(instructions({ source: 'monitor' }), /do not delete or relax/i);
+  const file = join(mkdtempSync(join(tmpdir(), 'betspapa-incident-')), 'incident.json');
+  const log = join(tmpdir(), `monitor-log-${Date.now()}.txt`);
+  writeFileSync(log, 'answered 200 (expected 200)\n');
+  writeIncident({
+    EVENT_NAME: 'workflow_run',
+    WORKFLOW_NAME: 'Monitor (self-healing)',
+    RUN_ID: '43735587283',
+    CI_LOG: log,
+    INCIDENT_FILE: file,
+  });
+  const record = JSON.parse(readFileSync(file, 'utf8'));
+  assert.equal(record.source, 'monitor');
+  assert.equal(record.name, 'Monitor (self-healing)');
+  assert.match(record.log, /answered 200 \(expected 200\)/);
+});
+
+test('a named monitor failure does not call the model', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'betspapa-fixer-'));
+  const incident = join(dir, 'incident.json');
+  writeFileSync(incident, JSON.stringify({
+    source: 'monitor',
+    log: 'answered 200 but body did not contain "guardian":"ok" (guardian is "attention")',
+  }));
+  const code = await main({
+    XAI_API_KEY: 'test-key',
+    INCIDENT_FILE: incident,
+    SPEND_FILE: join(dir, 'spend.json'),
+    APPLY: '0',
+  }, async () => {
+    throw new Error('should not call the model');
+  });
+  assert.equal(code, 0);
 });

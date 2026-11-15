@@ -15,7 +15,7 @@ import socket
 import ssl
 import time
 
-from monitor_lib import Result, http, load_state, now_iso, save_state, send_email, sync_issues, write_summary
+from monitor_lib import Result, http, judge, load_state, now_iso, save_state, send_email, sync_issues, write_summary
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = json.load(open(os.path.join(HERE, "checks.json"), encoding="utf-8"))
@@ -28,18 +28,16 @@ def one(c: dict) -> Result:
     if headers:
         headers.setdefault("Authorization", "Bearer " + next(iter(headers.values())))
     expect, timeout = int(c.get("expect", 200)), float(c.get("timeout", 20))
+    status, body, err = 0, b"", ""
+    good, detail = False, ""
     for attempt in range(2):  # the second try also wakes sleeping free services
         status, body, err = http(c["url"], method=c.get("method", "GET"), headers=headers, timeout=timeout, retries=0)
-        good = status == expect and (not c.get("contains") or c["contains"].encode() in body)
-        if good and c.get("json_ok_field"):
-            try:
-                good = bool(json.loads(body).get(c["json_ok_field"]))
-            except ValueError:
-                good = False
+        good, detail = judge(
+            status, body, err, expect=expect, contains=c.get("contains"), json_ok_field=c.get("json_ok_field"))
         if good:
             break
         time.sleep(5)
-    r = Result(c["name"], good, f"{status}" if good else f"answered {status or err} (expected {expect})")
+    r = Result(c["name"], good, detail)
     if not good and c.get("redeploy_hook_env") and os.environ.get(c["redeploy_hook_env"]):
         s, _, e = http(os.environ[c["redeploy_hook_env"]], method="POST", timeout=20, retries=0)
         r.fixes.append(f"asked for a redeploy ({s or e})")
@@ -72,7 +70,8 @@ def main() -> int:
     state["last_run"] = now_iso()
     save_state(state)
     write_summary(results, actions + notes)
-    return 0
+    # A failed check fails the job so the AI fixer can see it. A pass still exits 0.
+    return 0 if all(r.ok for r in results) else 1
 
 
 if __name__ == "__main__":

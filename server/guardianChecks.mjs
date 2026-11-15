@@ -46,6 +46,17 @@ function codedParts(slip, desk) {
   return (slip?.books?.[desk]?.parts || []).filter((part) => part?.code);
 }
 
+/** The booker recorded that this desk does not sell the market. A missing code is not a gap. */
+function deskDoesNotSell(slip, desk, now) {
+  const dropped = slip?.books?.[desk]?.dropped || [];
+  if (!dropped.length) return false;
+  const unlisted = dropped.every((row) => /does not list|market not supported/i.test(String(row?.reason || '')));
+  if (!unlisted) return false;
+  const open = openLegs(slip, now);
+  const ids = new Set(dropped.map((row) => row?.eventId));
+  return open.length > 0 && open.every((leg) => ids.has(leg.eventId));
+}
+
 function partLegs(part) {
   if (Array.isArray(part?.matches) && part.matches.length) return part.matches.length;
   const count = Number(part?.legs);
@@ -172,6 +183,7 @@ function coverageIssues(state, now) {
       const parts = codedParts(slip, desk);
       const cap = partCap(desk);
       if (!parts.length) {
+        if (deskDoesNotSell(slip, desk, now)) continue;
         issues.push({ empty: false, message: `${slipName(slip)} has no ${DESK_LABEL[desk]} code.` });
         continue;
       }

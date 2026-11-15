@@ -55,8 +55,9 @@ test('password compare is exact and the session cookie expires', () => {
   const token = signSession(PASSWORD, now);
   assert.equal(verifySession(token, PASSWORD, now + 1000), true);
   assert.equal(verifySession(token, 'other-password', now + 1000), false);
-  const last = token.slice(-1);
-  assert.equal(verifySession(`${token.slice(0, -1)}${last === 'x' ? 'y' : 'x'}`, PASSWORD, now + 1000), false);
+  const dot = token.lastIndexOf('.');
+  const flipped = token[dot + 1] === 'A' ? 'B' : 'A';
+  assert.equal(verifySession(token.slice(0, dot + 1) + flipped + token.slice(dot + 2), PASSWORD, now + 1000), false);
   assert.equal(verifySession(signSession(PASSWORD, now - 13 * 60 * 60 * 1000), PASSWORD, now), false);
   const secure = cookieHeader(token, { secure: true });
   assert.match(secure, /HttpOnly/);
