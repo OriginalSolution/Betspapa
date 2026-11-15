@@ -68,20 +68,19 @@ The sideload APK is Betspapa (`com.betspapa.scores`), version 0.4.4 (versionCode
 
 ## Grading
 
-Each market has an odds range (the alt range). A price outside that range is not shown and not booked. Inside the range, the engine reads the last 10 real games for each team (at least 8 must have a score).
+A booking code is published only when every leg has passed the odds range, the 80% trend, the team check, and the league check. Each pick carries the reasons. Picks that fail are listed on `researchDrops` in `GET /api/engine`, with the same reasons.
 
-- **Both teams support the pick** when each team's own record hits that outcome at least 6 times out of 10. The published grade is the weaker of the two. It is 100% only when both records are perfect. A game both teams support stays on the board even when the old hotter-side trend is under 80%, and it is booked on the 80% slip. The chip shows the real weaker sample, such as 6/10.
-- **The teams do not both support it** (one side is under 60%, or one side is clearly against the pick) and both samples exist: the game is left out. A 10/10 on one team is not graded as a sure pick.
-- **One team has no usable sample:** the previous rule stays. The line is kept when the existing trend is 80% or better, graded on that trend.
-- Home and away picks use each team's games at that venue. The other side is read the same way, so an away side that has been losing away supports a home win. Goal lines and both-teams-to-score use each team's own recent matches, home and away.
+The team check uses each side's recent goals scored, goals conceded, over/under and both-teams-to-score rates, and the home/away split. Both sides have to support the pick. The grade is the weaker record. One team's 10/10 is not a sure pick. If one side has no sample of 8 games, the trend stands.
 
-Some leagues make certain prices dangerous. Those bands live in `server/leagueRisk.json` and start empty, because this repo has no settled-results archive to measure them from. A band can exclude the pick or mark it down so a 100% record is capped at 90%. Edit that file, or replace it with `league-risk.json` in `ENGINE_DATA_DIR` (or set `LEAGUE_RISK_PATH`). The shape is in the file and in [HANDOFF.md](./HANDOFF.md). League danger is applied after the team check: a dangerous price is still dropped or marked down when both teams agree.
+The league check uses finished matches from the same Sportradar last-X feed as the team history, grouped by competition. With 12 or more matches, a pick is blocked when that league hits the market much less often than the price implies, or the results are very jumpy (the grade is then capped at 90% instead of blocked). Under 12 matches, nothing is blocked. Settled picks are remembered in `research-settled.json` under `ENGINE_DATA_DIR` and, once 8 share a league, market, and odds band, that band's record is used too.
+
+`server/leagueRisk.json` is an optional extra. It can force another exclude or markdown. It starts empty and is not how the defaults are chosen. No new API key. The detail is in [HANDOFF.md](./HANDOFF.md).
 
 Package version 3.1.0 is this grading release. The Android app version is separate.
 
 ## Unattended engine
 
-`npm start` starts a booking cycle 20 seconds after boot and then every 15 minutes. It pulls the fixture feed, keeps the last good copy if the feed fails, qualifies tips the grading rules keep (80%+ trends, plus a pick both teams support), and books the master slip and each trend on the same five Ghana desks. It stores only codes a bookmaker returned. Invalid or missing codes are removed and those desks are retried. A stored win or loss that does not match the score is corrected when a score is present. The upcoming feed has no scores, so legs stay open until then. Failures are written to the process log and to the engine snapshot at `GET /api/engine`.
+`npm start` starts a booking cycle 20 seconds after boot and then every 15 minutes. It pulls the fixture feed, keeps the last good copy if the feed fails, qualifies tips that pass the trend, team, and league checks, and books the master slip and each trend on the same five Ghana desks. It stores only codes a bookmaker returned. Invalid or missing codes are removed and those desks are retried. A stored win or loss that does not match the score is corrected when a score is present. The upcoming feed has no scores, so legs stay open until then. Failures are written to the process log and to the engine snapshot at `GET /api/engine`.
 
 The snapshot is written to `data/engine/engine-state.json` (or `ENGINE_DATA_DIR`). On Render that file lasts until the service restarts; the next cycle then rebuilds it and rebooks any open legs that no longer have a valid code. A cron job every 15 minutes calls `POST /api/engine/run` with `ENGINE_RUN_TOKEN` so a sleeping service still runs a cycle. The cron does not book by itself and does not call Predict2u.
 

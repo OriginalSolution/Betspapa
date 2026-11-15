@@ -34,6 +34,7 @@ export type PickChip = {
   homeSample: string | null;
   awaySample: string | null;
   leagueRisk: 'penalise' | null;
+  reasons: string[];
 };
 
 export type MatchPickCard = {
@@ -131,6 +132,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
       homeSample: leg.homeSample || null,
       awaySample: leg.awaySample || null,
       leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+      reasons: Array.isArray(leg.reasons) ? leg.reasons.slice(0, 8) : [],
     });
   }
   return chips;

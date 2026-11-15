@@ -19,7 +19,7 @@ export const SLIP_CONCURRENCY = 4;
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && priceInRange(leg.market, leg.odds, leg),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && priceInRange(leg.market, leg.odds, leg),
   );
 }
 
@@ -168,6 +168,7 @@ function legView(leg) {
     awaySample: leg.awaySample || null,
     leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
     agreement: leg.agreement || null,
+    reasons: Array.isArray(leg.reasons) ? leg.reasons.filter((line) => typeof line === 'string').slice(0, 8) : [],
     inRangeDesks: Array.isArray(leg.inRangeDesks) ? leg.inRangeDesks : null,
   };
 }

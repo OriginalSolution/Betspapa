@@ -265,6 +265,9 @@ function TipRow({
                 {tip.chip.opponentHeld && <i className="held-chip">Held after opponent</i>}
                 {tip.chip.homeSample && tip.chip.awaySample && <i className="held-chip">{`Home ${tip.chip.homeSample} · Away ${tip.chip.awaySample}`}</i>}
                 {tip.chip.leagueRisk === 'penalise' && <i className="exception-chip">League risk</i>}
+                {tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line)) && (
+                  <i className="held-chip">{tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line))}</i>
+                )}
               </span>
             )}
           </span>

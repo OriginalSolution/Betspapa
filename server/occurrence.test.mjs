@@ -173,17 +173,14 @@ test('both teams have to support the outcome, and a one-sided 10/10 is not booke
     odds: { 'over-15': 1.25, 'over-25': 1.4 },
   };
   const rescued = buildOccurrenceBoard([event], histories, now);
-  const over15 = rescued.legs.find((leg) => leg.market === 'over15');
-  assert.equal(over15.teamsAgree, true);
-  assert.equal(over15.sample, '6/10');
-  assert.equal(over15.rate, 0.6);
-  assert.equal(over15.occurrence, 60);
-  assert.equal(over15.homeSample, '7/10');
-  assert.equal(over15.awaySample, '6/10');
-  assert.match(rescued.notes.join('\n'), /both teams supported/);
+  const over15 = rescued.researchDrops.find((leg) => leg.market === 'over15');
+  assert.equal(rescued.legs.some((leg) => leg.market === 'over15'), false);
+  assert.equal(over15.publish, false);
+  assert.match(over15.reasons.join(' '), /under 80%/);
+  assert.match(over15.reasons.join(' '), /Both teams support/);
   const dropped = buildOccurrenceBoard([event], split, now);
   assert.equal(dropped.legs.some((leg) => leg.market === 'over15'), false);
-  assert.match(dropped.notes.join('\n'), /did not both support/);
+  assert.match(dropped.notes.join('\n'), /scoring records did not support/);
 
   const risky = normaliseLeagueRisk({
     leagues: {
@@ -204,8 +201,42 @@ test('both teams have to support the outcome, and a one-sided 10/10 is not booke
   assert.equal(marked.sample, '10/10');
   assert.equal(marked.leagueRisk, 'penalise');
   assert.equal(marked.occurrence, 90);
-  assert.match(blocked.notes.join('\n'), /dangerous league price/);
+  assert.match(blocked.notes.join('\n'), /left off the code because that league/);
   assert.match(blocked.notes.join('\n'), /marked down/);
+  assert.match(marked.reasons.join(' '), /scored/);
+});
+
+test('a league with rare overs blocks a short price without an owner table', () => {
+  const goals = (count, idStart, total, uts) => played(count, (index) => row({
+    matchId: idStart + index,
+    uts: uts - index,
+    teamIsHome: true,
+    ftHome: total,
+    ftAway: 0,
+    tournament: 'Ghana Premier League',
+  }));
+  const histories = new Map([
+    [1, goals(10, 1, 3, 50)],
+    [2, goals(10, 20, 3, 40)],
+    [3, goals(20, 100, 1, 500)],
+  ]);
+  const event = {
+    eventId: 'sr:match:40',
+    home: 'Alpha',
+    away: 'Beta',
+    homeId: 'sr:competitor:1',
+    awayId: 'sr:competitor:2',
+    kickoff: '2026-11-13T18:00:00.000Z',
+    tournament: 'Ghana Premier League',
+    country: 'Ghana',
+    odds: { 'over-25': 1.4 },
+  };
+  const board = buildOccurrenceBoard([event], histories, now, { leagueRisk: { leagues: {} } });
+  assert.equal(board.legs.some((leg) => leg.market === 'over25'), false);
+  const drop = board.researchDrops.find((leg) => leg.market === 'over25');
+  assert.ok(drop);
+  assert.match(drop.reasons.join(' '), /blocked/);
+  assert.match(drop.reasons.join(' '), /Ghana Premier League|ghana premier league/i);
 });
 
 test('a home trend uses home games only and ignores neutral grounds', () => {

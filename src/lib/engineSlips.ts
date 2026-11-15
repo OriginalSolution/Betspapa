@@ -101,6 +101,8 @@ export type EngineLeg = {
   /** Set when the price sits in that league's dangerous band and the pick was kept at a lower grade. */
   leagueRisk?: 'penalise' | null;
   agreement?: string | null;
+  /** Why the research step kept this pick. */
+  reasons?: string[];
 };
 
 export type EnginePart = {
@@ -239,6 +241,7 @@ function parseLeg(value: unknown): EngineLeg | null {
     awaySample: text(row.awaySample),
     leagueRisk: row.leagueRisk === 'penalise' ? 'penalise' : null,
     agreement: text(row.agreement),
+    reasons: Array.isArray(row.reasons) ? row.reasons.filter((line): line is string => typeof line === 'string').slice(0, 8) : [],
   };
 }
 

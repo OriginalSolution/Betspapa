@@ -25,7 +25,7 @@ Betspapa is Riddim Boss's football matchday app: live scores, trends, picks, boo
 
 **Push:** Firebase Cloud Messaging (FCM HTTP v1). Data-only high-priority messages; the phone builds the Red Ticker UI itself. The on-phone poller is the fallback. See [docs/fcm.md](./docs/fcm.md).
 
-**Update 15 Nov 2026, grading:** package `3.1.0` grades a pick from both teams' own records once the price is inside the market's odds range, and adds an empty editable per-league dangerous-odds table (`server/leagueRisk.json`). See §8. It is not on the live API until this change is merged to `main`.
+**Update 15 Nov 2026, grading:** package `3.1.0` publishes a code only after the trend, both teams' scoring records, and a league score from finished matches all pass. Reasons are on each pick. `server/leagueRisk.json` is an optional override and starts empty. See §8. It is not on the live API until this change is merged to `main`.
 
 **Update 15 Nov 2026:** the approved 1 GB disk `dsk-dbsgb0ei0phs73d2b210` is mounted at `/var/data` on `srv-dbr5crdckfvc73d8i51g`, and `ENGINE_DATA_DIR=/var/data` is set. Devices, the booked board, and promo state all live in that directory. Papa Guardian runs on boot and after every engine cycle. It switches the process to live mode, keeps the last booked board up, drops odds violators (the 1.60 exception only when both samples are 10/10), rebooks kicked-off legs and missing desk parts, and raises `guardian: "attention"` with a plain `reason` when it cannot fix something. `/api/health` includes a `checks` list. `/api/guardian` returns that status JSON.
 
@@ -44,7 +44,7 @@ A public `engine-data` branch stores `engine-state.json` so a restart can reload
 | Default branch | `main` |
 | Created | 15 Jul 2026, 10:37 PM Africa/Accra |
 | Node | `>=20` (CI uses 22) |
-| `package.json` version | `3.1.0` (this is not the Android version). 3.1.0 adds team-agreement grading and the empty per-league dangerous-odds table. |
+| `package.json` version | `3.1.0` (this is not the Android version). 3.1.0 gates booking on trend, team, and league research. |
 | Issues / wiki / projects | Enabled |
 | Pages | Enabled, source `main`, build type `workflow` (`.github/workflows/pages.yml`) |
 
@@ -267,45 +267,17 @@ Every pick or tip is inclusive of the bookmaker price, except where noted. A pic
 
 The implementation is `server/oddsRange.mjs` (`ODDS_RANGES`, `PERFECT_CEILING`, `validException`, `assertBookingRanges`). Keep this table and that file in sync.
 
-### Team agreement (3.1.0)
+### Team check and league score (3.1.0)
 
-The odds range is still the first gate. Inside it, grading no longer stops at the hotter team's trend.
+A code is published only when every leg passes the odds range, the 80% trend, the team check, and the league check. Reasons are on the leg. Anything left off is in `researchDrops` on `GET /api/engine`.
 
-`server/occurrence.mjs` (`teamRecords`) and `server/teamGrade.mjs` (`SUPPORT_RATE` 0.60, `gradeWithTeams`) do this:
+`server/research.mjs` (`reviewPick`) does the work from data the process already has. No new API key.
 
-1. Each team is scored on the last 10 relevant games, needing 8 scored games, with the same hit rules as the board.
-2. Home and away markets use that team's games at the venue. The other team is flipped, so an away side that loses away supports a home win. Goal totals and both-teams-to-score use each team's own recent matches.
-3. **Both support** (each at least 60%): keep the pick. The published rate is the weaker record. It is 100% only when both are perfect (10/10, or 8/8). If the weaker rate is under 80%, the pick still stays and is booked on the 80% slip, not on 90% or 100%. The old hotter-side trend would have dropped it; team agreement keeps it.
-4. **They do not both support**, and both samples exist: the pick is left out. A one-sided 10/10 is not booked as a sure thing. This includes a home win where the away side has been winning away: that is the old 1.60 "both 10/10" mirror, and it no longer becomes a home-win pick, because the two records point at opposite results.
-5. **One sample is missing:** nothing new applies. The line is kept when the existing trend is at least 80%, graded on that trend.
+1. **Trend.** Hotter-side occurrence, last 10 games, at least 8 scored, at least 80%.
+2. **Teams.** Goals scored, goals conceded, over 1.5 / 2.5 / 3.5, both-teams-to-score, and the home/away split. Both sides must clear 60% on the market, and the scoring average must not contradict it. The grade is the weaker record. One missing sample leaves the trend in charge. A one-sided 10/10 is not booked. Home and away markets use games at that venue. An away side that wins away does not support a home win, so the old 1.60 "both 10/10" home-win case is not booked.
+3. **League.** Sportradar `stats_team_lastx` (the same feed as team history) is grouped by competition. The last 40 unique matches are the sample. With 12 or more, the pick is blocked when the league hits the market at least 12 points less often than `1 / odds`, or the hit rate is under 42%. A swing of 28 points between the two halves caps the grade at 90%. Under 12 matches, the league is not blocked. Settled picks go to `ENGINE_DATA_DIR/research-settled.json`. Once 8 share a league, market, and odds band, that band's win rate is the measure.
 
-### League danger (3.1.0)
-
-`server/leagueRisk.json` is the owner's table. It ships with `"leagues": {}`. This repo stores live last-10 team rows for grading, not a settled results archive by league and price, so no default bands were invented.
-
-Edit the JSON, or put a replacement at `ENGINE_DATA_DIR/league-risk.json` (on the live service that is `/var/data/league-risk.json`) or set `LEAGUE_RISK_PATH`. The next engine cycle reads it. A broken file is ignored and the shipped table is used.
-
-```json
-{
-  "version": 1,
-  "leagues": {
-    "Ghana Premier League": [
-      { "market": "over25", "min": 1.4, "max": 1.49, "action": "exclude" }
-    ],
-    "England | Premier League": [
-      { "market": "*", "min": 1.45, "max": 1.49, "action": "penalise" }
-    ]
-  }
-}
-```
-
-- The key is the tournament name, or `country | tournament`, without case.
-- `market` is an engine id (`over25`, `home`, `btts`, `dc-12`, …) or `*` for every market.
-- `min` and `max` are inclusive.
-- `exclude` drops the pick. `penalise` keeps it and caps a grade of 90% or higher at 90%, so it cannot be 100%.
-- A dangerous band still applies when both teams agree. Team agreement does not override it.
-
-The loader is `server/leagueRisk.mjs`. Unknown market ids are skipped and named in the engine notes.
+`server/leagueRisk.json` is an optional override. It starts empty. It can exclude or markdown a band. It cannot publish a pick the results already blocked. `ENGINE_DATA_DIR/league-risk.json` or `LEAGUE_RISK_PATH` replaces the shipped file. Unknown market ids are named in the engine notes.
 
 ### Product and process rules
 
