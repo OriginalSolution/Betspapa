@@ -230,13 +230,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   }, [trendFollows, matches, picks, engineTick, follows, settings]);
 
   useEffect(() => {
-    let last = 0;
-    const send = () => {
-      const now = Date.now();
-      if (now - last < 4000) return;
-      last = now;
-      syncDeviceRef.current();
-    };
+    const send = () => syncDeviceRef.current();
+    send();
     const onVisible = () => {
       if (document.visibilityState === 'visible') send();
     };

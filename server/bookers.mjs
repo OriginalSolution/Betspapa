@@ -1,5 +1,5 @@
 /** No-login Ghana share booking. Betway is omitted because it needs a logged-in account. */
-import { priceInRange, rangeReason, strictInRange } from './oddsRange.mjs';
+import { priceInRange, rangeReason } from './oddsRange.mjs';
 import { loadOfferIndex, stillOffered, toSelection } from './selection.mjs';
 
 const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
@@ -431,7 +431,7 @@ async function betpawaTry(legs, request) {
       dropped.push(drop(leg, 'Not listed or not open on betPawa.'));
       continue;
     }
-    if (!strictInRange(leg.market, price[1])) {
+    if (!priceInRange(leg.market, price[1], leg)) {
       dropped.push(drop(leg, `betPawa price ${rangeReason(leg.market, price[1])}`));
       continue;
     }

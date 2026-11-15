@@ -10,6 +10,8 @@ services:
         value: production
       - key: DATA_MODE
         value: live
+      - key: ENGINE_DATA_DIR
+        value: /var/data
       - key: FOOTBALL_DATA_API_KEY
         sync: false
       - key: ENGINE_RUN_TOKEN

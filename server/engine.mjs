@@ -196,6 +196,7 @@ export function createEngine(options = {}) {
   });
   let state = load();
   let running = null;
+  let published = null;
   let publishChain = Promise.resolve();
   let timer = null;
   let kick = null;
@@ -455,15 +456,34 @@ export function createEngine(options = {}) {
 
   function run() {
     if (!running) {
-      running = cycle().finally(() => {
-        running = null;
-      });
+      running = cycle()
+        .finally(() => {
+          running = null;
+        })
+        .then(async (result) => {
+          if (options.onCycle) {
+            try {
+              await options.onCycle(result);
+            } catch (error) {
+              log('error', `Cycle watch failed: ${error instanceof Error ? error.message : error}`);
+            }
+          }
+          return result;
+        });
     }
     return running;
   }
 
+  function viewed(now = options.now ? options.now() : new Date()) {
+    const view = publicState(state, now);
+    if (running && published && boardHasCodes(published) && !boardHasCodes(view)) return published;
+    if (boardHasCodes(view)) published = view;
+    return view;
+  }
+
   return {
-    getState: () => publicState(state, options.now ? options.now() : new Date()),
+    getState: () => viewed(),
+    getRaw: () => state,
     needsRepair: () => boardDirty(state, options.now ? options.now() : new Date()),
     getEvents: () => state.events,
     getOccurrence: () => state.occurrenceByEvent || {},
@@ -520,14 +540,40 @@ export function createEngine(options = {}) {
 const engine = createEngine({
   loadEvents: () => loadUpcomingEvents({ force: true }),
   loadExtraPrices: () => loadExtraPrices(),
+  onCycle: (result) => notifyEngineCycle(result),
 });
+
+async function notifyEngineCycle(result) {
+  for (const fn of cycleListeners) {
+    try {
+      await fn(result);
+    } catch (error) {
+      console.error(`[engine] Cycle watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+  return result;
+}
 
 export function startEngine() {
   engine.start();
 }
 
+const cycleListeners = [];
+
+export function onEngineCycle(fn) {
+  cycleListeners.push(fn);
+  return () => {
+    const index = cycleListeners.indexOf(fn);
+    if (index >= 0) cycleListeners.splice(index, 1);
+  };
+}
+
 export function getEngineState() {
   return engine.getState();
+}
+
+export function getEngineRaw() {
+  return engine.getRaw();
 }
 
 export function engineNeedsRepair() {
