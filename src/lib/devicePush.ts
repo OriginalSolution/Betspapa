@@ -19,14 +19,31 @@ export type DeviceRegistration = {
   >;
 };
 
+let tokenWait: Promise<{ token: string; enabled: boolean }> | null = null;
+
+/** Play Services often returns the token a few seconds after the first read. */
+async function waitForPushToken(): Promise<{ token: string; enabled: boolean }> {
+  const push = await readPushToken();
+  if (!push.enabled || push.token) return push;
+  if (!tokenWait) {
+    tokenWait = (async () => {
+      let current = push;
+      for (let attempt = 0; current.enabled && !current.token && attempt < 10; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        current = await readPushToken();
+      }
+      return current;
+    })().finally(() => {
+      tokenWait = null;
+    });
+  }
+  return tokenWait;
+}
+
 /** Registers the FCM token. A build without google-services.json has no token and this is a no-op. */
 export async function syncPushDevice(body: Omit<DeviceRegistration, 'token' | 'appVersion'>): Promise<boolean> {
   if (!isNativeApp()) return false;
-  let push = await readPushToken();
-  for (let attempt = 0; push.enabled && !push.token && attempt < 8; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    push = await readPushToken();
-  }
+  const push = await waitForPushToken();
   if (!push.enabled || !push.token) return false;
   const payload: DeviceRegistration = { ...body, token: push.token, appVersion: APP_VERSION };
   try {

@@ -228,7 +228,14 @@ public class WatchPlugin extends Plugin {
             note.fixture = json.optString("fixture", "");
             rememberMatch(json);
             String sound = json.optString("goalSound", "crowd");
-            AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            boolean posted = AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            if (posted && note.id != null && !note.id.isEmpty()) {
+                synchronized (WatchState.FILE_LOCK) {
+                    WatchState state = WatchState.load(WatchFiles.file(getContext()));
+                    state.markSent(note.id);
+                    state.save(WatchFiles.file(getContext()));
+                }
+            }
             call.resolve();
         } catch (Exception error) {
             call.reject("Could not post the alert", error);

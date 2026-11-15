@@ -13,7 +13,8 @@ import com.google.firebase.messaging.RemoteMessage
 /**
  * Data-only FCM. Android would draw a plain card itself if the payload
  * included a notification block, and this method would not run.
- * The note id is marked sent so the poller does not post it again.
+ * The shade id is marked sent only after the card is posted. An in-app
+ * inbox row (seen) is not a shade notification, so it must not swallow the push.
  */
 class BetspapaFirebaseService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
@@ -32,7 +33,7 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
         val note: WatchNote
         synchronized(WatchState.FILE_LOCK) {
             val state = WatchState.load(file)
-            if (state.sent.contains(id) || state.seen(id)) {
+            if (state.sent.contains(id)) {
                 Log.i(TAG, "skip duplicate id=$id")
                 return
             }
@@ -44,7 +45,6 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             data["odds"]?.takeIf { it.isNotEmpty() }?.let { note.oddsText = it }
             if (kind == "var") note.varCheck = true
             state.record(note, System.currentTimeMillis())
-            state.markSent(id)
             try {
                 state.save(file)
             } catch (_: Exception) {
@@ -52,15 +52,28 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             }
             sound = state.goalSound?.takeIf { it.isNotEmpty() } ?: "crowd"
         }
-        if (kind == "promo") {
+        val posted = if (kind == "promo") {
             val picture = download(data["image"])
-            val posted = AlertPoster.postPromo(this, note, sound, picture, data["code"], data["route"])
-            Log.i(TAG, "posted=$posted id=$id kind=promo channel=${AlertPoster.channelFor("goal", sound)} sound=$sound")
-            return
+            AlertPoster.postPromo(this, note, sound, picture, data["code"], data["route"])
+        } else {
+            AlertPoster.post(this, note, sound)
         }
-        val posted = AlertPoster.post(this, note, sound)
-        val channel = AlertPoster.channelFor(kind, sound)
+        if (posted) markPosted(file, id)
+        val channel = AlertPoster.channelFor(if (kind == "promo") "goal" else kind, sound)
         Log.i(TAG, "posted=$posted id=$id kind=$kind channel=$channel sound=$sound match=${note.matchId}")
+    }
+
+    private fun markPosted(file: java.io.File, id: String) {
+        synchronized(WatchState.FILE_LOCK) {
+            val state = WatchState.load(file)
+            if (state.sent.contains(id)) return
+            state.markSent(id)
+            try {
+                state.save(file)
+            } catch (_: Exception) {
+                /* the card is already on the shade */
+            }
+        }
     }
 
     private fun rememberMatch(state: WatchState, data: Map<String, String>) {
