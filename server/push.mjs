@@ -10,6 +10,7 @@
  * come from the score and matchStatus. Red cards, VAR, and penalties are
  * emitted only when those fields are present on a row.
  */
+import { spawn } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { priceInRange } from './oddsRange.mjs';
 import { cleanCountry } from './geo.mjs';
@@ -21,6 +22,17 @@ import { isDummyId, isSimulated } from './upcoming.mjs';
 
 export const MIN_ODDS = 1.2;
 const LIVE = 'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1';
+const LIVE_HEADERS = {
+  Accept: 'application/json',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+  Referer: 'https://www.sportybet.com/gh/sport/football',
+};
+/**
+ * HiOS and other OEM battery savers often deliver a data message minutes
+ * after FCM accepts it. A 2-minute TTL expired before the phone woke, so
+ * Google reported success and the shade stayed empty.
+ */
+export const PUSH_TTL = '3600s';
 
 export function fcmConfigured(env = process.env) {
   const account = serviceAccount(env);
@@ -130,7 +142,7 @@ export function messageFor(note, device) {
       token: device.token,
       android: {
         priority: 'HIGH',
-        ttl: '120s',
+        ttl: PUSH_TTL,
       },
       data,
     },
@@ -761,40 +773,136 @@ export function pruneStaleDevices(book, { maxAgeMs = 60 * 24 * 60 * 60 * 1000, n
   return removed;
 }
 
+export function baselinePath(dir) {
+  return join(dir, 'push-baseline.json');
+}
+
+/** Last scores the watcher compared. A restart reads this instead of treating the next poll as the first. */
+export function readScoreBaseline(dir) {
+  try {
+    const parsed = JSON.parse(readFileSync(baselinePath(dir), 'utf8'));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeScoreBaseline(dir, matches) {
+  mkdirSync(dir, { recursive: true });
+  const slim = (matches || []).map((match) => ({
+    id: match.id,
+    home: match.home,
+    away: match.away,
+    homeId: match.homeId,
+    awayId: match.awayId,
+    status: match.status,
+    minute: match.minute,
+    homeScore: match.homeScore,
+    awayScore: match.awayScore,
+    htHome: match.htHome,
+    htAway: match.htAway,
+    incidents: Array.isArray(match.incidents) ? match.incidents : [],
+    varReview: match.varReview || null,
+  }));
+  writeFileSync(baselinePath(dir), JSON.stringify(slim));
+}
+
+function readLiveCurl() {
+  return new Promise((resolve, reject) => {
+    const child = spawn('curl', [
+      '-4', '-sS', '-m', '40',
+      '-A', LIVE_HEADERS['User-Agent'],
+      '-H', `Accept: ${LIVE_HEADERS.Accept}`,
+      '-H', `Referer: ${LIVE_HEADERS.Referer}`,
+      LIVE,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const chunks = [];
+    child.stdout.on('data', (buf) => chunks.push(buf));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`In-play scores curl exited ${code}`));
+        return;
+      }
+      try {
+        const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (!Array.isArray(payload?.data)) throw new Error('not a list');
+        resolve(payload);
+      } catch {
+        reject(new Error('In-play scores curl was not JSON'));
+      }
+    });
+  });
+}
+
+async function readLiveFeed(fetchImpl, { timeoutMs = 45_000, allowCurl = false } = {}) {
+  try {
+    const response = await fetchImpl(LIVE, {
+      headers: LIVE_HEADERS,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload?.data)) throw new Error('In-play scores were not a list');
+    return { payload, fallback: false };
+  } catch (error) {
+    if (!allowCurl) throw error;
+    try {
+      return { payload: await readLiveCurl(), fallback: true };
+    } catch {
+      throw error;
+    }
+  }
+}
+
 export function startPushWatch(options = {}) {
   const dir = options.dir || process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+  const env = options.env || process.env;
+  const deliver = options.send || sendMessage;
   const book = options.book || createDeviceBook(dir);
   const alerts = options.alerts || createAlertLog(dir);
   const log = options.log || ((message) => console.log(`[push] ${message}`));
   const intervalMs = options.intervalMs ?? 25_000;
-  let baseline = null;
+  let baseline = readScoreBaseline(dir);
   let warned = false;
   let announced = false;
+  let curlAnnounced = false;
+  let ticking = false;
   let timer = null;
   const stats = { feedOk: null, feedAt: null, feedError: null, sentOk: 0, sentError: 0, lastSendAt: null };
 
   async function tick() {
-    const account = serviceAccount();
-    if (!fcmConfigured() && !warned) {
+    if (ticking) return;
+    ticking = true;
+    try {
+      await runTick();
+    } finally {
+      ticking = false;
+    }
+  }
+
+  async function runTick() {
+    const account = serviceAccount(env);
+    const configured = fcmConfigured(env);
+    if (!configured && !warned) {
       warned = true;
       log('FCM service account is not set. Devices can register. Nothing is pushed.');
     }
-    if (fcmConfigured() && !announced) {
+    if (configured && !announced) {
       announced = true;
       log(`FCM HTTP v1 is on for project ${account.project_id}. Devices registered: ${book.list().length}. The list is stored with the engine data.`);
     }
     let payload;
     try {
-      const response = await (options.fetchImpl || fetch)(LIVE, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-          Referer: 'https://www.sportybet.com/gh/sport/football',
-        },
-        signal: AbortSignal.timeout(20_000),
+      const loaded = await readLiveFeed(options.fetchImpl || fetch, {
+        timeoutMs: options.timeoutMs ?? 45_000,
+        allowCurl: !options.fetchImpl,
       });
-      if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
-      payload = await response.json();
+      payload = loaded.payload;
+      if (loaded.fallback && !curlAnnounced) {
+        curlAnnounced = true;
+        log('Live feed fetch failed. Reading scores over IPv4 instead.');
+      }
       stats.feedOk = true;
       stats.feedAt = new Date().toISOString();
       stats.feedError = null;
@@ -809,12 +917,22 @@ export function startPushWatch(options = {}) {
     const matches = normalizeLive(payload);
     if (!baseline) {
       baseline = matches;
+      try {
+        writeScoreBaseline(dir, matches);
+      } catch (error) {
+        log(`Could not store the score baseline: ${error instanceof Error ? error.message : error}`);
+      }
       return;
     }
     const notes = diffMatches(baseline, matches);
     const previous = baseline;
     baseline = matches;
-    if (!fcmConfigured()) return;
+    try {
+      writeScoreBaseline(dir, matches);
+    } catch (error) {
+      log(`Could not store the score baseline: ${error instanceof Error ? error.message : error}`);
+    }
+    if (!configured) return;
     const logged = new Set();
     let sentOk = 0;
     let sentError = 0;
@@ -823,7 +941,7 @@ export function startPushWatch(options = {}) {
       for (const item of mine) {
         if (book.alreadySent(device.token, item.id)) continue;
         try {
-          const result = await sendMessage(account, messageFor(item, device));
+          const result = await deliver(account, messageFor(item, device));
           const fcm = publicFcm(result.body);
           if (result.dropped) {
             sentError += 1;

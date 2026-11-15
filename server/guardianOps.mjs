@@ -11,7 +11,7 @@ export const DISK_PRESSURE = 0.8;
 export const MEMORY_PRESSURE = 0.85;
 export const ATTENTION_STREAK = 3;
 
-const KEEP_FILES = new Set(['devices.json', 'engine-state.json', 'device-census.json', 'incidents.jsonl']);
+const KEEP_FILES = new Set(['devices.json', 'engine-state.json', 'device-census.json', 'incidents.jsonl', 'push-baseline.json']);
 
 export function cycleHung(startedAt, now, intervalMs) {
   const started = Number(startedAt);
