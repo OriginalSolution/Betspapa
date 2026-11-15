@@ -1,5 +1,6 @@
 /** No-login Ghana share booking. Betway is omitted because it needs a logged-in account. */
 import { priceInRange, rangeReason } from './oddsRange.mjs';
+import { responseShape } from './guardianOps.mjs';
 import { loadOfferIndex, stillOffered, toSelection } from './selection.mjs';
 
 const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
@@ -537,6 +538,18 @@ async function cachedIndex(request) {
 
 export async function bookAll(legs, request, onBook, only) {
   if (typeof request !== 'function') throw new Error('Booking needs an HTTP client.');
+  const rawRequest = request;
+  request = async (method, url, opts) => {
+    let last;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      last = await rawRequest(method, url, opts);
+      const shape = responseShape(last);
+      if (shape.ok) return last;
+      console.error(`[book] Response schema changed: ${shape.sample}`);
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+    return last;
+  };
   const mapped = [];
   const seen = new Set();
   for (const leg of legs.map(toSelection).filter(Boolean)) {

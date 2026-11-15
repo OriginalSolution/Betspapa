@@ -221,7 +221,13 @@ test('push log keeps the match and drops anything that is not type, match, and t
 });
 
 test('the next automatic cycle is armed for 20 seconds, then every 15 minutes', () => {
-  const engine = createEngine({ dir: mkdtempSync(join(tmpdir(), 'betspapa-sched-')), log: () => {} });
+  const engine = createEngine({
+    dir: mkdtempSync(join(tmpdir(), 'betspapa-sched-')),
+    log: () => {},
+    loadEvents: async () => [],
+    loadHistories: async () => new Map(),
+    retryMs: 0,
+  });
   try {
     engine.start();
     const schedule = engine.getSchedule();

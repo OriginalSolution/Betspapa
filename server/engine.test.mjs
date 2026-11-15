@@ -115,6 +115,19 @@ test('an empty cycle keeps the last booked board until those legs kick off', () 
   assert.equal(boardHasCodes(afterKick), false);
   const fresh = { books: { sportybet: { parts: [{ code: 'NEW1' }] } }, master: null, trends: [], legs: [] };
   assert.equal(preserveBoard(previous, fresh, new Date('2026-11-10T12:00:00.000Z')).books.sportybet.parts[0].code, 'NEW1');
+  const many = {
+    ...previous,
+    legs: Array.from({ length: 10 }, (_, index) => ({ eventId: `sr:match:${index}`, kickoff: '2026-11-10T18:00:00.000Z' })),
+  };
+  const thin = {
+    books: { sportybet: { parts: [{ code: 'THIN' }] } },
+    master: { legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z' }, { eventId: 'sr:match:2', kickoff: '2026-11-10T18:00:00.000Z' }] },
+    trends: [],
+    legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z' }, { eventId: 'sr:match:2', kickoff: '2026-11-10T18:00:00.000Z' }],
+  };
+  const held = preserveBoard(many, thin, new Date('2026-11-10T12:00:00.000Z'));
+  assert.equal(held.books.sportybet.parts[0].code, 'KEEP1');
+  assert.match(held.issues[0], /30%/);
 });
 
 test('boot restores a booked snapshot and a failed cycle does not clear it', async () => {

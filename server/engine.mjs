@@ -9,6 +9,7 @@ import { inspectBooks, repairSettlement } from './quality.mjs';
 import { SLIP_CONCURRENCY, bookSlips, bookableLegs, codeGroups, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
 import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
 import { loadEngineSnapshot, publishEngineSnapshot } from './engineSnapshot.mjs';
+import { collapsedLegs, shapeSample } from './guardianOps.mjs';
 
 const FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 const INTERVAL_MS = 15 * 60 * 1000;
@@ -155,10 +156,7 @@ function stillOpen(slip, now) {
   return { ...slip, legs, legCount: legs.length };
 }
 
-/** A cycle with no codes must not wipe a board that still has a booked slip. Legs leave only after kickoff. */
-export function preserveBoard(previous, next, now = new Date()) {
-  if (boardHasCodes(next)) return next;
-  if (!boardHasCodes(previous)) return next;
+function keptBoard(previous, next, now, note) {
   const master = stillOpen(previous.master, now);
   const trends = (previous.trends || []).map((trend) => stillOpen(trend, now)).filter((trend) => (trend?.legs || []).length || slipHasCode(trend));
   const tierRows = (previous.tiers || []).map((tier) => stillOpen(tier, now)).filter((tier) => (tier?.legs || []).length || slipHasCode(tier));
@@ -177,8 +175,19 @@ export function preserveBoard(previous, next, now = new Date()) {
     legs,
     slipKey: previous.slipKey,
     slipCache: previous.slipCache,
-    issues: ['Keeping the last booked board. This cycle did not return codes.', ...(next.issues || [])].slice(0, 40),
+    issues: [note, ...(next.issues || [])].slice(0, 40),
   };
+}
+
+/** A cycle with no codes, or one that keeps less than 30% of the open legs, must not wipe the last booked board. */
+export function preserveBoard(previous, next, now = new Date()) {
+  if (collapsedLegs(previous, next, now)) {
+    const kept = keptBoard(previous, next, now, 'Keeping the last booked board. This cycle kept less than 30% of the open legs.');
+    if (kept !== next) return kept;
+  }
+  if (boardHasCodes(next)) return next;
+  if (!boardHasCodes(previous)) return next;
+  return keptBoard(previous, next, now, 'Keeping the last booked board. This cycle did not return codes.');
 }
 
 async function pause(ms) {
@@ -197,6 +206,9 @@ export function createEngine(options = {}) {
   let state = load();
   let running = null;
   let published = null;
+  let activeGen = 0;
+  let cycleStartedAt = null;
+  const hangMs = options.hangMs ?? INTERVAL_MS * 2;
   let publishChain = Promise.resolve();
   let timer = null;
   let kick = null;
@@ -224,7 +236,8 @@ export function createEngine(options = {}) {
     }
   }
 
-  function save(next) {
+  function save(next, gen = activeGen) {
+    if (gen !== activeGen) return;
     state = next;
     try {
       mkdirSync(dir, { recursive: true });
@@ -234,8 +247,9 @@ export function createEngine(options = {}) {
     }
   }
 
-  function remember(next, now = new Date()) {
-    save(next);
+  function remember(next, now = new Date(), gen = activeGen) {
+    save(next, gen);
+    if (gen !== activeGen) return;
     if (!boardHasCodes(next)) return;
     const publish = options.publishSnapshot || publishEngineSnapshot;
     const body = restartSnapshot(publicState(next, now), now);
@@ -256,7 +270,10 @@ export function createEngine(options = {}) {
         const response = await fetchImpl(FEED, { signal: AbortSignal.timeout(25_000) });
         if (!response.ok) throw new Error(`Betspapa fixtures returned ${response.status}`);
         const body = await response.json();
-        if (!Array.isArray(body.events)) throw new Error('Fixture feed failed');
+        if (!Array.isArray(body?.events)) {
+          log('error', `Fixture schema changed: ${shapeSample(body)}`);
+          throw new Error('Fixture feed schema changed');
+        }
         return body.events;
       } catch (error) {
         last = error instanceof Error ? error : new Error(String(error));
@@ -268,6 +285,7 @@ export function createEngine(options = {}) {
   }
 
   async function cycle() {
+    const gen = activeGen;
     const issues = [];
     const now = options.now ? options.now() : new Date();
     let events = state.events;
@@ -303,14 +321,14 @@ export function createEngine(options = {}) {
       issues.push(`Team history failed: ${message}. Keeping the previous slips.`);
       log('error', message);
       const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
-      save(kept);
+      save(kept, gen);
       return publicState(kept, now);
     }
     if (!options.loadHistories && loaded.teams > 0 && loaded.teamErrors === loaded.teams) {
       issues.push('Team history failed for every side. Keeping the previous slips.');
       log('error', issues[issues.length - 1]);
       const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
-      save(kept);
+      save(kept, gen);
       return publicState(kept, now);
     }
 
@@ -356,7 +374,7 @@ export function createEngine(options = {}) {
       cycleNotes: issues,
       issues: issues.slice(0, 40),
     }, now);
-    if ((legs.length || !beforeOpen) && !boardHasCodes(before)) save(preview);
+    if ((legs.length || !beforeOpen) && !boardHasCodes(before)) save(preview, gen);
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
@@ -406,7 +424,7 @@ export function createEngine(options = {}) {
           issues: [...issues, ...progress.issues].slice(0, 40),
         };
         const nextBoard = projectBoard(partial, clock);
-        if (boardHasCodes(nextBoard)) remember(nextBoard, clock);
+        if (boardHasCodes(nextBoard)) remember(nextBoard, clock, gen);
       },
         });
       }
@@ -443,7 +461,8 @@ export function createEngine(options = {}) {
       issues: issues.slice(0, 40),
     };
     const kept = projectBoard(preserveBoard(before, next, now), now);
-    remember(kept, now);
+    if (gen !== activeGen) return publicState(state, now);
+    remember(kept, now, gen);
     if (options.crests !== false && !options.fetchImpl) {
       const fromDay = now.toISOString().slice(0, 10);
       const toDay = new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);
@@ -454,11 +473,26 @@ export function createEngine(options = {}) {
     return publicState(kept, now);
   }
 
+  function hung() {
+    return Boolean(running) && cycleStartedAt && Date.now() - cycleStartedAt > hangMs;
+  }
+
   function run() {
+    if (hung()) {
+      activeGen += 1;
+      running = null;
+      cycleStartedAt = null;
+      log('error', 'The booking cycle hung past two intervals. Starting another.');
+    }
     if (!running) {
+      const gen = activeGen;
+      cycleStartedAt = Date.now();
       running = cycle()
         .finally(() => {
-          running = null;
+          if (gen === activeGen) {
+            running = null;
+            cycleStartedAt = null;
+          }
         })
         .then(async (result) => {
           if (options.onCycle) {
@@ -487,7 +521,12 @@ export function createEngine(options = {}) {
     needsRepair: () => boardDirty(state, options.now ? options.now() : new Date()),
     getEvents: () => state.events,
     getOccurrence: () => state.occurrenceByEvent || {},
-    getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running) }),
+    getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running), startedAt: cycleStartedAt, hangMs }),
+    restartIfHung() {
+      if (!hung()) return false;
+      void run();
+      return true;
+    },
     run,
     stop() {
       clearTimeout(kick);
@@ -594,6 +633,10 @@ export function getEventOccurrence() {
 
 export function runEngineCycle() {
   return engine.run();
+}
+
+export function restartEngineIfHung() {
+  return engine.restartIfHung();
 }
 
 export function restoreEngine() {
