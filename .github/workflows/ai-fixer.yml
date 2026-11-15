@@ -4,7 +4,7 @@ on:
     types: [guardian-attention]
   workflow_dispatch:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["CI", "Monitor (self-healing)"]
     types: [completed]
     branches: [main]
 
@@ -55,6 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
           CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
           CI_LOG: ci.log
         run: |

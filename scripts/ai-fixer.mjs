@@ -39,6 +39,26 @@ export function overCap(record) {
   return (Number(record?.usd) || 0) >= MONTHLY_CAP_USD;
 }
 
+/** True only for the monitor bug that blames a status which already matched. */
+export function monitorPatchAllowed(log) {
+  return /answered\s+(\d+)\s+\(expected\s+\1\)/.test(String(log || ''));
+}
+
+/** A monitor repair may change the checker, not the server and not checks.json. */
+export function limitMonitorProposal(proposal) {
+  const files = (proposal?.files || []).filter((file) => {
+    const path = String(file?.path || '').replace(/\\/g, '/').replace(/^\.\//, '');
+    return path.startsWith('.github/monitor/') && path.endsWith('.py') && pathAllowed(path);
+  });
+  return { summary: String(proposal?.summary || 'Monitor repair').slice(0, 240), files };
+}
+
+export function instructions(incident) {
+  const base = 'You repair the Betspapa Node server. Reply with JSON only: {"summary":"...","files":[{"path":"server/file.mjs","content":"full file"}]}. Change as little as possible. Never include secrets, keystores, release tags, or workflow files that disable the spend cap.';
+  if (incident?.source !== 'monitor') return base;
+  return `${base} This incident is from the GitHub Actions monitor (.github/monitor/monitor.py and monitor_lib.py). Patch those Python files only when the log says "answered N (expected N)" for the same N: that blames a status which already matched, so name the condition that actually failed. Do not delete or relax expect, contains, or json_ok_field. If the log already names a real remote condition, return an empty files array.`;
+}
+
 export function parseProposal(text) {
   const raw = String(text || '').trim();
   const fenced = raw.match(/```json\s*([\s\S]*?)```/i);
@@ -73,7 +93,7 @@ export async function propose(incident, fetchImpl, env = process.env) {
       messages: [
         {
           role: 'system',
-          content: 'You repair the Betspapa Node server. Reply with JSON only: {"summary":"...","files":[{"path":"server/file.mjs","content":"full file"}]}. Change as little as possible. Never include secrets, keystores, release tags, or workflow files that disable the spend cap.',
+          content: instructions(incident),
         },
         { role: 'user', content: JSON.stringify(incident).slice(0, 12_000) },
       ],
@@ -99,8 +119,13 @@ export async function main(env = process.env, fetchImpl = fetch) {
   let incident = { source: env.INCIDENT_SOURCE || 'manual' };
   if (env.INCIDENT_FILE && existsSync(env.INCIDENT_FILE)) incident = JSON.parse(readFileSync(env.INCIDENT_FILE, 'utf8'));
   else if (env.INCIDENT_JSON) incident = JSON.parse(env.INCIDENT_JSON);
+  if (incident.source === 'monitor' && !monitorPatchAllowed(incident.log)) {
+    console.log('Monitor failure names a real condition. Leaving it for the next pass.');
+    return 0;
+  }
   const result = await propose(incident, fetchImpl, env);
   if (result.skipped) return 0;
+  if (incident.source === 'monitor') result.proposal = limitMonitorProposal(result.proposal);
   const cost = spendCost(result.usage);
   const spend = nextSpend(current, cost.usd);
   writeFileSync(spendFile, JSON.stringify(spend));
@@ -122,7 +147,8 @@ export function writeIncident(env = process.env) {
     let log = '';
     const file = env.CI_LOG || '';
     if (file && existsSync(file)) log = readFileSync(file, 'utf8').slice(-8000);
-    record = { source: 'ci', runId: env.RUN_ID || '', log };
+    const name = env.WORKFLOW_NAME || '';
+    record = { source: name === 'Monitor (self-healing)' ? 'monitor' : 'ci', runId: env.RUN_ID || '', name, log };
   } else if (env.EVENT_NAME === 'repository_dispatch') {
     let payload = {};
     try {
