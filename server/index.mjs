@@ -7,35 +7,40 @@ import { gzipSync } from 'node:zlib';
 import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
-import { getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineSchedule, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { forceLiveMode, getConfig } from './config.mjs';
+import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
+import { gzippedBytes } from './guardianChecks.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
-import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
+import { fcmConfigured, pruneStaleDevices, sendTestPush, startPushWatch } from './push.mjs';
 import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './promo/service.mjs';
 import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
+const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+forceLiveMode();
 const pushWatch = startPushWatch();
+let prunedTokens = 0;
 const guardian = createGuardian({
-  dir: join(process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine'), 'health'),
+  dir: join(dataDir, 'health'),
+  dataDir,
   getState: getEngineState,
+  getRaw: getEngineRaw,
   booking: () => Boolean(getEngineSchedule().running),
   needsRepair: engineNeedsRepair,
   runCycle: runEngineCycle,
   restore: restoreEngine,
   fcm: fcmConfigured,
+  mode: () => getConfig().mode,
+  forceLive: () => forceLiveMode(),
+  deviceCount: () => pushWatch.book.list().length,
+  push: () => ({ ...pushWatch.stats(), pruned: prunedTokens }),
+  payloadBytes: () => gzippedBytes(appEngineState(getEngineState())),
   pruneDevices: async () => {
-    let removed = 0;
-    for (const device of pushWatch.book.list()) {
-      if (String(device?.token || '').trim().length < 20) {
-        pushWatch.book.drop(device.token);
-        removed += 1;
-      }
-    }
-    return removed;
+    prunedTokens = pruneStaleDevices(pushWatch.book);
+    return prunedTokens;
   },
   prunePromos: async () => {
     const cutoff = Date.now() - 21 * 86_400_000;
@@ -53,6 +58,7 @@ const guardian = createGuardian({
   },
 });
 attachGuardian(guardian);
+onEngineCycle(() => guardian.check());
 const pushBook = pushWatch.book;
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
@@ -293,11 +299,23 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/health') {
+    const live = getConfig();
     const watch = guardian.status();
-    send(req, res, 200, { ok: true, mode: config.mode, provider: config.provider, fixtures: 'live', push: fcmConfigured(), guardian: watch.ok ? 'ok' : 'attention' });
+    send(req, res, 200, {
+      ok: true,
+      mode: live.mode,
+      provider: live.provider,
+      fixtures: 'live',
+      push: fcmConfigured(),
+      guardian: watch.ok ? 'ok' : 'attention',
+      reason: watch.reason,
+      devices: watch.devices,
+      checks: watch.checks,
+    });
     return;
   }
   if (url.pathname === '/api/guardian') {
+    if (String(getConfig().mode) !== 'live') forceLiveMode();
     send(req, res, 200, guardian.status());
     return;
   }
@@ -381,7 +399,10 @@ async function handleApi(req, res, url) {
     }
     return;
   }
-  if (config.mode !== 'live') {
+  if (getConfig().mode !== 'live') {
+    forceLiveMode();
+  }
+  if (getConfig().mode !== 'live') {
     send(req, res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
     return;
   }

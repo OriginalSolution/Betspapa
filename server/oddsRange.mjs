@@ -1,7 +1,7 @@
 /**
  * One odds table for every pick, tip, slip, flyer, notification, and booked leg.
  * Ranges are inclusive. A market that is not listed is not shown and not booked.
- * The board and the codes use this band only. A tagged 10/10 price above the band is not listed.
+ * The board and the codes use this band. A price above the band is listed only as a 1.60 exception when both samples are 10/10.
  */
 
 export const PERFECT_CEILING = 1.6;
@@ -141,7 +141,7 @@ function keptPrices(slip, leg) {
 
 function shownLeg(slip, leg) {
   const kept = keptPrices(slip, leg);
-  if (strictInRange(leg.market, leg.odds)) {
+  if (priceInRange(leg.market, leg.odds, leg)) {
     const dropped = new Set();
     for (const desk of DESKS) {
       const book = slip?.books?.[desk];

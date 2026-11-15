@@ -25,8 +25,10 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   const wide = { ...leg(99, 'dc-12', 1.28), opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
   assert.equal(codeLegs([wide, ...rows]).some((row) => row.eventId === 'sr:match:99'), false);
   const tagged = { ...leg(98, 'dc-12', 1.27), sample: '10/10', opponentSample: '10/10', exception: true };
-  assert.equal(bookableLegs([tagged, leg(2, 'dc-12', 1.22)], now).some((row) => row.eventId === 'sr:match:98'), false);
-  assert.equal(codeLegs([tagged, ...rows]).some((row) => row.eventId === 'sr:match:98'), false);
+  assert.equal(bookableLegs([tagged, leg(2, 'dc-12', 1.22)], now).some((row) => row.eventId === 'sr:match:98'), true);
+  assert.equal(codeLegs([tagged]).some((row) => row.eventId === 'sr:match:98'), true);
+  const tooHigh = { ...leg(97, 'dc-12', 1.61), sample: '10/10', opponentSample: '10/10', exception: true };
+  assert.equal(bookableLegs([tooHigh], now).some((row) => row.eventId === 'sr:match:97'), false);
   const hundred = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 1, 'dc-12', 1.22), rate: 1, occurrence: 100 }));
   const ninety = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 50, 'dc-12', 1.22), rate: 0.92, occurrence: 92 }));
   const bandEighty = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 80, 'over15', 1.25), rate: 0.84, occurrence: 84 }));

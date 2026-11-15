@@ -745,6 +745,22 @@ export function createAlertLog(dir) {
   };
 }
 
+/** Drop unusable tokens and tokens the phone has not refreshed for a long time. */
+export function pruneStaleDevices(book, { maxAgeMs = 60 * 24 * 60 * 60 * 1000, now = Date.now() } = {}) {
+  let removed = 0;
+  const rows = [...(book?.list?.() || [])];
+  for (const device of rows) {
+    const token = String(device?.token || '');
+    const seen = Date.parse(device?.lastSeenAt || '');
+    const expired = Number.isFinite(seen) && now - seen > maxAgeMs;
+    if (token.trim().length < 20 || /\s/.test(token) || expired) {
+      book.drop(token);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
 export function startPushWatch(options = {}) {
   const dir = options.dir || process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
   const book = options.book || createDeviceBook(dir);
@@ -755,6 +771,7 @@ export function startPushWatch(options = {}) {
   let warned = false;
   let announced = false;
   let timer = null;
+  const stats = { feedOk: null, feedAt: null, feedError: null, sentOk: 0, sentError: 0, lastSendAt: null };
 
   async function tick() {
     const account = serviceAccount();
@@ -764,7 +781,7 @@ export function startPushWatch(options = {}) {
     }
     if (fcmConfigured() && !announced) {
       announced = true;
-      log(`FCM HTTP v1 is on for project ${account.project_id}. Devices registered: ${book.list().length}. The list is on this instance disk and resets when the service restarts.`);
+      log(`FCM HTTP v1 is on for project ${account.project_id}. Devices registered: ${book.list().length}. The list is stored with the engine data.`);
     }
     let payload;
     try {
@@ -778,8 +795,15 @@ export function startPushWatch(options = {}) {
       });
       if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
       payload = await response.json();
+      stats.feedOk = true;
+      stats.feedAt = new Date().toISOString();
+      stats.feedError = null;
     } catch (error) {
-      log(`Live feed failed: ${error instanceof Error ? error.message : error}`);
+      const message = error instanceof Error ? error.message : 'Live feed failed';
+      stats.feedOk = false;
+      stats.feedAt = new Date().toISOString();
+      stats.feedError = message;
+      log(`Live feed failed: ${message}`);
       return;
     }
     const matches = normalizeLive(payload);
@@ -792,6 +816,8 @@ export function startPushWatch(options = {}) {
     baseline = matches;
     if (!fcmConfigured()) return;
     const logged = new Set();
+    let sentOk = 0;
+    let sentError = 0;
     for (const device of book.list()) {
       const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
       for (const item of mine) {
@@ -799,9 +825,12 @@ export function startPushWatch(options = {}) {
         try {
           const result = await sendMessage(account, messageFor(item, device));
           const fcm = publicFcm(result.body);
-          log(`FCM response ${result.status} ${JSON.stringify(fcm)}`);
-          if (result.dropped) book.drop(device.token);
-          else {
+          if (result.dropped) {
+            sentError += 1;
+            book.drop(device.token);
+            log(`FCM response ${result.status} ${JSON.stringify(fcm)}`);
+          } else {
+            sentOk += 1;
             book.remember(device.token, item.id);
             if (!logged.has(item.id)) {
               logged.add(item.id);
@@ -809,10 +838,17 @@ export function startPushWatch(options = {}) {
             }
           }
         } catch (error) {
+          sentError += 1;
           const fcm = error && error.fcm ? ` ${JSON.stringify(error.fcm)}` : '';
           log(`Push failed: ${error instanceof Error ? error.message : error}${fcm}`);
         }
       }
+    }
+    if (sentOk || sentError) {
+      stats.sentOk += sentOk;
+      stats.sentError += sentError;
+      stats.lastSendAt = new Date().toISOString();
+      log(`FCM sent success=${sentOk} error=${sentError}`);
     }
   }
 
@@ -824,5 +860,11 @@ export function startPushWatch(options = {}) {
     return book;
   }
 
-  return { book, alerts, start, tick };
+  return {
+    book,
+    alerts,
+    start,
+    tick,
+    stats: () => ({ ...stats }),
+  };
 }

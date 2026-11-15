@@ -25,7 +25,9 @@ Betspapa is Riddim Boss's football matchday app: live scores, trends, picks, boo
 
 **Push:** Firebase Cloud Messaging (FCM HTTP v1). Data-only high-priority messages; the phone builds the Red Ticker UI itself. The on-phone poller is the fallback. See [docs/fcm.md](./docs/fcm.md).
 
-**Current incident, not yet fixed:** device registrations are stored in `devices.json` under `ENGINE_DATA_DIR` (default `data/engine/`), which is ephemeral on Render. The service has restarted often, the phone list has been wiped, and notifications then have nobody to send to. The owner approved a 1 GB Render disk (~$0.25/month) on 14 Nov 2026 at 1:49 PM Africa/Accra. **As of 7:26 PM the same day, that disk is not attached.** `get_service` on `srv-dbr5crdckfvc73d8i51g` showed no disk, and there were no `disk_created` / `disk_updated` events. Until the disk is mounted, `ENGINE_DATA_DIR` points at it, and a register-and-push test succeeds after a restart, do not ship 0.4.9.
+**Update 15 Nov 2026:** the approved 1 GB disk `dsk-dbsgb0ei0phs73d2b210` is mounted at `/var/data` on `srv-dbr5crdckfvc73d8i51g`, and `ENGINE_DATA_DIR=/var/data` is set. Devices, the booked board, and promo state all live in that directory. Papa Guardian runs on boot and after every engine cycle. It switches the process to live mode, keeps the last booked board up, drops odds violators (the 1.60 exception only when both samples are 10/10), rebooks kicked-off legs and missing desk parts, and raises `guardian: "attention"` with a plain `reason` when it cannot fix something. `/api/health` includes a `checks` list. `/api/guardian` returns that status JSON.
+
+**Earlier incident:** device registrations had been stored on the ephemeral disk, so restarts wiped `devices.json` and pushes had nobody to send to. The owner approved the 1 GB disk (~$0.25/month) on 14 Nov 2026 at 1:49 PM Africa/Accra. It was not attached at 7:26 PM that day. It is attached now. Do not publish 0.4.9 until a restart leaves the device count unchanged.
 
 A public `engine-data` branch stores `engine-state.json` so a restart can reload the last booked board without a disk. That snapshot does **not** persist FCM device tokens.
 
@@ -206,7 +208,7 @@ Papa Guardian is independent of both the routine and the Actions monitor. It run
 
 Do **not** publish a new APK until the owner-facing issues are fixed and checked on the live server with real data and screenshots.
 
-1. **Attach the approved 1 GB disk** on `srv-dbr5crdckfvc73d8i51g`, mount it, set `ENGINE_DATA_DIR` to the mount, redeploy. Confirm `devices.json` and `engine-state.json` survive a restart.
+1. **Confirm the 1 GB disk survives a restart.** It is mounted at `/var/data` (`dsk-dbsgb0ei0phs73d2b210`) and `ENGINE_DATA_DIR=/var/data`. `devices.json` and `engine-state.json` must still be there after a restart, and the device count must not fall to 0.
 2. **Notification delivery verification.** Register a real phone after the disk is on, send `POST /api/devices/test`, confirm a Red Ticker arrives with the app closed, and confirm the token is still there after a restart. This was the reason 0.4.9 was held back.
 3. **Publish 0.4.9 only after (1) and (2)** plus a live QC of codes, odds ranges, and per-code copy buttons. The draft already exists on `cursor/apk-049-5587`.
 4. **Open [PR #66](https://github.com/OriginalSolution/Betspapa/pull/66)** — restored share codes should stay attached to open matches. Review and merge (merge method) if it is still correct and not already superseded by later `main` commits.
