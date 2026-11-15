@@ -2,6 +2,7 @@
  * One slip per 80%+ market, plus the master slip. Each distinct slip is booked
  * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
+import { BOOKING_MAP_VERSION } from './bookers.mjs';
 import { labelFor } from './occurrence.mjs';
 import { assertBookingRanges, legOpen, priceInRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
@@ -19,7 +20,7 @@ export const SLIP_CONCURRENCY = 4;
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && priceInRange(leg.market, leg.odds, leg),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && priceInRange(leg.market, leg.odds, leg),
   );
 }
 
@@ -60,10 +61,17 @@ export function orderForTier(legs, tier) {
   if (bandMax == null) return rows.slice().sort(byConfidence);
   const priority = [];
   const higher = [];
-  for (const leg of rows) (legRate(leg) + 1e-12 < bandMax ? priority : higher).push(leg);
+  const rescued = [];
+  for (const leg of rows) {
+    const rate = legRate(leg);
+    if (tier === '80' && leg.teamsAgree === true && rate + 1e-12 < 0.8) rescued.push(leg);
+    else if (rate + 1e-12 < bandMax) priority.push(leg);
+    else higher.push(leg);
+  }
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  return [...priority, ...higher];
+  rescued.sort(byConfidence);
+  return [...priority, ...higher, ...rescued];
 }
 
 /** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
@@ -98,7 +106,7 @@ const TIERS = [
 export function tierSlips(legs) {
   const slips = [];
   for (const tier of TIERS) {
-    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min);
+    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min || (tier.id === '80' && leg.teamsAgree === true));
     if (!rows.length) continue;
     const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
     slips.push({
@@ -151,10 +159,17 @@ function legView(leg) {
     odds: leg.odds,
     occurrence: leg.occurrence ?? null,
     sample: leg.sample ?? null,
+    rate: Number.isFinite(Number(leg.rate)) ? Number(leg.rate) : null,
     form: form.length ? form : null,
     opponentHeld: leg.opponentHeld === true ? true : null,
     opponentSample: leg.opponentSample || null,
     exception: leg.exception === true ? true : null,
+    teamsAgree: leg.teamsAgree === true ? true : null,
+    homeSample: leg.homeSample || null,
+    awaySample: leg.awaySample || null,
+    leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: leg.agreement || null,
+    reasons: Array.isArray(leg.reasons) ? leg.reasons.filter((line) => typeof line === 'string').slice(0, 8) : [],
     inRangeDesks: Array.isArray(leg.inRangeDesks) ? leg.inRangeDesks : null,
   };
 }
@@ -224,6 +239,8 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     let entry = nextCache[key] || { books: {}, attempts: {}, lastAttemptAt: 0, bookedAt: null };
     if (!cacheFresh(entry, legs)) entry = { books: {}, attempts: entry.attempts || {}, lastAttemptAt: 0, bookedAt: null };
     if (clock - (entry.lastAttemptAt || 0) > ATTEMPT_RESET_MS) entry = { ...entry, attempts: {} };
+    // A new desk map (for example second-half totals on betPawa) must be tried even if this hour's attempts are spent.
+    if ((entry.mapVersion || 1) !== BOOKING_MAP_VERSION) entry = { ...entry, attempts: {}, mapVersion: BOOKING_MAP_VERSION };
     const checked = inspectBooks(entry.books);
     for (const issue of checked.issues) issues.push(`${label}: ${issue}`);
     const desks = checked.retry.filter((desk) => (entry.attempts[desk] || 0) < MAX_ATTEMPTS && (!allow || allow.includes(desk)));
@@ -238,7 +255,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
           books = again.books;
           const attempts = { ...entry.attempts };
           for (const desk of desks) attempts[desk] = again.retry.includes(desk) ? (attempts[desk] || 0) + 1 : 0;
-          entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString() };
+          entry = { books, attempts, lastAttemptAt: clock, bookedAt: new Date(clock).toISOString(), mapVersion: BOOKING_MAP_VERSION };
           const missing = again.retry.filter((desk) => desks.includes(desk));
           if (missing.length) {
             const message = `${label}: no real code yet from ${missing.join(', ')}.`;
@@ -251,7 +268,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
           const message = `${label}: booking failed: ${error instanceof Error ? error.message : error}`;
           issues.push(message);
           log('error', message);
-          entry = { ...entry, lastAttemptAt: clock };
+          entry = { ...entry, lastAttemptAt: clock, mapVersion: BOOKING_MAP_VERSION };
         }
         nextCache[key] = entry;
         return entry;
@@ -261,7 +278,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
     } else if (inflight.has(key)) {
       entry = await inflight.get(key);
     } else {
-      entry = { ...entry, books: checked.books };
+      entry = { ...entry, books: checked.books, mapVersion: BOOKING_MAP_VERSION };
       nextCache[key] = entry;
     }
     return entry;

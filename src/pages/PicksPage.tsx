@@ -5,7 +5,7 @@ import { Crest } from '../components/Crest';
 import { FormPips } from '../components/PickCard';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { marketLabel, type DeskId } from '../lib/engineSlips';
-import { slipParts, tierMin, tierSlip, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
+import { showsInTier, slipParts, tierSlip, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
 import { cx, kickoffClock } from '../lib/format';
 import { combinedOdds, marketFilters, tipsFromEngine, type PickChip, type PickTip } from '../lib/matchPicks';
 import type { Team } from '../types';
@@ -62,7 +62,7 @@ export function PicksPage() {
       (tip) => !blocked.markets.has(tip.chip.market) && !blocked.teams.has(tip.chip.teamId) && !blocked.competitions.has(tip.competitionId),
     );
   }, [state, matches, blocked]);
-  const band = useMemo(() => tips.filter((tip) => (tip.chip.rate ?? 0) + 1e-12 >= tierMin(tier)), [tips, tier]);
+  const band = useMemo(() => tips.filter((tip) => showsInTier(tip.chip.rate, tier, tip.chip.teamsAgree)), [tips, tier]);
   const filters = useMemo(() => marketFilters(band), [band]);
   useEffect(() => {
     if (market !== 'all' && !filters.some((item) => item.id === market)) setMarket('all');
@@ -258,11 +258,16 @@ function TipRow({
                 {clock ? ` - ${clock}` : ''}
               </em>
             </span>
-            {(tip.chip.form?.length || tip.chip.opponentHeld || tip.chip.exception) && (
+            {(tip.chip.form?.length || tip.chip.opponentHeld || tip.chip.exception || tip.chip.homeSample || tip.chip.leagueRisk) && (
               <span className="tip-extra">
                 {tip.chip.form && tip.chip.form.length > 0 && <FormPips form={tip.chip.form} />}
                 {tip.chip.exception && <i className="exception-chip">Exception</i>}
                 {tip.chip.opponentHeld && <i className="held-chip">Held after opponent</i>}
+                {tip.chip.homeSample && tip.chip.awaySample && <i className="held-chip">{`Home ${tip.chip.homeSample} · Away ${tip.chip.awaySample}`}</i>}
+                {tip.chip.leagueRisk === 'penalise' && <i className="exception-chip">League risk</i>}
+                {tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line)) && (
+                  <i className="held-chip">{tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line))}</i>
+                )}
               </span>
             )}
           </span>

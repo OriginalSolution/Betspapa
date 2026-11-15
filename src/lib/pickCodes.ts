@@ -15,6 +15,12 @@ export function tierMin(tier: CodeTier): number {
   return tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;
 }
 
+/** The 80% band also keeps a pick both teams supported, even when that rate is under 80%. */
+export function showsInTier(rate: number | null, tier: CodeTier, teamsAgree = false): boolean {
+  if ((rate ?? 0) + 1e-12 >= tierMin(tier)) return true;
+  return tier === '80' && teamsAgree;
+}
+
 /** The booked slip for a confidence band. A market of null is every qualifying pick in that band. */
 export function tierSlip(state: EngineState | null, tier: CodeTier, market: string | null): EngineSlip | null {
   const id = market ? `tier:${tier}:${market}` : `tier:${tier}`;

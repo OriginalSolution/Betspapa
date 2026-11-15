@@ -157,7 +157,9 @@ export function FollowedTrends() {
         .find((leg) => leg.eventId === parsed.matchId && leg.market === parsed.market);
       const odds = Number(pick?.odds ?? engineLeg?.odds);
       const occurrence = engineLeg?.occurrence;
-      const rate = typeof occurrence === 'number' ? (occurrence > 1 ? occurrence / 100 : occurrence) : pick?.rate;
+      const fromOccurrence = typeof occurrence === 'number' ? (occurrence > 1 ? occurrence / 100 : occurrence) : null;
+      const fromGrade = typeof engineLeg?.rate === 'number' ? (engineLeg.rate > 1 ? engineLeg.rate / 100 : engineLeg.rate) : null;
+      const rate = fromGrade != null && (fromOccurrence == null || fromGrade < fromOccurrence) ? fromGrade : fromOccurrence ?? pick?.rate;
       if (!face.home || !face.away || !face.kickoff) continue;
       if (face.status === 'won' || face.status === 'bust') continue;
       legs.push({
@@ -167,6 +169,7 @@ export function FollowedTrends() {
         kickoff: face.kickoff,
         match: `${face.home} vs ${face.away}`,
         rate: typeof rate === 'number' ? rate : 0.8,
+        teamsAgree: engineLeg?.teamsAgree === true,
         status: face.status,
       });
     }

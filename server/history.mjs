@@ -47,6 +47,8 @@ export function rowFromMatch(match, teamId) {
   const htAway = Number(match.periods?.p1?.away);
   const id = Number(match._id);
   if (!Number.isFinite(id)) return null;
+  const tournament = match?.tournament?.uniquetournament?.name || match?.tournament?.name || match?.season?.uniquetournament?.name || '';
+  const country = match?.tournament?.category?.name || '';
   return {
     matchId: id,
     uts: Number(match.time?.uts) || 0,
@@ -60,6 +62,8 @@ export function rowFromMatch(match, teamId) {
     cornersAway: null,
     cardsHome: null,
     cardsAway: null,
+    tournament: tournament ? String(tournament).trim() : '',
+    country: typeof country === 'string' ? country.trim() : '',
   };
 }
 

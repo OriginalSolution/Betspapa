@@ -53,6 +53,18 @@ test('reads a finished result and skips a virtual or unfinished match', () => {
   assert.equal(real.teamIsHome, false);
   assert.equal(real.ftAway, 2);
   assert.equal(real.htAway, 1);
+  const named = rowFromMatch(
+    {
+      _id: 14,
+      teams: { home: { uid: 5, name: 'Alpha' }, away: { uid: 8, name: 'Gamma' } },
+      result: { home: 1, away: 0 },
+      time: { uts: 40 },
+      tournament: { name: 'Premier League', category: { name: 'England' }, uniquetournament: { name: 'Premier League' } },
+    },
+    5,
+  );
+  assert.equal(named.tournament, 'Premier League');
+  assert.equal(named.country, 'England');
 });
 
 test('reads corner and card counts', () => {

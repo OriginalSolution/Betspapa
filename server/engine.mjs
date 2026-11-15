@@ -5,6 +5,7 @@ import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
 import { assertBookingRanges, boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
+import { loadSettled, rememberSettled, saveSettled } from './research.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { SLIP_CONCURRENCY, bookSlips, bookableLegs, codeGroups, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
 import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
@@ -48,6 +49,7 @@ function publicState(state, now = new Date()) {
     tiers: view.tiers || [],
     issues: view.issues,
     cycleNotes: Array.isArray(view.cycleNotes) ? view.cycleNotes : null,
+    researchDrops: Array.isArray(view.researchDrops) ? view.researchDrops.slice(0, 40) : [],
   };
 }
 
@@ -64,6 +66,13 @@ function slimLeg(leg) {
     opponentHeld: leg.opponentHeld === true ? true : null,
     opponentSample: leg.opponentSample || null,
     exception: leg.exception === true ? true : null,
+    rate: Number.isFinite(Number(leg.rate)) ? Number(leg.rate) : null,
+    teamsAgree: leg.teamsAgree === true ? true : null,
+    homeSample: leg.homeSample || null,
+    awaySample: leg.awaySample || null,
+    leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: leg.agreement || null,
+    reasons: Array.isArray(leg.reasons) ? leg.reasons.slice(0, 8) : [],
   };
 }
 
@@ -332,7 +341,9 @@ export function createEngine(options = {}) {
       return publicState(kept, now);
     }
 
-    const board = buildOccurrenceBoard(events, loaded.histories, now);
+    const settledFile = join(dir, 'research-settled.json');
+    const settledRows = loadSettled(settledFile);
+    const board = buildOccurrenceBoard(events, loaded.histories, now, { settled: settledRows });
     if (loaded.statsMissing) board.notes.push(`No corner or card count for ${loaded.statsMissing} recent matches, so those lines were skipped where the sample fell under 8.`);
     if (loaded.statsDeferred) board.notes.push(`Corner and card counts for ${loaded.statsDeferred} recent matches wait for the next cycle.`);
     const fresh = board.legs.map((leg) => {
@@ -343,6 +354,11 @@ export function createEngine(options = {}) {
     if (settled.changed) {
       issues.push(...settled.issues);
       for (const issue of settled.issues) log('error', `Settlement repair: ${issue}`);
+    }
+    try {
+      saveSettled(settledFile, rememberSettled(settledRows, settled.legs));
+    } catch (error) {
+      log('error', `Could not store league results: ${error instanceof Error ? error.message : error}`);
     }
 
     const legs = bookableLegs(settled.legs, now);
@@ -370,6 +386,7 @@ export function createEngine(options = {}) {
       trends,
       tiers,
       occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
       settlement: settled.status,
       cycleNotes: issues,
       issues: issues.slice(0, 40),
@@ -419,6 +436,7 @@ export function createEngine(options = {}) {
           tiers: tiers.map(viewOf),
           slipCache: progress.cache,
           occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
           settlement: settled.status,
           cycleNotes: [...issues, ...progress.issues],
           issues: [...issues, ...progress.issues].slice(0, 40),
@@ -456,6 +474,7 @@ export function createEngine(options = {}) {
       tiers: tierViews,
       slipCache: booking.cache,
       occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
       settlement: settled.status,
       cycleNotes: issues,
       issues: issues.slice(0, 40),
