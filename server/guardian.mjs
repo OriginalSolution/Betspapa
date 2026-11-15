@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { appEngineState, boardHasCodes } from './engine.mjs';
 import { directoryPersistent, evaluateChecks, gzippedBytes, noteDeviceCount } from './guardianChecks.mjs';
+import { appendIncident, attentionStreak, compactDataDir, diskPressure, dispatchAttention, invalidDeskReports, memoryHot, noteSelfTest, readDiskUsage, readMemoryLimit, selfTestDue } from './guardianOps.mjs';
 import { priceInRange, rangeReason } from './oddsRange.mjs';
 
 const DESKS = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'];
@@ -161,8 +162,14 @@ export function createGuardian(options = {}) {
   const nowFn = options.now || (() => new Date());
 
   function logIncident(incident) {
-    incidents.unshift({ at: new Date().toISOString(), ...incident });
+    const record = { at: new Date().toISOString(), fixed: false, ...incident };
+    incidents.unshift(record);
     if (incidents.length > 40) incidents.length = 40;
+    try {
+      appendIncident(options.dataDir, record);
+    } catch {
+      /* a full disk is reported by the disk check */
+    }
   }
 
   function note(path, ms, bytes) {
@@ -173,6 +180,9 @@ export function createGuardian(options = {}) {
   let sawBoot = false;
   let devicesLost = false;
   let previousDevices = 0;
+  let streaks = {};
+  let selfTestState = { bootDone: false, gmtDay: null };
+  let memoryHigh = 0;
 
   function pause(ms) {
     if (!ms) return Promise.resolve();
@@ -263,8 +273,19 @@ export function createGuardian(options = {}) {
     try {
       const boot = !sawBoot;
       sawBoot = true;
+      let repairFailed = false;
       rememberDevices(boot);
+      if (options.restartHung?.()) {
+        logIncident({ code: 'hung-cycle', level: 'attention', message: 'Restarted a booking cycle that ran longer than two intervals.', fixed: true });
+      }
+      const disk = options.disk ? options.disk() : options.dataDir ? diskPressure(readDiskUsage(options.dataDir)) : { full: false, used: 0 };
+      if (disk.full && options.dataDir) {
+        const removed = compactDataDir(options.dataDir, nowFn());
+        logIncident({ code: 'disk', level: 'attention', message: `Data disk is ${Math.round((disk.used || 0) * 100)}% full. Compacted ${removed.length} old files.`, fixed: removed.length > 0 });
+      }
+      const invalid = invalidDeskReports(options.getRaw ? options.getRaw() : options.getState?.());
       let verdict = evaluate();
+      if (invalid.length && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
       lastCheckAt = nowFn().toISOString();
       let fixes = [];
       if (!verdict.ok || verdict.actions.includes('rebook') || verdict.actions.includes('switch-live')) {
@@ -274,6 +295,7 @@ export function createGuardian(options = {}) {
             fixes.push(...await rebook());
           }
         } catch (error) {
+          repairFailed = true;
           logIncident({ code: 'repair-failed', level: 'attention', message: error instanceof Error ? error.message : 'Repair failed.', fixed: false });
         }
         verdict = evaluate();
@@ -294,9 +316,46 @@ export function createGuardian(options = {}) {
         if (!live.has(item.code)) item.fixed = true;
       }
       if (nightlyDue(lastNightly, nowFn())) await nightly();
+      await maybeSelfTest(boot);
+      const streak = attentionStreak(streaks, verdict.checks);
+      streaks = streak.streaks;
+      if (repairFailed || streak.fired.length) {
+        const incident = {
+          at: new Date().toISOString(),
+          code: repairFailed ? 'repair-failed' : streak.fired[0],
+          message: repairFailed ? 'Self-repair failed.' : verdict.reason || 'A check stayed in attention.',
+          action: fixes.join(' '),
+          fixed: false,
+          checks: streak.fired,
+        };
+        logIncident({ code: 'ai-fixer', level: 'attention', message: incident.message, fixed: false });
+        const sent = await dispatchAttention(incident, options.env || process.env, options.fetchImpl || fetch);
+        if (!sent.sent) logIncident({ code: 'ai-fixer', level: 'info', message: sent.reason || 'Attention was logged for the fixer.', fixed: false });
+      }
+      const rss = options.rss ? options.rss() : process.memoryUsage().rss;
+      const limit = options.memoryLimit ? options.memoryLimit() : readMemoryLimit();
+      memoryHigh = memoryHot(rss, limit) ? memoryHigh + 1 : 0;
+      if (memoryHigh >= 3) {
+        logIncident({ code: 'memory', level: 'attention', message: 'Memory stayed over 85%. Exiting so the host can restart the process.', fixed: false });
+        (options.exit || ((code) => process.exit(code)))(0);
+      }
       return status();
     } finally {
       running = false;
+    }
+  }
+
+  async function maybeSelfTest(boot) {
+    if (!options.selfTest) return;
+    const clock = nowFn();
+    const due = selfTestDue(selfTestState, clock, boot);
+    if (!due.due) return;
+    selfTestState = noteSelfTest(selfTestState, { ...due, hour: clock.getUTCHours() });
+    try {
+      const result = await options.selfTest();
+      logIncident({ code: 'self-test', level: result?.ok ? 'info' : 'attention', message: result?.message || 'Self-test finished.', fixed: Boolean(result?.ok) });
+    } catch (error) {
+      logIncident({ code: 'self-test', level: 'attention', message: error instanceof Error ? error.message : 'Self-test failed.', fixed: false });
     }
   }
 

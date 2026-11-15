@@ -5,7 +5,10 @@
  * ever produced: if the catalogue is unreachable the caller gets an error.
  */
 
+import { catalogueShape, shapeSample } from './guardianOps.mjs';
+
 const BASE = 'https://www.sportybet.com/api/gh';
+const PREMATCH = `${BASE}/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1`;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const CACHE_TTL_MS = 5 * 60_000;
@@ -118,23 +121,78 @@ export function flattenPage(payload) {
   return events;
 }
 
-async function fetchPage(pageNum, fetchImpl, markets = CATALOGUE_MARKETS) {
+const FEED_HEADERS = {
+  Accept: 'application/json',
+  OperId: '3',
+  Platform: 'web',
+  Referer: 'https://www.sportybet.com/gh/sport/football',
+  Origin: 'https://www.sportybet.com',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+};
+
+async function pause(ms) {
+  if (!ms) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchPage(pageNum, fetchImpl, markets = CATALOGUE_MARKETS, delays = [200, 800]) {
   const url = `${BASE}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=${encodeURIComponent(markets)}&pageSize=${PAGE_SIZE}&pageNum=${pageNum}`;
-  const response = await fetchImpl(url, {
-    headers: {
-      Accept: 'application/json',
-      OperId: '3',
-      Platform: 'web',
-      Referer: 'https://www.sportybet.com/gh/sport/football',
-      Origin: 'https://www.sportybet.com',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`Fixture page ${pageNum} returned ${response.status}`);
+  let last = new Error('Fixture page failed');
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, { headers: FEED_HEADERS, signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`Fixture page ${pageNum} returned ${response.status}`);
+      const payload = await response.json();
+      if (!catalogueShape(payload)) {
+        console.error(`[fixtures] Catalogue schema changed: ${shapeSample(payload)}`);
+        throw new Error('Fixture catalogue schema changed');
+      }
+      if (Number(payload?.bizCode) !== 10000) throw new Error(`Fixture page ${pageNum} was rejected`);
+      return { events: flattenPage(payload), total: Number(payload?.data?.totalNum) || 0 };
+    } catch (error) {
+      last = error instanceof Error ? error : new Error(String(error));
+      if (attempt < delays.length) await pause(delays[attempt]);
+    }
+  }
+  throw last;
+}
+
+/** Prematch rows from the live list, used only when the catalogue page changes shape or fails. */
+export function flattenPrematch(payload) {
+  if (catalogueShape(payload)) return flattenPage(payload);
+  const events = [];
+  const groups = Array.isArray(payload?.data) ? payload.data : [];
+  for (const group of groups) {
+    for (const event of group?.events || []) {
+      const kickoffMs = Number(event?.estimateStartTime);
+      if (!event?.eventId || !event?.homeTeamName || !event?.awayTeamName || !Number.isFinite(kickoffMs)) continue;
+      const record = {
+        eventId: String(event.eventId),
+        home: String(event.homeTeamName),
+        away: String(event.awayTeamName),
+        kickoff: new Date(kickoffMs).toISOString(),
+        homeId: event.homeTeamId ? String(event.homeTeamId) : null,
+        awayId: event.awayTeamId ? String(event.awayTeamId) : null,
+        tournament: group.name || event.sport?.category?.tournament?.name || 'Fixture',
+        country: event.sport?.category?.name || '',
+        odds: parseOdds(event.markets),
+      };
+      if (!isDummyId(record.eventId) && !isSimulated(record)) events.push(record);
+    }
+  }
+  return events;
+}
+
+async function fetchPrematch(fetchImpl) {
+  const response = await fetchImpl(PREMATCH, { headers: FEED_HEADERS, signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) throw new Error(`Prematch list returned ${response.status}`);
   const payload = await response.json();
-  if (Number(payload?.bizCode) !== 10000) throw new Error(`Fixture page ${pageNum} was rejected`);
-  return { events: flattenPage(payload), total: Number(payload?.data?.totalNum) || 0 };
+  const events = flattenPrematch(payload);
+  if (!events.length) {
+    console.error(`[fixtures] Prematch schema changed: ${shapeSample(payload)}`);
+    throw new Error('Prematch list schema changed');
+  }
+  return events;
 }
 
 async function loadAll(fetchImpl, markets = CATALOGUE_MARKETS) {
@@ -158,6 +216,10 @@ async function loadAll(fetchImpl, markets = CATALOGUE_MARKETS) {
 function refresh(fetchImpl) {
   if (cache.pending) return cache.pending;
   cache.pending = loadAll(fetchImpl)
+    .catch(async (error) => {
+      console.error(`[fixtures] Catalogue failed (${error instanceof Error ? error.message : error}). Trying the prematch list.`);
+      return fetchPrematch(fetchImpl);
+    })
     .then((events) => {
       if (!events.length) throw new Error('Fixture catalogue returned no events');
       cache.events = events;

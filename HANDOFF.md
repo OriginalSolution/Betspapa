@@ -204,6 +204,24 @@ The routine definition was not found as a file on this box during this pass. If 
 
 Papa Guardian is independent of both the routine and the Actions monitor. It runs inside the Node process and is exposed at `/api/health` (`guardian`) and `/api/guardian`.
 
+### Papa Guardian self-heal (15 Nov 2026)
+
+The process repairs the board without another bot. On each check it can:
+
+- Restart a booking cycle that has run longer than two intervals (30 minutes at the 15-minute cycle).
+- Retry a fixture or desk response that fails or is no longer the expected JSON, log a short sample of the new shape, and fall back from the SportyBet catalogue to the prematch list.
+- Keep the last booked board when a cycle returns codes but fewer than 30% of the previous open legs.
+- Compact old health files when the data disk is over 80% full. It does not delete `devices.json` or `engine-state.json`.
+- Exit when resident memory stays over 85% for three checks, so Render starts a fresh process.
+- Prune stale FCM tokens and rebook a slip when a desk reports the code invalid.
+- Run a self-test at boot and again after 04:00 GMT: parse `/api/engine?view=app`, and book one real open leg on the five desks when a leg exists. It does not invent a code.
+
+Incidents are appended to `ENGINE_DATA_DIR/incidents.jsonl` and returned by `GET /api/guardian/incidents`. Each line records what broke, what the guardian did, and whether that fixed it.
+
+If the same check stays at attention for 3 cycles, or a repair throws, the process sends a GitHub `repository_dispatch` named `guardian-attention` with the incident JSON. That happens only when `GITHUB_DISPATCH_TOKEN` is set on the service. Otherwise it writes the incident and continues. The token is not stored in the repo.
+
+`.github/workflows/ai-fixer.yml` listens for that dispatch, for a failed CI run on `main`, and for a manual run. If the GitHub secret `XAI_API_KEY` is missing, the workflow exits 0. When the key is present it asks the xAI chat API (`grok-4`) for a small patch, runs `npm test`, opens a pull request, and merges with the merge method only after the pull request checks pass. It records token spend and stops for the rest of the month once the estimated total passes $20, using the rates $3 per million input tokens and $15 per million output tokens. The running total is the `guardian-ai-spend` artifact. The workflow does not create releases or tags and does not edit the keystore, env files, or its own spend cap.
+
 ## 7. Open issues and pending decisions
 
 Do **not** publish a new APK until the owner-facing issues are fixed and checked on the live server with real data and screenshots.

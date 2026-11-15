@@ -8,9 +8,13 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { forceLiveMode, getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
+import { readIncidents } from './guardianOps.mjs';
+import { bookAll } from './bookers.mjs';
+import { requestJson } from './curl-request.mjs';
+import { legOpen, priceInRange } from './oddsRange.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
 import { fcmConfigured, pruneStaleDevices, sendTestPush, startPushWatch } from './push.mjs';
@@ -20,6 +24,23 @@ import { slimLivePayload } from './liveSlim.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 
 const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+
+async function tinySelfTest() {
+  let parsed = false;
+  try {
+    const view = JSON.parse(JSON.stringify(appEngineState(getEngineState())));
+    parsed = Boolean(view && typeof view === 'object' && ('master' in view || Array.isArray(view.tiers)));
+  } catch {
+    parsed = false;
+  }
+  const raw = getEngineRaw();
+  const pool = [...(raw?.legs || []), ...(raw?.master?.legs || [])];
+  const leg = pool.find((item) => legOpen(item) && priceInRange(item?.market, item?.odds, item));
+  if (!leg) return { ok: parsed, message: parsed ? 'App view parses. No open leg for a desk test.' : 'App view did not parse.' };
+  const books = await bookAll([leg], requestJson);
+  const coded = Object.entries(books || {}).filter(([, book]) => (book?.parts || []).some((part) => part?.code)).map(([desk]) => desk);
+  return { ok: parsed, message: `Desk test ${coded.length ? `booked ${coded.join(', ')}` : 'returned no code'}. App view ${parsed ? 'parses' : 'failed'}.` };
+}
 forceLiveMode();
 const pushWatch = startPushWatch();
 let prunedTokens = 0;
@@ -35,6 +56,8 @@ const guardian = createGuardian({
   fcm: fcmConfigured,
   mode: () => getConfig().mode,
   forceLive: () => forceLiveMode(),
+  restartHung: restartEngineIfHung,
+  selfTest: tinySelfTest,
   deviceCount: () => pushWatch.book.list().length,
   push: () => ({ ...pushWatch.stats(), pruned: prunedTokens }),
   payloadBytes: () => gzippedBytes(appEngineState(getEngineState())),
@@ -312,6 +335,10 @@ async function handleApi(req, res, url) {
       devices: watch.devices,
       checks: watch.checks,
     });
+    return;
+  }
+  if (url.pathname === '/api/guardian/incidents') {
+    send(req, res, 200, { incidents: readIncidents(dataDir) });
     return;
   }
   if (url.pathname === '/api/guardian') {

@@ -1,0 +1,109 @@
+name: AI fixer
+on:
+  repository_dispatch:
+    types: [guardian-attention]
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+jobs:
+  fix:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Leave quietly when the key is missing
+        id: gate
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          if [ -z "$XAI_API_KEY" ]; then
+            echo "XAI_API_KEY is not set."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Previous spend
+        if: steps.gate.outputs.skip != '1'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list --workflow ai-fixer.yml --limit 30 --json databaseId,conclusion --jq '[.[] | select(.conclusion=="success")][0].databaseId')
+          if [ -n "$id" ] && [ "$id" != "null" ]; then
+            gh run download "$id" -n guardian-ai-spend -D "$RUNNER_TEMP/spend" || true
+            if [ -f "$RUNNER_TEMP/spend/spend.json" ]; then cp "$RUNNER_TEMP/spend/spend.json" spend.json; fi
+          fi
+
+      - name: Incident
+        if: steps.gate.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          CLIENT_PAYLOAD: ${{ toJson(github.event.client_payload) }}
+          CI_LOG: ci.log
+        run: |
+          if [ "$EVENT_NAME" = "workflow_run" ] && [ -n "$RUN_ID" ]; then
+            gh run view "$RUN_ID" --log-failed > ci.log || true
+          fi
+          node scripts/ai-fixer.mjs --write-incident
+
+      - name: Propose a patch
+        if: steps.gate.outputs.skip != '1'
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          XAI_MODEL: grok-4
+          APPLY: "1"
+          INCIDENT_FILE: incident.json
+          SPEND_FILE: spend.json
+        run: node scripts/ai-fixer.mjs
+
+      - name: Test the patch
+        id: test
+        if: steps.gate.outputs.skip != '1'
+        run: |
+          if git diff --quiet && [ -z "$(git ls-files --others --exclude-standard | grep -v spend.json || true)" ]; then
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=1" >> "$GITHUB_OUTPUT"
+          npm ci
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          npm test
+
+      - name: Open a pull request and merge when tests passed
+        if: steps.test.outputs.changed == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="cursor/ai-fixer-${{ github.run_id }}-40df"
+          git checkout -b "$branch"
+          git add -A
+          git reset -- spend.json incident.json || true
+          git commit -m "Fix a guardian incident"
+          git push -u origin "$branch"
+          url=$(gh pr create --base main --head "$branch" --title "Fix a guardian incident" --body "Papa Guardian asked for a repair. The workflow ran the test suite before opening this pull request. It merges with a merge commit only after the pull request checks pass.")
+          gh pr merge "$url" --merge --auto
+
+      - name: Store this month's spend
+        if: steps.gate.outputs.skip != '1' && hashFiles('spend.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardian-ai-spend
+          path: spend.json
+          retention-days: 90
