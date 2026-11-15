@@ -60,10 +60,17 @@ export function orderForTier(legs, tier) {
   if (bandMax == null) return rows.slice().sort(byConfidence);
   const priority = [];
   const higher = [];
-  for (const leg of rows) (legRate(leg) + 1e-12 < bandMax ? priority : higher).push(leg);
+  const rescued = [];
+  for (const leg of rows) {
+    const rate = legRate(leg);
+    if (tier === '80' && leg.teamsAgree === true && rate + 1e-12 < 0.8) rescued.push(leg);
+    else if (rate + 1e-12 < bandMax) priority.push(leg);
+    else higher.push(leg);
+  }
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  return [...priority, ...higher];
+  rescued.sort(byConfidence);
+  return [...priority, ...higher, ...rescued];
 }
 
 /** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
@@ -98,7 +105,7 @@ const TIERS = [
 export function tierSlips(legs) {
   const slips = [];
   for (const tier of TIERS) {
-    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min);
+    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min || (tier.id === '80' && leg.teamsAgree === true));
     if (!rows.length) continue;
     const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
     slips.push({
@@ -151,10 +158,16 @@ function legView(leg) {
     odds: leg.odds,
     occurrence: leg.occurrence ?? null,
     sample: leg.sample ?? null,
+    rate: Number.isFinite(Number(leg.rate)) ? Number(leg.rate) : null,
     form: form.length ? form : null,
     opponentHeld: leg.opponentHeld === true ? true : null,
     opponentSample: leg.opponentSample || null,
     exception: leg.exception === true ? true : null,
+    teamsAgree: leg.teamsAgree === true ? true : null,
+    homeSample: leg.homeSample || null,
+    awaySample: leg.awaySample || null,
+    leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: leg.agreement || null,
     inRangeDesks: Array.isArray(leg.inRangeDesks) ? leg.inRangeDesks : null,
   };
 }

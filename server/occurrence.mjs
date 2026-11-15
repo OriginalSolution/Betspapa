@@ -1,9 +1,14 @@
 /**
  * Occurrence is how often a market hit in recent real matches, not the price.
  * A line qualifies at 80% or better over the last 10 relevant games, with at
- * least 8 of those games scored. The hit rules match the app's settle().
+ * least 8 of those games scored. When both teams have a sample, the published
+ * grade is the weaker side, and a line both teams support stays even if that
+ * rate is under 80%. A one-sided trend is not graded as a sure pick. The hit
+ * rules match the app's settle().
  */
+import { applyLeagueRisk, dangerousBand, loadLeagueRisk, unknownLeagueMarkets } from './leagueRisk.mjs';
 import { MIN_ODDS, priceInRange } from './oddsRange.mjs';
+import { gradeWithTeams } from './teamGrade.mjs';
 import { isSimulated } from './upcoming.mjs';
 
 export const WINDOW = 10;
@@ -272,6 +277,31 @@ export function explainTip(market, homeRows, awayRows) {
   return { form, opponentHeld };
 }
 
+/**
+ * Each team's own record for this outcome.
+ * Home and away lines use that team's venue. The other side is flipped, so
+ * an away loss supports a home win. Match lines (goals, both teams to score)
+ * use each team's own recent games, home and away.
+ */
+export function teamRecords(market, homeRows, awayRows) {
+  let homeList;
+  let awayList;
+  if (market.scope === 'home') {
+    homeList = venue(homeRows, 'home');
+    awayList = venue(awayRows, 'away').map((row) => asSide(row, true));
+  } else if (market.scope === 'away') {
+    homeList = venue(homeRows, 'home').map((row) => asSide(row, false));
+    awayList = venue(awayRows, 'away');
+  } else if (market.scope === 'venue-either') {
+    homeList = venue(homeRows, 'home');
+    awayList = venue(awayRows, 'away');
+  } else {
+    homeList = homeRows;
+    awayList = awayRows;
+  }
+  return { home: rateOf(homeList, market.hit), away: rateOf(awayList, market.hit) };
+}
+
 function rowsOf(histories, uid) {
   const rows = histories instanceof Map ? histories.get(uid) : histories?.[uid];
   return Array.isArray(rows) ? rows : [];
@@ -282,15 +312,23 @@ function percent(rate) {
 }
 
 /**
- * One leg per open fixture per market at or above 80%, inside the odds table.
- * A price just outside the band is kept so another book can still price it.
- * `byEvent` also keeps cooler measured rates so the app can show the same record.
+ * One leg per open fixture per market inside the odds table.
+ * The hotter-side trend still has to clear 80% when either team has no sample.
+ * When both teams have a sample, both must support the outcome. The published
+ * rate is then the weaker team, so a one-sided 10/10 is not a 100% pick.
+ * `byEvent` still stores the raw trend, including rates under 80%.
  */
-export function buildOccurrenceBoard(events, histories, now = new Date()) {
+export function buildOccurrenceBoard(events, histories, now = new Date(), options = {}) {
+  const leagueTable = options.leagueRisk || loadLeagueRisk();
   const legs = [];
   const byEvent = {};
   let skippedNoTeam = 0;
   let beforeRange = 0;
+  let inRange = 0;
+  let teamKept = 0;
+  let teamDropped = 0;
+  let leagueDropped = 0;
+  let leagueMarked = 0;
   const unpriced = new Map();
   for (const event of Array.isArray(events) ? events : []) {
     if (!isRealFixture(event) || !isOpenToday(event, now)) continue;
@@ -305,29 +343,41 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
     if (!homeRows.length && !awayRows.length) continue;
     const measured = [];
     for (const market of OCCURRENCE_MARKETS) {
-      const rate = measureMarket(market, homeRows, awayRows);
-      if (!rate) continue;
-      measured.push({ market: market.id, hits: rate.hits, sample: rate.sample, rate: rate.hits / rate.sample });
-      if (rate.rate + 1e-12 < THRESHOLD) continue;
-      beforeRange += 1;
+      const trend = measureMarket(market, homeRows, awayRows);
+      const records = teamRecords(market, homeRows, awayRows);
+      if (trend) measured.push({ market: market.id, hits: trend.hits, sample: trend.sample, rate: trend.hits / trend.sample });
+      const graded = gradeWithTeams({ trend, home: records.home, away: records.away });
       const price = Number(event.odds?.[market.oddsKey]);
-      const explained = explainTip(market, homeRows, awayRows);
       const mirror = mirroredRecords(market, homeRows, awayRows);
-      const sample = `${rate.hits}/${rate.sample}`;
+      const trendSample = trend ? `${trend.hits}/${trend.sample}` : null;
       const draft = {
         market: market.id,
         odds: price,
-        sample,
-        rate: rate.rate,
-        occurrence: percent(rate.rate),
-        opponentHeld: explained.opponentHeld,
+        sample: trendSample,
         opponentSample: mirror.opponentSample,
-        exception: sample === '10/10' && mirror.opponentSample === '10/10',
+        exception: trendSample === '10/10' && mirror.opponentSample === '10/10',
       };
+      const trendQualified = Boolean(trend) && trend.rate + 1e-12 >= THRESHOLD;
+      if (trendQualified) beforeRange += 1;
       if (!priceInRange(market.id, price, draft)) {
-        unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
+        if (trendQualified) unpriced.set(market.id, (unpriced.get(market.id) || 0) + 1);
         continue;
       }
+      if (trendQualified) inRange += 1;
+      if (!graded) {
+        if (trendQualified) teamDropped += 1;
+        continue;
+      }
+      const band = dangerousBand(leagueTable, event, market.id, price);
+      const judged = applyLeagueRisk(graded, band);
+      if (!judged) {
+        leagueDropped += 1;
+        continue;
+      }
+      if (judged.leagueRisk === 'penalise') leagueMarked += 1;
+      if (judged.keptBy === 'teams') teamKept += 1;
+      const explained = explainTip(market, homeRows, awayRows);
+      const sample = `${judged.hits}/${judged.sample}`;
       legs.push({
         eventId: String(event.eventId),
         market: market.id,
@@ -338,21 +388,32 @@ export function buildOccurrenceBoard(events, histories, now = new Date()) {
         homeScore: null,
         awayScore: null,
         finished: false,
-        occurrence: percent(rate.rate),
+        occurrence: percent(judged.rate),
         sample,
-        hits: rate.hits,
-        played: rate.sample,
-        rate: rate.rate,
+        hits: judged.hits,
+        played: judged.sample,
+        rate: judged.rate,
         form: explained.form,
         opponentHeld: explained.opponentHeld,
         opponentSample: mirror.opponentSample,
         exception: draft.exception,
+        agreement: judged.agreement,
+        teamsAgree: judged.teamsAgree === true,
+        homeSample: judged.homeSample,
+        awaySample: judged.awaySample,
+        leagueRisk: judged.leagueRisk || null,
       });
     }
     if (measured.length) byEvent[String(event.eventId)] = measured;
   }
   const notes = [];
-  notes.push(`Range filter: ${beforeRange} lines at 80%+ before the price check, ${legs.length} inside the range.`);
+  notes.push(`Range filter: ${beforeRange} lines at 80%+ before the price check, ${inRange} inside the range, ${legs.length} kept.`);
+  if (teamKept) notes.push(`${teamKept} lines were under the 80% trend and stayed because both teams supported the pick.`);
+  if (teamDropped) notes.push(`${teamDropped} lines were at 80%+ inside the range and were left out because the two teams did not both support the pick.`);
+  if (leagueDropped) notes.push(`${leagueDropped} lines were inside the odds range but sit on a dangerous league price, so they were left out.`);
+  if (leagueMarked) notes.push(`${leagueMarked} lines were marked down because the price is dangerous in that league.`);
+  const unknown = unknownLeagueMarkets(leagueTable, OCCURRENCE_MARKETS.map((market) => market.id));
+  if (unknown.length) notes.push(`League risk ignored unknown markets: ${unknown.slice(0, 6).join(', ')}.`);
   if (skippedNoTeam) notes.push(`${skippedNoTeam} real fixtures had no team id, so occurrence could not be computed.`);
   if (unpriced.size) {
     const detail = [...unpriced.entries()]

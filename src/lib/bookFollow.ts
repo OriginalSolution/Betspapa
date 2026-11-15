@@ -2,7 +2,7 @@ import { CapacitorHttp } from '@capacitor/core';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 import type { DeskId, EngineBook } from './engineSlips';
 import { MIN_PUBLISHED_ODDS } from './oddsFloor';
-import { tierMin, TIER_LABEL, type CodeTier } from './pickCodes';
+import { showsInTier, TIER_LABEL, type CodeTier } from './pickCodes';
 
 export type BookLeg = {
   eventId: string;
@@ -11,6 +11,7 @@ export type BookLeg = {
   kickoff: string;
   match?: string;
   rate?: number | null;
+  teamsAgree?: boolean;
   status?: 'open' | 'won' | 'bust' | null;
 };
 
@@ -45,10 +46,9 @@ export function tierFallback(legs: BookLeg[], tier: CodeTier, now = Date.now()):
 }
 
 export function legsForTier(legs: BookLeg[], tier: CodeTier, market: string | null, now = Date.now()): BookLeg[] {
-  const min = tierMin(tier);
   return legs.filter((leg) => {
     const rate = typeof leg.rate === 'number' ? (leg.rate > 1 ? leg.rate / 100 : leg.rate) : 1;
-    if (rate + 1e-12 < min) return false;
+    if (!showsInTier(rate, tier, leg.teamsAgree === true)) return false;
     if (market && leg.market !== market) return false;
     if (leg.status === 'won' || leg.status === 'bust') return false;
     if (!Number.isFinite(leg.odds) || leg.odds < MIN_PUBLISHED_ODDS) return false;

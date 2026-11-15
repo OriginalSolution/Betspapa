@@ -90,6 +90,17 @@ export type EngineLeg = {
   opponentSample?: string | null;
   /** True only for a 10/10 record whose opponent is also 10/10, so the price may exceed the strict band. */
   exception?: boolean | null;
+  /** Published grade, 0–1. Lower than the sample when a league penalty marked the pick down. */
+  rate?: number | null;
+  /** Both teams' own records support this outcome, including when the rate is under 80%. */
+  teamsAgree?: boolean | null;
+  /** Home side's own sample, such as 8/10. */
+  homeSample?: string | null;
+  /** Away side's own sample, such as 6/10. */
+  awaySample?: string | null;
+  /** Set when the price sits in that league's dangerous band and the pick was kept at a lower grade. */
+  leagueRisk?: 'penalise' | null;
+  agreement?: string | null;
 };
 
 export type EnginePart = {
@@ -206,6 +217,7 @@ function parseLeg(value: unknown): EngineLeg | null {
   const odds = Number(row.odds);
   if (!eventId || !market || !match || !kickoff || !publishableOdds(odds)) return null;
   const occurrence = Number(row.occurrence);
+  const graded = Number(row.rate);
   const form = Array.isArray(row.form)
     ? row.form.filter((mark): mark is FormMark => mark === 'W' || mark === 'D' || mark === 'L').slice(0, 5)
     : [];
@@ -217,10 +229,16 @@ function parseLeg(value: unknown): EngineLeg | null {
     odds,
     occurrence: Number.isFinite(occurrence) ? occurrence : null,
     sample: text(row.sample),
+    rate: Number.isFinite(graded) ? (graded > 1 ? graded / 100 : graded) : null,
     form: form.length ? form : null,
     opponentHeld: row.opponentHeld === true ? true : null,
     opponentSample: text(row.opponentSample),
     exception: row.exception === true ? true : null,
+    teamsAgree: row.teamsAgree === true ? true : null,
+    homeSample: text(row.homeSample),
+    awaySample: text(row.awaySample),
+    leagueRisk: row.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: text(row.agreement),
   };
 }
 

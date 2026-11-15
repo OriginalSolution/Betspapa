@@ -48,7 +48,18 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   const slips = tierSlips([
     { ...leg(1, 'dc-12', 1.22), occurrence: 80, rate: 0.8 },
     { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },
+    { ...leg(3, 'over25', 1.3), occurrence: 70, rate: 0.7, teamsAgree: true },
   ]);
+  const rescued = slips.find((slip) => slip.id === 'tier:80:over25');
+  assert.equal(rescued.legs.length, 1);
+  assert.equal(slips.find((slip) => slip.id === 'tier:90:over25'), undefined);
+  assert.equal(slips.find((slip) => slip.id === 'tier:100:over25'), undefined);
+  const ordered = codeGroups([
+    { ...leg(3, 'over25', 1.3), rate: 0.7, teamsAgree: true },
+    { ...leg(4, 'over25', 1.3), rate: 0.84 },
+    { ...leg(5, 'over25', 1.3), rate: 1 },
+  ], '80')[0];
+  assert.deepEqual(ordered.map((row) => row.rate), [0.84, 1, 0.7]);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:dc-12'), undefined);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:over15').label, '100% Over 1.5 goals');
   const eighty = slips.find((slip) => slip.id === 'tier:80:dc-12');

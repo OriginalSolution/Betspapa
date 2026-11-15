@@ -25,6 +25,8 @@ Betspapa is Riddim Boss's football matchday app: live scores, trends, picks, boo
 
 **Push:** Firebase Cloud Messaging (FCM HTTP v1). Data-only high-priority messages; the phone builds the Red Ticker UI itself. The on-phone poller is the fallback. See [docs/fcm.md](./docs/fcm.md).
 
+**Update 15 Nov 2026, grading:** package `3.1.0` grades a pick from both teams' own records once the price is inside the market's odds range, and adds an empty editable per-league dangerous-odds table (`server/leagueRisk.json`). See §8. It is not on the live API until this change is merged to `main`.
+
 **Update 15 Nov 2026:** the approved 1 GB disk `dsk-dbsgb0ei0phs73d2b210` is mounted at `/var/data` on `srv-dbr5crdckfvc73d8i51g`, and `ENGINE_DATA_DIR=/var/data` is set. Devices, the booked board, and promo state all live in that directory. Papa Guardian runs on boot and after every engine cycle. It switches the process to live mode, keeps the last booked board up, drops odds violators (the 1.60 exception only when both samples are 10/10), rebooks kicked-off legs and missing desk parts, and raises `guardian: "attention"` with a plain `reason` when it cannot fix something. `/api/health` includes a `checks` list. `/api/guardian` returns that status JSON.
 
 **Earlier incident:** device registrations had been stored on the ephemeral disk, so restarts wiped `devices.json` and pushes had nobody to send to. The owner approved the 1 GB disk (~$0.25/month) on 14 Nov 2026 at 1:49 PM Africa/Accra. It was not attached at 7:26 PM that day. It is attached now. Do not publish 0.4.9 until a restart leaves the device count unchanged.
@@ -42,7 +44,7 @@ A public `engine-data` branch stores `engine-state.json` so a restart can reload
 | Default branch | `main` |
 | Created | 15 Jul 2026, 10:37 PM Africa/Accra |
 | Node | `>=20` (CI uses 22) |
-| `package.json` version | `3.0.0` (this is not the Android version) |
+| `package.json` version | `3.1.0` (this is not the Android version). 3.1.0 adds team-agreement grading and the empty per-league dangerous-odds table. |
 | Issues / wiki / projects | Enabled |
 | Pages | Enabled, source `main`, build type `workflow` (`.github/workflows/pages.yml`) |
 
@@ -264,6 +266,46 @@ Every pick or tip is inclusive of the bookmaker price, except where noted. A pic
 | Exception | Up to **1.60** only when that team is **10/10** on that exact market **and** the opponent's record on the mirrored market is also **10/10**. An 80% "held" flag is not enough |
 
 The implementation is `server/oddsRange.mjs` (`ODDS_RANGES`, `PERFECT_CEILING`, `validException`, `assertBookingRanges`). Keep this table and that file in sync.
+
+### Team agreement (3.1.0)
+
+The odds range is still the first gate. Inside it, grading no longer stops at the hotter team's trend.
+
+`server/occurrence.mjs` (`teamRecords`) and `server/teamGrade.mjs` (`SUPPORT_RATE` 0.60, `gradeWithTeams`) do this:
+
+1. Each team is scored on the last 10 relevant games, needing 8 scored games, with the same hit rules as the board.
+2. Home and away markets use that team's games at the venue. The other team is flipped, so an away side that loses away supports a home win. Goal totals and both-teams-to-score use each team's own recent matches.
+3. **Both support** (each at least 60%): keep the pick. The published rate is the weaker record. It is 100% only when both are perfect (10/10, or 8/8). If the weaker rate is under 80%, the pick still stays and is booked on the 80% slip, not on 90% or 100%. The old hotter-side trend would have dropped it; team agreement keeps it.
+4. **They do not both support**, and both samples exist: the pick is left out. A one-sided 10/10 is not booked as a sure thing. This includes a home win where the away side has been winning away: that is the old 1.60 "both 10/10" mirror, and it no longer becomes a home-win pick, because the two records point at opposite results.
+5. **One sample is missing:** nothing new applies. The line is kept when the existing trend is at least 80%, graded on that trend.
+
+### League danger (3.1.0)
+
+`server/leagueRisk.json` is the owner's table. It ships with `"leagues": {}`. This repo stores live last-10 team rows for grading, not a settled results archive by league and price, so no default bands were invented.
+
+Edit the JSON, or put a replacement at `ENGINE_DATA_DIR/league-risk.json` (on the live service that is `/var/data/league-risk.json`) or set `LEAGUE_RISK_PATH`. The next engine cycle reads it. A broken file is ignored and the shipped table is used.
+
+```json
+{
+  "version": 1,
+  "leagues": {
+    "Ghana Premier League": [
+      { "market": "over25", "min": 1.4, "max": 1.49, "action": "exclude" }
+    ],
+    "England | Premier League": [
+      { "market": "*", "min": 1.45, "max": 1.49, "action": "penalise" }
+    ]
+  }
+}
+```
+
+- The key is the tournament name, or `country | tournament`, without case.
+- `market` is an engine id (`over25`, `home`, `btts`, `dc-12`, …) or `*` for every market.
+- `min` and `max` are inclusive.
+- `exclude` drops the pick. `penalise` keeps it and caps a grade of 90% or higher at 90%, so it cannot be 100%.
+- A dangerous band still applies when both teams agree. Team agreement does not override it.
+
+The loader is `server/leagueRisk.mjs`. Unknown market ids are skipped and named in the engine notes.
 
 ### Product and process rules
 

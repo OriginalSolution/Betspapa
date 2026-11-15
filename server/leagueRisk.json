@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "howTo": "The leagues object starts empty because this repo has no settled-results archive to measure dangerous prices from. Add a league, or drop a replacement file at ENGINE_DATA_DIR/league-risk.json (or LEAGUE_RISK_PATH) which replaces this table on the next engine cycle. A key is the tournament name, or \"country | tournament\", matched without case. Each band is {\"market\":\"over25\",\"min\":1.40,\"max\":1.49,\"action\":\"exclude\"}. action exclude drops the pick. action penalise keeps it but caps the grade at 90% so it is not 100%. market \"*\" means every market. min and max are inclusive and use the same prices as the odds-range table. Market ids are the engine ids: home, away, draw, over15, over25, over35, under15, under25, under35, btts, btts-no, dc-1x, dc-12, dc-x2, dnb-home, dnb-away, home-score, away-score, fh-over05, fh-over15, sh-over05, and the other ids in server/occurrence.mjs.",
+  "leagues": {}
+}
