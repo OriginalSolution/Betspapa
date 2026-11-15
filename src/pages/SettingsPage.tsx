@@ -409,7 +409,7 @@ function AndroidWatchStatus() {
       </button>
       {testNote && <p className="status-ok">Close Betspapa. You should hear the selected goal sound in about 10 seconds.</p>}
       <button type="button" className="btn" data-setup-again onClick={startAgain}>
-        Run alert setup again
+        Set up alerts again
       </button>
     </div>
   );

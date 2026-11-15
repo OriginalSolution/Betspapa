@@ -2,12 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   ALERT_SETUP_VERSION,
   bannerNeeded,
+  doneCopy,
   emptyDeviceStatus,
   fixSteps,
   introSteps,
+  isStepSatisfied,
   nativeSetupIsCurrent,
   nextUnsatisfiedIndex,
   parseDeviceStatus,
+  parseOem,
   pollIsStale,
   readStoredSetup,
   retryNote,
@@ -16,6 +19,7 @@ import {
   setupIsCurrent,
   shouldShowIntro,
   stepCopy,
+  stepHint,
   writeStoredSetup,
   type AlertDeviceStatus,
   type AlertStepId,
@@ -35,6 +39,7 @@ import {
 import { isNativeApp } from '../lib/nativeHttp';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
+import { SetupHint } from './SetupHint';
 
 type AlertSetupContextValue = {
   status: AlertDeviceStatus | null;
@@ -66,6 +71,7 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<FlowPhase>('ask');
   const [noted, setNoted] = useState(false);
+  const [celebrating, setCelebrating] = useState<AlertStepId | null>(null);
   const phaseRef = useRef(phase);
   const leftRef = useRef(false);
   const finishing = useRef(false);
@@ -93,6 +99,7 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
     setOpen(false);
     setPhase('ask');
     setNoted(false);
+    setCelebrating(null);
     const saved = await markAlertSetup(ALERT_SETUP_VERSION, true);
     if (saved) applyParsed(parseDeviceStatus(saved));
     else await refresh();
@@ -104,11 +111,26 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
     setIndex(0);
     setPhase('ask');
     setNoted(false);
+    setCelebrating(null);
     setOpen(true);
   }, []);
 
   useEffect(() => {
-    if (!isNativeApp()) return;
+    if (!import.meta.env.DEV) return;
+    const params = new URLSearchParams(window.location.search);
+    const preview = params.get('setupPreview');
+    if (!preview) return;
+    const known = (['notifications', 'battery', 'exact', 'autostart', 'test'] as const).find((item) => item === preview) ?? 'notifications';
+    setStatus({ ...emptyDeviceStatus(), oem: parseOem(params.get('oem')) ?? 'transsion', notifications: 'prompt', batteryUnrestricted: false, exactAlarms: 'denied' });
+    setSteps([known]);
+    setIndex(0);
+    setPhase('ask');
+    setOpen(true);
+    setBooting(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isNativeApp() || (import.meta.env.DEV && new URLSearchParams(window.location.search).get('setupPreview'))) return;
     let cancelled = false;
     const decided = { current: false };
     const settle = (parsed: AlertDeviceStatus) => {
@@ -148,16 +170,36 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
   }, [applyParsed, openFlow]);
 
   useEffect(() => {
-    if (!open || !status || phase === 'sent' || phase === 'confirm') return;
+    if (!open || !status || phase === 'sent' || phase === 'confirm' || celebrating) return;
     const next = nextUnsatisfiedIndex(steps, index, status);
     if (next === index) return;
+    const current = steps[index];
+    if (current && isStepSatisfied(status, current)) {
+      setCelebrating(current);
+      return;
+    }
     if (next >= steps.length) {
       void finish();
       return;
     }
     setIndex(next);
     setPhase('ask');
-  }, [open, status, steps, index, phase, finish]);
+  }, [open, status, steps, index, phase, finish, celebrating]);
+
+  useEffect(() => {
+    if (!celebrating || !status) return;
+    const timer = window.setTimeout(() => {
+      const next = nextUnsatisfiedIndex(steps, index, status);
+      setCelebrating(null);
+      if (next >= steps.length) {
+        void finish();
+        return;
+      }
+      setIndex(next);
+      setPhase('ask');
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [celebrating, finish, index, status, steps]);
 
   const onReturn = useCallback(async () => {
     const waiting = leftRef.current && phaseRef.current === 'sent';
@@ -226,6 +268,7 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
     setIndex(next);
     setPhase('ask');
     setNoted(false);
+    setCelebrating(null);
   }, [finish, index, steps.length]);
 
   const onPrimary = useCallback(async () => {
@@ -271,6 +314,7 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
     setIndex(0);
     setPhase('ask');
     setNoted(true);
+    setCelebrating(null);
     setOpen(true);
   }, [status]);
 
@@ -288,31 +332,42 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
 
   const step = steps[index];
   const copy = step ? stepCopy(step, status?.oem ?? null, phase) : null;
-  const showOverlay = isNativeApp() && (booting || (open && Boolean(copy)));
+  const hint = step && !celebrating ? stepHint(step, status?.oem ?? null, phase) : null;
+  const previewing = import.meta.env.DEV && new URLSearchParams(window.location.search).has('setupPreview');
+  const showOverlay = (isNativeApp() || previewing) && (booting || (open && Boolean(copy)));
 
   return (
     <AlertSetupContext.Provider value={value}>
       {children}
       {showOverlay && (
         <div className="alert-setup" role="dialog" aria-modal="true" aria-labelledby="alert-setup-title" data-setup={booting ? 'booting' : 'open'} data-setup-step={step ?? ''} data-setup-phase={phase}>
-          <p className="alert-setup-kicker">Set up live alerts</p>
+              <p className="alert-setup-kicker">Alerts on this phone</p>
           {booting || !copy || !step ? (
             <h2 id="alert-setup-title">Checking this phone</h2>
           ) : (
             <>
               <div className="alert-setup-progress" aria-hidden="true">
                 {steps.map((item, itemIndex) => (
-                  <i key={item} className={itemIndex <= index ? 'is-on' : ''} />
+                  <i key={item} className={itemIndex < index || (itemIndex === index && celebrating) ? 'is-on is-done' : itemIndex === index ? 'is-on' : ''} />
                 ))}
               </div>
               <p className="alert-setup-count">
                 Step {index + 1} of {steps.length}
               </p>
-              <h2 id="alert-setup-title">{copy.title}</h2>
-              <p className="alert-setup-body">{phase === 'sent' ? sentCopy() : copy.body}</p>
-              {noted && phase === 'ask' && <p className="alert-setup-note">{retryNote()}</p>}
+              <h2 id="alert-setup-title">{celebrating ? 'Done' : copy.title}</h2>
+              <p className="alert-setup-body">{celebrating ? doneCopy(celebrating) : phase === 'sent' ? sentCopy() : copy.body}</p>
+              {hint && <SetupHint hint={hint} />}
+              {noted && phase === 'ask' && !celebrating && <p className="alert-setup-note">{retryNote()}</p>}
               <div className="alert-setup-spacer" />
-              {phase !== 'sent' && (
+              {celebrating && (
+                <p className="setup-done" role="status">
+                  <span className="setup-done-mark" aria-hidden="true">
+                    ✓
+                  </span>
+                  This step is on.
+                </p>
+              )}
+              {phase !== 'sent' && !celebrating && (
                 <button type="button" className="btn" data-setup-action="primary" onClick={() => void onPrimary()}>
                   {copy.action}
                 </button>
