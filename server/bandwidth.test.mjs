@@ -5,7 +5,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { encodePayload, publicCacheControl, resetLimits, staticCacheControl, takeRequest } from './bandwidth.mjs';
+import { encodePayload, etagMatches, publicCacheControl, resetLimits, staticCacheControl, takeRequest } from './bandwidth.mjs';
 
 function ask(port, { path = '/', headers = {} } = {}) {
   return new Promise((resolve, reject) => {
@@ -35,6 +35,9 @@ test('public reads name a short cache and crests stay immutable', () => {
   assert.equal(publicCacheControl('/api/fixtures', 200), 'public, max-age=60');
   assert.equal(publicCacheControl('/api/matches', 409), 'public, max-age=300');
   assert.equal(staticCacheControl('/crests/arsenal.png'), 'public, max-age=31536000, immutable');
+  assert.equal(etagMatches('W/"abc"', '"abc"'), true);
+  assert.equal(etagMatches('"abc"', '"abc"'), true);
+  assert.equal(etagMatches('W/"other"', '"abc"'), false);
 });
 
 test('json responses shrink with gzip and brotli', () => {
@@ -77,7 +80,7 @@ test('a missing football key answers 409 with Retry-After, and a repeat is empty
     assert.match(denied.headers['cache-control'], /max-age=300/);
     const again = await ask(port, {
       path: '/api/matches?from=2026-11-17T00:00:00.000Z&to=2026-11-17T23:59:59.000Z',
-      headers: { 'x-forwarded-for': '203.0.113.50', 'if-none-match': denied.headers.etag },
+      headers: { 'x-forwarded-for': '203.0.113.50', 'if-none-match': `W/${denied.headers.etag}` },
     });
     assert.equal(again.status, 304);
     assert.equal(again.raw, 0);
