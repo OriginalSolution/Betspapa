@@ -1,5 +1,6 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { publishableOdds } from './oddsFloor';
+import { FeedPause, headerValue } from './backoff';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 
 /** Production engine. It is not origin-locked. Codes only come from this payload. */
@@ -341,6 +342,9 @@ export async function fetchEngine(): Promise<EngineState> {
   const finish = (state: EngineState) => preferEngine(state, cached);
   if (isNativeApp()) {
     const response = await CapacitorHttp.request(nativeRequestOptions('GET', ENGINE_URL, { connectMs: 20_000, readMs: 30_000 }));
+    if (response.status === 409 || response.status === 429 || response.status >= 500) {
+      throw new FeedPause(response.status, headerValue(response.headers, 'retry-after'));
+    }
     if (response.status < 200 || response.status >= 300) {
       if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
       throw new Error(`Slips returned ${response.status}`);
@@ -349,18 +353,26 @@ export async function fetchEngine(): Promise<EngineState> {
   }
   try {
     const local = await fetch('/api/engine?view=app');
+    if (local.status === 409 || local.status === 429 || local.status >= 500) {
+      throw new FeedPause(local.status, local.headers.get('retry-after'));
+    }
     if (local.ok) {
       const state = parseEngine(await local.json());
       if (engineHasRows(state)) return finish(state);
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof FeedPause) throw error;
     /* GitHub Pages has no API process */
   }
   try {
     const response = await fetch(ENGINE_URL);
+    if (response.status === 409 || response.status === 429 || response.status >= 500) {
+      throw new FeedPause(response.status, response.headers.get('retry-after'));
+    }
     if (!response.ok) throw new Error(`Slips returned ${response.status}`);
     return finish(parseEngine(await response.json()));
   } catch (error) {
+    if (error instanceof FeedPause) throw error;
     if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
     throw error;
   }

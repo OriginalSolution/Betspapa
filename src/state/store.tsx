@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
 import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
+import { FeedPause, shouldPoll, shouldPollLive } from '../lib/backoff';
 import { followedNotices, staleAlertIds } from '../lib/alerts';
 import { decorateMatches, goalEventMinute, loadGoalBook, mergeNativeMarkers, paintGoals, saveGoalBook } from '../lib/goalMinutes';
 import { flushWatch, mergeInbox, pullWatch, stageWatch } from '../lib/deviceWatch';
@@ -353,10 +354,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!state.ready) return;
     let cancelled = false;
     let inflight = false;
+    let pauseUntil = 0;
     const run = async () => {
+      const current = stateRef.current;
+      const visible = document.visibilityState !== 'hidden';
+      if (!shouldPoll(visible, current.config.mode) || Date.now() < pauseUntil) return;
       if (inflight) return;
       inflight = true;
-      const current = stateRef.current;
       try {
         try {
           const matches = await fetchSportyBoard(current.date);
@@ -368,6 +372,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           saveFixtureCache(current.date, decorated);
           if (!cancelled) dispatch({ type: 'snapshot', matches: decorated, now: Date.now(), usingDemo: false, feedNote: null });
         } catch (error) {
+          if (error instanceof FeedPause) pauseUntil = error.retryAt;
           const message = error instanceof Error ? error.message : 'Fixture feed failed';
           const kept = stateRef.current.matches.length ? stateRef.current.matches : loadFixtureCache(current.date).matches;
           const choice = chooseFixtures({ ok: false, message }, kept);
@@ -454,6 +459,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!state.ready) return;
     let stop = false;
+    let pauseUntil = 0;
     const paint = (live: Match[]) => {
       liveRef.current = live;
       const current = stateRef.current;
@@ -464,11 +470,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'snapshot', matches: merged, now: Date.now(), usingDemo: false, feedNote: current.feedNote });
     };
     const tick = async () => {
+      const current = stateRef.current;
+      const visible = document.visibilityState !== 'hidden';
+      if (!shouldPollLive(visible, current.matches.map((match) => match.status)) || Date.now() < pauseUntil) return;
       try {
         const live = await fetchInPlay();
         if (stop) return;
         paint(live);
-      } catch {
+      } catch (error) {
+        if (error instanceof FeedPause) pauseUntil = error.retryAt;
         /* a missed score must not clear the board or the crests */
       }
     };
