@@ -2,7 +2,29 @@
  * One odds table for every pick, tip, slip, flyer, notification, and booked leg.
  * Ranges are inclusive. A market that is not listed is not shown and not booked.
  * The board and the codes use this band. A price above the band is listed only as a 1.60 exception when both samples are 10/10.
+ * MARKET_RULES_PATH or ENGINE_DATA_DIR/market-rules.json can replace one market's band.
  */
+import { meetsConfidence } from './thresholds.mjs';
+
+let rangeOverrides = {};
+
+/** Per-market min/max from the owner's rules file. Known markets only. */
+export function setRangeOverrides(map) {
+  rangeOverrides = map && typeof map === 'object' ? map : {};
+}
+
+export function rangeFor(market) {
+  const id = String(market || '');
+  const base = ODDS_RANGES[id];
+  if (!base) return null;
+  const extra = rangeOverrides[id];
+  if (!extra) return base;
+  const min = Number.isFinite(Number(extra.min)) ? Number(extra.min) : base.min;
+  const max = Number.isFinite(Number(extra.max)) ? Number(extra.max) : base.max;
+  if (!(max + 1e-9 >= min)) return base;
+  const maxExclusive = extra.maxExclusive == null ? Boolean(base.maxExclusive) : Boolean(extra.maxExclusive);
+  return { min, max, maxExclusive };
+}
 
 export const PERFECT_CEILING = 1.6;
 /** How far a catalogue price may sit outside the band before other books are not asked. */
@@ -91,7 +113,7 @@ export function strictInRange(market, price) {
 }
 
 export function priceInRange(market, price, leg) {
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   if (!range) return false;
   const value = Number(price);
   if (!Number.isFinite(value) || value <= 1) return false;
@@ -105,7 +127,7 @@ export function priceInRange(market, price, leg) {
 /** Close enough that another book might still price the leg inside the band. */
 export function priceNearRange(market, price, leg) {
   if (priceInRange(market, price, leg)) return false;
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   if (!range) return false;
   const value = Number(price);
   if (!Number.isFinite(value) || value <= 1) return false;
@@ -115,7 +137,7 @@ export function priceNearRange(market, price, leg) {
 }
 
 export function rangeReason(market, price) {
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   const shown = Number.isFinite(Number(price)) ? Number(price).toFixed(2) : 'missing';
   if (!range) return `${shown} is on a market that is not priced.`;
   const top = range.maxExclusive ? `under ${range.max.toFixed(2)}` : range.max.toFixed(2);
@@ -164,7 +186,7 @@ export function projectSlip(slip, now = Date.now()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   const legs = [];
   for (const leg of slip.legs || []) {
-    if (!legOpen(leg, clock)) continue;
+    if (!legOpen(leg, clock) || !meetsConfidence(leg)) continue;
     const shown = shownLeg(slip, leg);
     if (shown) legs.push(shown);
   }

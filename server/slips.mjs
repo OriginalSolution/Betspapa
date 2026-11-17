@@ -7,6 +7,7 @@ import { labelFor } from './occurrence.mjs';
 import { assertBookingRanges, legOpen, priceInRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
+import { meetsConfidence } from './thresholds.mjs';
 
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
@@ -17,10 +18,14 @@ export const CODE_LIMIT = 18;
 export const PART_SIZE = 50;
 export const SLIP_CONCURRENCY = 4;
 
+function keptForCode(leg) {
+  return priceInRange(leg?.market, leg?.odds, leg) && meetsConfidence(leg);
+}
+
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && priceInRange(leg.market, leg.odds, leg),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && keptForCode(leg),
   );
 }
 
@@ -44,7 +49,7 @@ function byConfidence(a, b) {
 /** The legs that go on one code. Strict published band only, then the cap. */
 export function codeLegs(legs, limit = CODE_LIMIT) {
   return (Array.isArray(legs) ? legs : [])
-    .filter((leg) => priceInRange(leg?.market, leg?.odds, leg))
+    .filter((leg) => keptForCode(leg))
     .slice()
     .sort(byConfidence)
     .slice(0, limit);
@@ -56,22 +61,20 @@ export function codeLegs(legs, limit = CODE_LIMIT) {
  * Inside a band the best hit rate comes first, then the earliest kickoff.
  */
 export function orderForTier(legs, tier) {
-  const rows = (Array.isArray(legs) ? legs : []).filter((leg) => priceInRange(leg?.market, leg?.odds, leg));
+  const floor = tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;
+  const rows = (Array.isArray(legs) ? legs : []).filter((leg) => keptForCode(leg) && legRate(leg) + 1e-12 >= floor);
   const bandMax = tier === '90' ? 0.995 : tier === '80' ? 0.9 : null;
   if (bandMax == null) return rows.slice().sort(byConfidence);
   const priority = [];
   const higher = [];
-  const rescued = [];
   for (const leg of rows) {
     const rate = legRate(leg);
-    if (tier === '80' && leg.teamsAgree === true && rate + 1e-12 < 0.8) rescued.push(leg);
-    else if (rate + 1e-12 < bandMax) priority.push(leg);
+    if (rate + 1e-12 < bandMax) priority.push(leg);
     else higher.push(leg);
   }
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  rescued.sort(byConfidence);
-  return [...priority, ...higher, ...rescued];
+  return [...priority, ...higher];
 }
 
 /** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
@@ -106,7 +109,7 @@ const TIERS = [
 export function tierSlips(legs) {
   const slips = [];
   for (const tier of TIERS) {
-    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min || (tier.id === '80' && leg.teamsAgree === true));
+    const rows = (legs || []).filter((leg) => meetsConfidence(leg) && legRate(leg) + 1e-12 >= tier.min);
     if (!rows.length) continue;
     const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
     slips.push({

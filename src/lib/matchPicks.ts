@@ -99,7 +99,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
   for (const leg of legs) {
     if (!publishableOdds(leg.odds)) continue;
     const rate = hitRate(leg.occurrence, leg.sample, leg.rate);
-    if (rate != null && rate + 1e-12 < 0.8 && leg.teamsAgree !== true) continue;
+    if (rate != null && rate + 1e-12 < 0.8) continue;
     const id = `${leg.eventId}:${leg.market}`;
     if (seen.has(id)) continue;
     seen.add(id);
@@ -258,7 +258,7 @@ export function tipsFromEngine(state: EngineState | null, matches: Match[]): Pic
     const match = board.get(card.eventId);
     if (!realFixture(card, match)) continue;
     for (const chip of card.chips) {
-      if (!publishableOdds(chip.odds) || chip.rate == null || (chip.rate + 1e-12 < 0.8 && !chip.teamsAgree)) continue;
+      if (!publishableOdds(chip.odds) || chip.rate == null || chip.rate + 1e-12 < 0.8) continue;
       tips.push({
         chip,
         home: card.home,

@@ -4,9 +4,10 @@
  * teams have a sample, that trend is not the grade.
  *
  * A team supports the outcome at 60% or better over the same last-10 window
- * the rest of the engine uses (at least 8 scored games). Both supporting keeps
- * the game even when the trend is under 80%. Anything else, when both samples
- * exist, is left out rather than published as a sure pick.
+ * the rest of the engine uses (at least 8 scored games). That 60% bar is only
+ * whether the two records point the same way. The grade that is published is
+ * still the weaker record, and reviewPick refuses it when it is under the
+ * market minimum (80% unless the owner set another).
  */
 
 /** Same 80% bar as THRESHOLD in occurrence.mjs. */

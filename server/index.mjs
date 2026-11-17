@@ -22,6 +22,9 @@ import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './p
 import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
+import { loadMarketRules } from './marketRules.mjs';
+
+loadMarketRules();
 
 const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
 
