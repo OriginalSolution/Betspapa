@@ -3,7 +3,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { encodePayload, NOT_LIVE_RETRY_SECONDS, publicCacheControl, staticCacheControl, takeRequest, clientIp } from './bandwidth.mjs';
+import { encodePayload, etagMatches, NOT_LIVE_RETRY_SECONDS, publicCacheControl, staticCacheControl, takeRequest, clientIp } from './bandwidth.mjs';
 import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
@@ -119,7 +119,7 @@ function send(req, res, status, body, cacheControl, extraHeaders = {}) {
     Vary: 'Accept-Encoding',
     ...extraHeaders,
   };
-  if ((status === 200 || status === 409) && req?.headers?.['if-none-match'] === etag) {
+  if ((status === 200 || status === 409) && etagMatches(req?.headers?.['if-none-match'], etag)) {
     headers['Content-Length'] = 0;
     res.writeHead(304, headers);
     res.end();

@@ -27,6 +27,16 @@ export function publicCacheControl(pathname, status) {
   return 'public, max-age=60';
 }
 
+/** Cloudflare turns a strong ETag into a weak one. Both forms mean the same bytes. */
+export function etagMatches(header, etag) {
+  if (!header || !etag) return false;
+  const got = String(etag).replace(/^W\//, '');
+  return String(header).split(',').some((part) => {
+    const token = part.trim();
+    return token === '*' || token.replace(/^W\//, '') === got;
+  });
+}
+
 export function staticCacheControl(pathname) {
   if (pathname.startsWith('/crests/') || pathname.startsWith('/bookies/') || pathname.startsWith('/icons/') || pathname.startsWith('/assets/')) {
     return 'public, max-age=31536000, immutable';
