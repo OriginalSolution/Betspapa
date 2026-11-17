@@ -4,6 +4,7 @@ import { mapSportyEvents, type SportyEvent } from './sporty';
 import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
 import { LIVE_FEED, parseLivePayload } from '../lib/liveBoard';
+import { FeedPause, headerValue } from '../lib/backoff';
 import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
@@ -13,7 +14,7 @@ export { LIVE_FEED };
 
 export type FixtureBody = { events?: SportyEvent[]; error?: string; message?: string };
 
-export type FixtureResult = { status: number; body: FixtureBody };
+export type FixtureResult = { status: number; body: FixtureBody; retryAfter?: string };
 
 export type FixtureTransport = {
   native: boolean;
@@ -47,6 +48,12 @@ function fixtureFailure(result: FixtureResult): string {
   return result.body?.message || result.body?.error || `Could not load scores (${result.status})`;
 }
 
+function refuse(result: FixtureResult): void {
+  if (result.status === 409 || result.status === 429 || result.status >= 500) {
+    throw new FeedPause(result.status, result.retryAfter);
+  }
+}
+
 function asFixtureBody(data: unknown): FixtureBody {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
   return data as FixtureBody;
@@ -59,7 +66,7 @@ async function browserResult(response: Response): Promise<FixtureResult> {
   } catch {
     body = {};
   }
-  return { status: response.status, body };
+  return { status: response.status, body, retryAfter: response.headers.get('retry-after') || '' };
 }
 
 function defaultTransport(): FixtureTransport {
@@ -74,7 +81,7 @@ function defaultTransport(): FixtureTransport {
         const response = await CapacitorHttp.request(
           nativeRequestOptions('GET', url, { connectMs: FIXTURE_CONNECT_MS, readMs: FIXTURE_READ_MS, headers }),
         );
-        return { status: response.status, body: asFixtureBody(readJsonBody(response.data)) };
+        return { status: response.status, body: asFixtureBody(readJsonBody(response.data)), retryAfter: headerValue(response.headers, 'retry-after') };
       }
       return browserResult(await fetch(url, headers ? { headers } : undefined));
     },
@@ -94,8 +101,10 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
       if (local.status >= 200 && local.status < 300 && Array.isArray(local.body?.events)) {
         return mapSportyEvents(local.body.events, from, to);
       }
+      refuse(local);
       lastError = fixtureFailure(local);
     } catch (error) {
+      if (error instanceof FeedPause) throw error;
       lastError = error instanceof Error ? error.message : lastError;
     }
   }
@@ -104,18 +113,22 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
     if (slim.status >= 200 && slim.status < 300 && Array.isArray(slim.body?.events)) {
       return mapSportyEvents(slim.body.events, from, to);
     }
+    refuse(slim);
     lastError = fixtureFailure(slim);
   } catch (error) {
+    if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
   // The full catalogue is the fallback when the one-day list is unavailable.
   try {
     const direct = await transport.direct(FIXTURE_FEED);
     if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
+      refuse(direct);
       throw new Error(direct.status ? fixtureFailure(direct) : lastError);
     }
     return mapSportyEvents(direct.body.events, from, to);
   } catch (error) {
+    if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
   throw new Error(lastError);
@@ -125,6 +138,7 @@ export async function fetchSportyBoard(date: string, transport: FixtureTransport
 export async function fetchSportyWindow(fromIso: string, toIso: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const direct = await transport.direct(FIXTURE_FEED);
   if (direct.status < 200 || direct.status >= 300 || !Array.isArray(direct.body?.events)) {
+    refuse(direct);
     throw new Error(direct.status ? fixtureFailure(direct) : 'Fixture feed failed');
   }
   return mapSportyEvents(direct.body.events, fromIso, toIso);
@@ -132,7 +146,10 @@ export async function fetchSportyWindow(fromIso: string, toIso: string, transpor
 
 export async function fetchInPlay(transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const read = (result: FixtureResult): Match[] => {
-    if (result.status < 200 || result.status >= 300) throw new Error(`In-play scores returned ${result.status}`);
+    if (result.status < 200 || result.status >= 300) {
+      refuse(result);
+      throw new Error(`In-play scores returned ${result.status}`);
+    }
     return parseLivePayload(result.body as { data?: [] });
   };
   let lastError = 'In-play scores failed';
@@ -140,12 +157,14 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
     const slim = transport.native ? await transport.direct(LIVE_API) : await browserResult(await fetch(LIVE_API));
     return read(slim);
   } catch (error) {
+    if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
   if (!transport.native) {
     try {
       return read(await transport.local('/api/live'));
     } catch (error) {
+      if (error instanceof FeedPause) throw error;
       lastError = error instanceof Error ? error.message : lastError;
     }
   }
@@ -180,6 +199,9 @@ async function readError(response: Response): Promise<string> {
 export async function fetchLiveBoard(date: string, follows: Follows, activeId: string | null): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   const response = await fetch(`/api/matches?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  if (response.status === 409 || response.status === 429 || response.status >= 500) {
+    throw new FeedPause(response.status, response.headers.get('retry-after'));
+  }
   if (!response.ok) throw new Error(await readError(response));
   const data = (await response.json()) as { matches?: Match[] };
   const matches = data.matches ?? [];
@@ -203,6 +225,9 @@ export async function fetchLiveBoard(date: string, follows: Follows, activeId: s
 
 export async function fetchLiveMatch(id: string): Promise<Match | null> {
   const response = await fetch(`/api/matches/${encodeURIComponent(id)}`);
+  if (response.status === 409 || response.status === 429 || response.status >= 500) {
+    throw new FeedPause(response.status, response.headers.get('retry-after'));
+  }
   if (!response.ok) return null;
   const body = (await response.json()) as { match?: Match };
   return body.match ?? null;

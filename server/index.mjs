@@ -3,7 +3,7 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { encodePayload, NOT_LIVE_RETRY_SECONDS, publicCacheControl, staticCacheControl, takeRequest, clientIp } from './bandwidth.mjs';
 import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
@@ -106,31 +106,38 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 
-function send(req, res, status, body, cacheControl = 'private, no-cache') {
+function send(req, res, status, body, cacheControl, extraHeaders = {}) {
   const startedAt = Date.now();
+  const path = String(req?.url || '/').split('?')[0];
   const json = JSON.stringify(body);
   const etag = `"${createHash('sha1').update(json).digest('hex')}"`;
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': cacheControl,
+    'Cache-Control': cacheControl || ((req?.method || 'GET') === 'GET' ? publicCacheControl(path, status) : 'private, no-store'),
     ETag: etag,
     'Access-Control-Allow-Origin': '*',
     Vary: 'Accept-Encoding',
+    ...extraHeaders,
   };
-  if (status === 200 && req?.headers?.['if-none-match'] === etag) {
+  if ((status === 200 || status === 409) && req?.headers?.['if-none-match'] === etag) {
+    headers['Content-Length'] = 0;
     res.writeHead(304, headers);
     res.end();
+    noteRequest(path, Date.now() - startedAt, 0);
     return;
   }
   let payload = Buffer.from(json);
-  if (status === 200 && payload.length > 800 && /\bgzip\b/.test(String(req?.headers?.['accept-encoding'] || ''))) {
-    payload = gzipSync(payload);
-    headers['Content-Encoding'] = 'gzip';
-  }
+  const encoded = status === 200 ? encodePayload(payload, req?.headers?.['accept-encoding']) : { body: payload, encoding: '' };
+  payload = encoded.body;
+  if (encoded.encoding) headers['Content-Encoding'] = encoded.encoding;
   headers['Content-Length'] = payload.length;
   res.writeHead(status, headers);
   res.end(payload);
-  noteRequest(String(req?.url || '/').split('?')[0], Date.now() - startedAt, payload.length);
+  noteRequest(path, Date.now() - startedAt, payload.length);
+}
+
+function sendNotLive(req, res, error) {
+  send(req, res, 409, { error }, `public, max-age=${NOT_LIVE_RETRY_SECONDS}`, { 'Retry-After': String(NOT_LIVE_RETRY_SECONDS) });
 }
 
 async function cached(key, ttl, fn) {
@@ -183,6 +190,13 @@ function readJson(req) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === 'GET') {
+    const limit = takeRequest(clientIp(req), url.pathname);
+    if (limit.limited) {
+      send(req, res, 429, { error: 'Slow down.' }, 'private, no-store', { 'Retry-After': String(limit.retryAfter) });
+      return;
+    }
+  }
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -433,11 +447,19 @@ async function handleApi(req, res, url) {
     forceLiveMode();
   }
   if (getConfig().mode !== 'live') {
-    send(req, res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
+    sendNotLive(req, res, 'Not live.');
     return;
   }
   if (url.pathname.startsWith('/api/matches') && !config.footballData) {
-    send(req, res, 409, { error: 'FOOTBALL_DATA_API_KEY is not set. Live scores and pushes use SportyBet.' });
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const dates = from && to ? providerDates(from, to) : null;
+    const saved = dates ? cache.get(`list:${dates.dateFrom}:${dates.dateTo}`) : null;
+    if (saved && Array.isArray(saved.value)) {
+      send(req, res, 200, { matches: saved.value, stale: true }, 'public, max-age=60');
+      return;
+    }
+    sendNotLive(req, res, 'Not live.');
     return;
   }
 
@@ -486,9 +508,10 @@ function publicAsset(requested) {
 function streamFile(res, file, requested) {
   const ext = extname(file);
   const hashed = requested.startsWith('/assets/');
+  const frozen = staticCacheControl(requested);
   res.writeHead(200, {
     'Content-Type': TYPES[ext] || 'application/octet-stream',
-    'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+    'Cache-Control': frozen || (hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600'),
   });
   createReadStream(file).pipe(res);
 }

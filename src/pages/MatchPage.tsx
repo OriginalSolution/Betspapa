@@ -33,6 +33,8 @@ export function MatchPage() {
     let cancelled = false;
     fetchLiveMatch(id).then((match) => {
       if (!cancelled) setRemote(match);
+    }).catch(() => {
+      /* a 409 or 429 waits; the board match is enough */
     });
     return () => {
       cancelled = true;
