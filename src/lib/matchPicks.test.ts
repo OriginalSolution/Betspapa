@@ -131,7 +131,7 @@ describe('match-first picks', () => {
     expect(tipsFromEngine(fake, [simulated])).toEqual([]);
   });
 
-  it('keeps a pick both teams support and uses a marked-down grade instead of a 10/10 sample', () => {
+  it('hides a grade under 80% even when both teams agreed, and uses a marked-down grade instead of a 10/10 sample', () => {
     expect(hitRate(100, '10/10', 0.9)).toBe(0.9);
     expect(hitRate(60, '6/10', 0.6)).toBe(0.6);
     const agreed = state();
@@ -155,11 +155,13 @@ describe('match-first picks', () => {
         ],
       },
     ];
-    const tips = tipsFromEngine(agreed, board);
-    expect(tips.map((tip) => tip.chip.sample)).toEqual(['6/10']);
-    expect(tips[0]?.chip.teamsAgree).toBe(true);
-    expect(tips[0]?.chip.homeSample).toBe('7/10');
+    expect(tipsFromEngine(agreed, board)).toEqual([]);
     expect(bestTrendChip(agreed, board[0])).toBeNull();
+    agreed.trends[0].legs[0] = { ...agreed.trends[0].legs[0], occurrence: 80, sample: '8/10', rate: 0.8, teamsAgree: true, homeSample: '9/10', awaySample: '8/10' };
+    const tips = tipsFromEngine(agreed, board);
+    expect(tips.map((tip) => tip.chip.sample)).toEqual(['8/10']);
+    expect(tips[0]?.chip.teamsAgree).toBe(true);
+    expect(tips[0]?.chip.homeSample).toBe('9/10');
     const marked = state();
     marked.trends[1].legs[0] = { ...marked.trends[1].legs[0], odds: 1.4, occurrence: 90, sample: '10/10', rate: 0.9, leagueRisk: 'penalise' };
     const chip = bestTrendChip(marked, board[0]);

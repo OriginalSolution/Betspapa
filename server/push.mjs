@@ -16,7 +16,7 @@ import { priceInRange } from './oddsRange.mjs';
 import { cleanCountry } from './geo.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
+import { expandAlias, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog } from './crestResolve.mjs';
 import { isDummyId, isSimulated } from './upcoming.mjs';
 
@@ -276,6 +276,8 @@ export function normalizeLive(payload) {
         away,
         homeId: slug(home),
         awayId: slug(away),
+        homeCompetitor: event.homeTeamId ? String(event.homeTeamId) : '',
+        awayCompetitor: event.awayTeamId ? String(event.awayTeamId) : '',
         status,
         minute,
         homeScore: score ? score[0] : 0,
@@ -348,10 +350,27 @@ export function diffMatches(previous, next) {
   return notes;
 }
 
+function clubKey(name) {
+  return looseKey(expandAlias(String(name || '')));
+}
+
+/** A followed team matches the live row by id, by slug, or by the same club name. */
+export function teamFollows(team, match) {
+  if (!team || !match) return false;
+  const ids = [match.homeId, match.awayId, match.homeCompetitor, match.awayCompetitor].filter(Boolean);
+  const storedId = String(team.id || '');
+  if (storedId && ids.includes(storedId)) return true;
+  const storedName = String(team.name || '');
+  if (storedName && (teamSlug(storedName) === match.homeId || teamSlug(storedName) === match.awayId)) return true;
+  const key = clubKey(storedName || storedId.replace(/-/g, ' '));
+  if (!key) return false;
+  return key === clubKey(match.home) || key === clubKey(match.away);
+}
+
 function follows(device, match) {
   const book = device.follows || {};
   if ((book.matches || []).includes(match.id)) return true;
-  return (book.teams || []).some((team) => team && (team.id === match.homeId || team.id === match.awayId));
+  return (book.teams || []).some((team) => teamFollows(team, match));
 }
 
 function allowed(device, kind) {
@@ -544,6 +563,8 @@ export function createDeviceBook(dir) {
       const now = new Date().toISOString();
       const device = {
         ...accepted.device,
+        follows: body?.follows == null && existing?.follows ? existing.follows : accepted.device.follows,
+        trends: body?.trends == null && existing?.trends ? existing.trends : accepted.device.trends,
         sent: existing?.sent || [],
         appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),
         country: cleanCountry(meta?.country) || cleanCountry(existing?.country) || null,
@@ -869,6 +890,7 @@ export function startPushWatch(options = {}) {
   let curlAnnounced = false;
   let ticking = false;
   let timer = null;
+  let lastQuietLog = 0;
   const stats = { feedOk: null, feedAt: null, feedError: null, sentOk: 0, sentError: 0, lastSendAt: null };
 
   async function tick() {
@@ -936,8 +958,10 @@ export function startPushWatch(options = {}) {
     const logged = new Set();
     let sentOk = 0;
     let sentError = 0;
+    let matched = 0;
     for (const device of book.list()) {
       const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
+      if (mine.length) matched += 1;
       for (const item of mine) {
         if (book.alreadySent(device.token, item.id)) continue;
         try {
@@ -967,6 +991,9 @@ export function startPushWatch(options = {}) {
       stats.sentError += sentError;
       stats.lastSendAt = new Date().toISOString();
       log(`FCM sent success=${sentOk} error=${sentError}`);
+    } else if ((notes.length || matches.length) && Date.now() - lastQuietLog > 15 * 60 * 1000) {
+      lastQuietLog = Date.now();
+      log(`Live matches ${matches.length}. Score changes ${notes.length}. Phones ${book.list().length}. Followed matches among them ${matched}.`);
     }
   }
 

@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { acceptDevice, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, startPushWatch, trendNotes } from './push.mjs';
+import { acceptDevice, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, startPushWatch, teamFollows, trendNotes } from './push.mjs';
 
 test('FCM stays off until a service account is configured', () => {
   assert.equal(fcmConfigured({}), false);
@@ -64,6 +64,22 @@ test('a score change is a goal and a missing timeline does not invent a red card
   });
   const cards = diffMatches(after, withCard);
   assert.equal(cards.some((note) => note.kind === 'red'), true);
+});
+
+test('a followed team matches a different live spelling of the same club', () => {
+  const manCity = { id: 'man-city', name: 'Man City' };
+  const live = { id: 'sr:match:1', home: 'Manchester City', away: 'Arsenal', homeId: 'manchester-city', awayId: 'arsenal' };
+  assert.equal(teamFollows(manCity, live), true);
+  assert.equal(teamFollows({ id: 'sr:competitor:17', name: 'Other' }, { ...live, homeCompetitor: 'sr:competitor:17' }), true);
+  assert.equal(teamFollows({ id: 'hearts', name: 'Hearts' }, live), false);
+  const device = acceptDevice({
+    token: 'fcm-token-value-that-is-long-enough',
+    follows: { matches: [], teams: [manCity] },
+  }).device;
+  const notes = [
+    { id: 'sr:match:1:goal:home:1', matchId: 'sr:match:1', kind: 'goal', title: 'Goal', body: 'City', match: live },
+  ];
+  assert.equal(notesForDevice(notes, device).length, 1);
 });
 
 test('a device only hears followed matches and the message is high priority', () => {

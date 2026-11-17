@@ -10,6 +10,7 @@ import { dirname } from 'node:path';
 import { ODDS_RANGES } from './oddsRange.mjs';
 import { WINDOW } from './occurrence.mjs';
 import { gradeWithTeams, SUPPORT_RATE, TREND_RATE } from './teamGrade.mjs';
+import { minConfidence } from './thresholds.mjs';
 import { applyLeagueRisk, canonLeague, dangerousBand, leagueKeys } from './leagueRisk.mjs';
 
 export const LEAGUE_MIN = 12;
@@ -246,10 +247,15 @@ export function judgeLeague({ matches, market, odds, settled, leagueName }) {
 
 /**
  * Trend, then both teams' scoring records, then the league.
- * `publish` is true only when all three pass. A penalised league still publishes, capped at 90%.
+ * `publish` is true only when the grade that would be shown clears that
+ * market's minimum (80% unless the owner raised it), the team check passes,
+ * and the league does not block. A weaker record under the minimum is not
+ * published, even when the hotter side cleared 80% and both sides cleared 60%.
+ * A penalised league still publishes, capped at 90%.
  */
 export function reviewPick({ market, trend, records, homeRows, awayRows, odds, event, leagueIndex, settled, leagueTable }) {
   const graded = gradeWithTeams({ trend, home: records?.home, away: records?.away });
+  const floor = minConfidence(market?.id);
   const trendPass = Boolean(trend) && trend.rate + 1e-12 >= TREND_RATE;
   const teamAgree = graded?.agreement === 'agree';
   if (!trendPass && !teamAgree) return null;
@@ -292,7 +298,9 @@ export function reviewPick({ market, trend, records, homeRows, awayRows, odds, e
   }
 
   const blocked = action === 'block';
-  const publish = Boolean(trendPass && teamPass && !blocked);
+  const gradeRate = graded?.rate;
+  const confidencePass = gradeRate != null && gradeRate + 1e-12 >= floor;
+  let publish = Boolean(confidencePass && teamPass && !blocked);
   let rate = graded?.rate ?? null;
   let hits = graded?.hits ?? null;
   let sample = graded?.sample ?? null;
@@ -301,9 +309,17 @@ export function reviewPick({ market, trend, records, homeRows, awayRows, odds, e
     const marked = applyLeagueRisk({ rate, hits, sample, keptBy: graded?.keptBy }, { action: 'penalise' });
     rate = marked.rate;
     leagueRisk = 'penalise';
-    if (marked.keptBy === 'markdown') reasons.push('Published at 90% because this league price is marked down.');
+    if (rate + 1e-12 < floor) {
+      publish = false;
+      leagueRisk = null;
+      reasons.push(`Left off the code because the marked-down grade is under this market's ${Math.round(floor * 100)}% minimum.`);
+    } else if (marked.keptBy === 'markdown') reasons.push('Published at 90% because this league price is marked down.');
   }
   if (!trendPass && teamAgree) reasons.push('Both teams support the pick, but the trend is under 80%, so it is not on a booking code.');
+  if (trendPass && teamPass && !confidencePass) {
+    const shown = gradeRate == null ? 'missing' : `${Math.round(gradeRate * 100)}%`;
+    reasons.push(`Left off the code because the grade is ${shown}, under this market's ${Math.round(floor * 100)}% minimum.`);
+  }
   if (trendPass && teamPass && blocked) reasons.push('Left off the code because the league check blocked it.');
   if (trendPass && !teamPass) reasons.push('Left off the code because the team check did not support it.');
 
@@ -311,6 +327,7 @@ export function reviewPick({ market, trend, records, homeRows, awayRows, odds, e
     publish,
     trendPass,
     teamPass,
+    confidencePass,
     leagueAction: action,
     rate,
     hits,
