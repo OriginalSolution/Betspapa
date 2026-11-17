@@ -1,8 +1,10 @@
 /**
- * Guided live-alert setup. Version 1 is the first walkthrough (app 0.3.2).
- * Installs from 0.3.1 have no record, so they see it once after updating.
+ * Guided live-alert setup.
+ * Version 1 was the first walkthrough (app 0.3.2).
+ * Version 2 adds the illustrated "tap this" cards, so an install that finished
+ * version 1 sees the clearer guide once.
  */
-export const ALERT_SETUP_VERSION = 1;
+export const ALERT_SETUP_VERSION = 2;
 export const ALERT_SETUP_KEY = 'betspapa.alertSetup.v1';
 
 export const OEM_BRANDS = ['transsion', 'xiaomi', 'oppo', 'vivo', 'huawei', 'samsung'] as const;
@@ -210,50 +212,169 @@ export function nextUnsatisfiedIndex(steps: AlertStepId[], index: number, status
 export function stepCopy(step: AlertStepId, oem: OemBrand | null, phase: FlowPhase): StepCopy {
   if (step === 'notifications') {
     return {
-      title: 'Allow notifications',
-      body: 'Live goals, kick-off, and full-time need permission to appear on this phone.',
-      action: 'Allow notifications',
+      title: 'Turn on alerts',
+      body: 'This lets goals, kick-off, and full-time show on your phone. On the next screen, tap Allow.',
+      action: 'Allow alerts',
     };
   }
   if (step === 'battery') {
     return {
-      title: 'Allow background activity',
-      body: 'Battery optimization can stop those alerts when Betspapa is closed. Allow background activity so the watcher keeps running.',
-      action: 'Allow background activity',
+      title: 'Keep Betspapa awake',
+      body: 'Phones save battery by stopping apps. Tap Unrestricted so alerts still arrive when Betspapa is closed.',
+      action: 'Open battery settings',
     };
   }
   if (step === 'exact') {
     return {
-      title: 'Allow exact alarms',
-      body: 'Android 12 and newer can delay an alert unless Betspapa may schedule an exact alarm.',
-      action: 'Allow exact alarms',
+      title: 'Let alerts arrive on time',
+      body: 'Turn on the switch next to Betspapa. A goal can be late if this stays off.',
+      action: 'Open alarm settings',
     };
   }
   if (step === 'autostart') {
+    const phone =
+      oem === 'transsion'
+        ? 'On Tecno, Infinix, and itel, '
+        : oem === 'xiaomi'
+          ? 'On Xiaomi, Redmi, and POCO, '
+          : oem === 'oppo'
+            ? 'On Oppo and Realme, '
+            : oem === 'vivo'
+              ? 'On Vivo and iQOO, '
+              : oem === 'huawei'
+                ? 'On Huawei and Honor, '
+                : 'On Samsung, ';
     return {
       title: 'Turn on Autostart',
-      body: OEM_INSTRUCTION[oem ?? 'samsung'],
-      action: phase === 'opened' ? "I've turned it on" : 'Open autostart settings',
+      body: `${phone}the picture shows the switch to turn on.`,
+      action: phase === 'opened' ? 'I turned it on' : 'Open Autostart',
     };
   }
   if (phase === 'confirm') {
     return {
-      title: 'Did you get it?',
-      body: 'The test alert is sent with Betspapa closed. It should be in your notifications.',
-      action: 'Yes',
+      title: 'Did the alert show up?',
+      body: 'Look at the top of your phone. It should say Betspapa.',
+      action: 'Yes, I saw it',
     };
   }
   return {
-    title: 'Test it',
-    body: 'We send one alert in about 10 seconds through the same goal-sound channel the watcher uses. Leave Betspapa, then come back. You should hear the cheer you picked. If it is silent, turn Notification sound on for that channel.',
-    action: 'Play test sound',
+    title: 'Send a test alert',
+    body: 'We will send one alert in about 10 seconds. Close Betspapa and wait for it.',
+    action: 'Send test alert',
   };
 }
 
+export type HintControl = 'allow' | 'switch' | 'radio';
+
+export type HintRow = {
+  label: string;
+  detail?: string;
+  control: HintControl;
+  on: boolean;
+  target: boolean;
+};
+
+/** A picture of the system screen, with the control the person should tap marked. */
+export type StepHint = {
+  screen: string;
+  caption: string;
+  rows: HintRow[];
+};
+
+const APP = 'Betspapa';
+
+function row(label: string, control: HintControl, on: boolean, target: boolean, detail?: string): HintRow {
+  return { label, detail, control, on, target };
+}
+
+function autostartHint(oem: OemBrand | null): StepHint {
+  if (oem === 'transsion') {
+    return {
+      screen: 'Phone Master · Autostart',
+      caption: 'Find Betspapa and tap the switch so it turns on.',
+      rows: [row(APP, 'switch', true, true, 'Autostart')],
+    };
+  }
+  if (oem === 'xiaomi') {
+    return {
+      screen: 'Security · Autostart',
+      caption: 'Find Betspapa and tap the switch so it turns on.',
+      rows: [row(APP, 'switch', true, true)],
+    };
+  }
+  if (oem === 'oppo') {
+    return {
+      screen: 'App launch · Betspapa',
+      caption: 'Turn on Auto launch and Background activity.',
+      rows: [row('Auto launch', 'switch', true, true), row('Background activity', 'switch', true, true)],
+    };
+  }
+  if (oem === 'vivo') {
+    return {
+      screen: 'Autostart',
+      caption: 'Find Betspapa and tap the switch so it turns on.',
+      rows: [row(APP, 'switch', true, true)],
+    };
+  }
+  if (oem === 'huawei') {
+    return {
+      screen: 'App launch · Betspapa',
+      caption: 'Choose Manage manually, then turn on Auto-launch.',
+      rows: [row('Manage manually', 'radio', true, true), row('Auto-launch', 'switch', true, true)],
+    };
+  }
+  return {
+    screen: 'Battery · Betspapa',
+    caption: 'Tap Unrestricted. If Betspapa is in Sleeping apps, take it out.',
+    rows: [row('Optimized', 'radio', false, false), row('Unrestricted', 'radio', true, true)],
+  };
+}
+
+export function stepHint(step: AlertStepId, oem: OemBrand | null, phase: FlowPhase): StepHint | null {
+  if (phase === 'confirm') return null;
+  if (step === 'test' || phase === 'sent') {
+    return {
+      screen: 'Your notifications',
+      caption: 'This card should appear even when Betspapa is closed.',
+      rows: [row('Goal · Arsenal', 'allow', true, false, 'Saka scores · Arsenal 1–0 Chelsea')],
+    };
+  }
+  if (step === 'notifications') {
+    return {
+      screen: 'Allow Betspapa to send notifications?',
+      caption: 'Tap Allow. That is the button on the right.',
+      rows: [row('Don’t allow', 'allow', false, false), row('Allow', 'allow', true, true)],
+    };
+  }
+  if (step === 'battery') {
+    return {
+      screen: 'Battery · Betspapa',
+      caption: 'Tap Unrestricted so the phone does not put Betspapa to sleep.',
+      rows: [row('Optimized', 'radio', false, false), row('Unrestricted', 'radio', true, true)],
+    };
+  }
+  if (step === 'exact') {
+    return {
+      screen: 'Alarms and reminders',
+      caption: 'Tap the switch next to Betspapa so it turns on.',
+      rows: [row(APP, 'switch', true, true, 'Allow setting alarms and reminders')],
+    };
+  }
+  return autostartHint(oem);
+}
+
+export function doneCopy(step: AlertStepId): string {
+  if (step === 'notifications') return 'Alerts are allowed.';
+  if (step === 'battery') return 'Betspapa can stay awake.';
+  if (step === 'exact') return 'Alerts can arrive on time.';
+  if (step === 'autostart') return 'Autostart is on.';
+  return 'Test alert sent.';
+}
+
 export function sentCopy(): string {
-  return 'Leave Betspapa now. The test alert should arrive in about 10 seconds.';
+  return 'Close Betspapa now. The test alert should arrive in about 10 seconds.';
 }
 
 export function retryNote(): string {
-  return 'That test did not arrive. This step is still blocking live alerts.';
+  return 'That test did not arrive. Let’s turn on the step that is still off.';
 }
