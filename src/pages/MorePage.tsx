@@ -19,6 +19,10 @@ export function MorePage() {
             <span>{link.detail}</span>
           </Link>
         ))}
+        <a href="https://betspapa.com/privacy/" target="_blank" rel="noopener noreferrer">
+          <strong>Privacy policy</strong>
+          <span>What alerts send and how to delete it</span>
+        </a>
       </nav>
     </div>
   );
