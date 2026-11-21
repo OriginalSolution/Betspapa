@@ -16,6 +16,7 @@ import { SlipsPage } from './pages/SlipsPage';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
 import { isNativeApp } from './lib/nativeHttp';
+import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
 
 const titles: Record<string, string> = {
@@ -48,9 +49,10 @@ export function App() {
     setSeen((current) => (current.includes(location.pathname) ? current : [...current, location.pathname]));
   }, [location.pathname]);
 
+  const matchMeta = match ? { home: match.home.shortName, away: match.away.shortName, competition: match.competition.name } : undefined;
   useEffect(() => {
-    document.title = `${title} · Betspapa`;
-  }, [title]);
+    applyPageMeta(pageMeta(location.pathname, title, matchMeta));
+  }, [location.pathname, title]);
 
   useEffect(() => {
     if (!isNativeApp()) return;
