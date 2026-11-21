@@ -17,6 +17,9 @@ import { prepareCrest } from './crestImage.mjs';
 const USER_AGENT = 'Betspapa/0.4.12 (crest list; https://betspapa.com)';
 export const SPORTRADAR = 'https://img.sportradar.com/ls/crest/big/';
 const DAY = 86_400_000;
+/** Bump when the image checks change so earlier misses are tried again at once. */
+export const CHECK_VERSION = 2;
+const TRANSIENT = /http (429|5\d\d)|abort|timeout|timed out|fetch failed|network|ECONN|ETIMEDOUT|socket/i;
 const HOUR = 3_600_000;
 const TOP = [/^england\|premier league$/, /^spain\|laliga$/, /^italy\|serie a$/, /^germany\|bundesliga$/, /^france\|ligue 1$/, /^international clubs\|uefa (champions|europa|conference) league/];
 const YOUTH = /\b(u1[5-9]|u2[0-3]|women|youth|reserve|amateur|juvenil|primavera|development|academy)\b|\b(w|ii|b|u\d\d)$/i;
@@ -65,6 +68,13 @@ export function createCrestStore(options = {}) {
   mkdirSync(imgDir, { recursive: true });
   const index = { ...emptyIndex(), ...readJson(indexFile, {}) };
   for (const key of ['teams', 'misses', 'overrides']) if (!index[key] || typeof index[key] !== 'object') index[key] = {};
+  if (index.checkVersion !== CHECK_VERSION) {
+    for (const miss of Object.values(index.misses)) {
+      miss.nextAt = 0;
+      miss.tries = 0;
+    }
+    index.checkVersion = CHECK_VERSION;
+  }
   let legacy = null;
   let legacyOverrides = null;
   const paceRadar = options.paceRadar || pacer(options.radarGap ?? 250);
@@ -251,8 +261,17 @@ export function createCrestStore(options = {}) {
         slowQueue.push({ ...team, id: cid, reasons });
         return null;
       }
-    } else if (Array.isArray(team.reasons)) {
-      reasons.push(...team.reasons);
+    } else {
+      const earlier = Array.isArray(team.reasons) ? team.reasons : [];
+      // A network blip on the fast pass gets one more Sportradar try here.
+      const radar = earlier.find((reason) => reason.startsWith('sportradar:'));
+      if (radar && TRANSIENT.test(radar)) {
+        url = await tryLayer(cid, team, 'sportradar', `${SPORTRADAR}${cid}.png`, reasons, paceRadar);
+        if (url) return url;
+        reasons.push(...earlier.filter((reason) => !reason.startsWith('sportradar:')));
+      } else {
+        reasons.push(...earlier);
+      }
     }
     if (!url) {
       let found = null;
