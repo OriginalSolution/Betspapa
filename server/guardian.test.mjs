@@ -164,6 +164,33 @@ test('mode must be live and a demo or simulated mode asks to switch', () => {
   }
 });
 
+test('coverage waits until the booking cycle finishes', () => {
+  const now = Date.now();
+  const input = healthyInput(now);
+  delete input.state.tiers[0].books.sportybet;
+  const idle = evaluateChecks(input);
+  assert.equal(idle.checks.find((row) => row.id === 'coverage').ok, false);
+  assert.ok(idle.actions.includes('rebook'));
+  const booking = evaluateChecks({ ...input, booking: true });
+  const coverage = booking.checks.find((row) => row.id === 'coverage');
+  assert.equal(coverage.ok, true);
+  assert.match(coverage.message, /still running/);
+  assert.equal(booking.actions.includes('rebook'), false);
+});
+
+test('a missing snapshot token is healthy when the booked board is on disk', () => {
+  const onDisk = evaluateChecks({ ...healthyInput(), snapshot: 'no-token', boardStored: true, persistent: true });
+  const persist = onDisk.checks.find((row) => row.id === 'persist');
+  assert.equal(persist.ok, true);
+  assert.match(persist.message, /booked board is on disk/);
+  const lost = evaluateChecks({ ...healthyInput(), snapshot: 'no-token', persistent: false });
+  assert.equal(lost.checks.find((row) => row.id === 'persist').ok, false);
+  assert.match(lost.checks.find((row) => row.id === 'persist').message, /No snapshot token/);
+  const failed = evaluateChecks({ ...healthyInput(), boardStored: false, diskError: 'disk full' });
+  assert.match(failed.checks.find((row) => row.id === 'persist').message, /data disk/);
+  assert.match(failed.checks.find((row) => row.id === 'persist').message, /disk full/);
+});
+
 test('an empty board is attention unless a cycle is still booking', () => {
   const empty = evaluateChecks({ ...healthyInput(), state: { master: null, trends: [], tiers: [], books: {} } });
   assert.equal(empty.checks.find((row) => row.id === 'board').ok, false);
@@ -345,6 +372,51 @@ test('stale tokens are pruned and a demo mode is switched before another cycle',
   assert.equal(status.ok, true);
   assert.equal(status.checks.length, 8);
   assert.equal(cycles, 0);
+});
+
+test('a running booking cycle does not recompute health or start another cycle', async () => {
+  let booking = false;
+  let cycles = 0;
+  let reads = 0;
+  const leg = { eventId: 'sr:match:1', market: 'over15', odds: 1.25, kickoff: new Date(Date.now() + 3_600_000).toISOString() };
+  const books = codedBooks();
+  delete books.msport;
+  const guardian = createGuardian({
+    dir: mkdtempSync(join(tmpdir(), 'betspapa-health-')),
+    backoffMs: [0, 0],
+    booking: () => booking,
+    healthCacheMs: 60_000,
+    getState: () => {
+      reads += 1;
+      return {
+        books,
+        master: { id: 'master', legs: [leg], books },
+        trends: [],
+        tiers: [
+          { id: 'tier:100', tier: '100', label: '100% all picks', legs: [leg], books },
+          { id: 'tier:90', tier: '90', label: '90%+ all picks', legs: [leg], books },
+          { id: 'tier:80', tier: '80', label: '80%+ all picks', legs: [leg], books },
+        ],
+      };
+    },
+    runCycle: async () => {
+      cycles += 1;
+    },
+    push: () => ({ feedOk: true, sentOk: 0, sentError: 0 }),
+    persistent: () => true,
+    now: () => new Date('2026-11-13T02:00:00.000Z'),
+  });
+  await guardian.check();
+  const afterIdle = { cycles, reads };
+  assert.ok(afterIdle.cycles >= 1);
+  booking = true;
+  const during = await guardian.check();
+  assert.equal(cycles, afterIdle.cycles);
+  assert.equal(reads, afterIdle.reads);
+  assert.equal(during.checks.find((row) => row.id === 'coverage').ok, false);
+  const again = await guardian.status();
+  assert.equal(reads, afterIdle.reads);
+  assert.equal(again.ok, during.ok);
 });
 
 test('missing desk codes are rebooked with backoff and then left alone', async () => {

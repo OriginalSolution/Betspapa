@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bookAll, resetBookerCache } from './bookers.mjs';
-import { CODE_LIMIT, bookSlips, bookableLegs, codeGroups, codeLegs, tierSlips, trendGroups } from './slips.mjs';
+import { CODE_LIMIT, bookSlips, bookableLegs, bookingGroups, codeGroups, codeLegs, tierSlips, trendGroups } from './slips.mjs';
 import { selectionKey } from './selection.mjs';
 
 const now = new Date('2026-11-13T10:00:00.000Z');
@@ -134,6 +134,42 @@ test('a tier books a second part instead of dropping the extra legs', async () =
   assert.equal(parts.length, 2);
   assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
   assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
+});
+
+test('the master slip is booked in parts of 50, not one 18-leg code', async () => {
+  const calls = [];
+  const linkFor = (desk, code) => ({
+    sportybet: `https://www.sportybet.com/gh/?shareCode=${code}`,
+    footballcom: `https://www.football.com/gh/?shareCode=${code}`,
+    msport: `https://www.msport.com/gh/?shareCode=${code}`,
+    betika: `https://betika.com/en-gh/share/${code}`,
+    betpawa: `https://www.betpawa.com.gh/share-betslip/${code}`,
+  })[desk];
+  const book = async (legs, desks) => {
+    calls.push({ n: legs.length, desks: desks.slice() });
+    const code = `M${calls.length}CODE`;
+    return Object.fromEntries(desks.map((desk) => [desk, {
+      parts: [{ code, link: linkFor(desk, code), legs: legs.length, matches: legs.map((row) => row.eventId) }],
+      kept: [],
+      dropped: [],
+      error: null,
+    }]));
+  };
+  const legs = Array.from({ length: 60 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 }));
+  assert.deepEqual(bookingGroups({ id: 'master' }, legs).map((group) => group.length), [50, 10]);
+  assert.equal(bookingGroups({ id: '80:over15' }, legs).length, 1);
+  assert.equal(bookingGroups({ id: '80:over15' }, legs)[0].length, CODE_LIMIT);
+  const out = await bookSlips({
+    slips: [{ id: 'master', name: '80%+ Master Slip', legs }],
+    book,
+    now: now.getTime(),
+    log: () => {},
+  });
+  const parts = out.results[0].books.sportybet.parts;
+  assert.equal(parts.length, 2);
+  assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
+  assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
+  assert.equal(calls.some((call) => (call.desks || []).includes('betway')), false);
 });
 
 test('betPawa books second-half over 0.5 from market type 4976', async () => {

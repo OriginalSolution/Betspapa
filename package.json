@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "node server/index.mjs",
     "test": "vitest run && node --test server/*.test.mjs server/*/*.test.mjs scripts/goal-cheer.test.mjs",
+    "ci": "python3 -m unittest discover -s .github/monitor -p 'test_judge.py' && npm test && npm run build",
     "icons": "node scripts/generate-icons.mjs",
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleRelease"

@@ -1,6 +1,7 @@
 /**
- * Last booked board, stored on the public engine-data branch so a restart
- * can restore it without a paid disk. A token is only needed to publish.
+ * Optional copy of the last booked board on the public engine-data branch.
+ * The Render disk (ENGINE_DATA_DIR) is the copy that survives a restart.
+ * Publishing needs a token. Without one, this returns once and does not call GitHub.
  */
 
 const REPO = process.env.ENGINE_SNAPSHOT_REPO || 'OriginalSolution/Betspapa';
@@ -33,8 +34,7 @@ export async function loadEngineSnapshot(fetchImpl = fetch) {
   return null;
 }
 
-export async function publishEngineSnapshot(state, fetchImpl = fetch) {
-  const key = token();
+export async function publishEngineSnapshot(state, fetchImpl = fetch, key = token()) {
   if (!state) return { ok: false, error: 'empty board' };
   if (!key) return { ok: false, error: 'no snapshot token' };
   const path = `https://api.github.com/repos/${REPO}/contents/${FILE}`;
@@ -51,7 +51,8 @@ export async function publishEngineSnapshot(state, fetchImpl = fetch) {
       const meta = await current.json();
       sha = meta.sha || '';
     } else if (current.status !== 404) {
-      return false;
+      const text = await current.text().catch(() => '');
+      return { ok: false, error: `${current.status} ${String(text).slice(0, 160)}`.trim() };
     }
     const body = {
       message: 'Update the last booked engine board',

@@ -8,7 +8,7 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { forceLiveMode, getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
 import { readIncidents } from './guardianOps.mjs';
@@ -53,6 +53,7 @@ const guardian = createGuardian({
   getState: getEngineState,
   getRaw: getEngineRaw,
   booking: () => Boolean(getEngineSchedule().running),
+  persistence: enginePersistence,
   needsRepair: engineNeedsRepair,
   runCycle: runEngineCycle,
   restore: restoreEngine,
