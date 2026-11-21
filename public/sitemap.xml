@@ -2,5 +2,6 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://betspapa.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
   <url><loc>https://betspapa.com/about/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://betspapa.com/privacy/</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
   <url><loc>https://betspapa.com/download/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>
