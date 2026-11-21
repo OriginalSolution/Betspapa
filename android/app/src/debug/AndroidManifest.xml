@@ -8,5 +8,11 @@
             android:name=".watch.ScoreWatchService"
             android:exported="true"
             tools:replace="android:exported" />
+        <!-- Release keeps the test alert private to the app (Settings schedules it with an explicit intent).
+             Debug opens it so the QC harness can fire a test card with adb. -->
+        <receiver
+            android:name=".watch.TestAlertReceiver"
+            android:exported="true"
+            tools:replace="android:exported" />
     </application>
 </manifest>

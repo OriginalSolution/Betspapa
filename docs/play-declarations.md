@@ -23,4 +23,4 @@ The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.
 
 ## Flags
 - The upload keystore `android/betspapa-release.keystore` is committed with the public sideload password from the README. Play App Signing protects the key users receive, but anyone with the repo can sign as the upload key. Consider registering a new private upload key (Play Console → App integrity → Request upload key reset) before production.
-- `TestAlertReceiver` is exported without a permission so adb QC can trigger a test card. Any installed app could fire a harmless test notification. Consider making it non-exported for the Play build.
+- `TestAlertReceiver` is not exported in release builds (0.4.11). Debug builds export it for the adb QC harness.
