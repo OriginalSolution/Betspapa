@@ -1,2 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /settings
+Disallow: /inbox
+Disallow: /lists
+
+Sitemap: https://betspapa.com/sitemap.xml
