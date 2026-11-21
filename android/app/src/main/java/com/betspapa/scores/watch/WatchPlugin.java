@@ -38,8 +38,22 @@ public class WatchPlugin extends Plugin {
         data.put("route", route == null ? "" : route);
         data.put("matchId", matchId == null ? "" : matchId);
         data.put("trendId", trendId == null ? "" : trendId);
-        pendingOpen = data;
+        // Keep it for a cold start only. A warm tap is delivered to the live listener; leaving it
+        // pending made the next re-mount navigate to that match a second time.
+        pendingOpen = hasListeners("open") ? null : data;
         notifyListeners("open", data);
+    }
+
+    /** The last device registration the app sent. A token refreshed while the app is closed re-sends it natively. */
+    @PluginMethod
+    public void stashDevice(PluginCall call) {
+        String payload = call.getString("payload", "");
+        if (getContext() == null || payload == null || payload.isEmpty() || payload.length() > 200_000) {
+            call.resolve();
+            return;
+        }
+        getContext().getSharedPreferences(DeviceRegistrar.PREFS, Context.MODE_PRIVATE).edit().putString(DeviceRegistrar.KEY, payload).apply();
+        call.resolve();
     }
 
     @PluginMethod
@@ -228,13 +242,16 @@ public class WatchPlugin extends Plugin {
             note.fixture = json.optString("fixture", "");
             rememberMatch(json);
             String sound = json.optString("goalSound", "crowd");
-            boolean posted = AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
-            if (posted && note.id != null && !note.id.isEmpty()) {
-                synchronized (WatchState.FILE_LOCK) {
-                    WatchState state = WatchState.load(WatchFiles.file(getContext()));
-                    state.markSent(note.id);
-                    state.save(WatchFiles.file(getContext()));
-                }
+            // FCM or the native poller may already have posted this id. The gate keeps the cheer to one.
+            if (!AlertGate.claim(getContext(), note.id)) {
+                call.resolve();
+                return;
+            }
+            boolean posted = false;
+            try {
+                posted = AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            } finally {
+                AlertGate.finish(getContext(), note.id, posted);
             }
             call.resolve();
         } catch (Exception error) {

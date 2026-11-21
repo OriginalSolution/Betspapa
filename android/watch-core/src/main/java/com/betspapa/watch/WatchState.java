@@ -136,6 +136,7 @@ public final class WatchState {
         if (note.bookId != null) row.put("bookId", note.bookId);
         if (note.bookCode != null) row.put("bookCode", note.bookCode);
         if (note.fixture != null) row.put("fixture", note.fixture);
+        if (note.replaces != null && !note.replaces.isEmpty()) row.put("replaces", note.replaces);
         inbox.add(0, row);
         seen.add(note.id);
         while (inbox.size() > 120) inbox.remove(inbox.size() - 1);
@@ -157,6 +158,7 @@ public final class WatchState {
             note.bookId = row.optString("bookId", "");
             note.bookCode = row.optString("bookCode", "");
             note.fixture = row.optString("fixture", "");
+            note.replaces = row.optString("replaces", "");
             pending.add(note);
         }
         return pending;
@@ -239,6 +241,37 @@ public final class WatchState {
             if (keepWithoutFixture(prior, now)) matches.add(prior);
         }
         fixturesAt = now;
+    }
+
+    /**
+     * Followed matches that were live late in the second half and are missing from
+     * this in-play list. The live list never shows a finished match, so these are
+     * the ones worth one event lookup.
+     */
+    public List<String> vanishedLate(List<WatchMatch> live) {
+        Set<String> liveIds = new HashSet<String>();
+        for (WatchMatch row : live) liveIds.add(row.id);
+        List<String> out = new ArrayList<String>();
+        for (WatchMatch match : matches) {
+            if (liveIds.contains(match.id) || !relevant(match)) continue;
+            if (!"live".equals(match.status) || match.minute == null || match.minute < 80) continue;
+            out.add(match.id);
+        }
+        return out;
+    }
+
+    /** SportyBet's event row says the match ended. Full time and full-time trends can settle now, not 130 minutes after kick-off. */
+    public boolean finishFromDetail(String id, String matchStatus, int numericStatus, Integer home, Integer away) {
+        String status = matchStatus == null ? "" : matchStatus.trim().toUpperCase(java.util.Locale.US);
+        boolean ended = "ENDED".equals(status) || "FT".equals(status) || "AET".equals(status) || "AP".equals(status)
+            || "FINISHED".equals(status) || numericStatus == 3 || numericStatus == 4;
+        if (!ended) return false;
+        WatchMatch match = find(matches, id);
+        if (match == null) return false;
+        match.status = "finished";
+        if (home != null) match.homeScore = home;
+        if (away != null) match.awayScore = away;
+        return true;
     }
 
     public void overlayLive(List<WatchMatch> live, long now) {
@@ -455,6 +488,14 @@ public final class WatchState {
             if (!incoming.awayId.isEmpty()) prior.awayId = incoming.awayId;
             if (incoming.kickoffMs > 0) prior.kickoffMs = incoming.kickoffMs;
             return prior;
+        }
+        // The fixture list can lag the in-play feed. It must not lower a live score, or the
+        // watcher would read that as VAR taking a goal back.
+        boolean priorLive = "live".equals(prior.status) || "halftime".equals(prior.status);
+        if (priorLive && !"finished".equals(incoming.status)) {
+            if (prior.homeScore != null && (incoming.homeScore == null || incoming.homeScore < prior.homeScore)) incoming.homeScore = prior.homeScore;
+            if (prior.awayScore != null && (incoming.awayScore == null || incoming.awayScore < prior.awayScore)) incoming.awayScore = prior.awayScore;
+            if ("scheduled".equals(incoming.status)) incoming.status = prior.status;
         }
         if (incoming.seenHome == null) incoming.seenHome = prior.seenHome;
         else if (prior.seenHome != null) incoming.seenHome = Math.max(incoming.seenHome, prior.seenHome);

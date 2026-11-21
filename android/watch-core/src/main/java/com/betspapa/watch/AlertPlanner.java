@@ -73,7 +73,7 @@ public final class AlertPlanner {
         for (WatchMatch match : matches) {
             if (!inWindow(match, state, now) && !justFinished(match, state, now)) continue;
             if (!state.follows(match)) continue;
-            for (WatchNote note : signals(viewOf(match, now))) {
+            for (WatchNote note : signals(viewOf(match, now), state)) {
                 if (state.seen(note.id) || !state.allows(note.kind)) continue;
                 notes.add(note);
             }
@@ -187,7 +187,7 @@ public final class AlertPlanner {
         return view;
     }
 
-    private static List<WatchNote> signals(WatchMatch match) {
+    static List<WatchNote> signals(WatchMatch match, WatchState state) {
         List<WatchNote> out = new ArrayList<WatchNote>();
         if ("scheduled".equals(match.status) || "postponed".equals(match.status)) return out;
         String versus = match.home + " vs " + match.away;
@@ -216,16 +216,12 @@ public final class AlertPlanner {
         // currently under VAR stays uncounted until that review leaves the feed.
         int homeFloor = match.seenHome == null ? 0 : match.seenHome;
         int awayFloor = match.seenAway == null ? 0 : match.seenAway;
-        if (!holdHome) {
-            for (int index = homeFloor + 1; index <= count(match.homeScore); index++) out.add(goal(match, true, index));
-        }
-        if (!holdAway) {
-            for (int index = awayFloor + 1; index <= count(match.awayScore); index++) out.add(goal(match, false, index));
-        }
-        boolean pastHalf = "halftime".equals(match.status)
-            || "finished".equals(match.status)
-            || ("live".equals(match.status) && match.minute != null && match.minute >= 45);
-        if (pastHalf) {
+        boolean inPlay = "live".equals(match.status) || "halftime".equals(match.status) || "finished".equals(match.status);
+        if (!holdHome) sideNotes(out, match, state, true, homeFloor, inPlay);
+        if (!holdAway) sideNotes(out, match, state, false, awayFloor, inPlay);
+        // Only the break itself. "Half-time" at full time, or at 45' while stoppage time is still
+        // being played, was a stale card.
+        if ("halftime".equals(match.status)) {
             String ht = match.htHome != null && match.htAway != null ? scoreText(match.htHome, match.htAway) : current;
             out.add(new WatchNote(match.id + ":ht", match.id, "ht", "Half-time", match.home + " " + ht + " " + match.away));
         }
@@ -239,6 +235,51 @@ public final class AlertPlanner {
             if ("var".equals(marker.type) && !sawVar) out.add(cardNote(match, marker, "var", "VAR"));
         }
         return out;
+    }
+
+    /**
+     * Goals above the confirmed tally alert. A tally that went down is VAR (or the
+     * feed) taking goals back: each gets a silent Disallowed card that replaces the
+     * goal card, and the next goal at that count gets a new revision id so it still
+     * alerts. The server builds the same ids, so FCM and this watcher never double up.
+     */
+    private static void sideNotes(List<WatchNote> out, WatchMatch match, WatchState state, boolean home, int floor, boolean inPlay) {
+        int now = count(home ? match.homeScore : match.awayScore);
+        String side = home ? "home" : "away";
+        if (now < floor) {
+            if (!inPlay) return;
+            String team = home ? match.home : match.away;
+            for (int index = floor; index > now; index--) {
+                String goalId = goalId(match.id, side, index, revision(state, match.id, side, index));
+                WatchNote note = new WatchNote(
+                    goalId + ":cancelled",
+                    match.id,
+                    "var",
+                    "VAR · " + team,
+                    "Goal disallowed · " + match.home + " " + scoreText(match.homeScore, match.awayScore) + " " + match.away
+                );
+                note.disallowed = true;
+                note.varCheck = true;
+                note.replaces = goalId;
+                note.minute = match.minute;
+                out.add(note);
+            }
+            return;
+        }
+        for (int index = floor + 1; index <= now; index++) out.add(goal(match, home, index, revision(state, match.id, side, index)));
+    }
+
+    public static String goalId(String matchId, String side, int index, int rev) {
+        String base = matchId + ":goal:" + side + ":" + index;
+        return rev > 0 ? base + ":r" + rev : base;
+    }
+
+    /** How many times goal `index` on this side was taken back, read from the cards already raised. */
+    static int revision(WatchState state, String matchId, String side, int index) {
+        if (state == null) return 0;
+        int rev = 0;
+        while (rev < 20 && state.seen(goalId(matchId, side, index, rev) + ":cancelled")) rev++;
+        return rev;
     }
 
     private static WatchNote cardNote(WatchMatch match, WatchMatch.Marker marker, String kind, String title) {
@@ -262,11 +303,11 @@ public final class AlertPlanner {
         return score == null ? 0 : score;
     }
 
-    private static WatchNote goal(WatchMatch match, boolean home, int index) {
+    private static WatchNote goal(WatchMatch match, boolean home, int index, int rev) {
         String team = home ? match.home : match.away;
         String side = home ? "home" : "away";
         WatchNote note = new WatchNote(
-            match.id + ":goal:" + side + ":" + index,
+            goalId(match.id, side, index, rev),
             match.id,
             "goal",
             "Goal · " + team,

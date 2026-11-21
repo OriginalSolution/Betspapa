@@ -70,6 +70,17 @@ public class ScoreWatchService extends Service {
         startInForeground();
     }
 
+    /**
+     * Android 15 caps a dataSync foreground service at six hours and kills the app if it is
+     * still running when this fires. Stop cleanly; the watchdog alarm starts a fresh one.
+     */
+    @Override
+    public void onTimeout(int startId, int fgsType) {
+        WatchScheduler.armWatchdog(this);
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
+    }
+
     @Override
     public void onDestroy() {
         handler.removeCallbacks(tick);

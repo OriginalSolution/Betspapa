@@ -25,6 +25,9 @@ public final class PushBridge {
 
     static void remember(Context context, String token) {
         if (token == null || token.isEmpty()) return;
+        String previous = currentToken(context);
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(TOKEN, token).apply();
+        // A rotated token is sent to the server now, not on the next app open.
+        if (!previous.isEmpty() && !previous.equals(token)) DeviceRegistrar.onNewToken(context, token, previous);
     }
 }
