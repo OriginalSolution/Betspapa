@@ -8,6 +8,7 @@ on:
       - .github/workflows/play-aab.yml
       - android/app/build.gradle
       - android/app/src/main/AndroidManifest.xml
+      - android/app/src/debug/AndroidManifest.xml
 permissions:
   contents: read
 jobs:
@@ -31,9 +32,22 @@ jobs:
         run: ./gradlew --no-daemon :watch-core:test :app:testReleaseUnitTest
       - name: Build signed release bundle
         working-directory: android
-        # Signed with the same upload key as v0.4.10 (signingConfigs.release in android/app/build.gradle).
-        run: ./gradlew --no-daemon :app:bundleRelease
+        # Signed with the private Play upload key from repository secrets. Nothing is written outside the runner.
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.PLAY_UPLOAD_KEYSTORE_BASE64 }}
+          BETSPAPA_STORE_PASSWORD: ${{ secrets.PLAY_UPLOAD_KEYSTORE_PASSWORD }}
+          BETSPAPA_KEY_ALIAS: ${{ secrets.PLAY_UPLOAD_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$UPLOAD_KEYSTORE_BASE64" || { echo "PLAY_UPLOAD_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          export BETSPAPA_STORE_FILE="$RUNNER_TEMP/upload.keystore"
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 -d > "$BETSPAPA_STORE_FILE"
+          ./gradlew --no-daemon :app:bundleRelease
+          rm -f "$BETSPAPA_STORE_FILE"
       - name: Check version, target SDK, FCM and signing
+        env:
+          # Public certificate fingerprint of the Play upload key (not a secret).
+          EXPECTED_UPLOAD_SHA256: D0:B4:D5:86:87:33:F9:3E:05:50:77:FB:47:27:E4:D5:28:D4:25:65:D9:8C:7C:13:A5:8E:F7:84:3B:3C:A5:E7
         run: |
           set -euo pipefail
           AAB=android/app/build/outputs/bundle/release/app-release.aab
@@ -47,12 +61,9 @@ jobs:
           if echo "$MANIFEST" | grep -q 'USE_EXACT_ALARM'; then echo "USE_EXACT_ALARM must not ship to Play"; exit 1; fi
           echo "$MANIFEST" | grep -q 'BetspapaFirebaseService'
           BUNDLE_SHA=$(keytool -printcert -jarfile "$AAB" | grep -m1 'SHA256:' | awk '{print $2}')
-          curl -sSL -o previous.apk https://github.com/OriginalSolution/Betspapa/releases/download/v0.4.10/app-release.apk
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          PREVIOUS_SHA=$("$APKSIGNER" verify --print-certs previous.apk | grep -m1 'SHA-256 digest' | awk '{print $NF}' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
-          echo "bundle signer   $BUNDLE_SHA"
-          echo "v0.4.10 signer  $PREVIOUS_SHA"
-          test "$BUNDLE_SHA" = "$PREVIOUS_SHA"
+          echo "bundle signer  $BUNDLE_SHA"
+          echo "upload key     $EXPECTED_UPLOAD_SHA256"
+          test "$BUNDLE_SHA" = "$EXPECTED_UPLOAD_SHA256"
           sha256sum "$AAB"
       - uses: actions/upload-artifact@v4
         with:

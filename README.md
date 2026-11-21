@@ -102,12 +102,16 @@ The signed APK is written to `android/app/build/outputs/apk/release/app-release.
 
 ### Signing
 
-The release build is signed with `android/betspapa-release.keystore`, which is committed so a rebuild can be installed as an update over the GitHub APK. This key is only for that sideload distribution. It is not a Play Store upload key, and the password is public on purpose:
+No keystore or signing password is kept in the repository. Gradle signs a release only when these environment variables are set; otherwise the release output is unsigned.
 
-| Field | Value |
+| Variable | Meaning |
 | --- | --- |
-| Alias | `betspapa` |
-| Store password | `betspapa` |
-| Key password | `betspapa` |
+| `BETSPAPA_STORE_FILE` | Path to the keystore |
+| `BETSPAPA_STORE_PASSWORD` | Keystore password |
+| `BETSPAPA_KEY_ALIAS` | Key alias |
+| `BETSPAPA_KEY_PASSWORD` | Key password (defaults to the store password) |
 
-Replacing the keystore makes Android treat the result as a different app, so existing installs will not upgrade in place. Do not reuse this keystore for a Play Console listing.
+- **Google Play bundles** are signed with the private **upload key**. The `Play bundle` workflow reads it from the GitHub secrets `PLAY_UPLOAD_KEYSTORE_BASE64`, `PLAY_UPLOAD_KEYSTORE_PASSWORD` and `PLAY_UPLOAD_KEY_ALIAS`. Google Play re-signs installs with the app signing key.
+- **The legacy GitHub APK** must keep the original app signing key so existing installs upgrade in place. That key lives in the GitHub secrets `LEGACY_KEYSTORE_BASE64`, `LEGACY_KEYSTORE_PASSWORD` and `LEGACY_KEY_ALIAS`, and in the owner's secrets folder on the build box. Never commit it.
+
+Replacing the app signing key makes Android treat the result as a different app, so existing installs will not upgrade in place.
