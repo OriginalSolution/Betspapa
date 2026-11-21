@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Match } from '../types';
 import { forgetSearch, kickoffSoon, rememberSearch, searchBoard, setSearchStore, trending } from './search';
+import { highlightParts, kickoffDay } from './search';
 
 function match(patch: Partial<Match> = {}): Match {
   return {
@@ -99,5 +100,32 @@ describe('fixture search', () => {
     expect(rememberSearch('ghana')).toEqual(['ghana', 'ars']);
     expect(forgetSearch('ARS')).toEqual(['ghana']);
     setSearchStore(null);
+  });
+});
+
+describe('highlightParts', () => {
+  it('marks every case-insensitive match', () => {
+    expect(highlightParts('Madagascar vs Ghana', 'ghana')).toEqual([
+      { text: 'Madagascar vs ', hit: false },
+      { text: 'Ghana', hit: true },
+    ]);
+    expect(highlightParts('Ghana vs Ghana U23', 'GHANA').filter((part) => part.hit)).toHaveLength(2);
+  });
+  it('leaves the label alone with no query or no match', () => {
+    expect(highlightParts('Chelsea', '')).toEqual([{ text: 'Chelsea', hit: false }]);
+    expect(highlightParts('Chelsea', 'arsenal')).toEqual([{ text: 'Chelsea', hit: false }]);
+  });
+});
+
+describe('kickoffDay', () => {
+  const now = new Date('2026-11-21T10:00:00Z');
+  it('says Today for a kick-off today in Accra', () => {
+    expect(kickoffDay('2026-11-21T20:00:00Z', now)).toBe('Today');
+  });
+  it('gives weekday and date otherwise', () => {
+    expect(kickoffDay('2026-11-23T16:00:00Z', now)).toBe('Mon 23');
+  });
+  it('is empty for a missing time', () => {
+    expect(kickoffDay('', now)).toBe('');
   });
 });

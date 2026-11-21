@@ -178,3 +178,28 @@ export function kickoffSoon(matches: Match[], now = Date.now(), limit = 4): Matc
     .sort((a, b) => a.utcDate.localeCompare(b.utcDate))
     .slice(0, limit);
 }
+
+/** Split a label into plain and matched parts for the search highlight. Case-insensitive. */
+export function highlightParts(label: string, query: string): Array<{ text: string; hit: boolean }> {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return [{ text: label, hit: false }];
+  const lower = label.toLowerCase();
+  const parts: Array<{ text: string; hit: boolean }> = [];
+  let at = 0;
+  for (let found = lower.indexOf(needle); found !== -1; found = lower.indexOf(needle, at)) {
+    if (found > at) parts.push({ text: label.slice(at, found), hit: false });
+    parts.push({ text: label.slice(found, found + needle.length), hit: true });
+    at = found + needle.length;
+  }
+  if (at < label.length) parts.push({ text: label.slice(at), hit: false });
+  return parts.length ? parts : [{ text: label, hit: false }];
+}
+
+/** Day label under a kick-off clock: "Today" for today in Accra, otherwise "Mon 17". */
+export function kickoffDay(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (!iso || Number.isNaN(date.getTime())) return '';
+  const day = (value: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Accra', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+  if (day(date) === day(now)) return 'Today';
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'Africa/Accra' }).format(date).replace(',', '');
+}

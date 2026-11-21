@@ -1269,6 +1269,17 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   color: var(--text);
   font-weight: 750;
 }
+.search-row .hit, .search-match .hit {
+  background: rgba(229, 32, 46, 0.18);
+  color: #fff;
+  border-radius: 2px;
+  padding: 0;
+  font-weight: 750;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.search-match time.kick { display: flex; flex-direction: column; align-items: flex-end; min-width: 58px; font-size: 13px; letter-spacing: -0.2px; }
+.search-match time.kick small { font-size: 10.5px; color: var(--muted); margin-top: 2px; font-weight: 500; }
 .search-match time, .score-pill {
   margin-left: auto;
   font-variant-numeric: tabular-nums;

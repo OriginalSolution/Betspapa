@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchSportyWindow } from '../data/remote';
 import { catalogCrest, loadCrestCatalog } from '../lib/crestCatalog';
-import { forgetSearch, kickoffSoon, leaguesIn, loadLeagueFollows, loadRecent, rememberSearch, searchBoard, teamsIn, toggleLeagueFollow, trending, type SearchFilter } from '../lib/search';
-import { cx, formatDay, formatTime, minuteLabel, teamFollow } from '../lib/format';
+import { forgetSearch, highlightParts, kickoffDay, kickoffSoon, leaguesIn, loadLeagueFollows, loadRecent, rememberSearch, searchBoard, teamsIn, toggleLeagueFollow, trending, type SearchFilter } from '../lib/search';
+import { cx, formatDay, kickoffClock, minuteLabel, teamFollow } from '../lib/format';
 import type { Match } from '../types';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
@@ -133,6 +133,7 @@ export function TodaySearch({ matches, onQuery, onCorpus }: { matches: Match[]; 
                   key={hit.team.id}
                   team={hit.team}
                   subtitle={hit.subtitle}
+                  query={text}
                   following={follows.teams.some((team) => team.id === hit.team.id)}
                   onOpen={() => {
                     commit(text);
@@ -147,6 +148,7 @@ export function TodaySearch({ matches, onQuery, onCorpus }: { matches: Match[]; 
                   key={hit.id}
                   name={hit.name}
                   subtitle={`${hit.area} · ${hit.fixtures} ${hit.fixtures === 1 ? 'fixture' : 'fixtures'}`}
+                  query={text}
                   following={leagues.includes(hit.id)}
                   onOpen={() => {
                     commit(text);
@@ -160,6 +162,7 @@ export function TodaySearch({ matches, onQuery, onCorpus }: { matches: Match[]; 
                 <MatchResult
                   key={match.id}
                   match={match}
+                  query={text}
                   onOpen={() => {
                     commit(text);
                     navigate(`/match/${match.id}`);
@@ -237,7 +240,7 @@ function Discovery({
                       {match.competition.name} · {formatDay(match.utcDate.slice(0, 10))}
                     </em>
                   </span>
-                  <time>{formatTime(match.utcDate)}</time>
+                  <Kick iso={match.utcDate} />
                 </Link>
               </li>
             ))}
@@ -251,12 +254,14 @@ function Discovery({
 function TeamRow({
   team,
   subtitle,
+  query = '',
   following,
   onOpen,
   onFollow,
 }: {
   team: Match['home'];
   subtitle: string;
+  query?: string;
   following: boolean;
   onOpen: () => void;
   onFollow: () => void;
@@ -267,7 +272,9 @@ function TeamRow({
         <button type="button" className="search-open" onClick={onOpen}>
           <Crest team={team} size={36} followed={following} />
           <span>
-            <strong>{team.shortName}</strong>
+            <strong>
+              <Hit label={team.shortName} query={query} />
+            </strong>
             <em>{subtitle}</em>
           </span>
         </button>
@@ -282,12 +289,14 @@ function TeamRow({
 function LeagueRow({
   name,
   subtitle,
+  query = '',
   following,
   onOpen,
   onFollow,
 }: {
   name: string;
   subtitle: string;
+  query?: string;
   following: boolean;
   onOpen: () => void;
   onFollow: () => void;
@@ -300,7 +309,9 @@ function LeagueRow({
             {name.slice(0, 1)}
           </span>
           <span>
-            <strong>{name}</strong>
+            <strong>
+              <Hit label={name} query={query} />
+            </strong>
             <em>{subtitle}</em>
           </span>
         </button>
@@ -312,7 +323,7 @@ function LeagueRow({
   );
 }
 
-function MatchResult({ match, onOpen }: { match: Match; onOpen: () => void }) {
+function MatchResult({ match, query, onOpen }: { match: Match; query: string; onOpen: () => void }) {
   const live = match.status === 'live' || match.status === 'halftime';
   const scored = match.homeScore != null && match.awayScore != null && match.status !== 'scheduled';
   return (
@@ -322,7 +333,7 @@ function MatchResult({ match, onOpen }: { match: Match; onOpen: () => void }) {
         <Crest team={match.away} />
         <span>
           <strong>
-            {match.home.shortName} vs {match.away.shortName}
+            <Hit label={`${match.home.shortName} vs ${match.away.shortName}`} query={query} />
           </strong>
           <em>
             {match.competition.name}
@@ -335,10 +346,35 @@ function MatchResult({ match, onOpen }: { match: Match; onOpen: () => void }) {
             {live && <i>{minuteLabel(match)}</i>}
           </b>
         ) : (
-          <time>{formatTime(match.utcDate)}</time>
+          <Kick iso={match.utcDate} />
         )}
       </button>
     </li>
+  );
+}
+
+function Hit({ label, query }: { label: string; query: string }) {
+  return (
+    <>
+      {highlightParts(label, query).map((part, index) =>
+        part.hit ? (
+          <mark key={index} className="hit">
+            {part.text}
+          </mark>
+        ) : (
+          part.text
+        ),
+      )}
+    </>
+  );
+}
+
+function Kick({ iso }: { iso: string }) {
+  return (
+    <time className="kick" dateTime={iso}>
+      {kickoffClock(iso)}
+      <small>{kickoffDay(iso)}</small>
+    </time>
   );
 }
 
