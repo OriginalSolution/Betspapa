@@ -79,6 +79,13 @@
     .split-row { grid-template-columns: 72px 1fr auto; }
     .track { height: 8px; border-radius: 99px; background: rgba(255,255,255,.06); overflow: hidden; }
     .track i { display: block; height: 100%; background: var(--red); border-radius: 99px; }
+    .crest-miss { display: grid; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+    .crest-miss small { display: block; color: var(--muted); font-size: 12px; }
+    .crest-fix { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .crest-fix input[type=url] { flex: 1 1 220px; min-height: 40px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,255,255,.04); padding: 0 10px; }
+    .crest-file { display: inline-flex; align-items: center; cursor: pointer; }
+    .crest-force { font-size: 13px; color: var(--muted); }
+    .line img { vertical-align: middle; border-radius: 50%; }
     .apk, .line { grid-template-columns: 1fr auto auto; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
     .desk { grid-template-columns: 36px 1fr auto; padding: 9px 0; border-top: 1px solid var(--line); }
     .desk img { width: 36px; height: 36px; border-radius: 10px; object-fit: cover; background: #111; }
@@ -152,6 +159,8 @@
     let data = null;
     let flash = '';
     let busy = false;
+    let crestView = null;
+    const crestDraft = {};
 
     function esc(value) {
       return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -315,12 +324,30 @@
         '<div class="actions"><button type="button" class="primary" data-act="goal">Send test goal</button><button type="button" class="primary" data-act="kickoff">Kick-off</button></div><p class="flash">' + esc(flash) + '</p><h3>Recent alerts</h3>' + alerts(data.alerts, 30) + '</section>';
     }
     function crestsTab() {
-      const crests = data.crests || {};
-      return '<section class="card"><h2>Crests</h2>' + metrics([
-        { value: crests.cataloguePercent == null ? '—' : crests.cataloguePercent + '%', label: 'Catalogue coverage' },
-        { value: crests.upcomingBothPercent == null ? '—' : crests.upcomingBothPercent + '%', label: 'Upcoming board, both crests' },
-        { value: num(crests.missingClubs), label: crests.missingLive ? 'Missing clubs on the board' : 'Missing clubs in the catalogue' },
-      ]) + '<p class="sub">' + num(crests.upcomingFixtures) + ' upcoming fixtures in the engine · ' + num(crests.catalogueTeams) + ' clubs in the catalogue' + (crests.generatedAt ? ' · report ' + esc(stamp(crests.generatedAt)) : '') + '</p></section>';
+      const view = crestView || {};
+      const cover = view.coverage48 || { tiers: {}, missing: [] };
+      const week = view.coverage7d || {};
+      const pct = (row) => row && row.teams ? row.pct + '% (' + num(row.withCrest) + '/' + num(row.teams) + ')' : '—';
+      const misses = (cover.missing || []).slice(0, 150).map((row) => {
+        const id = row.id ? 'sr:competitor:' + row.id : '';
+        return '<div class="crest-miss"><div><b>' + esc(row.name) + '</b><small>' + esc(row.tier) + ' · ' + esc(row.country) + ' · ' + esc(row.competition) + (id ? ' · ' + esc(id) : '') + '</small>' +
+          '<small>' + esc((row.reasons || []).join('; ')) + '</small></div>' +
+          (row.id ? '<div class="crest-fix"><input type="url" placeholder="https://… image link" data-crest-url="' + esc(row.id) + '" value="' + esc(crestDraft[row.id] || '') + '">' +
+          '<label class="ghost crest-file">Upload<input type="file" accept="image/png,image/jpeg,image/svg+xml" data-crest-file="' + esc(row.id) + '" hidden></label>' +
+          '<label class="crest-force"><input type="checkbox" data-crest-force="' + esc(row.id) + '"> skip checks</label>' +
+          '<button type="button" class="primary" data-act="crest-save" data-id="' + esc(row.id) + '">Save</button></div>' : '<small>No team id in the feed.</small>') +
+          '</div>';
+      }).join('') || '<p class="empty">No missing crests in the next 48 hours.</p>';
+      const overrides = (view.overrides || []).map((row) =>
+        '<div class="line"><b>' + (row.crest ? '<img src="' + esc(row.crest) + '" alt="" width="22" height="22"> ' : '') + esc(row.name || row.id) + '</b><span>sr:competitor:' + esc(row.id) + '</span><button type="button" class="ghost" data-act="crest-clear" data-id="' + esc(row.id) + '">Remove</button></div>').join('') || '<p class="empty">No manual crests.</p>';
+      return '<section class="card"><h2>Crests</h2>' + (flash ? '<p class="sub">' + esc(flash) + '</p>' : '') + metrics([
+        { value: pct(cover.tiers.top), label: 'Top leagues, next 48 h' },
+        { value: pct(cover.tiers.all), label: 'All teams, next 48 h' },
+        { value: pct(week.all), label: 'All teams, next 7 days' },
+      ]) + '<p class="sub">' + num(cover.stored) + ' crests saved · ' + num(cover.queue) + ' in the lookup queue · target 95% top / 85% all</p>' +
+        '<div class="actions"><button type="button" class="ghost" data-act="crest-retry">Retry misses now</button></div></section>' +
+        '<section class="card"><h2>Missing crests (next 48 h)</h2><p class="sub">Paste an image link or upload a file, then Save. The image is checked, trimmed and served from our server.</p>' + misses + '</section>' +
+        '<section class="card"><h2>Manual crests</h2>' + overrides + '</section>';
     }
     function healthTab() {
       const watch = health || {};
@@ -384,6 +411,10 @@
         if (promoRes.ok) promos = await promoRes.json();
         const healthRes = await fetch('/api/admin/health', { cache: 'no-store' });
         if (healthRes.ok) health = await healthRes.json();
+        if (tab === 'Crests') {
+          const crestRes = await fetch('/api/admin/crests', { cache: 'no-store' });
+          if (crestRes.ok) crestView = await crestRes.json();
+        }
         draw();
         document.body.dataset.ready = '1';
       } catch {
@@ -394,7 +425,7 @@
     async function act(kind, id) {
       if (busy) return;
       busy = true;
-      flash = kind === 'cycle' ? 'Running the booking cycle…' : 'Sending…';
+      flash = kind === 'cycle' ? 'Running the booking cycle…' : kind.startsWith('crest') ? 'Working…' : 'Sending…';
       draw();
       try {
         let path = kind === 'cycle' ? '/api/admin/cycle' : '/api/admin/push-test';
@@ -412,6 +443,17 @@
         } else if (kind === 'promo-mine') {
           path = '/api/admin/promos/' + encodeURIComponent(id) + '/send-device';
           payload = { token: promoToken };
+        } else if (kind === 'crest-save') {
+          path = '/api/admin/crests/override';
+          const force = document.querySelector('[data-crest-force="' + id + '"]');
+          payload = { id, url: crestDraft[id] || '', image: crestDraft['file:' + id] || '', force: Boolean(force && force.checked) };
+        } else if (kind === 'crest-clear') {
+          path = '/api/admin/crests/override/' + encodeURIComponent(id);
+          method = 'DELETE';
+          payload = null;
+        } else if (kind === 'crest-retry') {
+          path = '/api/admin/crests/retry';
+          payload = {};
         } else if (kind === 'promo-delete') {
           path = '/api/admin/promos/' + encodeURIComponent(id);
           method = 'DELETE';
@@ -427,7 +469,11 @@
           location.replace('/admin');
           return;
         }
-        flash = body.error || (kind === 'cycle' ? 'Cycle finished.' : 'Sent.');
+        flash = body.error || (kind === 'cycle' ? 'Cycle finished.' : kind === 'crest-save' ? 'Crest saved.' : kind === 'crest-clear' ? 'Manual crest removed.' : kind === 'crest-retry' ? 'Queued ' + (body.queued || 0) + ' crests for another lookup.' : 'Sent.');
+        if (kind === 'crest-save' && !body.error) {
+          delete crestDraft[id];
+          delete crestDraft['file:' + id];
+        }
       } catch {
         flash = 'The request did not finish.';
       } finally {
@@ -440,10 +486,29 @@
       const button = event.target.closest('button[data-tab]');
       if (!button) return;
       tab = button.dataset.tab;
-      if (data) draw();
+      if (tab === 'Crests') load();
+      else if (data) draw();
     });
     document.getElementById('view').addEventListener('input', (event) => {
       if (event.target.id === 'promo-token') promoToken = event.target.value;
+      if (event.target.dataset && event.target.dataset.crestUrl) crestDraft[event.target.dataset.crestUrl] = event.target.value;
+    });
+    document.getElementById('view').addEventListener('change', (event) => {
+      const id = event.target.dataset && event.target.dataset.crestFile;
+      const file = id && event.target.files && event.target.files[0];
+      if (!file) return;
+      if (file.size > 2000000) {
+        flash = 'That file is over 2 MB.';
+        draw();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        crestDraft['file:' + id] = String(reader.result || '');
+        flash = file.name + ' is ready. Press Save.';
+        draw();
+      };
+      reader.readAsDataURL(file);
     });
     document.getElementById('view').addEventListener('click', (event) => {
       const button = event.target.closest('button[data-act]');
@@ -451,7 +516,10 @@
       act(button.dataset.act, button.dataset.id || '');
     });
     load();
-    setInterval(load, 30000);
+    setInterval(() => {
+      const typing = document.activeElement && document.activeElement.closest && document.activeElement.closest('.crest-fix');
+      if (!typing) load();
+    }, 30000);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/admin/sw.js', { scope: '/admin' });
   </script>
 </body>

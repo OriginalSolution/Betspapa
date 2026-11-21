@@ -655,4 +655,18 @@ public class AlertPlannerTest {
         }
         return builder.toString();
     }
+
+    @Test
+    public void parserKeepsTheServerCrestAndDropsOtherHosts() {
+        String upcoming = "{\"events\":[{\"eventId\":\"sr:match:9\",\"home\":\"Chelsea\",\"away\":\"Leeds United\",\"kickoff\":\"2026-11-21T15:00:00Z\",\"country\":\"England\",\"tournament\":\"Premier League\","
+            + "\"homeCrest\":\"https://api.betspapa.com/crests/id/38.png?v=abc\",\"awayCrest\":\"https://img.sofascore.com/x.png\"}]}";
+        WatchMatch fixture = MatchParser.parseUpcoming(upcoming).get(0);
+        assertEquals("https://api.betspapa.com/crests/id/38.png?v=abc", fixture.homeCrest);
+        assertEquals("", fixture.awayCrest);
+        String live = "{\"data\":[{\"name\":\"Premier League\",\"categoryName\":\"England\",\"events\":[{\"eventId\":\"sr:match:9\",\"homeTeamName\":\"Chelsea\",\"awayTeamName\":\"Leeds United\","
+            + "\"matchStatus\":\"H1\",\"status\":1,\"setScore\":\"1:0\",\"playedSeconds\":\"12:00\",\"homeCrest\":\"https://api.betspapa.com/crests/id/38.png?v=abc\",\"awayCrest\":\"http://plain.example/x.png\"}]}]}";
+        WatchMatch scored = MatchParser.parseLive(live).get(0);
+        assertEquals("https://api.betspapa.com/crests/id/38.png?v=abc", scored.homeCrest);
+        assertEquals("", scored.awayCrest);
+    }
 }

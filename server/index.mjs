@@ -21,6 +21,7 @@ import { fcmConfigured, pruneStaleDevices, sendTestPush, startPushWatch } from '
 import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './promo/service.mjs';
 import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
+import { crestStore, scheduleNightly } from './crestStore.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 
@@ -45,6 +46,32 @@ async function tinySelfTest() {
   return { ok: parsed, message: `Desk test ${coded.length ? `booked ${coded.join(', ')}` : 'returned no code'}. App view ${parsed ? 'parses' : 'failed'}.` };
 }
 forceLiveMode();
+const crests = crestStore();
+scheduleNightly(async () => {
+  try {
+    crests.prewarm(await loadUpcomingEvents(), { days: 7 });
+  } catch (error) {
+    console.error(`[crests] Nightly pre-warm failed: ${error instanceof Error ? error.message : error}`);
+  }
+});
+onEngineCycle(() => {
+  try {
+    crests.prewarm(getCachedEvents(), { days: 2 });
+  } catch {
+    /* the nightly pass still runs */
+  }
+});
+
+/** Board, search and live rows carry our own crest URL for each side. */
+function withCrests(events) {
+  crests.remember(events);
+  return events.map((event) => {
+    const homeCrest = crests.crestFor(event.homeId, event.home);
+    const awayCrest = crests.crestFor(event.awayId, event.away);
+    return homeCrest || awayCrest ? { ...event, homeCrest: homeCrest || undefined, awayCrest: awayCrest || undefined } : event;
+  });
+}
+
 const pushWatch = startPushWatch();
 let prunedTokens = 0;
 const guardian = createGuardian({
@@ -64,6 +91,8 @@ const guardian = createGuardian({
   selfTest: tinySelfTest,
   deviceCount: () => pushWatch.book.list().length,
   push: () => ({ ...pushWatch.stats(), pruned: prunedTokens }),
+  crests: () => crests.coverage({ hours: 48 }),
+  healCrests: () => crests.healMisses({ hours: 48 }),
   payloadBytes: () => gzippedBytes(appEngineState(getEngineState())),
   pruneDevices: async () => {
     prunedTokens = pruneStaleDevices(pushWatch.book);
@@ -231,7 +260,7 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname.startsWith('/api/admin/')) {
-    await handleAdminApi(req, res, url, { book: pushBook, alerts: pushAlerts, fcm: fcmConfigured });
+    await handleAdminApi(req, res, url, { book: pushBook, alerts: pushAlerts, fcm: fcmConfigured, crests });
     return;
   }
   if (url.pathname === '/api/devices/test') {
@@ -399,7 +428,7 @@ async function handleApi(req, res, url) {
         if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
         return response.json();
       });
-      send(req, res, 200, slimLivePayload(events), 'public, max-age=20');
+      send(req, res, 200, slimLivePayload(events, (id, name) => crests.crestFor(id, name)), 'public, max-age=20');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'In-play scores failed' });
     }
@@ -409,7 +438,7 @@ async function handleApi(req, res, url) {
     // Public fixture feed the Android app reads directly. Real fixtures only.
     try {
       const events = await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' });
-      const decorated = withOccurrence(events);
+      const decorated = withCrests(withOccurrence(events));
       send(req, res, 200, { source: 'betspapa', generatedAt: new Date().toISOString(), count: decorated.length, events: decorated }, 'public, max-age=60');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Fixture feed failed' });
@@ -438,7 +467,7 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
-      send(req, res, 200, { source: 'betspapa', events: withOccurrence(filtered) }, 'public, max-age=60');
+      send(req, res, 200, { source: 'betspapa', events: withCrests(withOccurrence(filtered)) }, 'public, max-age=60');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Fixture feed failed' });
     }
@@ -539,8 +568,35 @@ function redirectToSite(res) {
   res.end();
 }
 
+function serveCrest(req, res, pathname) {
+  if (pathname === '/crests/id/index.json') {
+    send(req, res, 200, crests.publicList(), 'public, max-age=300');
+    return true;
+  }
+  const match = pathname.match(/^\/crests\/id\/(\d{1,12})\.png$/);
+  if (!match) return false;
+  const file = crests.imagePath(match[1]);
+  if (!file) {
+    res.writeHead(404, { 'Cache-Control': 'public, max-age=300', 'Content-Length': 9, 'Access-Control-Allow-Origin': '*' });
+    res.end('Not found');
+    return true;
+  }
+  const size = statSync(file).size;
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Content-Length': size,
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Access-Control-Allow-Origin': '*',
+  });
+  if (req.method === 'HEAD') res.end();
+  else createReadStream(file).pipe(res);
+  noteRequest('/crests/id', 0, size);
+  return true;
+}
+
 function serveStatic(req, res, url) {
   const requested = decodeURIComponent(url.pathname);
+  if (requested.startsWith('/crests/id/') && serveCrest(req, res, requested)) return;
   const bundled = publicAsset(requested);
   if (bundled) {
     streamFile(res, bundled, requested);

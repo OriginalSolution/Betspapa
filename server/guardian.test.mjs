@@ -454,3 +454,19 @@ test('missing desk codes are rebooked with backoff and then left alone', async (
   await guardian.check();
   assert.deepEqual(calls, ['rebook']);
 });
+
+test('crest coverage below target is a warning with a crest retry, never an attention page', () => {
+  const low = evaluateChecks({
+    crests: { ready: true, tiers: { top: { teams: 20, withCrest: 17, pct: 85 }, all: { teams: 400, withCrest: 380, pct: 95 } } },
+  });
+  const row = low.checks.find((item) => item.id === 'crests');
+  assert.equal(row.ok, false);
+  assert.equal(row.level, 'warn');
+  assert.ok(low.actions.includes('crests'));
+  assert.ok(!low.checks.filter((item) => item.level === 'attention' && !item.ok).some((item) => item.id === 'crests'));
+  const good = evaluateChecks({
+    crests: { ready: true, tiers: { top: { teams: 20, withCrest: 20, pct: 100 }, all: { teams: 400, withCrest: 360, pct: 90 } } },
+  });
+  assert.equal(good.checks.find((item) => item.id === 'crests').ok, true);
+  assert.equal(evaluateChecks({}).checks.some((item) => item.id === 'crests'), false);
+});

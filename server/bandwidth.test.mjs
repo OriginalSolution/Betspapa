@@ -35,6 +35,7 @@ test('public reads name a short cache and crests stay immutable', () => {
   assert.equal(publicCacheControl('/api/fixtures', 200), 'public, max-age=60');
   assert.equal(publicCacheControl('/api/matches', 409), 'public, max-age=300');
   assert.equal(staticCacheControl('/crests/arsenal.png'), 'public, max-age=31536000, immutable');
+  assert.equal(staticCacheControl('/crests/crests.json'), 'public, max-age=300');
   assert.equal(etagMatches('W/"abc"', '"abc"'), true);
   assert.equal(etagMatches('"abc"', '"abc"'), true);
   assert.equal(etagMatches('W/"other"', '"abc"'), false);

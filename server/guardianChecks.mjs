@@ -21,6 +21,9 @@ const DESK_LABEL = {
   betpawa: 'betPawa',
 };
 
+export const CREST_TOP_TARGET = 95;
+export const CREST_ALL_TARGET = 85;
+
 export function isLiveMode(mode) {
   const value = String(mode || '').trim().toLowerCase();
   return value !== 'demo' && value !== 'simulated' && value !== 'simulation';
@@ -293,6 +296,18 @@ export function evaluateChecks(input = {}) {
       ? `The app board is ${Math.ceil(payloadBytes / 1024)}KB gzipped, over the 400KB limit.`
       : 'The app board is within 400KB gzipped.',
   ));
+
+  // Crest coverage for the next 48 hours. A warning, never a reason to page the
+  // AI fixer: the guardian retries the misses itself.
+  const crests = input.crests;
+  if (crests && crests.ready) {
+    const top = crests.tiers?.top || {};
+    const all = crests.tiers?.all || {};
+    const topOk = !top.teams || top.pct >= CREST_TOP_TARGET;
+    const allOk = !all.teams || all.pct >= CREST_ALL_TARGET;
+    const text = `Crests for the next 48 h: top leagues ${top.withCrest ?? 0}/${top.teams ?? 0}${top.teams ? ` (${top.pct}%)` : ''}, all teams ${all.withCrest ?? 0}/${all.teams ?? 0}${all.teams ? ` (${all.pct}%)` : ''}.`;
+    checks.push(check('crests', topOk && allOk, 'warn', topOk && allOk ? text : `${text} Below the ${CREST_TOP_TARGET}% / ${CREST_ALL_TARGET}% target. Retrying the misses.`, ['crests']));
+  }
 
   const attention = checks.filter((row) => !row.ok && row.level === 'attention');
   for (const row of checks) {

@@ -18,6 +18,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expandAlias, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog } from './crestResolve.mjs';
+import { crestStore } from './crestStore.mjs';
 import { isDummyId, isSimulated } from './upcoming.mjs';
 
 export const MIN_ODDS = 1.2;
@@ -114,6 +115,17 @@ export function crestUrlFor(name) {
   return `https://api.betspapa.com${file.startsWith('/') ? file : `/${file}`}`;
 }
 
+/** Our own crest copy by competitor id first, then the bundled catalogue by name. */
+function teamCrest(competitor, name) {
+  try {
+    const url = crestStore().crestFor(competitor, name);
+    if (url) return url;
+  } catch {
+    /* the bundled catalogue below still answers */
+  }
+  return crestUrlFor(name);
+}
+
 /**
  * Data-only FCM. A notification block makes Android draw a plain system card
  * and never calls onMessageReceived, so the Red Ticker would not run.
@@ -136,8 +148,8 @@ export function messageFor(note, device) {
     awayScore: match.awayScore == null ? '' : String(match.awayScore),
     minute: match.minute == null ? '' : String(match.minute),
     status: String(match.status || ''),
-    homeCrest: String(match.homeCrest || crestUrlFor(home)),
-    awayCrest: String(match.awayCrest || crestUrlFor(away)),
+    homeCrest: String(match.homeCrest || teamCrest(match.homeCompetitor, home)),
+    awayCrest: String(match.awayCrest || teamCrest(match.awayCompetitor, away)),
     competition: String(match.competition || ''),
     market: String(note.market || ''),
     marketLabel: String(note.marketLabel || ''),
