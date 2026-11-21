@@ -156,3 +156,20 @@ test('teams with no stored copy fall back to the bundled catalogue by name', () 
   assert.match(store.crestFor('', 'Arsenal') || store.crestFor('', 'Barcelona') || 'https://api.betspapa.com/crests/img/x.png', /^https:\/\/api\.betspapa\.com\/crests\//);
   assert.equal(store.crestFor('sr:competitor:1', 'Zzzz Nowhere Club 123'), '');
 });
+
+test('a Sportradar network error on the fast pass is retried in the slow pass', async () => {
+  let radarCalls = 0;
+  const { store } = makeStore([[/img\.sportradar\.com/, () => { radarCalls += 1; return radarCalls <= 2 ? response(503, '') : response(200, png()); }]]);
+  store.enqueue({ id: 'sr:competitor:44', name: 'Liverpool', country: 'England', competition: 'Premier League' });
+  await store.idle();
+  assert.equal(store.index.teams['44']?.source, 'sportradar');
+  assert.equal(store.index.misses['44'], undefined);
+});
+
+test('misses saved by an older image check are due again after an upgrade', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'crests-'));
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({ version: 1, teams: {}, overrides: {}, misses: { 44: { name: 'Liverpool', tries: 1, nextAt: Date.now() + 86_400_000 } } }));
+  const store = createCrestStore({ dir, log: () => {}, fetchImpl: async () => response(404, '') });
+  assert.equal(store.index.misses['44'].nextAt, 0);
+});

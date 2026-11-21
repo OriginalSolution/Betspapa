@@ -9,7 +9,8 @@ import { Resvg } from '@resvg/resvg-js';
 
 export const MAX_SIDE = 128;
 export const MIN_SIDE = 64;
-export const BLUR_LIMIT = 0.62;
+export const BLUR_LIMIT = 0.17;
+export const MIN_VISIBLE = 40;
 
 export function sniff(bytes) {
   if (!bytes || bytes.length < 12) return '';
@@ -160,6 +161,59 @@ export function clearBackdrop(img, color, tolerance = 36) {
   return { ...img, data };
 }
 
+function bilinear(small, width, height) {
+  const out = { width, height, data: new Uint8Array(width * height * 4) };
+  for (let y = 0; y < height; y += 1) {
+    const fy = Math.min(small.height - 1, Math.max(0, ((y + 0.5) * small.height) / height - 0.5));
+    const y0 = Math.floor(fy);
+    const y1 = Math.min(small.height - 1, y0 + 1);
+    const dy = fy - y0;
+    for (let x = 0; x < width; x += 1) {
+      const fx = Math.min(small.width - 1, Math.max(0, ((x + 0.5) * small.width) / width - 0.5));
+      const x0 = Math.floor(fx);
+      const x1 = Math.min(small.width - 1, x0 + 1);
+      const dx = fx - x0;
+      for (let c = 0; c < 4; c += 1) {
+        const top = small.data[(y0 * small.width + x0) * 4 + c] * (1 - dx) + small.data[(y0 * small.width + x1) * 4 + c] * dx;
+        const bottom = small.data[(y1 * small.width + x0) * 4 + c] * (1 - dx) + small.data[(y1 * small.width + x1) * 4 + c] * dx;
+        out.data[(y * width + x) * 4 + c] = top * (1 - dy) + bottom * dy;
+      }
+    }
+  }
+  return out;
+}
+
+function shades(img) {
+  const out = new Float64Array(img.width * img.height);
+  for (let p = 0; p < out.length; p += 1) {
+    const a = img.data[p * 4 + 3];
+    out[p] = ((0.299 * img.data[p * 4] + 0.587 * img.data[p * 4 + 1] + 0.114 * img.data[p * 4 + 2]) * a + 128 * (255 - a)) / 255;
+  }
+  return out;
+}
+
+/**
+ * Fine detail: how much of the picture is lost by halving it and scaling back,
+ * relative to its edges. Real badges score about 0.20 or more; a badge blown
+ * up from 32px or less scores about 0.15 or less.
+ */
+function detail(img, lum) {
+  if (img.width < 16) return 1;
+  const half = fitSquare(img, Math.max(8, Math.round(img.width / 2)));
+  const back = shades(bilinear(half, img.width, img.height));
+  const w = img.width;
+  let lost = 0;
+  let edges = 0;
+  for (let y = 1; y < img.height - 1; y += 1) {
+    for (let x = 1; x < w - 1; x += 1) {
+      const p = y * w + x;
+      lost += Math.abs(lum[p] - back[p]);
+      edges += Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + w] - lum[p - w]);
+    }
+  }
+  return edges ? lost / edges : 1;
+}
+
 /** Numbers the checks use; exported for tests and the admin view. */
 export function measure(img) {
   const { width, height, data } = img;
@@ -198,24 +252,7 @@ export function measure(img) {
   const coverage = total ? visible / total : 0;
   const disc = insideDisc > 0 && insideDiscVisible / insideDisc > 0.97 && outsideDiscVisible / Math.max(1, visible) < 0.02;
   const square = coverage > 0.97;
-  // Edge crispness: how much of a 4px-span step happens within 2px. Crisp
-  // edges score near 0.8+, an image upscaled from ~32px scores near 0.55.
-  const near = [];
-  const far = [];
-  for (let y = 2; y < height - 2; y += 1) {
-    for (let x = 2; x < width - 2; x += 1) {
-      const p = y * width + x;
-      const wide = Math.abs(lum[p + 2] - lum[p - 2]) + Math.abs(lum[p + 2 * width] - lum[p - 2 * width]);
-      if (wide < 40) continue;
-      far.push(wide);
-      near.push(Math.abs(lum[p + 1] - lum[p - 1]) + Math.abs(lum[p + width] - lum[p - width]));
-    }
-  }
-  near.sort((a, b) => a - b);
-  far.sort((a, b) => a - b);
-  const edges = far.length;
-  const sharpness = edges >= 20 ? near[Math.floor(edges * 0.9)] / far[Math.floor(edges * 0.9)] : 1;
-  return { width, height, coverage, colors: counts.length, topTwo, shape: disc ? 'disc' : square ? 'square' : 'other', sharpness, edges };
+  return { width, height, coverage, colors: counts.length, topTwo, shape: disc ? 'disc' : square ? 'square' : 'other', sharpness: detail(img, lum) };
 }
 
 /**
@@ -231,6 +268,7 @@ export function prepareCrest(bytes, { force = false, minSide = MIN_SIDE } = {}) 
     return { ok: false, reason: error instanceof Error ? error.message : 'decode failed' };
   }
   if (img.width <= 2 || img.height <= 2) return { ok: false, reason: 'placeholder (1x1)' };
+  if (Math.max(img.width, img.height) < minSide) return { ok: false, reason: `too small (${img.width}x${img.height})` };
   if (opaque(img)) {
     const color = flatBorder(img);
     if (color) img = clearBackdrop(img, color);
@@ -238,13 +276,13 @@ export function prepareCrest(bytes, { force = false, minSide = MIN_SIDE } = {}) 
   }
   img = trim(img);
   if (!img.width) return { ok: false, reason: 'empty image' };
-  if (Math.max(img.width, img.height) < minSide) return { ok: false, reason: `too small (${img.width}x${img.height})` };
+  if (Math.max(img.width, img.height) < MIN_VISIBLE) return { ok: false, reason: `too small (${img.width}x${img.height} visible)` };
   const fitted = fitSquare(img);
   const metrics = measure(fitted);
   if (metrics.coverage < 0.08) return { ok: false, reason: 'mostly empty', metrics };
   if (!force) {
     if ((metrics.shape === 'disc' || metrics.shape === 'square') && metrics.topTwo > 0.95) return { ok: false, reason: 'initials badge', metrics };
-    if (metrics.edges >= 20 && metrics.sharpness < BLUR_LIMIT) return { ok: false, reason: 'blurry', metrics };
+    if (metrics.sharpness < BLUR_LIMIT) return { ok: false, reason: 'blurry', metrics };
   }
   const png = PNG.sync.write({ width: fitted.width, height: fitted.height, data: Buffer.from(fitted.data) }, { colorType: 6 });
   return { ok: true, png, metrics, native: { width: img.width, height: img.height } };
