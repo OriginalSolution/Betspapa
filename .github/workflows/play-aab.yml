@@ -25,6 +25,15 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Read version from build.gradle
+        id: version
+        run: |
+          set -euo pipefail
+          CODE=$(grep -m1 -o 'versionCode [0-9]*' android/app/build.gradle | awk '{print $2}')
+          NAME=$(grep -m1 -o 'versionName "[^"]*"' android/app/build.gradle | cut -d'"' -f2)
+          grep -q "APP_VERSION = '$NAME'" src/lib/appVersion.ts || { echo "src/lib/appVersion.ts does not say $NAME"; exit 1; }
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
       - run: npm run build
       - run: npx cap sync android
       - name: Unit tests
@@ -54,8 +63,8 @@ jobs:
           curl -sSL -o bundletool.jar https://github.com/google/bundletool/releases/download/1.17.2/bundletool-all-1.17.2.jar
           MANIFEST=$(java -jar bundletool.jar dump manifest --bundle "$AAB")
           echo "$MANIFEST" | grep -o 'android:versionCode="[0-9]*"\|android:versionName="[^"]*"\|android:targetSdkVersion="[0-9]*"' | sort -u
-          echo "$MANIFEST" | grep -q 'android:versionCode="34"'
-          echo "$MANIFEST" | grep -q 'android:versionName="0.4.11"'
+          echo "$MANIFEST" | grep -q 'android:versionCode="${{ steps.version.outputs.code }}"'
+          echo "$MANIFEST" | grep -q 'android:versionName="${{ steps.version.outputs.name }}"'
           TARGET=$(echo "$MANIFEST" | grep -o 'android:targetSdkVersion="[0-9]*"' | grep -o '[0-9]*')
           test "$TARGET" -ge 35
           if echo "$MANIFEST" | grep -q 'USE_EXACT_ALARM'; then echo "USE_EXACT_ALARM must not ship to Play"; exit 1; fi
@@ -67,7 +76,7 @@ jobs:
           sha256sum "$AAB"
       - uses: actions/upload-artifact@v4
         with:
-          name: betspapa-0.4.11-vc34-aab
+          name: betspapa-${{ steps.version.outputs.name }}-vc${{ steps.version.outputs.code }}-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 30
