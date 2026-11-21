@@ -1,6 +1,6 @@
 # Google Play: permissions and declarations for 0.4.11 (versionCode 34)
 
-The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.yml`), signed with the same key as v0.4.10. On Play this key is the **upload key**; use Play App Signing.
+The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.yml`), signed with the private Play **upload key** (GitHub secrets `PLAY_UPLOAD_*`; certificate SHA-256 `D0:B4:D5:86:87:33:F9:3E:05:50:77:FB:47:27:E4:D5:28:D4:25:65:D9:8C:7C:13:A5:8E:F7:84:3B:3C:A5:E7`). The original v0.4.10 key is exported to Play App Signing with PEPK, so Play installs and GitHub APK installs share one app signature.
 
 ## Declarations Play Console will ask for
 
@@ -22,5 +22,5 @@ The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.
 - **Ads:** none. **Target audience:** adults (it covers betting markets and booking codes). Expect the gambling-related content questions in the content rating form.
 
 ## Flags
-- The upload keystore `android/betspapa-release.keystore` is committed with the public sideload password from the README. Play App Signing protects the key users receive, but anyone with the repo can sign as the upload key. Consider registering a new private upload key (Play Console → App integrity → Request upload key reset) before production.
+- The original app signing keystore was removed from the repository and the README on 21 Nov 2026, and is now read from secrets. It and its password remain in older git history of this public repo.
 - `TestAlertReceiver` is exported without a permission so adb QC can trigger a test card. Any installed app could fire a harmless test notification. Consider making it non-exported for the Play build.
