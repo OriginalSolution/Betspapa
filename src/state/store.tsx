@@ -5,8 +5,7 @@ import { followedNotices, staleAlertIds } from '../lib/alerts';
 import { decorateMatches, goalEventMinute, loadGoalBook, mergeNativeMarkers, paintGoals, saveGoalBook } from '../lib/goalMinutes';
 import { flushWatch, mergeInbox, pullWatch, stageWatch } from '../lib/deviceWatch';
 import { catalogUrls, loadCrestCatalog } from '../lib/crestCatalog';
-import { lookupCrestChain } from '../lib/crestLive';
-import { crestKey, resolveCrests } from '../lib/crests';
+import { cachedCrest, crestKey } from '../lib/crests';
 import { chooseFixtures, loadFixtureCache, saveFixtureCache } from '../lib/fixtureCache';
 import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
@@ -423,17 +422,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         crestRef.current = { ...seeded, ...crestRef.current };
         dispatch({ type: 'crests', crests: crestRef.current });
       }
-      const pending = names.filter((team) => !crestRef.current[crestKey(team.name)]);
-      await resolveCrests(
-        pending,
-        (found) => {
-          if (stop) return;
-          crestRef.current = { ...crestRef.current, ...found };
-          dispatch({ type: 'crests', crests: crestRef.current });
-        },
-        fetch,
-        lookupCrestChain,
-      );
+      // No per-phone lookups any more: the server sends each crest with the
+      // fixture. Badges this phone already saved still fill old rows.
+      const saved: Record<string, string> = {};
+      for (const team of names) {
+        const key = crestKey(team.name);
+        if (crestRef.current[key]) continue;
+        const url = cachedCrest(team.name);
+        if (url) saved[key] = url;
+      }
+      if (Object.keys(saved).length) {
+        crestRef.current = { ...crestRef.current, ...saved };
+        dispatch({ type: 'crests', crests: crestRef.current });
+      }
     })();
     return () => {
       stop = true;

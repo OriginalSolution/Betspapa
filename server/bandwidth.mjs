@@ -38,6 +38,8 @@ export function etagMatches(header, etag) {
 }
 
 export function staticCacheControl(pathname) {
+  // Lists change; only the image files are safe to freeze.
+  if (pathname.endsWith('.json')) return 'public, max-age=300';
   if (pathname.startsWith('/crests/') || pathname.startsWith('/bookies/') || pathname.startsWith('/icons/') || pathname.startsWith('/assets/')) {
     return 'public, max-age=31536000, immutable';
   }

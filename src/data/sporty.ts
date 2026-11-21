@@ -12,6 +12,9 @@ export type SportyEvent = {
   odds?: Record<string, number> | null;
   occurrence?: Array<{ market: string; hits: number; sample: number; rate: number }>;
   url?: string;
+  /** Our own crest copy, from the server's crest list (absolute URL). */
+  homeCrest?: string;
+  awayCrest?: string;
 };
 
 const PALETTE = ['#e11d2e', '#3d7eff', '#f0c94a', '#21a366', '#a855f7', '#ff7a45', '#14b8a6', '#6366f1', '#84cc16', '#6cabdd'];
@@ -32,9 +35,15 @@ function abbr(name: string): string {
   return name.slice(0, 3).toUpperCase();
 }
 
-function team(name: string): Team {
+function serverCrest(url: unknown): string | null {
+  if (typeof url !== 'string' || !/^https:\/\//i.test(url)) return null;
+  return /sofascore|sportybet/i.test(url) ? null : url;
+}
+
+function team(name: string, crest?: unknown): Team {
   const id = slug(name);
-  return { id, name, shortName: name, abbr: abbr(name), color: hashColor(name) };
+  const badge = serverCrest(crest);
+  return { id, name, shortName: name, abbr: abbr(name), color: hashColor(name), ...(badge ? { crest: badge } : {}) };
 }
 
 function priority(tournament: string, country: string): number {
@@ -68,8 +77,8 @@ export function mapSportyEvent(event: SportyEvent): Match {
     status: 'scheduled',
     minute: null,
     injuryTime: null,
-    home: team(event.home),
-    away: team(event.away),
+    home: team(event.home, event.homeCrest),
+    away: team(event.away, event.awayCrest),
     homeScore: null,
     awayScore: null,
     htHome: null,

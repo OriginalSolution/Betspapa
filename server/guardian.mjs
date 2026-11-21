@@ -245,6 +245,7 @@ export function createGuardian(options = {}) {
       sentOk: push.sentOk,
       sentError: push.sentError,
       pruned: Number(push.pruned) || 0,
+      crests: options.crests ? safeCall(options.crests) : null,
       payloadBytes: booking && heldVerdict ? 0 : (options.payloadBytes ? options.payloadBytes() : gzippedBytes(appEngineState(state))),
     });
     if (options.needsRepair?.() && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
@@ -252,6 +253,14 @@ export function createGuardian(options = {}) {
     heldAt = Date.now();
     heldWhile = booking ? 'booking' : 'idle';
     return verdict;
+  }
+
+  function safeCall(fn) {
+    try {
+      return fn();
+    } catch {
+      return null;
+    }
   }
 
   async function heal(verdict) {
@@ -313,6 +322,13 @@ export function createGuardian(options = {}) {
       if (invalid.length && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
       lastCheckAt = nowFn().toISOString();
       let fixes = [];
+      if (verdict.actions.includes('crests') && options.healCrests) {
+        const retried = Number(safeCall(options.healCrests)) || 0;
+        if (retried) {
+          const row = verdict.checks.find((item) => item.id === 'crests');
+          logIncident({ code: 'crests', level: 'warn', message: row?.message || 'Crest coverage is below target.', fixed: false, fix: `Queued ${retried} missing crests for another lookup.` });
+        }
+      }
       if (!verdict.ok || verdict.actions.includes('rebook') || verdict.actions.includes('switch-live')) {
         try {
           fixes = await heal(verdict);

@@ -1,7 +1,7 @@
 /** The live catalogue sends every market. The board only reads these lines. */
 const KEEP = new Set(['1', '10', '11', '18', '19', '20', '29', '60', '68']);
 
-export function slimLivePayload(body) {
+export function slimLivePayload(body, crestFor = null) {
   if (!body || typeof body !== 'object' || !Array.isArray(body.data)) return body;
   const data = [];
   for (const tournament of body.data) {
@@ -33,6 +33,10 @@ export function slimLivePayload(body) {
         sport: event.sport,
         fixtureVenue: event.fixtureVenue,
         varReview: event.varReview,
+        homeTeamId: event.homeTeamId,
+        awayTeamId: event.awayTeamId,
+        homeCrest: crestFor ? crestFor(event.homeTeamId, event.homeTeamName) || undefined : undefined,
+        awayCrest: crestFor ? crestFor(event.awayTeamId, event.awayTeamName) || undefined : undefined,
         timeline: event.timeline,
         incidents: event.incidents,
         comments: event.comments,

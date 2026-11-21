@@ -29,3 +29,11 @@ test('the live payload keeps scores and the lines the board reads', () => {
   assert.deepEqual(event.markets.map((market) => String(market.id)), ['1']);
   assert.ok(Buffer.byteLength(JSON.stringify(slim)) < 800);
 });
+
+test('live rows carry our crest URL by team id when a lookup is given', () => {
+  const body = { data: [{ name: 'Premier League', categoryName: 'England', events: [{ eventId: 'sr:match:1', homeTeamName: 'Chelsea', awayTeamName: 'Leeds United', homeTeamId: 'sr:competitor:38', awayTeamId: 'sr:competitor:34', markets: [] }] }] };
+  const slim = slimLivePayload(body, (id) => (id === 'sr:competitor:38' ? 'https://api.betspapa.com/crests/id/38.png?v=abc' : ''));
+  const event = slim.data[0].events[0];
+  assert.equal(event.homeCrest, 'https://api.betspapa.com/crests/id/38.png?v=abc');
+  assert.equal(event.awayCrest, undefined);
+});

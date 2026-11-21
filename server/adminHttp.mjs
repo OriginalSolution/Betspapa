@@ -227,6 +227,46 @@ export async function handleAdminApi(req, res, url, ctx) {
     }
     return true;
   }
+  if (url.pathname === '/api/admin/crests' && req.method === 'GET' && ctx.crests) {
+    sendJson(res, 200, ctx.crests.adminView());
+    return true;
+  }
+  if (url.pathname === '/api/admin/crests/override' && req.method === 'POST' && ctx.crests) {
+    let body;
+    try {
+      body = JSON.parse((await readRaw(req, 3_000_000)) || '{}');
+    } catch {
+      sendJson(res, 400, { error: 'Crest override must be JSON.' });
+      return true;
+    }
+    let bytes = null;
+    const image = typeof body.image === 'string' ? body.image : '';
+    if (image) {
+      const match = image.match(/^data:image\/(png|jpeg|jpg|svg\+xml|webp);base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) {
+        sendJson(res, 400, { error: 'Upload a PNG, JPEG or SVG file.' });
+        return true;
+      }
+      bytes = Buffer.from(match[2], 'base64');
+    }
+    const result = await ctx.crests.setOverride(String(body.id || ''), {
+      url: typeof body.url === 'string' ? body.url.trim() : '',
+      bytes,
+      name: typeof body.name === 'string' ? body.name.slice(0, 120) : '',
+      force: body.force === true,
+    });
+    sendJson(res, result.error ? 400 : 200, result);
+    return true;
+  }
+  const crestClear = url.pathname.match(/^\/api\/admin\/crests\/override\/([^/]+)$/);
+  if (crestClear && req.method === 'DELETE' && ctx.crests) {
+    sendJson(res, ctx.crests.clearOverride(decodeURIComponent(crestClear[1])) ? 200 : 404, { ok: true });
+    return true;
+  }
+  if (url.pathname === '/api/admin/crests/retry' && req.method === 'POST' && ctx.crests) {
+    sendJson(res, 200, { ok: true, queued: ctx.crests.healMisses({ hours: 48, force: true }) });
+    return true;
+  }
   if (url.pathname === '/api/admin/promos' && req.method === 'GET') {
     sendJson(res, 200, listPromos());
     return true;
@@ -295,7 +335,7 @@ export async function handleAdminApi(req, res, url, ctx) {
     sendJson(res, result.status || (result.error ? 502 : 200), { ok: !result.error, error: result.error || null });
     return true;
   }
-  if (req.method !== 'GET' && req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
     sendJson(res, 405, { error: 'Method not allowed' });
     return true;
   }
