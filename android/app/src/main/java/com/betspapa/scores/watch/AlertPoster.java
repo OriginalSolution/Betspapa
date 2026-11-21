@@ -289,6 +289,12 @@ public final class AlertPoster {
         boolean soundOn = wantsSound(note.kind, goalSound, note.disallowed, preview, sounds);
         String channel = soundOn ? channelFor(note.kind, goalSound, preview, sounds) : GOAL_OFF;
         int id = replaceId != 0 ? replaceId : AlertPlanner.notificationId(note.id);
+        if (note.disallowed && replaceId == 0 && note.replaces != null && !note.replaces.isEmpty()) {
+            // VAR took the goal back: take the goal card off the shade and put a silent Disallowed card in its place.
+            id = AlertPlanner.notificationId(note.replaces);
+            NotificationManagerCompat.from(context).cancel(note.replaces, id);
+            NotificationManagerCompat.from(context).cancel(id);
+        }
         if ("goal".equals(note.kind) && replaceId == 0) {
             VarSlots.Slot slot = VarSlots.take(context, note.matchId);
             if (slot != null) {

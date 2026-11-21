@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { priceInRange } from './oddsRange.mjs';
 import { cleanCountry } from './geo.mjs';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expandAlias, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog } from './crestResolve.mjs';
@@ -33,6 +33,17 @@ const LIVE_HEADERS = {
  * Google reported success and the shade stayed empty.
  */
 export const PUSH_TTL = '3600s';
+
+/**
+ * A goal that reaches the phone 50 minutes late is noise, so live events expire
+ * sooner than a trend hit. The phone also drops a live card that arrives stale.
+ */
+export function ttlFor(kind) {
+  if (kind === 'goal' || kind === 'var' || kind === 'red' || kind === 'penalty') return '900s';
+  if (kind === 'kickoff' || kind === 'ht') return '900s';
+  if (kind === 'ft') return '1800s';
+  return PUSH_TTL;
+}
 
 export function fcmConfigured(env = process.env) {
   const account = serviceAccount(env);
@@ -136,13 +147,16 @@ export function messageFor(note, device) {
     image: String(note.image || ''),
     route: String(note.route || ''),
     code: String(note.code || ''),
+    disallowed: note.disallowed ? '1' : '',
+    replaces: String(note.replaces || ''),
+    sentAt: String(note.sentAt || Date.now()),
   };
   return {
     message: {
       token: device.token,
       android: {
         priority: 'HIGH',
-        ttl: PUSH_TTL,
+        ttl: ttlFor(note.kind),
       },
       data,
     },
@@ -292,32 +306,84 @@ export function normalizeLive(payload) {
   return matches;
 }
 
+/** A kick-off seen for the first time this late is not news. The phone would get it mid-match. */
+export const KICKOFF_FRESH_MINUTES = 5;
+
+/** Goal ids. A goal VAR took back bumps the revision so the re-scored goal still alerts. */
+export function goalNoteId(matchId, side, index, rev = 0) {
+  const base = `${matchId}:goal:${side}:${index}`;
+  return rev > 0 ? `${base}:r${rev}` : base;
+}
+
+function revsOf(row) {
+  const revs = row && row.revs && typeof row.revs === 'object' ? row.revs : {};
+  return {
+    home: { ...(revs.home && typeof revs.home === 'object' ? revs.home : {}) },
+    away: { ...(revs.away && typeof revs.away === 'object' ? revs.away : {}) },
+  };
+}
+
+function kickoffNote(match) {
+  return { id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match };
+}
+
+/**
+ * Notes for what changed between two polls. `next` rows gain a `revs` map so a
+ * cancelled goal's revision is carried into the stored baseline.
+ */
 export function diffMatches(previous, next) {
   const prior = new Map((previous || []).map((match) => [match.id, match]));
   const notes = [];
   for (const match of next || []) {
     const before = prior.get(match.id);
     if (!before) {
-      if (match.status === 'live' || match.status === 'halftime') {
-        notes.push({ id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match });
-      }
+      const fresh = match.minute == null || (Number.isFinite(match.minute) && match.minute <= KICKOFF_FRESH_MINUTES);
+      if (match.status === 'live' && fresh) notes.push(kickoffNote(match));
       continue;
     }
+    const revs = revsOf(before);
+    match.revs = revs;
     if ((before.status === 'scheduled' || !before.status) && (match.status === 'live' || match.status === 'halftime')) {
-      notes.push({ id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match });
+      notes.push(kickoffNote(match));
     }
-    const homeDelta = match.homeScore - (before.homeScore || 0);
-    const awayDelta = match.awayScore - (before.awayScore || 0);
-    for (let index = 1; index <= homeDelta; index += 1) {
-      const n = (before.homeScore || 0) + index;
-      notes.push({ id: `${match.id}:goal:home:${n}`, matchId: match.id, kind: 'goal', title: `Goal · ${match.home}`, body: `${match.home} score · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
+    for (const side of ['home', 'away']) {
+      const team = side === 'home' ? match.home : match.away;
+      const was = Number(before[`${side}Score`]) || 0;
+      const now = Number(match[`${side}Score`]) || 0;
+      if (now < was) {
+        // The feed took a goal back. That is a VAR (or data) correction, never a new goal.
+        for (let index = was; index > now; index -= 1) {
+          const rev = Number(revs[side][index]) || 0;
+          const goalId = goalNoteId(match.id, side, index, rev);
+          notes.push({
+            id: `${goalId}:cancelled`,
+            matchId: match.id,
+            kind: 'var',
+            title: `VAR · ${team}`,
+            body: `Goal disallowed · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`,
+            disallowed: true,
+            replaces: goalId,
+            match,
+          });
+          revs[side][index] = rev + 1;
+        }
+        continue;
+      }
+      for (let index = was + 1; index <= now; index += 1) {
+        const rev = Number(revs[side][index]) || 0;
+        notes.push({
+          id: goalNoteId(match.id, side, index, rev),
+          matchId: match.id,
+          kind: 'goal',
+          title: `Goal · ${team}`,
+          body: `${team} score · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`,
+          match,
+        });
+      }
     }
-    for (let index = 1; index <= awayDelta; index += 1) {
-      const n = (before.awayScore || 0) + index;
-      notes.push({ id: `${match.id}:goal:away:${n}`, matchId: match.id, kind: 'goal', title: `Goal · ${match.away}`, body: `${match.away} score · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
-    }
-    if (before.status !== 'halftime' && before.status !== 'finished' && (match.status === 'halftime' || match.status === 'finished')) {
-      notes.push({ id: `${match.id}:ht`, matchId: match.id, kind: 'ht', title: 'Half-time', body: `${match.home} vs ${match.away}`, match });
+    // Half-time only when the feed actually shows the break. A match first seen as finished is not half-time.
+    if (before.status !== 'halftime' && before.status !== 'finished' && match.status === 'halftime') {
+      notes.push({ id: `${match.id}:ht`, matchId: match.id, kind: 'ht', title: 'Half-time', body: `${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
     }
     if (before.status !== 'finished' && match.status === 'finished') {
       notes.push({ id: `${match.id}:ft`, matchId: match.id, kind: 'ft', title: 'Full-time', body: `${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
@@ -327,12 +393,14 @@ export function diffMatches(previous, next) {
       if (seen.has(incident.key)) continue;
       const team = incident.side === 'away' ? match.away : match.home;
       const title = incident.type === 'red' ? 'Red card' : incident.type === 'penalty' ? 'Penalty' : 'VAR';
+      const player = incident.player || title;
       notes.push({
-        id: `${match.id}:${incident.type}:${incident.side}:${incident.minute}`,
+        // Same id the phone's own watcher builds, so the two never post the same card twice.
+        id: `${match.id}:${incident.type}:${incident.side}:${incident.minute}:${player}`,
         matchId: match.id,
         kind: incident.type,
         title: `${title} · ${team}`,
-        body: `${incident.player || title} ${incident.minute}′ · ${match.home} vs ${match.away}`,
+        body: `${player} ${incident.minute}′ · ${match.home} vs ${match.away}`,
         match,
       });
     }
@@ -348,6 +416,45 @@ export function diffMatches(previous, next) {
     }
   }
   return notes;
+}
+
+/** How long a live row may be missing from the feed before it is forgotten. */
+export const CARRY_MS = 12 * 60 * 1000;
+
+/**
+ * The live list sometimes drops a match for a poll or two, and it never lists
+ * a finished match. Keep the last row for a while so the next poll still has
+ * something to diff against instead of losing goals or re-sending kick-off.
+ */
+export function carryForward(previous, next, now = Date.now()) {
+  const ids = new Set((next || []).map((match) => match.id));
+  const out = [...(next || [])];
+  for (const row of previous || []) {
+    if (!row || ids.has(row.id)) continue;
+    if (row.status !== 'live' && row.status !== 'halftime') continue;
+    const since = Number(row.missingSince) || now;
+    if (now - since > CARRY_MS) continue;
+    out.push({ ...row, missingSince: since });
+  }
+  return out;
+}
+
+/**
+ * A followed match that left the live list late in the second half has usually
+ * ended. `detail` is SportyBet's own event row; only its final status is trusted.
+ */
+export function finishedFromDetail(row, detail) {
+  if (!row || !detail || typeof detail !== 'object') return null;
+  const status = liveStatus(detail.matchStatus, detail.status);
+  if (status !== 'finished') return null;
+  const score = pair(detail.setScore);
+  return {
+    ...row,
+    status: 'finished',
+    homeScore: score ? score[0] : row.homeScore,
+    awayScore: score ? score[1] : row.awayScore,
+    missingSince: undefined,
+  };
 }
 
 function clubKey(name) {
@@ -573,7 +680,16 @@ export function createDeviceBook(dir) {
       };
       delete device.ip;
       delete device.address;
-      devices = [device, ...devices.filter((item) => item.token !== device.token)].slice(0, 5000);
+      // A refreshed FCM token replaces the old one. The phone names it so the old token is not left to fail.
+      const previous = typeof body?.previousToken === 'string' ? body.previousToken.trim() : '';
+      const replaced = previous && previous !== device.token ? devices.find((item) => item.token === previous) : null;
+      if (replaced) {
+        device.sent = [...new Set([...(device.sent || []), ...(replaced.sent || [])])].slice(0, 400);
+        if (body?.follows == null && replaced.follows) device.follows = replaced.follows;
+        if (body?.trends == null && replaced.trends) device.trends = replaced.trends;
+        device.firstSeenAt = replaced.firstSeenAt || device.firstSeenAt;
+      }
+      devices = [device, ...devices.filter((item) => item.token !== device.token && item.token !== previous)].slice(0, 5000);
       save();
       return { ok: true, push: fcmConfigured() };
     },
@@ -624,6 +740,22 @@ async function googleToken(account) {
   return accessToken;
 }
 
+/**
+ * FCM answers 404 UNREGISTERED for an uninstalled app, 400 INVALID_ARGUMENT for a
+ * malformed token, and 403 SENDER_ID_MISMATCH for a token from another project.
+ * Each is permanent, so the token is removed instead of failing every goal.
+ */
+export function tokenIsDead(status, body) {
+  if (status === 404 || status === 410) return true;
+  const error = body && typeof body.error === 'object' ? body.error : {};
+  const details = Array.isArray(error.details) ? error.details : [];
+  const codes = details.map((item) => String(item?.errorCode || '')).filter(Boolean);
+  if (codes.includes('UNREGISTERED') || codes.includes('SENDER_ID_MISMATCH')) return true;
+  if (status === 403 && String(error.status || '') === 'PERMISSION_DENIED' && codes.includes('SENDER_ID_MISMATCH')) return true;
+  if (status === 400 && /registration token/i.test(String(error.message || ''))) return true;
+  return false;
+}
+
 export async function sendMessage(account, payload) {
   const token = await googleToken(account);
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`, {
@@ -638,10 +770,12 @@ export async function sendMessage(account, payload) {
   } catch {
     body = { error: { message: 'FCM response was not JSON' } };
   }
-  if (response.status === 404 || response.status === 410) return { dropped: true, ok: false, status: response.status, body };
+  if (tokenIsDead(response.status, body)) return { dropped: true, ok: false, status: response.status, body };
   if (!response.ok) {
     const error = new Error(`FCM returned ${response.status}`);
     error.fcm = publicFcm(body);
+    error.status = response.status;
+    error.retryable = response.status === 429 || response.status >= 500;
     throw error;
   }
   return { dropped: false, ok: true, status: response.status, body };
@@ -799,14 +933,20 @@ export function baselinePath(dir) {
 }
 
 /** Last scores the watcher compared. A restart reads this instead of treating the next poll as the first. */
-export function readScoreBaseline(dir) {
+export function readScoreBaseline(dir, { maxAgeMs = BASELINE_MAX_AGE_MS, now = Date.now() } = {}) {
   try {
-    const parsed = JSON.parse(readFileSync(baselinePath(dir), 'utf8'));
+    const file = baselinePath(dir);
+    // After a long outage the stored scores are too old to diff. Goals from then would land as stale alerts.
+    if (maxAgeMs > 0 && now - statSync(file).mtimeMs > maxAgeMs) return null;
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
     return Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
   }
 }
+
+/** A restart or deploy within this window still sends the goals it missed. Older baselines are re-seeded silently. */
+export const BASELINE_MAX_AGE_MS = 8 * 60 * 1000;
 
 export function writeScoreBaseline(dir, matches) {
   mkdirSync(dir, { recursive: true });
@@ -824,6 +964,8 @@ export function writeScoreBaseline(dir, matches) {
     htAway: match.htAway,
     incidents: Array.isArray(match.incidents) ? match.incidents : [],
     varReview: match.varReview || null,
+    revs: match.revs || undefined,
+    missingSince: match.missingSince || undefined,
   }));
   writeFileSync(baselinePath(dir), JSON.stringify(slim));
 }
@@ -876,6 +1018,37 @@ async function readLiveFeed(fetchImpl, { timeoutMs = 45_000, allowCurl = false }
   }
 }
 
+export const RETRY_LIMIT = 3;
+export const RETRY_WINDOW_MS = 5 * 60 * 1000;
+
+/** Match ids any phone follows directly, by team, or through a followed trend. */
+export function watchedMatchIds(devices, matches) {
+  const ids = new Set();
+  for (const device of devices || []) {
+    for (const id of device?.follows?.matches || []) ids.add(id);
+    for (const trend of device?.trends || []) {
+      const cut = String(trend).lastIndexOf(':');
+      if (cut > 0) ids.add(String(trend).slice(0, cut));
+    }
+    for (const match of matches || []) {
+      if ((device?.follows?.teams || []).some((team) => teamFollows(team, match))) ids.add(match.id);
+    }
+  }
+  return ids;
+}
+
+const EVENT_DETAIL = 'https://www.sportybet.com/api/gh/factsCenter/event?eventId=';
+
+async function readEventDetail(fetchImpl, eventId) {
+  const response = await fetchImpl(`${EVENT_DETAIL}${encodeURIComponent(eventId)}`, {
+    headers: LIVE_HEADERS,
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`Event detail returned ${response.status}`);
+  const json = await response.json();
+  return json && typeof json.data === 'object' ? json.data : null;
+}
+
 export function startPushWatch(options = {}) {
   const dir = options.dir || process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
   const env = options.env || process.env;
@@ -884,7 +1057,40 @@ export function startPushWatch(options = {}) {
   const alerts = options.alerts || createAlertLog(dir);
   const log = options.log || ((message) => console.log(`[push] ${message}`));
   const intervalMs = options.intervalMs ?? 25_000;
-  let baseline = readScoreBaseline(dir);
+  const clock = options.now || (() => Date.now());
+  let baseline = readScoreBaseline(dir, { now: clock() });
+  let baselineAt = clock();
+  let pending = [];
+  const detailFetch = options.detailImpl || ((id) => readEventDetail(options.fetchImpl || fetch, id));
+  const checkedGone = new Map();
+
+  /** Rows that left the live list late in the game: ask SportyBet once whether they ended. */
+  async function settleVanished(matches, fresh) {
+    const liveIds = new Set(fresh.map((row) => row.id));
+    const watched = watchedMatchIds(book.list(), matches);
+    const out = [];
+    for (const row of matches) {
+      if (liveIds.has(row.id) || !row.missingSince || !watched.has(row.id)) {
+        out.push(row);
+        continue;
+      }
+      const lateGame = row.status === 'live' && Number.isFinite(row.minute) && row.minute >= 80;
+      const last = checkedGone.get(row.id) || 0;
+      if (!lateGame || clock() - last < 60_000) {
+        out.push(row);
+        continue;
+      }
+      checkedGone.set(row.id, clock());
+      try {
+        const ended = finishedFromDetail(row, await detailFetch(row.id));
+        out.push(ended || row);
+      } catch {
+        out.push(row);
+      }
+    }
+    for (const [id, at] of checkedGone) if (clock() - at > CARRY_MS * 2) checkedGone.delete(id);
+    return out;
+  }
   let warned = false;
   let announced = false;
   let curlAnnounced = false;
@@ -936,21 +1142,28 @@ export function startPushWatch(options = {}) {
       log(`Live feed failed: ${message}`);
       return;
     }
-    const matches = normalizeLive(payload);
-    if (!baseline) {
-      baseline = matches;
+    const now = clock();
+    const fresh = normalizeLive(payload);
+    if (!baseline || now - baselineAt > BASELINE_MAX_AGE_MS) {
+      // First look, or the last good poll is too old: store scores without alerting on stale changes.
+      baseline = fresh;
+      baselineAt = now;
+      pending = [];
       try {
-        writeScoreBaseline(dir, matches);
+        writeScoreBaseline(dir, fresh);
       } catch (error) {
         log(`Could not store the score baseline: ${error instanceof Error ? error.message : error}`);
       }
       return;
     }
+    let matches = carryForward(baseline, fresh, now);
+    matches = await settleVanished(matches, fresh);
     const notes = diffMatches(baseline, matches);
     const previous = baseline;
-    baseline = matches;
+    baseline = matches.filter((row) => row.status !== 'finished');
+    baselineAt = now;
     try {
-      writeScoreBaseline(dir, matches);
+      writeScoreBaseline(dir, baseline);
     } catch (error) {
       log(`Could not store the score baseline: ${error instanceof Error ? error.message : error}`);
     }
@@ -959,31 +1172,45 @@ export function startPushWatch(options = {}) {
     let sentOk = 0;
     let sentError = 0;
     let matched = 0;
+    const queue = [];
+    // Retries first: a 429 or 5xx from the last poll is still worth sending while it is fresh.
+    for (const row of pending) {
+      if (now - row.at > RETRY_WINDOW_MS || row.attempts >= RETRY_LIMIT) continue;
+      const device = book.list().find((item) => item.token === row.token);
+      if (device) queue.push({ device, item: row.item, attempts: row.attempts, at: row.at });
+    }
+    pending = [];
     for (const device of book.list()) {
       const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
       if (mine.length) matched += 1;
-      for (const item of mine) {
-        if (book.alreadySent(device.token, item.id)) continue;
-        try {
-          const result = await deliver(account, messageFor(item, device));
-          const fcm = publicFcm(result.body);
-          if (result.dropped) {
-            sentError += 1;
-            book.drop(device.token);
-            log(`FCM response ${result.status} ${JSON.stringify(fcm)}`);
-          } else {
-            sentOk += 1;
-            book.remember(device.token, item.id);
-            if (!logged.has(item.id)) {
-              logged.add(item.id);
-              alerts.record(item);
-            }
-          }
-        } catch (error) {
+      for (const item of mine) queue.push({ device, item: { ...item, sentAt: now }, attempts: 0, at: now });
+    }
+    const dropped = new Set();
+    for (const { device, item, attempts, at } of queue) {
+      if (dropped.has(device.token)) continue;
+      if (book.alreadySent(device.token, item.id)) continue;
+      try {
+        const result = await deliver(account, messageFor(item, device));
+        const fcm = publicFcm(result.body);
+        if (result.dropped) {
           sentError += 1;
-          const fcm = error && error.fcm ? ` ${JSON.stringify(error.fcm)}` : '';
-          log(`Push failed: ${error instanceof Error ? error.message : error}${fcm}`);
+          dropped.add(device.token);
+          book.drop(device.token);
+          log(`FCM dropped a dead token: ${result.status} ${JSON.stringify(fcm)}`);
+        } else {
+          sentOk += 1;
+          book.remember(device.token, item.id);
+          if (!logged.has(item.id)) {
+            logged.add(item.id);
+            alerts.record(item);
+          }
         }
+      } catch (error) {
+        sentError += 1;
+        const fcm = error && error.fcm ? ` ${JSON.stringify(error.fcm)}` : '';
+        const retry = !error || error.retryable !== false;
+        if (retry) pending.push({ token: device.token, item, attempts: attempts + 1, at });
+        log(`Push failed${retry ? ' (will retry)' : ''}: ${error instanceof Error ? error.message : error}${fcm}`);
       }
     }
     if (sentOk || sentError) {
