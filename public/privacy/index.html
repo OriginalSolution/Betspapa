@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07080c" />
+    <title>Privacy policy · Betspapa</title>
+    <meta name="description" content="How the Betspapa app and betspapa.com handle data: what is collected for match alerts, who processes it, and how to delete it." />
+    <link rel="canonical" href="https://betspapa.com/privacy/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Betspapa" />
+    <meta property="og:url" content="https://betspapa.com/privacy/" />
+    <meta property="og:title" content="Privacy policy · Betspapa" />
+    <meta property="og:description" content="How the Betspapa app and betspapa.com handle data: what is collected for match alerts, who processes it, and how to delete it." />
+    <meta property="og:image" content="https://betspapa.com/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Privacy policy · Betspapa" />
+    <meta name="twitter:description" content="How the Betspapa app and betspapa.com handle data: what is collected for match alerts, who processes it, and how to delete it." />
+    <meta name="twitter:image" content="https://betspapa.com/og-image.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/pages.css" />
+  </head>
+  <body>
+    <header>
+      <a href="/"><img src="/icons/icon-192.png" alt="" width="36" height="36" />Betspapa</a>
+      <nav><a href="/">Board</a><a href="/about/">About</a><a href="/download/">Download</a></nav>
+    </header>
+    <main>
+      <h1>Privacy policy</h1>
+      <p><em>Last updated: 21 November 2026</em></p>
+      <p>This policy covers the Betspapa Android app (package <code>com.betspapa.scores</code>) and the website betspapa.com. Betspapa is published by Medit USA LTD, Accra, Ghana (&#8220;we&#8221;). If you have any question about this policy, email <a href="mailto:meditusa2023@gmail.com">meditusa2023@gmail.com</a>.</p>
+
+      <h2>The short version</h2>
+      <ul>
+        <li>There are no accounts. We never ask for your name, email, phone number or location.</li>
+        <li>To send match alerts, the app sends our server a push token and the matches, teams and trends you follow.</li>
+        <li>We don&#8217;t store your IP address with that data, and we don&#8217;t sell or share your data for advertising.</li>
+      </ul>
+
+      <h2>What the app sends to our server</h2>
+      <p>When notifications are turned on, the app registers with api.betspapa.com so we can send alerts to your phone even when the app is closed. That registration holds:</p>
+      <ul>
+        <li><strong>A push token</strong> issued by Firebase Cloud Messaging. It identifies the app install for delivering notifications, not you.</li>
+        <li><strong>What you follow:</strong> match ids, team ids and names, followed trends, and tips you have booked (their id and price), so we know which alerts to send.</li>
+        <li><strong>Your alert settings:</strong> which events you want (kick-off, goals, cards, VAR, half-time, full-time, promotions) and the goal sound you chose.</li>
+        <li><strong>App version and country.</strong> The country comes from our hosting provider&#8217;s network header, or a country-only lookup. We keep only the country, never the IP address.</li>
+        <li><strong>Delivery records:</strong> the ids of alerts already sent to that token and when it was last updated, so you don&#8217;t get the same alert twice.</li>
+      </ul>
+      <p>Everything else (follows, blacklists, alert history, preferences) stays on your device in the app&#8217;s local storage.</p>
+
+      <h2>The website</h2>
+      <p>betspapa.com needs no sign-up. Follows and settings you choose on the website are kept in your browser&#8217;s local storage. The website uses no advertising or analytics cookies. Its fonts load from Google Fonts, so Google receives the standard request details your browser sends.</p>
+
+      <h2>Who processes data for us</h2>
+      <ul>
+        <li><strong>Google Firebase Cloud Messaging</strong> delivers notifications to your phone.</li>
+        <li><strong>Render</strong> hosts our server (api.betspapa.com). Like any host it may keep short-lived technical request logs.</li>
+        <li><strong>GitHub Pages</strong> hosts the website and the app download.</li>
+      </ul>
+      <p>We don&#8217;t sell personal data, and we don&#8217;t share it with advertisers or data brokers.</p>
+
+      <h2>How long we keep it</h2>
+      <p>A registration is kept while the app keeps using it. When Firebase reports a token as no longer valid (for example after you uninstall the app), we delete that registration.</p>
+
+      <h2>Deleting your data</h2>
+      <ul>
+        <li>Unfollow matches and teams, or turn notifications off in Settings, to stop alerts.</li>
+        <li>Uninstall the app or clear its storage. This removes everything on your phone, and the registration on our server is deleted once its token stops working.</li>
+        <li>Or email <a href="mailto:meditusa2023@gmail.com">meditusa2023@gmail.com</a> and ask us to delete your registration. We will do it within 30 days.</li>
+      </ul>
+
+      <h2>Age</h2>
+      <p>Betspapa shows football betting trends and bookmaker booking codes. It is for people aged 18 and over, and is not directed at children. Betting can be addictive, so please bet responsibly and only where it is legal for you.</p>
+
+      <h2>Security</h2>
+      <p>Data is sent over HTTPS. Our server stores registrations without names, emails, phone numbers or IP addresses.</p>
+
+      <h2>Changes</h2>
+      <p>If this policy changes, we will update this page and its date.</p>
+    </main>
+    <footer>Betspapa · <a href="/">betspapa.com</a> · <a href="/privacy/">Privacy policy</a></footer>
+  </body>
+</html>

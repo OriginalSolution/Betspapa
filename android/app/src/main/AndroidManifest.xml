@@ -67,7 +67,7 @@
 
         <receiver
             android:name=".watch.TestAlertReceiver"
-            android:exported="true" />
+            android:exported="false" />
 
         <service
             android:name=".watch.BetspapaFirebaseService"

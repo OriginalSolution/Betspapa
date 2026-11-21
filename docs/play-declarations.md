@@ -18,9 +18,9 @@ The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.
 
 ## Other Play forms needed for the listing
 - **Data safety:** the device registration sends the FCM token, followed matches/teams/trends, app version and country (from the edge header) to api.betspapa.com. No IP address is stored, nothing is shared or sold, and data is sent over HTTPS.
-- **Privacy policy URL:** required. There isn't one on betspapa.com yet.
+- **Privacy policy URL:** https://betspapa.com/privacy/
 - **Ads:** none. **Target audience:** adults (it covers betting markets and booking codes). Expect the gambling-related content questions in the content rating form.
 
 ## Flags
 - The original app signing keystore was removed from the repository and the README on 21 Nov 2026, and is now read from secrets. It and its password remain in older git history of this public repo.
-- `TestAlertReceiver` is exported without a permission so adb QC can trigger a test card. Any installed app could fire a harmless test notification. Consider making it non-exported for the Play build.
+- `TestAlertReceiver` is not exported in release builds (0.4.11). Debug builds export it for the adb QC harness.
