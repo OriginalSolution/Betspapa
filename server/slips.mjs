@@ -12,7 +12,7 @@ import { meetsConfidence } from './thresholds.mjs';
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
-/** One code on the master and trends. Tier parts use PART_SIZE. */
+/** Trends use one code. The master slip and tier slips use PART_SIZE, then each desk's own limit. */
 export const CODE_LIMIT = 18;
 /** SportyBet accepts 50 selections. Tier and market slips are booked in blocks of this size. */
 export const PART_SIZE = 50;
@@ -89,6 +89,17 @@ export function packGroups(legs, size = PART_SIZE) {
 /** Every in-range leg on a tier, in that tier's order, packed into bookable codes. */
 export function codeGroups(legs, tier) {
   return packGroups(orderForTier(legs, tier));
+}
+
+/**
+ * How a slip is split before it is booked.
+ * The master slip and every tier go out in blocks of 50. bookAll then splits a block
+ * again when a desk holds fewer (MSport 30, Betika 20, betPawa 20). Trends stay one code.
+ */
+export function bookingGroups(slip, open) {
+  if (slip?.tier) return codeGroups(open, slip.tier);
+  if (slip?.id === 'master') return packGroups(open);
+  return [codeLegs(open)];
 }
 
 export function legRate(leg) {
@@ -299,7 +310,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
   async function bookOne(slip, index) {
     const clock = clockOf();
     const open = bookableLegs(slip.legs, new Date(clock));
-    const groups = slip.tier ? codeGroups(open, slip.tier) : [codeLegs(open)];
+    const groups = bookingGroups(slip, open);
     const flat = groups.flat();
     const violations = rangeViolations(flat);
     if (violations.length) {
@@ -322,7 +333,8 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
       results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
       return;
     }
-    if (!slip.tier) {
+    const many = Boolean(slip.tier) || slip.id === 'master';
+    if (!many) {
       const entry = await bookSelection(groups[0], slip.name);
       results[index] = { ...slip, legs: open, key: entry.key, books: entry.books, bookedAt: entry.bookedAt };
       if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });
