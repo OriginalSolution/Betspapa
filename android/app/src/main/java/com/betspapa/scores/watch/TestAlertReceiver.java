@@ -31,6 +31,7 @@ public class TestAlertReceiver extends BroadcastReceiver {
             new Thread(() -> {
                 try {
                     postPromo(app, intent, soundFinal);
+                    AlertSound.await(8_000L);
                 } finally {
                     pending.finish();
                 }
@@ -39,6 +40,7 @@ public class TestAlertReceiver extends BroadcastReceiver {
         }
         if (intent != null && intent.getStringExtra("home") != null) {
             postScore(app, intent, kind, sound);
+            holdForSound();
             return;
         }
         String title = app.getString(R.string.test_alert_title);
@@ -56,6 +58,7 @@ public class TestAlertReceiver extends BroadcastReceiver {
             body = "horn".equals(sound) ? "Test horn" : "Test arpeggio";
         }
         AlertPoster.post(app, new WatchNote("test:" + kind + ":" + System.currentTimeMillis(), "", kind, title, body), sound);
+        holdForSound();
     }
 
     /** A data-only style goal card: crests, score, and the chosen sound. The same id replaces, it does not stack. */
@@ -107,6 +110,19 @@ public class TestAlertReceiver extends BroadcastReceiver {
         WatchNote note = new WatchNote(id, matchId, kind, "Goal · " + home, home + " " + match.homeScore + "–" + match.awayScore + " " + away);
         note.minute = match.minute;
         AlertPoster.post(app, note, sound);
+    }
+
+    /** HyperOS kills a receiver as soon as it returns, which cuts the cheer off. */
+    private void holdForSound() {
+        if (!AlertSound.isPlaying()) return;
+        PendingResult pending = goAsync();
+        new Thread(() -> {
+            try {
+                AlertSound.await(8_000L);
+            } finally {
+                pending.finish();
+            }
+        }, "alert-sound").start();
     }
 
     /** Big-picture promo from a data-only payload. Works after the process has been killed. */

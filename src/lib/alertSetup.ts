@@ -1,13 +1,14 @@
 /**
  * Guided live-alert setup. Version 1 is the first walkthrough (app 0.3.2).
+ * Version 2 adds the HyperOS sound step, so a finished 0.4.14 setup runs again.
  * Installs from 0.3.1 have no record, so they see it once after updating.
  */
-export const ALERT_SETUP_VERSION = 1;
+export const ALERT_SETUP_VERSION = 2;
 export const ALERT_SETUP_KEY = 'betspapa.alertSetup.v1';
 
 export const OEM_BRANDS = ['transsion', 'xiaomi', 'oppo', 'vivo', 'huawei', 'samsung'] as const;
 export type OemBrand = (typeof OEM_BRANDS)[number];
-export type AlertStepId = 'notifications' | 'battery' | 'exact' | 'autostart' | 'test';
+export type AlertStepId = 'notifications' | 'battery' | 'exact' | 'autostart' | 'sound' | 'test';
 export type ExactAlarmState = 'granted' | 'denied' | 'unsupported';
 export type FlowPhase = 'ask' | 'sent' | 'confirm' | 'opened';
 
@@ -37,7 +38,7 @@ export type StepCopy = {
   action: string;
 };
 
-const ORDER: AlertStepId[] = ['notifications', 'battery', 'exact', 'autostart', 'test'];
+const ORDER: AlertStepId[] = ['notifications', 'battery', 'exact', 'autostart', 'sound', 'test'];
 
 export const OEM_INSTRUCTION: Record<OemBrand, string> = {
   transsion: 'On Tecno, Infinix, and itel, open Phone Master, turn on Autostart for Betspapa, and lock the app in the recent-apps list so HiOS does not close it.',
@@ -177,28 +178,43 @@ export function stepsFrom(status: AlertDeviceStatus, start: AlertStepId, include
       if (includeAutostart && status.oem) steps.push('autostart');
       continue;
     }
+    if (step === 'sound') {
+      // HyperOS reports a healthy channel while Sound is off, so Xiaomi always gets this step.
+      if (needsSoundStep(status)) steps.push('sound');
+      continue;
+    }
     if (step === start || !isStepSatisfied(status, step)) steps.push(step);
   }
   return steps;
 }
 
+function needsSoundStep(status: AlertDeviceStatus): boolean {
+  return status.oem === 'xiaomi' || status.soundBlocked;
+}
+
+/** Where a fresh pass starts. Sound sits before the test, including when every other check already passed. */
+function entryStep(status: AlertDeviceStatus, includeAutostart: boolean): AlertStepId {
+  const failing = failingStep(status);
+  if (failing) return failing;
+  if (includeAutostart && status.oem) return 'autostart';
+  if (needsSoundStep(status)) return 'sound';
+  return 'test';
+}
+
 /** First launch and Run alert setup again. Granted checks are left out. */
 export function introSteps(status: AlertDeviceStatus): AlertStepId[] {
-  const start = failingStep(status) ?? (status.oem ? 'autostart' : 'test');
-  return stepsFrom(status, start, true);
+  return stepsFrom(status, entryStep(status, true), true);
 }
 
 /** Banner Fix now. Starts at the failing check and does not detour through Autostart. */
 export function fixSteps(status: AlertDeviceStatus): AlertStepId[] {
-  const start = failingStep(status) ?? 'test';
-  const steps = stepsFrom(status, start, false);
+  const steps = stepsFrom(status, entryStep(status, false), false);
   return steps.length ? steps : ['test'];
 }
 
 /** The test alert did not arrive. Go back to the check that is still blocking it. */
 export function retrySteps(status: AlertDeviceStatus): AlertStepId[] {
-  const start = failingStep(status) ?? (status.oem ? 'autostart' : 'test');
-  return stepsFrom(status, start, true);
+  return stepsFrom(status, entryStep(status, true), true);
 }
 
 export function nextUnsatisfiedIndex(steps: AlertStepId[], index: number, status: AlertDeviceStatus): number {
@@ -234,6 +250,15 @@ export function stepCopy(step: AlertStepId, oem: OemBrand | null, phase: FlowPha
       title: 'Turn on Autostart',
       body: OEM_INSTRUCTION[oem ?? 'samsung'],
       action: phase === 'opened' ? "I've turned it on" : 'Open autostart settings',
+    };
+  }
+  if (step === 'sound') {
+    return {
+      title: 'Turn on notification sound',
+      body: oem === 'xiaomi'
+        ? 'HyperOS keeps a new app silent, so the test alert would arrive with no cheer. Open Betspapa\'s notifications and turn Sound on. Then open the goal channel and make sure its sound is not silent.'
+        : 'The goal channel is muted, so the test alert would arrive with no cheer. Open that channel and turn its sound on.',
+      action: phase === 'opened' ? "I've turned it on" : 'Open notification settings',
     };
   }
   if (phase === 'confirm') {

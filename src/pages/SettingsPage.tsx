@@ -385,16 +385,21 @@ function AndroidWatchStatus() {
         <span>Notification sound</span>
         <strong className={status.notificationSound === 'on' ? 'is-good' : 'is-bad'}>{status.notificationSound === 'on' ? 'On' : 'Off'}</strong>
       </div>
-      {status.soundBlocked && (
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            void openNotificationSound().then(applyStatus);
-          }}
-        >
-          Turn notification sound on
-        </button>
+      {(status.oem === 'xiaomi' || status.soundBlocked) && (
+        <>
+          {status.oem === 'xiaomi' && (
+            <p className="lede">HyperOS keeps Sound off for a new app. Turn it on for Betspapa, or the cheer stays silent.</p>
+          )}
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              void openNotificationSound().then(applyStatus);
+            }}
+          >
+            Turn notification sound on
+          </button>
+        </>
       )}
       {pollIsStale(status.lastPollAt) && (
         <button type="button" className="btn" onClick={startAgain}>

@@ -346,19 +346,13 @@ public class WatchPlugin extends Plugin {
         }
         AlertPoster.ensure(context);
         boolean channelMuted = false;
+        String channelId = AlertPoster.channelIdForSelected(context);
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
-            NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(AlertPoster.channelIdForSelected(context));
+            NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(channelId);
             channelMuted = channel == null || channel.getImportance() < NotificationManager.IMPORTANCE_DEFAULT || channel.getSound() == null;
         }
-        Intent intent;
-        if (channelMuted && Build.VERSION.SDK_INT >= 26) {
-            intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
-            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
-            intent.putExtra(Settings.EXTRA_CHANNEL_ID, AlertPoster.channelIdForSelected(context));
-        } else {
-            intent = new Intent(Settings.ACTION_SOUND_SETTINGS);
-        }
+        Intent intent = AlertPoster.notificationSettingsIntent(context, oemId(context), channelMuted, channelId);
         if (!(context instanceof android.app.Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             context.startActivity(intent);

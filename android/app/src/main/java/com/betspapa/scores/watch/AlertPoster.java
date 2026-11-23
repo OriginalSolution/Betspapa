@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.content.SharedPreferences;
+import android.provider.Settings;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -229,6 +230,25 @@ public final class AlertPoster {
         return Uri.parse("android.resource://" + context.getPackageName() + "/raw/" + name);
     }
 
+    /**
+     * HyperOS hides Sound on the app notification page, not on the ringer screen.
+     * A channel the Android API reports as muted still opens that channel.
+     */
+    static Intent notificationSettingsIntent(Context context, String brand, boolean channelMuted, String channelId) {
+        if ("xiaomi".equals(brand)) {
+            Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            return intent;
+        }
+        if (channelMuted && Build.VERSION.SDK_INT >= 26) {
+            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId == null ? "" : channelId);
+            return intent;
+        }
+        return new Intent(Settings.ACTION_SOUND_SETTINGS);
+    }
+
     static AudioAttributes notificationAudio() {
         return new AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -331,11 +351,14 @@ public final class AlertPoster {
         Notification notification = builder.build();
         // Compat only has setSound(Uri, stream). Write the same URI and usage the channel uses
         // so HiOS, which plays notification.sound, resolves raw/name instead of dropping it.
+        // HyperOS does not play that URI. AlertSound plays the same file on Xiaomi.
         if (sound != null) {
             notification.sound = sound;
             notification.audioAttributes = notificationAudio();
         }
-        return notify(context, note.id, id, notification);
+        boolean posted = notify(context, note.id, id, notification);
+        if (posted && sound != null && streamCanPlay(context)) AlertSound.play(context, sound);
+        return posted;
     }
 
     /** Ongoing score card. Same id per match. Score-unchanged updates do not alert again. */
@@ -482,8 +505,15 @@ public final class AlertPoster {
             if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
             builder.addAction(0, "Copy code", PendingIntent.getActivity(context, AlertPlanner.notificationId("promo-copy:" + note.id), copy, flags));
         }
-        NotificationManagerCompat.from(context).notify(note.id, id, builder.build());
-        return true;
+        Notification notification = builder.build();
+        Uri sound = soundFor(context, "goal", goalSound);
+        if (sound != null) {
+            notification.sound = sound;
+            notification.audioAttributes = notificationAudio();
+        }
+        boolean posted = notify(context, note.id, id, notification);
+        if (posted && sound != null && streamCanPlay(context)) AlertSound.play(context, sound);
+        return posted;
     }
 
     private static PendingIntent openApp(Context context) {

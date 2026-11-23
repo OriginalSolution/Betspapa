@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 const sounds = [
@@ -25,6 +25,32 @@ function measure(name) {
   assert.ok(match, log);
   return { duration, peak: Number(match[1]) };
 }
+
+test('android raw notification sounds are present for every channel', () => {
+  const raw = [
+    'cheer_crowd.mp3',
+    'cheer_afro.mp3',
+    'cheer_chant.mp3',
+    'cheer_papa.ogg',
+    'goal_horn.ogg',
+    'goal_arp.ogg',
+    'red_card.ogg',
+    'var_check.ogg',
+    'penalty.ogg',
+  ];
+  for (const name of raw) {
+    const file = new URL(`../android/app/src/main/res/raw/${name}`, import.meta.url);
+    assert.ok(statSync(file).size > 1000, name);
+  }
+  const poster = readFileSync(new URL('../android/app/src/main/java/com/betspapa/scores/watch/AlertPoster.java', import.meta.url), 'utf8');
+  assert.match(poster, /USAGE_NOTIFICATION/);
+  assert.match(poster, /R\.raw\.cheer_crowd/);
+  assert.match(poster, /R\.raw\.red_card/);
+  assert.match(poster, /R\.raw\.var_check/);
+  const player = readFileSync(new URL('../android/app/src/main/java/com/betspapa/scores/watch/AlertSound.java', import.meta.url), 'utf8');
+  assert.match(player, /playsInProcess/);
+  assert.match(player, /xiaomi/);
+});
 
 test('bundled goal cheers peak near -8 dBFS and are not the old files', () => {
   assert.equal(existsSync(new URL('../public/sounds/goal-cheer.wav', import.meta.url)), false);
