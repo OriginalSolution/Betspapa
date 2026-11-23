@@ -7,6 +7,7 @@ const descriptions: Record<string, string> = {
   '/': DEFAULT_DESCRIPTION,
   '/live': 'Football matches in play now on Betspapa, with live scores, the minute and VAR decisions.',
   '/picks': 'Betspapa picks: one card per match with every 80%+ trend and its real hit rate.',
+  '/codes': 'Banker codes on Betspapa. Each strategy uses its own odds rules, read back before it is shown.',
   '/trends': 'Every tracked football trend on Betspapa with its real record, plus developing form.',
   '/slips': 'Slips built from 80%+ Betspapa tips, tracked to a win or a bust.',
   '/record': 'The Betspapa record: every published 80%+ pick, graded from the full-time score.',

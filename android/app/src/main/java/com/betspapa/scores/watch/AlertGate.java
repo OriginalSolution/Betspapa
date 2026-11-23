@@ -62,7 +62,7 @@ public final class AlertGate {
         if ("goal".equals(kind) || "var".equals(kind) || "red".equals(kind) || "penalty".equals(kind)) return 15L * 60_000L;
         if ("kickoff".equals(kind) || "ht".equals(kind)) return 15L * 60_000L;
         if ("ft".equals(kind)) return 30L * 60_000L;
-        if ("win".equals(kind) || "bust".equals(kind) || "slip".equals(kind) || "lineup".equals(kind)) return 6L * 60L * 60_000L;
+        if ("win".equals(kind) || "bust".equals(kind) || "slip".equals(kind) || "lineup".equals(kind) || "code".equals(kind)) return 6L * 60L * 60_000L;
         return Long.MAX_VALUE;
     }
 

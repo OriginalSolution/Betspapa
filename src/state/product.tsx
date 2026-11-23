@@ -240,6 +240,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         promos: settings.promos,
         lineups: settings.lineups,
         lineupBig: settings.lineupBig,
+        bankerCodes: settings.bankerCodes,
       },
     });
   };

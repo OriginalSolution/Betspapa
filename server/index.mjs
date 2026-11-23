@@ -24,6 +24,7 @@ import { slimLivePayload } from './liveSlim.mjs';
 import { crestStore, scheduleNightly } from './crestStore.mjs';
 import { createResults } from './results.mjs';
 import { createLineups, lineupNote, lineupWanted } from './lineups.mjs';
+import { bankerNote, bankerWanted, createBanker } from './banker.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 
@@ -145,6 +146,27 @@ async function publishLineups(events) {
 onEngineBoard(() => {
   void publishLineups(getCachedEvents());
 });
+const banker = createBanker({
+  dir: dataDir,
+  request: requestJson,
+  fetchImpl: fetch,
+  results,
+  coverage: () => getCachedEvents(),
+});
+async function publishCodes(forceRead = false) {
+  try {
+    if (forceRead) await banker.refresh();
+    else await banker.tick();
+    for (const alert of banker.drain()) {
+      for (const device of pushBook.list()) {
+        if (!bankerWanted(device, alert)) continue;
+        await pushWatch.post(bankerNote(alert), device);
+      }
+    }
+  } catch (error) {
+    console.error(`[codes] ${error instanceof Error ? error.message : error}`);
+  }
+}
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
@@ -420,6 +442,24 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/guardian') {
     if (String(getConfig().mode) !== 'live') forceLiveMode();
     send(req, res, 200, guardian.status());
+    return;
+  }
+  if (url.pathname === '/api/codes') {
+    if (req.method === 'GET') {
+      send(req, res, 200, banker.view(), 'public, max-age=30');
+      return;
+    }
+    if (req.method === 'POST') {
+      send(req, res, 200, await banker.refresh(), 'no-store');
+      for (const alert of banker.drain()) {
+        for (const device of pushBook.list()) {
+          if (!bankerWanted(device, alert)) continue;
+          await pushWatch.post(bankerNote(alert), device);
+        }
+      }
+      return;
+    }
+    send(req, res, 405, { error: 'Method not allowed' });
     return;
   }
   if (url.pathname === '/api/lineups') {
@@ -717,6 +757,11 @@ if (invoked) {
   }, 2 * 60 * 1000);
   lineupTimer.unref?.();
   void publishLineups(getCachedEvents());
+  const codeTimer = setInterval(() => {
+    void publishCodes(false);
+  }, 60 * 1000);
+  codeTimer.unref?.();
+  void publishCodes(false);
   server.listen(port, '0.0.0.0', () => {
     console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
     loadUpcomingEvents()

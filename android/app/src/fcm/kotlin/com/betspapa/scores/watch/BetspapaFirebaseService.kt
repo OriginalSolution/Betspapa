@@ -48,6 +48,7 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             data["marketLabel"]?.takeIf { it.isNotEmpty() }?.let { note.marketLabel = it }
             data["fixture"]?.takeIf { it.isNotEmpty() }?.let { note.fixture = it }
             data["odds"]?.takeIf { it.isNotEmpty() }?.let { note.oddsText = it }
+            data["code"]?.takeIf { it.isNotEmpty() }?.let { note.bookCode = it }
             if (kind == "var") note.varCheck = true
             if (data["disallowed"] == "1") {
                 note.disallowed = true

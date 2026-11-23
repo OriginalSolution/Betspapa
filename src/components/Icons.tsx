@@ -120,6 +120,15 @@ export function IconTrends() {
   );
 }
 
+export function IconCodes() {
+  return (
+    <Svg>
+      <path d="M8 7h8M8 12h8M8 17h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <rect x="4.5" y="3.5" width="15" height="17" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+    </Svg>
+  );
+}
+
 export function IconSlip() {
   return (
     <Svg>

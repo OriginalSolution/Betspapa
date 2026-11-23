@@ -20,7 +20,7 @@ export type DeviceRegistration = {
   } | null;
   settings: Pick<
     Settings,
-    'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound' | 'promos' | 'lineups' | 'lineupBig'
+    'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound' | 'promos' | 'lineups' | 'lineupBig' | 'bankerCodes'
   >;
 };
 

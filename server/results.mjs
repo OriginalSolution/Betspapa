@@ -9,8 +9,10 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { priceInRange } from './oddsRange.mjs';
+import { bankerNeedsTimeline, gradeBanker, mismatchNote, timelineEvents } from './bankerGrade.mjs';
 
 const INFO_URL = (id) => `https://stats.fn.sportradar.com/common/en/Europe:Berlin/gismo/match_info/${id}`;
+const TIMELINE_URL = (id) => `https://stats.fn.sportradar.com/common/en/Europe:Berlin/gismo/match_timeline/${id}`;
 const DESKS = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'];
 /** 100 ended, 110 after extra time, 120 after penalties. The 90-minute score is periods.ft. */
 const FINAL = new Set([100, 110, 120]);
@@ -362,6 +364,99 @@ export function createResults({ dir, fetchImpl = fetch, crestFor = () => null, n
     return body?.doc?.[0]?.data?.match || null;
   }
 
+  async function lookupTimeline(matchId) {
+    const response = await fetchImpl(TIMELINE_URL(matchId), {
+      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return null;
+    return timelineEvents(await response.json());
+  }
+
+  /**
+   * Banker legs skip the 80%+ filter and the HARD odds cap. They use the
+   * strategy's own prices and are graded with the same full-time score.
+   */
+  function recordBanker(batch) {
+    if (!batch?.picks?.length) return 0;
+    const clock = now();
+    let dirty = false;
+    const keys = [];
+    for (const pick of batch.picks) {
+      if (!pick?.key || !pick.eventId || !pick.market) continue;
+      const kick = Date.parse(pick.kickoff || '');
+      if (!Number.isFinite(kick)) continue;
+      keys.push(pick.key);
+      const prior = record.picks[pick.key];
+      if (prior) {
+        if (prior.status === 'open' && pick.bookResult && pick.bookResult !== prior.bookResult) {
+          prior.bookResult = pick.bookResult;
+          dirty = true;
+        }
+        continue;
+      }
+      record.picks[pick.key] = {
+        key: pick.key,
+        eventId: String(pick.eventId),
+        market: pick.market,
+        odds: Number(pick.odds) || 0,
+        rate: null,
+        sample: null,
+        slips: [`banker:${pick.strategy || ''}`],
+        home: pick.home || '',
+        away: pick.away || '',
+        homeId: null,
+        awayId: null,
+        homeCrest: pick.homeCrest || null,
+        awayCrest: pick.awayCrest || null,
+        kickoff: new Date(kick).toISOString(),
+        day: dayKey(pick.kickoff),
+        tournament: 'Banker',
+        country: '',
+        firstSeen: new Date(clock).toISOString(),
+        status: 'open',
+        ft: null,
+        ht: null,
+        settledAt: null,
+        note: null,
+        banker: true,
+        bookResult: pick.bookResult || '',
+      };
+      dirty = true;
+    }
+    const code = batch.code;
+    if (code?.id && keys.length) {
+      const kicks = keys.map((key) => Date.parse(record.picks[key]?.kickoff || '')).filter(Number.isFinite);
+      if (kicks.length) {
+        const prior = record.codes[code.id];
+        if (!prior) {
+          const firstKickoff = new Date(Math.min(...kicks)).toISOString();
+          record.codes[code.id] = {
+            id: code.id,
+            slipId: `banker:${code.strategy || ''}`,
+            slip: code.name || 'Banker',
+            desk: 'sportybet',
+            code: String(code.code || ''),
+            link: code.link || null,
+            totalOdds: Number(code.totalOdds) || null,
+            legs: keys,
+            firstKickoff,
+            day: dayKey(firstKickoff),
+            bookedAt: new Date(clock).toISOString(),
+            status: 'open',
+            banker: true,
+          };
+          dirty = true;
+        } else if (prior.status === 'open') {
+          prior.legs = [...new Set([...(prior.legs || []), ...keys])];
+          dirty = true;
+        }
+      }
+    }
+    if (dirty) save();
+    return keys.length;
+  }
+
   function settleCodes() {
     for (const code of Object.values(record.codes)) {
       if (code.status !== 'open') continue;
@@ -406,6 +501,14 @@ export function createResults({ dir, fetchImpl = fetch, crestFor = () => null, n
         const reason = voidReason(match);
         const ft = finalScore(match);
         const ht = halfScore(match);
+        let timeline = null;
+        if (ft && picks.some((pick) => pick.banker && bankerNeedsTimeline(pick.market))) {
+          try {
+            timeline = await lookupTimeline(id);
+          } catch {
+            timeline = null;
+          }
+        }
         for (const pick of picks) {
           pick.checkedAt = new Date(clock).toISOString();
           dirty = true;
@@ -417,12 +520,17 @@ export function createResults({ dir, fetchImpl = fetch, crestFor = () => null, n
             continue;
           }
           if (!ft) continue;
-          const result = gradePick(pick.market, ft, ht);
+          const result = pick.banker ? gradeBanker(pick.market, ft, timeline) : gradePick(pick.market, ft, ht);
           if (result === 'open') continue;
           pick.status = result;
           pick.ft = `${ft.home}-${ft.away}`;
           pick.ht = ht ? `${ht.home}-${ht.away}` : null;
           pick.settledAt = new Date(clock).toISOString();
+          const clash = pick.banker ? mismatchNote(result, pick.bookResult) : '';
+          if (clash) {
+            pick.mismatch = true;
+            pick.note = clash;
+          }
           graded += 1;
         }
       }
@@ -507,5 +615,5 @@ export function createResults({ dir, fetchImpl = fetch, crestFor = () => null, n
     };
   }
 
-  return { ingest, settle, view, days, file, get record() { return record; } };
+  return { ingest, settle, view, days, recordBanker, file, get record() { return record; } };
 }

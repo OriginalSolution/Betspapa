@@ -101,6 +101,8 @@ export type Settings = {
   lineupCard: boolean;
   /** Followed team or match ids with lineup alerts turned off. */
   lineupOff: string[];
+  /** Banker strategies that may send a code alert. Empty until the user opts in. */
+  bankerCodes: string[];
 };
 
 export type Follows = {
@@ -146,4 +148,5 @@ export const defaultSettings: Settings = {
   lineupBig: false,
   lineupCard: true,
   lineupOff: [],
+  bankerCodes: [],
 };

@@ -78,6 +78,7 @@ export function loadSettings(): Settings {
   next.notificationStyle = migrateNotificationStyle(raw.notificationStyle);
   next.dataSource = 'sporty';
   if (Array.isArray(raw.lineupOff)) next.lineupOff = raw.lineupOff.filter((id): id is string => typeof id === 'string').slice(0, 200);
+  if (Array.isArray(raw.bankerCodes)) next.bankerCodes = raw.bankerCodes.filter((id): id is string => typeof id === 'string').slice(0, 8);
   return next;
 }
 
