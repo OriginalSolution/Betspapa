@@ -43,10 +43,10 @@ function average(rows, ga, played) {
 }
 
 /**
- * @param {object} options minVenueGames and gaRatio (0.8 means 80% of the league average).
+ * @param {object} options minVenueGames and gaRatio (1 means at or below the league average).
  * Returns null when there is no payload, or { found:false } / { missing:true }.
  */
-export function defenceFor(payload, uid, side, { minVenueGames = 6, gaRatio = 0.8 } = {}) {
+export function defenceFor(payload, uid, side, { minVenueGames = 6, gaRatio = 1 } = {}) {
   if (!payload || uid == null) return null;
   const want = uidKey(uid);
   const hits = [];

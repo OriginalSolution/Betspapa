@@ -37,9 +37,10 @@ export const GOLD_O25_UNDER = 1.4;
 export const CAPPED_CAP = 1.45;
 export const CAPPED_AH_O25_UNDER = 1.6;
 
-/** Shield: venue sample, and conceded goals against the league average. */
+/** Shield: current-season league games, at least this many at the venue. */
 export const SHIELD_MIN_VENUE_GAMES = 6;
-export const SHIELD_GA_RATIO = 0.8;
+/** 1 means at or below the league average. A lower number is a tighter cut. */
+export const SHIELD_GA_RATIO = 1;
 export const SHIELD_O25_MAX_EXCL = 1.6;
 
 /** Ladder: how often the weaker side has scored in its last 10. */
@@ -175,7 +176,7 @@ export function rulesFor(id) {
   if (id === 'shield') {
     return [
       pool,
-      `Good defence: at least ${SHIELD_MIN_VENUE_GAMES} games at that venue this season, and goals conceded per game at most ${Math.round(SHIELD_GA_RATIO * 100)}% of the league average on the same split. Then 2UP if AH −1 is under 1.80, or 1UP from 1.80 to 2.00.`,
+      `Good defence: at least ${SHIELD_MIN_VENUE_GAMES} games at that venue this season, and goals conceded per game ${SHIELD_GA_RATIO >= 1 - 1e-9 ? 'at or below the league average' : `at most ${Math.round(SHIELD_GA_RATIO * 100)}% of the league average`} on the same split. Then 2UP if AH −1 is under 1.80, or 1UP from 1.80 to 2.00.`,
       `Leaky defence: match Over 2.5 under ${SHIELD_O25_MAX_EXCL.toFixed(2)}. No usable defence table: drop the game.`,
       floor,
     ];

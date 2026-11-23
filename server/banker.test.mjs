@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { rulesFor, SHIELD_GA_RATIO } from './bankerConfig.mjs';
 import { createBanker } from './banker.mjs';
 import { defenceFor } from './bankerDefence.mjs';
 import { dropReason, isCupLeague, tableClash } from './bankerFilters.mjs';
@@ -102,19 +103,22 @@ test('overlap is counted inside one strategy, and Ladder has no week code', () =
   assert.match(week.note, /dailies only/);
 });
 
-test('Shield needs six venue games and conceded goals at 80% of the league', () => {
-  const rows = (played, against) => ({
+test('Shield needs six venue games and conceded goals at or below the league average', () => {
+  assert.equal(SHIELD_GA_RATIO, 1);
+  const rows = (homePlayed, homeAgainst, otherPlayed, otherAgainst) => ({
     tablerows: [
-      { team: { uid: 1 }, total: played, home: played, away: 0, goalsAgainstTotal: against, goalsAgainstHome: against, goalsAgainstAway: 0, pos: 4 },
-      { team: { uid: 2 }, total: 10, home: 10, away: 0, goalsAgainstTotal: 10, goalsAgainstHome: 10, goalsAgainstAway: 0, pos: 8 },
+      { team: { uid: 1 }, total: homePlayed, home: homePlayed, away: 0, goalsAgainstTotal: homeAgainst, goalsAgainstHome: homeAgainst, goalsAgainstAway: 0, pos: 4 },
+      { team: { uid: 2 }, total: otherPlayed, home: otherPlayed, away: 0, goalsAgainstTotal: otherAgainst, goalsAgainstHome: otherAgainst, goalsAgainstAway: 0, pos: 8 },
     ],
   });
-  const short = defenceFor(rows(5, 4), 1, 'H', { minVenueGames: 6, gaRatio: 0.8 });
-  assert.equal(short.missing, true);
-  const leaky = defenceFor(rows(8, 12), 1, 'H', { minVenueGames: 6, gaRatio: 0.8 });
-  assert.equal(leaky.good, false);
-  const tight = defenceFor(rows(10, 6), 1, 'H', { minVenueGames: 6, gaRatio: 0.8 });
-  assert.equal(tight.good, true);
+  const opts = { minVenueGames: 6, gaRatio: SHIELD_GA_RATIO };
+  assert.equal(defenceFor(rows(5, 4, 10, 10), 1, 'H', opts).missing, true);
+  assert.equal(defenceFor(rows(8, 12, 10, 10), 1, 'H', opts).good, false);
+  assert.equal(defenceFor(rows(10, 10, 10, 10), 1, 'H', opts).good, true);
+  assert.equal(defenceFor(rows(10, 9, 10, 10), 1, 'H', opts).good, true);
+  assert.equal(defenceFor(rows(10, 12, 10, 10), 1, 'H', opts).good, false);
+  assert.match(rulesFor('shield').join(' '), /at or below the league average/);
+  assert.match(rulesFor('shield').join(' '), /under 1\.60/);
 });
 
 test('2UP uses the goal timeline and an AH −1 one-goal win is void', () => {
