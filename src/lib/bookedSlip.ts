@@ -69,7 +69,7 @@ export function desksFromBooking(totalLegs: number, sentGroups: SentLeg[][], gro
         const matchCount = ids.size || new Set(rows.map((leg) => leg.eventId)).size;
         const link = typeof part.link === 'string' && part.link.startsWith('https:') ? part.link : undefined;
         const returnedOdds = Number(part.totalOdds);
-        const computed = combinedOdds(rows.filter((leg) => Number.isFinite(leg.odds)));
+        const computed = combinedOdds(rows.flatMap((leg) => (Number.isFinite(leg.odds) ? [{ odds: Number(leg.odds) }] : [])));
         const totalOdds = Number.isFinite(returnedOdds) && returnedOdds > 0 ? Math.round(returnedOdds * 100) / 100 : computed || null;
         parts.push({
           code,
