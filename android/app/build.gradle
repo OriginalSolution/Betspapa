@@ -15,7 +15,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 47
-        versionName "0.4.24"
+        versionName "0.4.24" // booking progress and Load on every code
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
