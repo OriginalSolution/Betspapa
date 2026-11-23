@@ -1,0 +1,1 @@
+A new first-launch guide shows a picture of each phone setting to tap, including the alert sound switch, so alerts arrive when Betspapa is closed. Restored booking codes stay attached to open matches after a restart, and betPawa codes are retried when a match is listed late.
