@@ -171,3 +171,46 @@ test('betPawa says which leg it does not sell, and asks again after a miss expir
   const closed = await bookAll(legs.slice(0, 1), request, undefined, ['betpawa']);
   assert.equal(closed.betpawa.dropped[0].reason, 'Not open on betPawa.');
 });
+
+function sportyOk(code) {
+  return async (method, url) => {
+    if (String(url).includes('pcUpcomingEvents')) return { data: { tournaments: [], totalNum: 0 } };
+    return { bizCode: 10000, data: { shareCode: code, outcomes: [{ matchStatus: 'Not start' }] } };
+  };
+}
+
+test('on-demand booking does not wait for a busy engine lane', async () => {
+  resetBookerCache();
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const hanging = async (method, url) => {
+    if (String(url).includes('pcUpcomingEvents')) return { data: { tournaments: [], totalNum: 0 } };
+    await gate;
+    return { bizCode: 10000, data: { shareCode: 'ENG', outcomes: [{ matchStatus: 'Not start' }] } };
+  };
+  const leg = { eventId: 'sr:match:1', market: 'over15', odds: 1.25, match: 'A vs B' };
+  const pending = [bookAll([leg], hanging, undefined, ['sportybet']), bookAll([{ ...leg, eventId: 'sr:match:2' }], hanging, undefined, ['sportybet'])];
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  const started = Date.now();
+  const result = await bookAll([{ ...leg, eventId: 'sr:match:3' }], sportyOk('NOW'), undefined, ['sportybet'], { interactive: true });
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(result.sportybet.parts[0].code, 'NOW');
+  release();
+  await Promise.all(pending);
+});
+
+test('a desk deadline returns a timeout instead of hanging', async () => {
+  resetBookerCache();
+  const hanging = async () => new Promise(() => {});
+  const result = await bookAll(
+    [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, match: 'A vs B' }],
+    hanging,
+    undefined,
+    ['sportybet'],
+    { deadline: Date.now() + 30 },
+  );
+  assert.match(result.sportybet.error, /took too long/i);
+  assert.equal(result.sportybet.parts.length, 0);
+});

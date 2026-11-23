@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { bookGroups, type BookLeg } from '../lib/bookFollow';
-import { desksFromBooking } from '../lib/bookedSlip';
+import { bookingFailureMessage, bookGroups, type BookLeg } from '../lib/bookFollow';
+import { desksFromBooking, failedDeskLine } from '../lib/bookedSlip';
 import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
 import { cx } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
-import { legsForPacks, PART_SIZE, partsOf, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
+import { legsForPacks, PART_SIZE, partsOf, totalOddsLine, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
 import { goToBookedCodes } from '../lib/useFreshCodes';
 import { useEngineBoard } from '../state/engine';
 import { useStore } from '../state/store';
@@ -51,8 +51,9 @@ export function SlipBuilder() {
       const desks = desksFromBooking(selected.length, chunks, booked);
       const parts = desks.flatMap((desk) => desk.parts.map((part) => ({ desk: desk.desk, code: part.code, legs: part.legs })));
       const reasons = booked.map((group) => group.reason).filter((reason): reason is string => Boolean(reason));
+      const failed = failedDeskLine(desks);
       if (!parts.length) {
-        setProblem(reasons[0] || 'No desk returned a code. Nothing was invented.');
+        setProblem(failed || reasons[0] || 'No desk returned a code. Nothing was invented.');
         return;
       }
       writeBuilder({
@@ -69,7 +70,7 @@ export function SlipBuilder() {
       // Land on the booked codes with an arrival animation and the new codes glowing.
       goToBookedCodes(navigate, '/slips/booked', parts.map((part) => ({ code: part.code, desk: part.desk })));
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Booking failed.');
+      setProblem(bookingFailureMessage(error));
     } finally {
       setBusy(false);
     }
@@ -97,7 +98,10 @@ export function SlipBuilder() {
       <section className="pack-slip" aria-label="In your slip">
         <div className="tip-head">
           <h2>In your slip</h2>
-          <span>{selected.length} legs · {matchCount} matches · avg {selected.length ? average.toFixed(2) : '—'}</span>
+          <span>
+            {selected.length} legs · {matchCount} matches
+            {selected.length ? ` · avg ${average.toFixed(2)} · ${totalOddsLine(selected)}` : ' · avg —'}
+          </span>
         </div>
         {selected.length === 0 ? (
           <p className="lede">Add a whole trend. Every pick in it has to sit inside the odds table.</p>
@@ -120,17 +124,22 @@ export function SlipBuilder() {
         {problem && <p className="lede">{problem}</p>}
       </section>
 
-      <div className={cx('pack-bar', busy && 'is-busy')} aria-busy={busy}>
+      <div className={cx('pack-bar', busy && 'is-busy', problem && 'has-problem')} aria-busy={busy}>
         {busy && <i className="pack-bar-progress" aria-hidden="true" />}
         <div>
           <p>Slip · {added.size} {added.size === 1 ? 'trend' : 'trends'}</p>
-          <strong className="pack-facts">{selected.length} legs · {matchCount} matches</strong>
-          <span role={busy ? 'status' : undefined}>
+          <strong className="pack-facts">
+            {selected.length} legs · {matchCount} matches
+            {selected.length && partCount === 1 ? ` · ${totalOddsLine(selected)}` : ''}
+          </strong>
+          <span role={busy || problem ? 'status' : undefined} className={problem && !busy ? 'pack-bar-error' : undefined}>
             {busy
               ? 'Booking your codes… this can take a moment'
-              : selected.length
-                ? `Avg price ${average.toFixed(2)} · ${partCount} ${partCount === 1 ? 'part' : 'parts'} (max ${PART_SIZE})`
-                : 'Add a whole trend'}
+              : problem
+                ? problem
+                : selected.length
+                  ? `${partCount > 1 ? `${totalOddsLine(selected)} · ` : ''}Avg price ${average.toFixed(2)} · ${partCount} ${partCount === 1 ? 'part' : 'parts'} (max ${PART_SIZE})`
+                  : 'Add a whole trend'}
           </span>
         </div>
         <button type="button" className="pack-edit" onClick={() => setEditing((value) => !value)} disabled={!selected.length || busy}>
@@ -148,6 +157,8 @@ export function SlipBuilder() {
               <i className="pack-book-spin" aria-hidden="true" />
               <span className="pack-book-label">Booking…</span>
             </>
+          ) : problem ? (
+            'Retry'
           ) : (
             'Book + track'
           )}

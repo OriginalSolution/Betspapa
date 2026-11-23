@@ -74,25 +74,49 @@ function cacheSet(cache, key, value, ttl, now = Date.now()) {
   cache.set(key, { value, expires: now + ttl });
 }
 const DESK_LIMIT = 2;
+const INTERACTIVE_LIMIT = 1;
 const deskLanes = new Map();
+const interactiveLanes = new Map();
 
-function lane(name) {
-  if (!deskLanes.has(name)) {
-    let active = 0;
-    const waiting = [];
-    deskLanes.set(name, async (fn) => {
-      if (active >= DESK_LIMIT) await new Promise((resolve) => waiting.push(resolve));
-      active += 1;
-      try {
-        return await fn();
-      } finally {
-        active -= 1;
-        const next = waiting.shift();
-        if (next) next();
-      }
-    });
+function makeLane(limit) {
+  let active = 0;
+  const waiting = [];
+  return async (fn) => {
+    if (active >= limit) await new Promise((resolve) => waiting.push(resolve));
+    active += 1;
+    try {
+      return await fn();
+    } finally {
+      active -= 1;
+      const next = waiting.shift();
+      if (next) next();
+    }
+  };
+}
+
+/** Engine bookings share one queue. On-demand Book + track uses a separate lane so it does not wait behind the engine. */
+function lane(name, interactive = false) {
+  const store = interactive ? interactiveLanes : deskLanes;
+  const limit = interactive ? INTERACTIVE_LIMIT : DESK_LIMIT;
+  if (!store.has(name)) store.set(name, makeLane(limit));
+  return store.get(name);
+}
+
+async function withDeadline(promise, deadline, message) {
+  const ms = deadline ? deadline - Date.now() : Infinity;
+  if (!Number.isFinite(ms)) return promise;
+  if (ms <= 0) throw new Error(message);
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
-  return deskLanes.get(name);
 }
 
 export function resetBookerCache() {
@@ -100,6 +124,7 @@ export function resetBookerCache() {
   priceCache.clear();
   offerCache = null;
   deskLanes.clear();
+  interactiveLanes.clear();
 }
 
 function product(values) {
@@ -584,7 +609,7 @@ async function cachedIndex(request) {
   }
 }
 
-export async function bookAll(legs, request, onBook, only) {
+export async function bookAll(legs, request, onBook, only, opts = {}) {
   if (typeof request !== 'function') throw new Error('Booking needs an HTTP client.');
   const rawRequest = request;
   request = async (method, url, opts) => {
@@ -606,10 +631,25 @@ export async function bookAll(legs, request, onBook, only) {
     seen.add(key);
     mapped.push(leg);
   }
-  const index = mapped.length ? await cachedIndex(request) : null;
+  const interactive = Boolean(opts.interactive);
+  const deadline = Number(opts.deadline) || 0;
+  const timeoutMessage = 'This bookmaker took too long. Try again.';
+  const allowed = Array.isArray(only) ? new Set(only) : null;
+  const deskNames = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'].filter((name) => !allowed || allowed.has(name));
+  let index = null;
+  try {
+    index = mapped.length ? await withDeadline(cachedIndex(request), deadline, timeoutMessage) : null;
+  } catch (error) {
+    const failed = { parts: [], error: publicError(error?.message || error), dropped: [] };
+    const books = {};
+    for (const name of deskNames) {
+      books[name] = { ...failed };
+      onBook?.(name, books[name]);
+    }
+    return books;
+  }
   const open = mapped.filter((leg) => stillOffered(index, leg));
   const closed = mapped.filter((leg) => !stillOffered(index, leg)).map((leg) => drop(leg, 'Closed or suspended in the latest price scan.'));
-  const allowed = Array.isArray(only) ? new Set(only) : null;
   const runners = [
     ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request), DESK_MAX.sportybet)],
     ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request), DESK_MAX.footballcom)],
@@ -622,7 +662,11 @@ export async function bookAll(legs, request, onBook, only) {
     runners.map(async ([name, run]) => {
       let result;
       try {
-        const done = await lane(name)(async () => (open.length ? await run(open) : { parts: [], dropped: [], kept: [] }));
+        const done = await withDeadline(
+          lane(name, interactive)(async () => (open.length ? await run(open) : { parts: [], dropped: [], kept: [] })),
+          deadline,
+          timeoutMessage,
+        );
         const parts = done.parts.map((part) => withLink(name, part));
         const dropped = [...closed, ...done.dropped];
         const kept = done.kept || [];

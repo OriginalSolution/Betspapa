@@ -11,6 +11,7 @@ const MAX_GROUPS = 12;
 const CACHE_MS = 6 * 60 * 60 * 1000;
 const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS = 8;
+const ON_DEMAND_MS = 40_000;
 
 const cache = new Map();
 const hits = new Map();
@@ -75,7 +76,7 @@ function remember(key, value) {
   return value;
 }
 
-export async function bookGroups(groups, request, now = new Date(), ip = 'local') {
+export async function bookGroups(groups, request, now = new Date(), ip = 'local', opts = {}) {
   const rows = (Array.isArray(groups) ? groups : []).slice(0, MAX_GROUPS);
   const booked = [];
   for (const group of rows) {
@@ -103,8 +104,25 @@ export async function bookGroups(groups, request, now = new Date(), ip = 'local'
       error.status = 429;
       throw error;
     }
-    const books = await bookAll(legs, request);
-    booked.push(remember(key, { id: String(group?.id || ''), key, books, bookedAt: new Date().toISOString(), legCount: legs.length }));
+    const started = Date.now();
+    const budget = Number(opts.deadlineMs);
+    const deadlineMs = Number.isFinite(budget) && budget >= 0 ? budget : ON_DEMAND_MS;
+    console.log(`[book] on-demand ${legs.length} legs`);
+    const books = await bookAll(legs, request, undefined, undefined, {
+      interactive: true,
+      deadline: started + deadlineMs,
+    });
+    const ok = Object.entries(books).filter(([, book]) => book?.parts?.length).map(([name]) => name);
+    const failed = Object.entries(books)
+      .filter(([, book]) => book?.error && !book?.parts?.length)
+      .map(([name, book]) => `${name}: ${book.error}`);
+    console.log(
+      `[book] on-demand done in ${Date.now() - started}ms legs=${legs.length} ok=${ok.join(',') || 'none'}`
+        + (failed.length ? ` fail=${failed.join('; ')}` : ''),
+    );
+    const row = { id: String(group?.id || ''), key, books, bookedAt: new Date().toISOString(), legCount: legs.length };
+    const timedOut = Object.values(books).some((book) => /took too long/i.test(String(book?.error || '')));
+    booked.push(timedOut ? row : remember(key, row));
   }
   return { groups: booked };
 }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { resetBookerCache } from './bookers.mjs';
 import { allowBooking, bookGroups, emptyBookReason, prepareLegs, resetBookingLimits } from './bookOnDemand.mjs';
 
 const future = '2026-11-13T22:00:00.000Z';
@@ -39,4 +40,21 @@ test('a burst of different lists is rate limited', () => {
   for (let i = 0; i < 8; i += 1) assert.equal(allowBooking('203.0.113.8', 1_000 + i), true);
   assert.equal(allowBooking('203.0.113.8', 1_007), false);
   assert.equal(allowBooking('203.0.113.9', 1_007), true);
+});
+
+test('a timed-out on-demand book is not cached', async () => {
+  resetBookingLimits();
+  resetBookerCache();
+  const legs = prepareLegs(
+    [{ eventId: 'sr:match:9', market: 'over15', odds: 1.3, kickoff: future, match: 'A vs B' }],
+    now,
+  );
+  const request = async (method, url) => {
+    if (String(url).includes('pcUpcomingEvents')) return { data: { tournaments: [], totalNum: 0 } };
+    return { bizCode: 10000, data: { shareCode: 'REAL9', outcomes: [{ matchStatus: 'Not start' }] } };
+  };
+  const first = await bookGroups([{ id: 'all', legs }], request, now, 'local', { deadlineMs: 0 });
+  assert.match(first.groups[0].books.sportybet.error, /took too long/i);
+  const again = await bookGroups([{ id: 'all', legs }], request, now, 'local', { deadlineMs: 5_000 });
+  assert.equal(again.groups[0].books.sportybet.parts[0].code, 'REAL9');
 });
