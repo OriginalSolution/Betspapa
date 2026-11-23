@@ -20,6 +20,11 @@
   --topbar: 58px;
   --tab: 62px;
   --radius: 18px;
+  /* Browser and installed PWA. The Android app overrides these inline with the real system bars. */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
 }
 
 * { box-sizing: border-box; }
@@ -37,7 +42,9 @@ body {
 body::before {
   content: "";
   position: fixed;
-  inset: 0 0 auto 0;
+  top: var(--safe-area-inset-top);
+  left: 0;
+  right: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--red) 20%, #ffb703 50%, var(--red) 80%, transparent);
   z-index: 80;
@@ -52,9 +59,13 @@ button:disabled { cursor: default; opacity: 0.35; }
   min-height: 100dvh;
 }
 .sidenav, .rail { display: none; }
-.center { min-height: 100dvh; }
+.center {
+  min-height: 100dvh;
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
 .main {
-  padding-bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 28px);
+  padding-bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 28px);
 }
 
 .topbar {
@@ -64,9 +75,9 @@ button:disabled { cursor: default; opacity: 0.35; }
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: var(--topbar);
-  padding: 8px 12px 8px 14px;
-  background: rgba(7, 8, 12, 0.88);
+  min-height: calc(var(--topbar) + var(--safe-area-inset-top));
+  padding: calc(8px + var(--safe-area-inset-top)) 12px 8px 14px;
+  background: #07080c;
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--line);
 }
@@ -346,9 +357,9 @@ img.crest { display: inline-block; padding: 1px; }
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  height: calc(var(--tab) + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-  background: rgba(10, 12, 16, 0.94);
+  height: calc(var(--tab) + var(--safe-area-inset-bottom));
+  padding: 0 var(--safe-area-inset-right) var(--safe-area-inset-bottom) var(--safe-area-inset-left);
+  background: #07080c;
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--line);
 }
@@ -609,9 +620,9 @@ img.crest { display: inline-block; padding: 1px; }
   position: fixed;
   z-index: 45;
   left: 50%;
-  bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 12px);
+  bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 12px);
   transform: translateX(-50%);
-  width: min(440px, calc(100vw - 24px));
+  width: min(440px, calc(100vw - 24px - var(--safe-area-inset-left) - var(--safe-area-inset-right)));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -807,9 +818,9 @@ img.crest { display: inline-block; padding: 1px; }
   position: fixed;
   z-index: 40;
   left: 50%;
-  bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 10px);
+  bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 10px);
   transform: translateX(-50%);
-  width: min(440px, calc(100vw - 24px));
+  width: min(440px, calc(100vw - 24px - var(--safe-area-inset-left) - var(--safe-area-inset-right)));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1113,7 +1124,7 @@ img.crest { display: inline-block; padding: 1px; }
   z-index: 90;
   display: flex;
   flex-direction: column;
-  padding: calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 22px);
+  padding: calc(var(--safe-area-inset-top) + 28px) calc(22px + var(--safe-area-inset-right)) calc(var(--safe-area-inset-bottom) + 22px) calc(22px + var(--safe-area-inset-left));
   background:
     radial-gradient(800px 380px at 50% -80px, rgba(225, 29, 46, 0.32), transparent 62%),
     #07080c;
@@ -1463,9 +1474,9 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .pick-float {
   position: fixed;
   z-index: 25;
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 10px);
+  left: calc(12px + var(--safe-area-inset-left));
+  right: calc(12px + var(--safe-area-inset-right));
+  bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 10px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2083,9 +2094,9 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .pack-remove { background: transparent; color: var(--muted); font-size: 12px; }
 .pack-bar {
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--tab) + env(safe-area-inset-bottom) + 8px);
+  left: calc(12px + var(--safe-area-inset-left));
+  right: calc(12px + var(--safe-area-inset-right));
+  bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 8px);
   z-index: 25;
   display: flex;
   align-items: center;
