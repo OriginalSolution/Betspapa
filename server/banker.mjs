@@ -34,6 +34,7 @@ import {
 import { collectCandidates, coverageFromEvents, mapPool } from './bankerFeed.mjs';
 import { bookShare, readCode, readDesk, sameSelections } from './bankerRead.mjs';
 import { assemble, priceStillOk, productOdds } from './bankerRules.mjs';
+import { legFixture, legList, legScore } from '../src/lib/noteCopy.mjs';
 
 function emptyState(now) {
   return {
@@ -131,6 +132,30 @@ function publicLeg(leg, crestFor) {
     status,
     mismatch: Boolean(leg.mismatch),
   };
+}
+
+/** Code alert wording. Legs are named by their real fixtures, e.g. "3 legs: Arsenal v Chelsea, Real Madrid v Getafe and 1 more." */
+export function codeNoticeCopy(row, kind, name, when = '') {
+  let title = `${name} ${when}${row.code} booked`;
+  const legs = row.legs || [];
+  const count = `${legs.length} ${legs.length === 1 ? 'leg' : 'legs'}`;
+  const fixtures = legList(legs, legFixture, 2);
+  let body = fixtures ? `${count}: ${fixtures}.` : `${count}.`;
+  if (kind === 'rebooked') {
+    title = `${name} ${row.replaced} replaced by ${row.code}`;
+    body = `Open ${row.code}. The previous code is no longer current.`;
+  } else if (kind === 'settled') {
+    const lost = (row.legs || []).find((leg) => (leg.gradeStatus || leg.bookResult) === 'lost');
+    if (lost) {
+      title = `${name} ${when}${row.code} lost`;
+      body = `${legScore(lost)} missed ${lost.label}.`.replace(/\s+/g, ' ').trim();
+    } else {
+      title = `${name} ${when}${row.code} won`;
+      const scores = legList(legs, (leg) => legScore(leg), 2);
+      body = scores ? `${count} landed: ${scores}.` : `All ${count} landed.`;
+    }
+  }
+  return { title, body };
 }
 
 export function bankerNote(alert) {
@@ -253,21 +278,7 @@ export function createBanker(options = {}) {
     const name = (meta?.name || row.strategy).replace('Banker ', '');
     const face = faceOf(row);
     const when = row.slot === 'daily' && row.day ? `${shortDow(row.day)} ` : '';
-    let title = `${name} ${when}${row.code} booked`;
-    let body = `${(row.legs || []).length} legs.`;
-    if (kind === 'rebooked') {
-      title = `${name} ${row.replaced} replaced by ${row.code}`;
-      body = `Open ${row.code}. The previous code is no longer current.`;
-    } else if (kind === 'settled') {
-      const lost = (row.legs || []).find((leg) => (leg.gradeStatus || leg.bookResult) === 'lost');
-      if (lost) {
-        title = `${name} ${when}${row.code} lost`;
-        body = `${lost.home} ${lost.score || lost.ft || ''} ${lost.away}, ${lost.label}`.replace(/\s+/g, ' ').trim();
-      } else {
-        title = `${name} ${when}${row.code} settled`;
-        body = `All ${(row.legs || []).length} legs are in.`;
-      }
-    }
+    const { title, body } = codeNoticeCopy(row, kind, name, when);
     const alert = {
       id,
       strategy: row.strategy,

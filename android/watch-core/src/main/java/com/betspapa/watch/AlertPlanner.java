@@ -17,7 +17,6 @@ public final class AlertPlanner {
     public static final long POLL_MS = 30_000L;
     public static final int WATCH_NOTIFICATION_ID = 2_000_000_001;
 
-    private static final String DASH = "\u2013";
     private static final Map<String, String> LABELS = labels();
 
     private AlertPlanner() {}
@@ -89,9 +88,10 @@ public final class AlertPlanner {
             org.json.JSONObject priced = state.bookingFor(trend);
             if (priced != null && belowFloor(priced.optString("odds", ""))) continue;
             String label = LABELS.get(parts[1]);
-            WatchNote note = new WatchNote(id, match.id, "win", "Trend hit · " + label, match.home + " vs " + match.away + " · " + label);
+            NoteCopy.Copy copy = NoteCopy.trend(match, label);
+            WatchNote note = new WatchNote(id, match.id, "win", copy.title, copy.body);
             note.marketLabel = label;
-            note.fixture = match.abbrHome() + " vs " + match.abbrAway();
+            note.fixture = NoteCopy.fixture(match);
             org.json.JSONObject booking = state.bookingFor(trend);
             if (booking != null) {
                 String bookedLabel = booking.optString("marketLabel", "");
@@ -190,22 +190,23 @@ public final class AlertPlanner {
     static List<WatchNote> signals(WatchMatch match, WatchState state) {
         List<WatchNote> out = new ArrayList<WatchNote>();
         if ("scheduled".equals(match.status) || "postponed".equals(match.status)) return out;
-        String versus = match.home + " vs " + match.away;
-        String current = scoreText(match.homeScore, match.awayScore);
-        out.add(new WatchNote(match.id + ":kickoff", match.id, "kickoff", "Kick-off", versus + " is underway"));
+        NoteCopy.Copy kickoff = NoteCopy.kickoff(match);
+        out.add(new WatchNote(match.id + ":kickoff", match.id, "kickoff", kickoff.title, kickoff.body));
         boolean holdHome = false;
         boolean holdAway = false;
         if (match.varReview != null) {
             holdHome = match.homeId != null && match.homeId.equals(match.varReview.teamId);
             holdAway = match.awayId != null && match.awayId.equals(match.varReview.teamId);
-            String team = holdHome ? match.home : match.away;
-            String player = match.varReview.player == null || match.varReview.player.isEmpty() ? "Goal" : match.varReview.player;
+            String side = holdHome ? "home" : holdAway ? "away" : "";
+            String named = match.varReview.player == null ? "" : match.varReview.player.trim();
+            String player = named.isEmpty() ? "Goal" : named;
+            NoteCopy.Copy copy = NoteCopy.varReview(match, side, named, match.varReview.minute);
             WatchNote review = new WatchNote(
                 match.id + ":var:" + match.varReview.minute + ":" + player,
                 match.id,
                 "var",
-                "VAR",
-                player + " " + match.varReview.minute + "′ · " + team + " goal under review"
+                copy.title,
+                copy.body
             );
             review.minute = match.varReview.minute;
             review.player = player;
@@ -222,11 +223,13 @@ public final class AlertPlanner {
         // Only the break itself. "Half-time" at full time, or at 45' while stoppage time is still
         // being played, was a stale card.
         if ("halftime".equals(match.status)) {
-            String ht = match.htHome != null && match.htAway != null ? scoreText(match.htHome, match.htAway) : current;
-            out.add(new WatchNote(match.id + ":ht", match.id, "ht", "Half-time", match.home + " " + ht + " " + match.away));
+            boolean known = match.htHome != null && match.htAway != null;
+            NoteCopy.Copy copy = NoteCopy.halfTime(match, known ? match.htHome : match.homeScore, known ? match.htAway : match.awayScore);
+            out.add(new WatchNote(match.id + ":ht", match.id, "ht", copy.title, copy.body));
         }
         if ("finished".equals(match.status)) {
-            out.add(new WatchNote(match.id + ":ft", match.id, "ft", "Full-time", match.home + " " + current + " " + match.away));
+            NoteCopy.Copy copy = NoteCopy.fullTime(match);
+            out.add(new WatchNote(match.id + ":ft", match.id, "ft", copy.title, copy.body));
         }
         boolean sawVar = match.varReview != null;
         for (WatchMatch.Marker marker : match.markers) {
@@ -248,15 +251,15 @@ public final class AlertPlanner {
         String side = home ? "home" : "away";
         if (now < floor) {
             if (!inPlay) return;
-            String team = home ? match.home : match.away;
+            NoteCopy.Copy copy = NoteCopy.disallowed(match, side, match.minute);
             for (int index = floor; index > now; index--) {
                 String goalId = goalId(match.id, side, index, revision(state, match.id, side, index));
                 WatchNote note = new WatchNote(
                     goalId + ":cancelled",
                     match.id,
                     "var",
-                    "VAR · " + team,
-                    "Goal disallowed · " + match.home + " " + scoreText(match.homeScore, match.awayScore) + " " + match.away
+                    copy.title,
+                    copy.body
                 );
                 note.disallowed = true;
                 note.varCheck = true;
@@ -283,15 +286,16 @@ public final class AlertPlanner {
     }
 
     private static WatchNote cardNote(WatchMatch match, WatchMatch.Marker marker, String kind, String title) {
-        boolean away = "away".equals(marker.side);
-        String team = away ? match.away : match.home;
-        String player = marker.player == null || marker.player.isEmpty() ? title : marker.player;
+        String named = marker.player == null ? "" : marker.player.trim();
+        String player = named.isEmpty() ? title : named;
+        String side = "away".equals(marker.side) ? "away" : "home".equals(marker.side) ? "home" : sideOfAbbr(match, marker.abbr);
+        NoteCopy.Copy copy = NoteCopy.incident(match, kind, side, named, marker.minute);
         WatchNote note = new WatchNote(
             match.id + ":" + kind + ":" + marker.side + ":" + marker.minute + ":" + player,
             match.id,
             kind,
-            title + " · " + team,
-            player + " " + marker.minute + "′ · " + match.home + " vs " + match.away
+            copy.title,
+            copy.body
         );
         note.minute = marker.minute;
         note.player = player;
@@ -304,24 +308,19 @@ public final class AlertPlanner {
     }
 
     private static WatchNote goal(WatchMatch match, boolean home, int index, int rev) {
-        String team = home ? match.home : match.away;
         String side = home ? "home" : "away";
-        WatchNote note = new WatchNote(
-            goalId(match.id, side, index, rev),
-            match.id,
-            "goal",
-            "Goal · " + team,
-            team + " score · " + match.home + " " + scoreText(match.homeScore, match.awayScore) + " " + match.away
-        );
+        NoteCopy.Copy copy = NoteCopy.goal(match, side, "", match.minute);
+        WatchNote note = new WatchNote(goalId(match.id, side, index, rev), match.id, "goal", copy.title, copy.body);
         note.minute = match.minute;
-        note.player = team;
         return note;
     }
 
-    private static String scoreText(Integer home, Integer away) {
-        int left = home == null ? 0 : home;
-        int right = away == null ? 0 : away;
-        return left + DASH + right;
+    /** Older markers only carry the team abbreviation; map it back to a side. */
+    private static String sideOfAbbr(WatchMatch match, String abbr) {
+        if (abbr == null || abbr.isEmpty()) return "";
+        if (abbr.equals(match.abbrHome()) && !abbr.equals(match.abbrAway())) return "home";
+        if (abbr.equals(match.abbrAway()) && !abbr.equals(match.abbrHome())) return "away";
+        return "";
     }
 
     private static boolean halfReady(WatchMatch match) {

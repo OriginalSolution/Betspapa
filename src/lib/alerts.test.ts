@@ -36,7 +36,7 @@ describe('followed alerts', () => {
     const now = Date.parse('2026-11-10T18:10:00.000Z');
     const notes = followedNotices([match()], follows, settings, new Set(), now);
     expect(notes.map((note) => note.kind)).toContain('kickoff');
-    expect(notes[0]?.body).toContain('Al Astiklal');
+    expect(notes[0]?.title).toContain('Al Astiklal');
     const again = followedNotices([match()], follows, settings, new Set(notes.map((note) => note.id)), now);
     expect(again).toEqual([]);
   });

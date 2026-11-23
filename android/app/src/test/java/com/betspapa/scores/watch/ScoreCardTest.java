@@ -80,7 +80,7 @@ public class ScoreCardTest {
         assertTrue(AlertPoster.post(context, goal, "chant"));
         Notification note = posted(context);
         assertEquals(AlertPoster.GOAL_CHANT, note.getChannelId());
-        assertEquals("Goal · Arsenal", note.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertEquals("GOAL! Arsenal 2-1 Chelsea", note.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
         String template = note.extras.getString(Notification.EXTRA_TEMPLATE);
         assertTrue(template, template != null && template.contains("DecoratedCustomView"));
         assertFalse(ScoreCards.shareText(goal, match).toLowerCase().contains("sporty"));
@@ -107,7 +107,7 @@ public class ScoreCardTest {
         WatchNote goal = goal(match);
         assertTrue(AlertPoster.post(context, goal, "crowd"));
         assertEquals(1, shadowOf(manager(context)).getAllNotifications().size());
-        assertEquals("Goal · Arsenal", posted(context).extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertEquals("GOAL! Arsenal 2-1 Chelsea", posted(context).extras.getCharSequence(Notification.EXTRA_TITLE).toString());
         assertEquals(AlertPoster.GOAL_CROWD, posted(context).getChannelId());
 
         WatchNote again = new WatchNote(match.id + ":var:70:Martinelli", match.id, "var", "VAR", "Martinelli under review");
@@ -236,7 +236,7 @@ public class ScoreCardTest {
     }
 
     private static WatchNote goal(WatchMatch match) {
-        WatchNote note = new WatchNote(match.id + ":goal:home:2", match.id, "goal", "Goal · Arsenal", "Arsenal score · Arsenal 2–1 Chelsea");
+        WatchNote note = new WatchNote(match.id + ":goal:home:2", match.id, "goal", "GOAL! Arsenal 2-1 Chelsea", "Saka 54′ · Arsenal");
         note.minute = 54;
         note.player = "Saka";
         return note;

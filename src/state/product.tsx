@@ -24,6 +24,7 @@ import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineS
 import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
 import { useStore } from './store';
+import { fixtureLine } from '../lib/noteCopy.mjs';
 
 type Product = {
   picks: PickView[];
@@ -198,7 +199,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
           market: pick.market,
           marketLabel: pick.marketLabel,
           odds,
-          fixture: match ? `${match.home.abbr} vs ${match.away.abbr}` : `${pick.teamName} vs ${pick.opponentName}`,
+          fixture: match ? fixtureLine({ home: match.home.name || match.home.shortName, away: match.away.name || match.away.shortName }) : fixtureLine({ home: pick.teamName, away: pick.opponentName }),
           bookId: booked?.bookId || '',
           code: booked?.code || '',
         };

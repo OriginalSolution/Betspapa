@@ -1,0 +1,28 @@
+export type CopyMatch = {
+  home?: string | null;
+  away?: string | null;
+  homeScore?: number | string | null;
+  awayScore?: number | string | null;
+  minute?: number | string | null;
+  competition?: string | null;
+};
+export type Copy = { title: string; body: string };
+export type CopyLeg = { home?: string | null; away?: string | null; score?: string | null; ft?: string | null };
+export type Side = 'home' | 'away' | '';
+export type Moment = { player?: string | null; minute?: number | string | null };
+
+export function teamName(value: unknown, fallback?: string): string;
+export function minuteMark(minute: number | string | null | undefined): string;
+export function scoreLine(match: CopyMatch, homeScore?: number | string | null, awayScore?: number | string | null): string;
+export function fixtureLine(match: CopyMatch): string;
+export function kickoffCopy(match: CopyMatch): Copy;
+export function goalCopy(match: CopyMatch, side: Side, moment?: Moment): Copy;
+export function disallowedCopy(match: CopyMatch, side: Side, moment?: Moment): Copy;
+export function varReviewCopy(match: CopyMatch, side: Side, moment?: Moment): Copy;
+export function incidentCopy(match: CopyMatch, type: string, side: Side, moment?: Moment): Copy;
+export function halfTimeCopy(match: CopyMatch, htHome?: number | string | null, htAway?: number | string | null): Copy;
+export function fullTimeCopy(match: CopyMatch): Copy;
+export function trendCopy(match: CopyMatch, label: string): Copy;
+export function legFixture(leg: CopyLeg): string;
+export function legScore(leg: CopyLeg, score?: string): string;
+export function legList<T>(legs: T[], text?: (leg: T) => string, limit?: number): string;

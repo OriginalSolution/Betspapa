@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.RemoteViews;
 import androidx.core.app.NotificationCompat;
 import com.betspapa.scores.R;
+import com.betspapa.watch.NoteCopy;
 import com.betspapa.watch.WatchMatch;
 import com.betspapa.watch.WatchNote;
 import java.util.List;
@@ -214,7 +215,7 @@ final class ScoreCards {
         if (match == null) return note == null || note.body == null ? "" : note.body;
         int home = match.homeScore == null ? 0 : match.homeScore;
         int away = match.awayScore == null ? 0 : match.awayScore;
-        return match.abbrHome() + " " + home + "\u2013" + away + " " + match.abbrAway();
+        return NoteCopy.home(match) + " " + home + "\u2013" + away + " " + NoteCopy.away(match);
     }
 
     private static String bigScore(WatchMatch match) {
@@ -253,8 +254,9 @@ final class ScoreCards {
         }
         if (latest == null) return "";
         if (latest.player != null && !latest.player.isEmpty()) return latest.player + " " + latest.minute + "′";
-        String abbr = latest.abbr == null ? "" : latest.abbr;
-        return abbr.isEmpty() ? latest.minute + "′" : latest.minute + "′ " + abbr;
+        String team = NoteCopy.team(match, latest.side);
+        if (team.isEmpty()) team = latest.abbr == null ? "" : latest.abbr;
+        return team.isEmpty() ? latest.minute + "′" : latest.minute + "′ " + team;
     }
 
     private static String name(WatchMatch match, boolean home) {
@@ -290,7 +292,7 @@ final class ScoreCards {
     private static String fixture(WatchNote note, WatchMatch match) {
         String line = note != null && note.fixture != null && !note.fixture.isEmpty()
             ? note.fixture
-            : match == null ? "" : match.abbrHome() + " vs " + match.abbrAway();
+            : match == null ? "" : NoteCopy.fixture(match);
         if (note != null && note.oddsText != null && !note.oddsText.isEmpty()) line = line + " " + note.oddsText;
         return line;
     }
@@ -370,8 +372,8 @@ final class ScoreCards {
     }
 
     static String shareText(WatchNote note, WatchMatch match) {
-        String home = match == null ? "Home" : match.fullHome();
-        String away = match == null ? "Away" : match.fullAway();
+        String home = NoteCopy.home(match);
+        String away = NoteCopy.away(match);
         int homeScore = match == null || match.homeScore == null ? 0 : match.homeScore;
         int awayScore = match == null || match.awayScore == null ? 0 : match.awayScore;
         String text = home + " " + homeScore + "\u2013" + awayScore + " " + away;

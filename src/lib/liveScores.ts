@@ -1,5 +1,6 @@
 import { crestKey, expandTeamName } from './crests';
 import type { Follows, InboxItem, Match, Settings } from '../types';
+import { kickoffCopy } from './noteCopy.mjs';
 
 /** TheSportsDB publishes 123 as the free API key for building apps. Livescore is premium; the day schedule includes status and score. */
 const SCORE_URL = 'https://www.thesportsdb.com/api/v1/json/123/eventsday.php';
@@ -131,8 +132,11 @@ export function kickoffNotices(
       id,
       matchId: match.id,
       kind: 'kickoff',
-      title: 'Kick-off',
-      body: `${match.home.shortName} vs ${match.away.shortName} is underway`,
+      ...kickoffCopy({
+        home: match.home.name || match.home.shortName,
+        away: match.away.name || match.away.shortName,
+        competition: match.competition?.name || '',
+      }),
       createdAt: now,
       read: false,
     });

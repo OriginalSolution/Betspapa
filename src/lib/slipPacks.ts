@@ -1,6 +1,7 @@
 import type { PickTip } from './matchPicks';
 import { marketLabel } from './engineSlips';
 import type { Match } from '../types';
+import { legList, legScore } from './noteCopy.mjs';
 
 /** Same bands as the server. A price outside this table is not a suggestion. */
 const RANGES: Record<string, { min: number; max: number; exclusive?: boolean }> = {
@@ -209,24 +210,9 @@ export function slipAlert(legs: GradedLeg[]): { title: string; body: string; kin
   const kind = lost.length ? 'bust' : 'win';
   const title = lost.length ? `Slip lost · ${won.length} of ${played.length} legs won` : `Slip won · ${won.length} of ${played.length} legs`;
   const missed = lost[0];
-  const landed = won.map((leg) => shortSide(leg.home)).filter(Boolean);
-  const landedLine = landed.length === 1 ? `${landed[0]} landed.` : landed.length ? `${joinNames(landed)} legs all landed.` : '';
-  const body = missed
-    ? `${missed.home} ${scoreWords(missed.ft)} ${missed.away} missed ${missed.label}.${landedLine ? ` ${landedLine}` : ''}`
-    : landedLine;
+  const landedList = legList(won, (leg) => legScore(leg, leg.ft || ''), 3);
+  const landedLine = landedList ? `${landedList} landed.` : '';
+  const body = missed ? `${legScore(missed, missed.ft || '')} missed ${missed.label}.${landedLine ? ` ${landedLine}` : ''}` : landedLine;
   return { title, kind, body: body.replace(/\s+/g, ' ').trim() };
 }
 
-function shortSide(name: string): string {
-  return name.replace(/\s+(FC|AFC|CF)$/i, '').trim();
-}
-
-function scoreWords(ft: string | null): string {
-  return ft ? ft.replace('-', '-') : '';
-}
-
-function joinNames(names: string[]): string {
-  if (names.length <= 1) return names[0] || '';
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}

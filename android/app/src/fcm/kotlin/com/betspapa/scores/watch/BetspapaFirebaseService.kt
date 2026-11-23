@@ -45,6 +45,7 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             rememberMatch(state, data)
             note = WatchNote(id, data["matchId"].orEmpty(), kind, title, body)
             data["minute"]?.toIntOrNull()?.let { note.minute = it }
+            data["player"]?.trim()?.takeIf { it.isNotEmpty() }?.let { note.player = it }
             data["marketLabel"]?.takeIf { it.isNotEmpty() }?.let { note.marketLabel = it }
             data["fixture"]?.takeIf { it.isNotEmpty() }?.let { note.fixture = it }
             data["odds"]?.takeIf { it.isNotEmpty() }?.let { note.oddsText = it }
@@ -111,7 +112,9 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
         val kind = data["kind"].orEmpty()
         if (minute != null && (kind == "goal" || kind == "var" || kind == "red" || kind == "penalty")) {
             val type = if (kind == "goal") "goal" else kind
-            match.addMarker(type, minute, match.abbrHome())
+            val side = data["side"]?.takeIf { it == "home" || it == "away" }.orEmpty()
+            val abbr = if (side == "away") match.abbrAway() else match.abbrHome()
+            match.addMarker(type, minute, abbr, side, data["player"].orEmpty())
         }
     }
 
