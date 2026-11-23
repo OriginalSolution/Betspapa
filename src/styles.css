@@ -2119,6 +2119,33 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .slip-alert p { margin: 0; color: #6d625c; font-size: 12px; }
 .slip-alert strong { display: block; margin-top: 2px; }
 .slip-alert span { display: block; margin-top: 4px; font-size: 13px; }
+.xi-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  background: linear-gradient(90deg, rgba(240, 201, 74, 0.2), rgba(240, 201, 74, 0.05));
+  border: 1px solid rgba(240, 201, 74, 0.5);
+}
+.xi-strip span { flex: 1; min-width: 0; }
+.xi-strip strong { display: block; color: var(--gold); font-size: 13px; }
+.xi-strip small { display: block; color: var(--muted); font-size: 11px; }
+.xi-strip em { font-style: normal; background: var(--gold); color: #14120a; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+.xi-card { background: #12151c; border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; margin-top: 12px; }
+.xi-card header { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+.xi-card header strong { color: var(--text); font-size: 16px; }
+.xi-card ol { list-style: none; margin: 10px 0 0; padding: 0; }
+.xi-card li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+.xi-card li b { color: var(--faint); }
+.xi-card li em { font-style: normal; color: #14120a; background: var(--gold); border-radius: 999px; padding: 2px 6px; font-size: 11px; font-weight: 800; }
+.xi-dropped { margin-top: 10px; }
+.xi-dropped p { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
+.xi-dropped div { display: flex; flex-wrap: wrap; gap: 6px; }
+.xi-dropped span { background: #1c222e; border-radius: 999px; padding: 4px 8px; font-size: 12px; }
 @media (min-width: 960px) {
   .pack-bar { position: sticky; bottom: 12px; left: auto; right: auto; }
   .slip-builder { padding-bottom: 12px; }

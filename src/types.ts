@@ -93,6 +93,14 @@ export type Settings = {
   dataSource: DataSource;
   /** Booking-code cards, match posters, and the weekend bankers flyer. */
   promos: boolean;
+  /** Starting XI alerts for a followed team or match. */
+  lineups: boolean;
+  /** Alert only when a team makes 3 or more changes. */
+  lineupBig: boolean;
+  /** Gold strip on the match card. */
+  lineupCard: boolean;
+  /** Followed team or match ids with lineup alerts turned off. */
+  lineupOff: string[];
 };
 
 export type Follows = {
@@ -134,4 +142,8 @@ export const defaultSettings: Settings = {
   notificationStyle: 'auto',
   dataSource: 'sporty',
   promos: true,
+  lineups: true,
+  lineupBig: false,
+  lineupCard: true,
+  lineupOff: [],
 };
