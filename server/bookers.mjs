@@ -633,6 +633,7 @@ export async function bookAll(legs, request, onBook, only, opts = {}) {
   }
   const interactive = Boolean(opts.interactive);
   const deadline = Number(opts.deadline) || 0;
+  const deskMs = Number(opts.deskMs) > 0 ? Number(opts.deskMs) : 0;
   const timeoutMessage = 'This bookmaker took too long. Try again.';
   const allowed = Array.isArray(only) ? new Set(only) : null;
   const deskNames = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'].filter((name) => !allowed || allowed.has(name));
@@ -662,9 +663,10 @@ export async function bookAll(legs, request, onBook, only, opts = {}) {
     runners.map(async ([name, run]) => {
       let result;
       try {
+        const deskDeadline = deskMs ? Math.min(deadline || Number.POSITIVE_INFINITY, Date.now() + deskMs) : deadline;
         const done = await withDeadline(
           lane(name, interactive)(async () => (open.length ? await run(open) : { parts: [], dropped: [], kept: [] })),
-          deadline,
+          deskDeadline,
           timeoutMessage,
         );
         const parts = done.parts.map((part) => withLink(name, part));

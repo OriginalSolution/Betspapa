@@ -30,12 +30,25 @@ export function goToBookedCodes(navigate: NavigateFunction, path: string, codes:
 }
 
 let hint: HTMLElement | null = null;
-function showHint(text: string) {
+function showHint(text: string, anchor?: HTMLElement) {
   hint?.remove();
   const node = document.createElement('p');
   node.className = 'fresh-hint';
   node.setAttribute('role', 'status');
   node.textContent = text;
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    const mid = Math.min(Math.max(rect.left + rect.width / 2, 140), window.innerWidth - 140);
+    const below = rect.bottom + 10;
+    node.classList.add('is-anchored');
+    node.style.left = `${mid}px`;
+    if (below + 72 < window.innerHeight - 96) {
+      node.style.top = `${below}px`;
+    } else {
+      node.style.top = `${Math.max(12, rect.top - 10)}px`;
+      node.style.transform = 'translate(-50%, -100%)';
+    }
+  }
   document.body.appendChild(node);
   hint = node;
   window.setTimeout(() => {
@@ -75,7 +88,7 @@ export function useFreshCodes(ready: unknown, options: { scroll?: boolean } = {}
       clearFresh();
       if (scroll) lit[0].scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
       const first = fresh.find((item) => isDesk(item.desk));
-      if (first) showHint(`New code ${first.code} · tap it to open ${deskName(first.desk)}`);
+      if (first) showHint(`New code ${first.code} · tap it to open ${deskName(first.desk)}`, lit[0]);
       pulseTimer = window.setTimeout(() => lit.forEach((node) => node.classList.remove('fresh-pulse')), PULSE_MS);
     });
     return () => {

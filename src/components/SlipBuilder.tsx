@@ -130,7 +130,7 @@ export function SlipBuilder() {
           <p>Slip · {added.size} {added.size === 1 ? 'trend' : 'trends'}</p>
           <strong className="pack-facts">
             {selected.length} legs · {matchCount} matches
-            {selected.length && partCount === 1 ? ` · ${totalOddsLine(selected)}` : ''}
+            {selected.length && partCount === 1 ? <> · <span className="pack-odds">{totalOddsLine(selected)}</span></> : ''}
           </strong>
           <span role={busy || problem ? 'status' : undefined} className={problem && !busy ? 'pack-bar-error' : undefined}>
             {busy
