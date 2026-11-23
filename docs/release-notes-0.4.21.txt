@@ -1,0 +1,1 @@
+Goal alerts now open as a full scoreboard with team names, score, minute and crests, and fit every screen, including the Galaxy Z Fold cover screen. The settings test alert shows a sample match. The Codes tab loads in the app again, and Read back works. Youth and reserve teams (U21, U23, B, II) show their senior club crest.
