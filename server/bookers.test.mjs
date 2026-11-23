@@ -214,3 +214,23 @@ test('a desk deadline returns a timeout instead of hanging', async () => {
   assert.match(result.sportybet.error, /took too long/i);
   assert.equal(result.sportybet.parts.length, 0);
 });
+
+test('a slow desk is cut off so the other desks can return', async () => {
+  resetBookerCache();
+  const request = async (method, url) => {
+    if (String(url).includes('pcUpcomingEvents')) return { data: { tournaments: [], totalNum: 0 } };
+    if (String(url).includes('betpawa')) return new Promise(() => {});
+    return { bizCode: 10000, data: { shareCode: 'NOW', outcomes: [{ matchStatus: 'Not start' }] } };
+  };
+  const started = Date.now();
+  const result = await bookAll(
+    [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, match: 'A vs B' }],
+    request,
+    undefined,
+    ['sportybet', 'betpawa'],
+    { interactive: true, deadline: Date.now() + 5_000, deskMs: 40 },
+  );
+  assert.ok(Date.now() - started < 400);
+  assert.equal(result.sportybet.parts[0].code, 'NOW');
+  assert.match(result.betpawa.error, /took too long/i);
+});

@@ -12,6 +12,8 @@ const CACHE_MS = 6 * 60 * 60 * 1000;
 const WINDOW_MS = 60 * 1000;
 const MAX_REQUESTS = 8;
 const ON_DEMAND_MS = 40_000;
+/** A single slow desk must not hold the whole Book + track response for the full 40s. */
+const DESK_MS = 15_000;
 
 const cache = new Map();
 const hits = new Map();
@@ -111,6 +113,7 @@ export async function bookGroups(groups, request, now = new Date(), ip = 'local'
     const books = await bookAll(legs, request, undefined, undefined, {
       interactive: true,
       deadline: started + deadlineMs,
+      deskMs: Number(opts.deskMs) > 0 ? Number(opts.deskMs) : DESK_MS,
     });
     const ok = Object.entries(books).filter(([, book]) => book?.parts?.length).map(([name]) => name);
     const failed = Object.entries(books)
