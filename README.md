@@ -98,6 +98,8 @@ npm run android:apk
 
 The signed APK is written to `android/app/build/outputs/apk/release/app-release.apk`.
 
+The **Sideload APK** workflow (`.github/workflows/sideload-apk.yml`) builds the same signed APK in CI with the original app signing key and uploads `betspapa-<version>.apk` as a workflow artifact, for phones that cannot use Google Play.
+
 `npm run icons` redraws the web icons and the Android launcher and splash from the same mark.
 
 ### Signing
