@@ -9,6 +9,8 @@ import { ListsPage } from './pages/ListsPage';
 import { LivePage } from './pages/LivePage';
 import { MatchPage } from './pages/MatchPage';
 import { MorePage } from './pages/MorePage';
+import { BookedPage } from './pages/BookedPage';
+import { CodesPage } from './pages/CodesPage';
 import { PicksPage } from './pages/PicksPage';
 import { RankingsPage } from './pages/RankingsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -16,14 +18,23 @@ import { SlipsPage } from './pages/SlipsPage';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
 import { isNativeApp } from './lib/nativeHttp';
+import { longDay } from './lib/format';
+import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
+import { LineupProvider } from './components/Lineups';
+import { useSlipAlert } from './components/SlipTrack';
+import { RecordPage } from './pages/RecordPage';
 
 const titles: Record<string, string> = {
   '/': 'Today',
   '/live': 'Live',
   '/picks': 'Picks',
+  '/codes': 'Codes',
   '/trends': 'Trends',
   '/slips': 'Slips',
+  '/slips/booked': 'Booked & tracking',
+  '/record': 'Record',
+  '/record/codes': 'Codes record',
   '/rankings': 'Rankings',
   '/lists': 'Lists',
   '/more': 'More',
@@ -31,6 +42,24 @@ const titles: Record<string, string> = {
   '/inbox': 'Alerts',
   '/settings': 'Settings',
 };
+
+function screenTitle(pathname: string, search: string): string {
+  if (pathname.startsWith('/codes/')) {
+    const names: Record<string, string> = {
+      classic: 'Banker Classic',
+      gold: 'Banker Gold',
+      shield: 'Banker Shield',
+      capped: 'Banker Capped',
+      ladder: 'Banker Ladder',
+    };
+    return names[pathname.split('/')[2] || ''] || 'Codes';
+  }
+  if (pathname === '/record/picks') {
+    const day = new URLSearchParams(search).get('day');
+    return day ? longDay(day) : 'Graded picks';
+  }
+  return titles[pathname] ?? 'Betspapa';
+}
 
 type OpenTarget = { route?: string; matchId?: string; trendId?: string };
 
@@ -41,16 +70,18 @@ export function App() {
   const match = location.pathname.startsWith('/match/')
     ? matches.find((item) => location.pathname === `/match/${item.id}`)
     : undefined;
-  const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : titles[location.pathname] ?? 'Betspapa';
+  const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : screenTitle(location.pathname, location.search);
+  useSlipAlert();
   const kept = ['/', '/picks', '/trends', '/slips', '/following'];
   const [seen, setSeen] = useState<string[]>(() => [location.pathname]);
   useEffect(() => {
     setSeen((current) => (current.includes(location.pathname) ? current : [...current, location.pathname]));
   }, [location.pathname]);
 
+  const matchMeta = match ? { home: match.home.shortName, away: match.away.shortName, competition: match.competition.name } : undefined;
   useEffect(() => {
-    document.title = `${title} · Betspapa`;
-  }, [title]);
+    applyPageMeta(pageMeta(location.pathname, title, matchMeta));
+  }, [location.pathname, title]);
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -69,6 +100,10 @@ export function App() {
       }
       if (open.route === 'slip') {
         navigate('/slips');
+        return;
+      }
+      if (open.route === 'codes') {
+        navigate(open.trendId ? `/codes/${open.trendId}` : '/codes');
         return;
       }
       if (open.route === 'picks') {
@@ -107,6 +142,7 @@ export function App() {
 
   return (
     <AlertSetupProvider>
+      <LineupProvider>
       <div className="shell">
         <SideNav />
         <div className="center">
@@ -140,11 +176,17 @@ export function App() {
             {!kept.includes(location.pathname) && (
             <Routes>
               <Route path="/live" element={<LivePage />} />
+              <Route path="/record" element={<RecordPage />} />
+              <Route path="/record/picks" element={<RecordPage />} />
+              <Route path="/record/codes" element={<RecordPage />} />
               <Route path="/rankings" element={<RankingsPage />} />
               <Route path="/lists" element={<ListsPage />} />
               <Route path="/more" element={<MorePage />} />
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/slips/booked" element={<BookedPage />} />
+              <Route path="/codes" element={<CodesPage />} />
+              <Route path="/codes/:strategy" element={<CodesPage />} />
               <Route path="/match/:id" element={<MatchPage />} />
             </Routes>
             )}
@@ -154,6 +196,7 @@ export function App() {
         <TabBar />
         <Toasts />
       </div>
+      </LineupProvider>
     </AlertSetupProvider>
   );
 }

@@ -13,6 +13,8 @@ type LiveMarket = { id?: string | number; specifier?: string; outcomes?: LiveOut
 type LiveEvent = {
   eventId?: string;
   homeTeamName?: string;
+  homeCrest?: string;
+  awayCrest?: string;
   awayTeamName?: string;
   estimateStartTime?: number;
   status?: number;
@@ -271,6 +273,8 @@ export function parseLiveEvent(event: LiveEvent, tournament?: LiveTournament): M
     tournament: event.sport?.category?.tournament?.name || tournament?.name || 'Fixture',
     country: event.sport?.category?.name || tournament?.categoryName || 'International',
     odds: oddsFromMarkets(event.markets),
+    homeCrest: event.homeCrest,
+    awayCrest: event.awayCrest,
   };
   const match = mapSportyEvent(sporty);
   const minute = liveMinute(event.playedSeconds, event.matchStatus);

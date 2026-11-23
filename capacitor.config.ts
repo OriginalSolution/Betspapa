@@ -4,7 +4,14 @@ const config: CapacitorConfig = {
   appId: 'com.betspapa.scores',
   appName: 'Betspapa',
   webDir: 'dist',
-  backgroundColor: '#000000',
+  backgroundColor: '#07080c',
+  plugins: {
+    SystemBars: {
+      insetsHandling: 'css',
+      style: 'DARK',
+      initialViewportFitValueHint: 'cover',
+    },
+  },
   android: {
     allowMixedContent: false,
   },

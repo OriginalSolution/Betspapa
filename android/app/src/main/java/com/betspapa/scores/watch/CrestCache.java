@@ -15,7 +15,6 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
@@ -128,8 +127,8 @@ final class CrestCache {
         File miss = new File(cacheDir(context), key + ".miss");
         if (miss.isFile() && System.currentTimeMillis() - miss.lastModified() < 12L * 60L * 60L * 1000L) return null;
         if (!allowNetwork()) return null;
+        // The server sends our own crest URL with each alert; no per-phone lookups.
         String resolved = url == null ? "" : url.trim();
-        if (resolved.isEmpty()) resolved = wiki(name);
         if (resolved.isEmpty() || resolved.toLowerCase(Locale.US).endsWith(".svg")) {
             touch(miss);
             return null;
@@ -155,75 +154,6 @@ final class CrestCache {
     private static boolean allowNetwork() {
         String finger = Build.FINGERPRINT == null ? "" : Build.FINGERPRINT.toLowerCase(Locale.US);
         return !finger.contains("robolectric");
-    }
-
-    private static String wiki(String name) {
-        if (name == null || name.trim().isEmpty()) return "";
-        try {
-            String query = URLEncoder.encode(name.trim() + " football", "UTF-8");
-            String address = "https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" + query
-                + "&gsrlimit=4&prop=pageimages|description&piprop=thumbnail&pithumbsize=200&format=json&origin=*";
-            JSONObject body = new JSONObject(http(address));
-            JSONObject pages = body.optJSONObject("query");
-            if (pages == null) return "";
-            pages = pages.optJSONObject("pages");
-            if (pages == null) return "";
-            JSONObject best = null;
-            int bestScore = 0;
-            java.util.Iterator<String> keys = pages.keys();
-            while (keys.hasNext()) {
-                JSONObject page = pages.optJSONObject(keys.next());
-                if (page == null) continue;
-                JSONObject thumb = page.optJSONObject("thumbnail");
-                String source = thumb == null ? "" : thumb.optString("source", "");
-                if (source.isEmpty() || photo(source)) continue;
-                String description = (page.optString("description", "") + " " + page.optString("title", "")).toLowerCase(Locale.US);
-                int score = 0;
-                if (description.contains("football") || description.contains("soccer")) score += 2;
-                if (description.contains("club") || description.contains("f.c")) score += 2;
-                if (description.contains("association")) score += 1;
-                if (score > bestScore) {
-                    bestScore = score;
-                    best = page;
-                }
-            }
-            if (best == null || bestScore < 2) return "";
-            JSONObject thumb = best.optJSONObject("thumbnail");
-            String source = thumb == null ? "" : thumb.optString("source", "");
-            if (source.contains("/")) {
-                source = source.replaceFirst("/\\d+px-", "/250px-");
-            }
-            return source;
-        } catch (Exception error) {
-            return "";
-        }
-    }
-
-    private static boolean photo(String url) {
-        String lower = url.toLowerCase(Locale.US);
-        return lower.contains("stadium") || lower.contains("flag_of") || lower.contains("portrait") || lower.contains("team_photo") || lower.contains("squad");
-    }
-
-    private static String http(String address) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
-        connection.setConnectTimeout(2500);
-        connection.setReadTimeout(3000);
-        connection.setRequestProperty("User-Agent", MatchFeeds.USER_AGENT);
-        connection.setRequestProperty("Accept", "application/json");
-        try {
-            InputStream stream = connection.getInputStream();
-            try {
-                byte[] buffer = new byte[4096];
-                java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-                int count;
-                while ((count = stream.read(buffer)) != -1) output.write(buffer, 0, count);
-                return output.toString("UTF-8");
-            } finally {
-                stream.close();
-            }
-        } finally {
-            connection.disconnect();
-        }
     }
 
     private static Bitmap download(String address) {

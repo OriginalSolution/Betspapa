@@ -1,14 +1,17 @@
 /**
  * Occurrence is how often a market hit in recent real matches, not the price.
- * A line qualifies at 80% or better over the last 10 relevant games, with at
- * least 8 of those games scored. When both teams have a sample, the published
- * grade is the weaker side, and a line both teams support stays even if that
- * rate is under 80%. A one-sided trend is not graded as a sure pick. The hit
- * rules match the app's settle().
+ * A line qualifies at that market's minimum (80% unless the owner set another)
+ * over the last 10 relevant games, with at least 8 of those games scored.
+ * When both teams have a sample, the published grade is the weaker side, and
+ * that grade still has to clear the minimum. A 60% weaker side is not booked
+ * just because both teams agreed or the hotter side was 80%+. The hit rules
+ * match the app's settle().
  */
 import { loadLeagueRisk, unknownLeagueMarkets } from './leagueRisk.mjs';
+import { loadMarketRules } from './marketRules.mjs';
 import { MIN_ODDS, priceInRange } from './oddsRange.mjs';
 import { indexLeagues, reviewPick } from './research.mjs';
+import { minConfidence } from './thresholds.mjs';
 import { isSimulated } from './upcoming.mjs';
 
 export const WINDOW = 10;
@@ -318,6 +321,7 @@ function percent(rate) {
  * score does not block it. `byEvent` still stores the raw trend.
  */
 export function buildOccurrenceBoard(events, histories, now = new Date(), options = {}) {
+  if (!options.marketRules) loadMarketRules();
   const leagueTable = options.leagueRisk || loadLeagueRisk();
   const leagueIndex = options.leagueIndex || indexLeagues(histories);
   const settled = options.settled || [];
@@ -328,6 +332,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   let beforeRange = 0;
   let inRange = 0;
   let teamDropped = 0;
+  let confidenceDropped = 0;
   let leagueDropped = 0;
   let leagueMarked = 0;
   const unpriced = new Map();
@@ -389,6 +394,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
       };
       if (!review.publish) {
         if (!review.teamPass) teamDropped += 1;
+        else if (!review.confidencePass) confidenceDropped += 1;
         if (review.leagueAction === 'block') leagueDropped += 1;
         researchDrops.push(report);
         continue;
@@ -430,6 +436,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   const notes = [];
   notes.push(`Range filter: ${beforeRange} lines at 80%+ before the price check, ${inRange} inside the range, ${legs.length} published.`);
   if (teamDropped) notes.push(`${teamDropped} lines were left off the code because the two teams' scoring records did not support the pick.`);
+  if (confidenceDropped) notes.push(`${confidenceDropped} lines were left off the code because the grade was under that market's minimum.`);
   if (leagueDropped) notes.push(`${leagueDropped} lines were left off the code because that league's results make the price unreliable.`);
   if (leagueMarked) notes.push(`${leagueMarked} lines were marked down to 90% by the league score or an owner override.`);
   for (const drop of researchDrops.slice(0, 6)) {

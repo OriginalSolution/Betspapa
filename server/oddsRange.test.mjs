@@ -5,6 +5,25 @@ import { assertBookingRanges, boardDirty, priceInRange, priceNearRange, projectS
 const future = new Date(Date.now() + 3600_000).toISOString();
 const past = new Date(Date.now() - 3600_000).toISOString();
 
+test('a recorded grade under 80% leaves the served slip even when both teams agreed', () => {
+  const slip = {
+    id: 'master',
+    legs: [
+      { eventId: 'sr:match:1', market: 'over15', odds: 1.25, rate: 0.9, kickoff: future, match: 'A vs B' },
+      { eventId: 'sr:match:2', market: 'home', odds: 1.3, rate: 0.6, teamsAgree: true, kickoff: future, match: 'C vs D' },
+      { eventId: 'sr:match:3', market: 'btts', odds: 1.4, rate: 0.8, kickoff: future, match: 'E vs F' },
+      { eventId: 'sr:match:4', market: 'sh-over05', odds: 1.3, rate: 1, kickoff: future, match: 'G vs H' },
+    ],
+    books: {
+      sportybet: { parts: [{ code: 'OLD', legs: 4, matches: ['sr:match:1', 'sr:match:2', 'sr:match:3', 'sr:match:4'] }], dropped: [], kept: [] },
+    },
+  };
+  const shown = projectSlip(slip);
+  assert.deepEqual(shown.legs.map((leg) => leg.eventId), ['sr:match:1', 'sr:match:3']);
+  assert.equal(shown.books.sportybet.parts[0].code, 'OLD');
+  assert.deepEqual(shown.books.sportybet.parts[0].matches, ['sr:match:1', 'sr:match:3']);
+});
+
 test('ranges are inclusive and unlisted markets are excluded', () => {
   assert.equal(priceInRange('over15', 1.2), true);
   assert.equal(priceInRange('over15', 1.3), true);

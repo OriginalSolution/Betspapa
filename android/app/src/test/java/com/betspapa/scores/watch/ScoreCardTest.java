@@ -193,6 +193,19 @@ public class ScoreCardTest {
         assertTrue(shadowOf(slip).getRequestCode() != shadowOf(recovered).getRequestCode());
     }
 
+    @Test
+    public void codeAlertOpensTheCodesTab() {
+        Context context = RuntimeEnvironment.getApplication();
+        WatchNote note = new WatchNote("code:APWHWQ:settled", "", "code", "Shield APWHWQ lost", "Nantes 1-0 Grenoble, Over 2.5");
+        note.fixture = "shield";
+        note.bookCode = "APWHWQ";
+        PendingIntent open = OpenMatch.forNote(context, note);
+        Intent intent = shadowOf(open).getSavedIntent();
+        assertEquals("codes", intent.getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("shield", intent.getStringExtra(OpenMatch.EXTRA_TREND));
+        assertEquals("", intent.getStringExtra(OpenMatch.EXTRA_MATCH));
+    }
+
     private static Context granted() {
         Context context = RuntimeEnvironment.getApplication();
         shadowOf((Application) context).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);

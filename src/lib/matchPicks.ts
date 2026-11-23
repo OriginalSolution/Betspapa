@@ -43,6 +43,8 @@ export type MatchPickCard = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -99,7 +101,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
   for (const leg of legs) {
     if (!publishableOdds(leg.odds)) continue;
     const rate = hitRate(leg.occurrence, leg.sample, leg.rate);
-    if (rate != null && rate + 1e-12 < 0.8 && leg.teamsAgree !== true) continue;
+    if (rate != null && rate + 1e-12 < 0.8) continue;
     const id = `${leg.eventId}:${leg.market}`;
     if (seen.has(id)) continue;
     seen.add(id);
@@ -163,8 +165,10 @@ export function cardsFromEngine(state: EngineState | null, matches: Match[], sor
       eventId,
       home: match?.home.shortName || homeName,
       away: match?.away.shortName || awayName,
-      homeId: match?.home.id || slug(homeName),
-      awayId: match?.away.id || slug(awayName),
+      homeId: match?.home.id || legs[0]?.homeId || slug(homeName),
+      awayId: match?.away.id || legs[0]?.awayId || slug(awayName),
+      homeCrest: match?.home.crest || legs[0]?.homeCrest || null,
+      awayCrest: match?.away.crest || legs[0]?.awayCrest || null,
       league: match?.competition.name || 'Fixture',
       competitionId: match?.competition.id || '',
       kickoff,
@@ -196,6 +200,8 @@ export type PickTip = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -258,13 +264,15 @@ export function tipsFromEngine(state: EngineState | null, matches: Match[]): Pic
     const match = board.get(card.eventId);
     if (!realFixture(card, match)) continue;
     for (const chip of card.chips) {
-      if (!publishableOdds(chip.odds) || chip.rate == null || (chip.rate + 1e-12 < 0.8 && !chip.teamsAgree)) continue;
+      if (!publishableOdds(chip.odds) || chip.rate == null || chip.rate + 1e-12 < 0.8) continue;
       tips.push({
         chip,
         home: card.home,
         away: card.away,
         homeId: card.homeId,
         awayId: card.awayId,
+        homeCrest: card.homeCrest || null,
+        awayCrest: card.awayCrest || null,
         league: card.league,
         competitionId: card.competitionId,
         kickoff: card.kickoff,

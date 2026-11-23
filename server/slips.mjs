@@ -7,20 +7,25 @@ import { labelFor } from './occurrence.mjs';
 import { assertBookingRanges, legOpen, priceInRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
 import { selectionKey } from './selection.mjs';
+import { meetsConfidence } from './thresholds.mjs';
 
 export { MIN_ODDS } from './oddsRange.mjs';
 const MAX_ATTEMPTS = 3;
 const ATTEMPT_RESET_MS = 60 * 60 * 1000;
-/** One code on the master and trends. Tier parts use PART_SIZE. */
+/** Trends use one code. The master slip and tier slips use PART_SIZE, then each desk's own limit. */
 export const CODE_LIMIT = 18;
 /** SportyBet accepts 50 selections. Tier and market slips are booked in blocks of this size. */
 export const PART_SIZE = 50;
 export const SLIP_CONCURRENCY = 4;
 
+function keptForCode(leg) {
+  return priceInRange(leg?.market, leg?.odds, leg) && meetsConfidence(leg);
+}
+
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && priceInRange(leg.market, leg.odds, leg),
+    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && keptForCode(leg),
   );
 }
 
@@ -44,7 +49,7 @@ function byConfidence(a, b) {
 /** The legs that go on one code. Strict published band only, then the cap. */
 export function codeLegs(legs, limit = CODE_LIMIT) {
   return (Array.isArray(legs) ? legs : [])
-    .filter((leg) => priceInRange(leg?.market, leg?.odds, leg))
+    .filter((leg) => keptForCode(leg))
     .slice()
     .sort(byConfidence)
     .slice(0, limit);
@@ -56,22 +61,20 @@ export function codeLegs(legs, limit = CODE_LIMIT) {
  * Inside a band the best hit rate comes first, then the earliest kickoff.
  */
 export function orderForTier(legs, tier) {
-  const rows = (Array.isArray(legs) ? legs : []).filter((leg) => priceInRange(leg?.market, leg?.odds, leg));
+  const floor = tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;
+  const rows = (Array.isArray(legs) ? legs : []).filter((leg) => keptForCode(leg) && legRate(leg) + 1e-12 >= floor);
   const bandMax = tier === '90' ? 0.995 : tier === '80' ? 0.9 : null;
   if (bandMax == null) return rows.slice().sort(byConfidence);
   const priority = [];
   const higher = [];
-  const rescued = [];
   for (const leg of rows) {
     const rate = legRate(leg);
-    if (tier === '80' && leg.teamsAgree === true && rate + 1e-12 < 0.8) rescued.push(leg);
-    else if (rate + 1e-12 < bandMax) priority.push(leg);
+    if (rate + 1e-12 < bandMax) priority.push(leg);
     else higher.push(leg);
   }
   priority.sort(byConfidence);
   higher.sort(byConfidence);
-  rescued.sort(byConfidence);
-  return [...priority, ...higher, ...rescued];
+  return [...priority, ...higher];
 }
 
 /** Blocks of 50. Only the last block is shorter, when fewer than 50 legs remain. */
@@ -86,6 +89,17 @@ export function packGroups(legs, size = PART_SIZE) {
 /** Every in-range leg on a tier, in that tier's order, packed into bookable codes. */
 export function codeGroups(legs, tier) {
   return packGroups(orderForTier(legs, tier));
+}
+
+/**
+ * How a slip is split before it is booked.
+ * The master slip and every tier go out in blocks of 50. bookAll then splits a block
+ * again when a desk holds fewer (MSport 30, Betika 20, betPawa 20). Trends stay one code.
+ */
+export function bookingGroups(slip, open) {
+  if (slip?.tier) return codeGroups(open, slip.tier);
+  if (slip?.id === 'master') return packGroups(open);
+  return [codeLegs(open)];
 }
 
 export function legRate(leg) {
@@ -106,7 +120,7 @@ const TIERS = [
 export function tierSlips(legs) {
   const slips = [];
   for (const tier of TIERS) {
-    const rows = (legs || []).filter((leg) => legRate(leg) + 1e-12 >= tier.min || (tier.id === '80' && leg.teamsAgree === true));
+    const rows = (legs || []).filter((leg) => meetsConfidence(leg) && legRate(leg) + 1e-12 >= tier.min);
     if (!rows.length) continue;
     const ordered = rows.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff) || a.eventId.localeCompare(b.eventId) || a.market.localeCompare(b.market));
     slips.push({
@@ -296,7 +310,7 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
   async function bookOne(slip, index) {
     const clock = clockOf();
     const open = bookableLegs(slip.legs, new Date(clock));
-    const groups = slip.tier ? codeGroups(open, slip.tier) : [codeLegs(open)];
+    const groups = bookingGroups(slip, open);
     const flat = groups.flat();
     const violations = rangeViolations(flat);
     if (violations.length) {
@@ -319,7 +333,8 @@ export async function bookSlips({ slips, cache = {}, book, now = Date.now(), gap
       results[index] = { ...slip, legs: open, key: '', books: {}, bookedAt: null };
       return;
     }
-    if (!slip.tier) {
+    const many = Boolean(slip.tier) || slip.id === 'master';
+    if (!many) {
       const entry = await bookSelection(groups[0], slip.name);
       results[index] = { ...slip, legs: open, key: entry.key, books: entry.books, bookedAt: entry.bookedAt };
       if (onProgress && hasCode(entry.books)) onProgress({ results: results.filter(Boolean), cache: { ...nextCache }, issues: issues.slice() });

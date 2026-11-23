@@ -14,11 +14,22 @@ function EmptyCrest({ size, followed }: { size: number; followed: boolean }) {
   );
 }
 
+/** A phone WebView can drop the first fetch. Two retries, then the plain shield. */
+const CREST_RETRIES = 2;
+
+export function crestSrc(url: string, attempt: number): string {
+  if (!url || attempt <= 0) return url;
+  const join = url.includes('?') ? '&' : '?';
+  return `${url}${join}try=${attempt}`;
+}
+
 export function Crest({ team, size = 22, followed = false }: { team: Team; size?: number; followed?: boolean }) {
   const [url, setUrl] = useState(team.crest || '');
+  const [attempt, setAttempt] = useState(0);
   const [broken, setBroken] = useState(false);
   useEffect(() => {
     setBroken(false);
+    setAttempt(0);
     if (team.crest) {
       setUrl(team.crest);
       return;
@@ -36,13 +47,16 @@ export function Crest({ team, size = 22, followed = false }: { team: Team; size?
     return (
       <img
         className={cx('crest', followed && 'team-on')}
-        src={url}
+        src={crestSrc(url, attempt)}
         alt=""
         width={size}
         height={size}
-        loading="lazy"
-        decoding="async"
-        onError={() => setBroken(true)}
+        decoding="sync"
+        referrerPolicy="no-referrer"
+        onError={() => {
+          if (attempt < CREST_RETRIES) setAttempt((current) => current + 1);
+          else setBroken(true);
+        }}
       />
     );
   }

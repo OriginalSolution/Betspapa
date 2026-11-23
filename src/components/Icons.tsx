@@ -103,10 +103,28 @@ export function IconPicks() {
   );
 }
 
+export function IconRecord() {
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 12l3.2-2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconTrends() {
   return (
     <Svg>
       <path d="M4 16l5-5 3 3 7-7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+export function IconCodes() {
+  return (
+    <Svg>
+      <path d="M8 7h8M8 12h8M8 17h5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <rect x="4.5" y="3.5" width="15" height="17" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7" />
     </Svg>
   );
 }

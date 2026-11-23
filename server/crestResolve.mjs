@@ -95,7 +95,7 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function pacer(gap) {
+export function pacer(gap) {
   let nextAt = 0;
   return async function pace() {
     const wait = Math.max(0, nextAt - Date.now());
@@ -224,7 +224,7 @@ function cacheGet(cache, key) {
   return cache && Object.prototype.hasOwnProperty.call(cache, key) ? cache[key] : undefined;
 }
 
-async function sportsDb(name, context, deps) {
+export async function sportsDb(name, context, deps) {
   const queries = searchQueries(name, context);
   let winner = null;
   for (const query of queries) {
@@ -266,7 +266,7 @@ async function sportsDb(name, context, deps) {
   return { source: 'thesportsdb', url: badge, confidence: winner.confidence, label: winner.candidate.name };
 }
 
-async function wikidata(name, context, deps) {
+export async function wikidata(name, context, deps) {
   const queries = searchQueries(name, context).slice(0, 2);
   const found = [];
   for (const query of queries) {

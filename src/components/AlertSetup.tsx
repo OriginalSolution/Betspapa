@@ -28,6 +28,7 @@ import {
 import {
   markAlertSetup,
   openAutostartSettings,
+  openNotificationSound,
   requestBatteryExemption,
   requestExactAlarm,
   requestWatchNotifications,
@@ -292,6 +293,15 @@ export function AlertSetupProvider({ children }: { children: ReactNode }) {
         return;
       }
       const opened = await openAutostartSettings();
+      if (opened) setPhase('opened');
+      return;
+    }
+    if (step === 'sound') {
+      if (phase === 'opened') {
+        advance();
+        return;
+      }
+      const opened = await openNotificationSound();
       if (opened) setPhase('opened');
       return;
     }

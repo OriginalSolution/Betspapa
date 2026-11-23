@@ -1,19 +1,41 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CodeStrip } from '../components/CodeStrip';
 import { Crest } from '../components/Crest';
-import { FormPips } from '../components/PickCard';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { marketLabel, type DeskId } from '../lib/engineSlips';
-import { showsInTier, slipParts, tierSlip, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
+import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
+import { showsInTier, slipParts, tierSlip, CODE_TIERS, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
+import { plainReasons } from '../lib/plainReason';
+import { BookMark } from '../components/BookMark';
 import { cx, kickoffClock } from '../lib/format';
-import { combinedOdds, marketFilters, tipsFromEngine, type PickChip, type PickTip } from '../lib/matchPicks';
+import { marketFilters, tipsFromEngine, type PickChip, type PickTip } from '../lib/matchPicks';
 import type { Team } from '../types';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 
 const emptyCatalog: CrestCatalog = { byKey: {}, byId: {} };
+
+async function copyText(value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.style.position = 'fixed';
+    area.style.left = '-9999px';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+  }
+}
+
+function confidenceBand(rate: number | null): CodeTier {
+  const value = rate ?? 0;
+  if (value + 1e-12 >= 0.995) return '100';
+  if (value + 1e-12 >= 0.9) return '90';
+  return '80';
+}
 
 function teamOf(name: string, id: string, abbr: string, color: string, catalog: CrestCatalog, crest?: string | null): Team {
   const team: Team = { id, name, shortName: name, abbr: abbr || name.slice(0, 3).toUpperCase(), color };
@@ -30,7 +52,9 @@ export function PicksPage() {
   const [desk, setDesk] = useState<DeskId>('sportybet');
   const [tier, setTier] = useState<CodeTier>('80');
   const [catalog, setCatalog] = useState<CrestCatalog>(emptyCatalog);
-  const [visible, setVisible] = useState(30);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
+  const [copied, setCopied] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem('betspapa.pickChips.v1') || '[]') as unknown;
@@ -68,14 +92,14 @@ export function PicksPage() {
     if (market !== 'all' && !filters.some((item) => item.id === market)) setMarket('all');
   }, [filters, market]);
   const shown = market === 'all' ? band : band.filter((tip) => tip.chip.market === market);
-  const page = shown.slice(0, visible);
   const booked = slipParts(tierSlip(state, tier, market === 'all' ? null : market), desk);
 
   const selected = useMemo(() => {
     const byId = new Map(tips.map((tip) => [tip.chip.id, tip.chip]));
     return chosen.map((id) => byId.get(id)).filter((chip): chip is PickChip => Boolean(chip));
   }, [tips, chosen]);
-  const total = combinedOdds(selected);
+  const average = selected.length ? selected.reduce((sum, chip) => sum + chip.odds, 0) / selected.length : 0;
+  const openTip = shown.find((tip) => tip.chip.id === openId) || null;
 
   const toggleChip = (chip: PickChip) => {
     const on = chosen.includes(chip.id);
@@ -86,19 +110,49 @@ export function PicksPage() {
 
   return (
     <div className={cx('stack', 'picks-page', selected.length > 0 && 'has-float')}>
-      <CodeStrip
-        desk={desk}
-        tier={tier}
-        title={market === 'all' ? `${TIER_LABEL[tier]} all picks` : `${TIER_LABEL[tier]} ${marketLabel(market)}`}
-        parts={booked.parts}
-        bookedAt={booked.bookedAt}
-        note={state?.showingCached ? 'Showing the last booked board' : undefined}
-        onDesk={setDesk}
-        onTier={setTier}
-      />
-      <div className="market-filters" role="tablist" aria-label="Filter by market">
+      <div className="pick-tiers" role="tablist" aria-label="Confidence">
+        {CODE_TIERS.map((id) => (
+          <button key={id} type="button" role="tab" aria-selected={tier === id} className={cx('pick-tier', tier === id && 'is-on')} onClick={() => setTier(id)}>
+            {TIER_LABEL[id]}
+            <small>{tips.filter((tip) => showsInTier(tip.chip.rate, id, tip.chip.teamsAgree)).length}</small>
+          </button>
+        ))}
+      </div>
+      <section className="master-code">
+        <header>
+          <span>Master code · {TIER_LABEL[tier]} all {band.length}</span>
+          <label>
+            <BookMark id={desk} />
+            <select value={desk} aria-label="Bookmaker" onChange={(event) => setDesk(event.target.value as DeskId)}>
+              {DESKS.map((id) => (
+                <option key={id} value={id}>{DESK_NAMES[id]}</option>
+              ))}
+            </select>
+          </label>
+        </header>
+        {booked.parts.length === 0 && <p>{state?.showingCached ? 'Showing the last booked board' : 'No code yet'}</p>}
+        <div>
+          {booked.parts.map((part) => (
+            <button
+              key={part.code}
+              type="button"
+              className="master-part"
+              onClick={() => {
+                void copyText(part.code);
+                setCopied(part.code);
+              }}
+            >
+              <span>P{part.index}·{part.legs}</span>
+              <b data-booking-code={part.code}>{part.code}</b>
+              <em>{copied === part.code ? 'Copied' : 'Copy'}</em>
+            </button>
+          ))}
+        </div>
+      </section>
+      <div className="market-filters pick-markets" role="tablist" aria-label="Filter by market">
         <button type="button" role="tab" aria-selected={market === 'all'} className={cx('market-filter', market === 'all' && 'is-on')} onClick={() => setMarket('all')}>
           All
+          <small>{band.length} picks</small>
         </button>
         {filters.map((item) => (
           <button
@@ -110,45 +164,71 @@ export function PicksPage() {
             onClick={() => setMarket(item.id)}
           >
             {item.label}
+            <b>{item.count}</b>
             <small>{slipParts(tierSlip(state, tier, item.id), desk).parts[0]?.code || ''}</small>
           </button>
         ))}
       </div>
-      <div className="tip-head">
-        <h2>{TIER_LABEL[tier]} tips</h2>
-        <span>{shown.length === 1 ? '1 tip' : `${shown.length} tips`}</span>
-      </div>
       {!state && <p className="lede">{problem ? 'Could not load picks. They appear when the engine responds.' : 'Loading picks.'}</p>}
-      {page.map((tip, index) => (
-        <TipRow
-          key={tip.chip.id}
-          tip={tip}
-          catalog={catalog}
-          matches={matches}
-          onSlip={chosen.includes(tip.chip.id)}
-          hint={index === 0}
-          onToggle={() => toggleChip(tip.chip)}
-        />
-      ))}
-      {page.length < shown.length && (
-        <button type="button" className="btn btn-quiet" onClick={() => setVisible((count) => count + 30)}>
-          Show more
-        </button>
-      )}
+      {(['100', '90', '80'] as CodeTier[])
+        .filter((id) => (tier === '100' ? id === '100' : tier === '90' ? id !== '80' : true))
+        .map((id) => {
+          const rows = shown.filter((tip) => confidenceBand(tip.chip.rate) === id);
+          if (!rows.length) return null;
+          const code = slipParts(tierSlip(state, id, market === 'all' ? null : market), desk).parts[0]?.code || '';
+          const shut = Boolean(folded[id]);
+          return (
+            <section key={id} className="pick-group">
+              <header>
+                <button type="button" aria-expanded={!shut} onClick={() => setFolded((current) => ({ ...current, [id]: !current[id] }))}>
+                  {shut ? '▸' : '▾'} {TIER_LABEL[id]}
+                  <small>{rows.length} {rows.length === 1 ? 'pick' : 'picks'}</small>
+                </button>
+                {code && (
+                  <button type="button" className="pick-group-code" onClick={() => { void copyText(code); setCopied(code); }}>
+                    <b data-booking-code={code}>{code}</b>
+                    <span>{copied === code ? 'Copied' : 'Copy'}</span>
+                  </button>
+                )}
+              </header>
+              {!shut && rows.map((tip) => (
+                <RingCard
+                  key={tip.chip.id}
+                  tip={tip}
+                  catalog={catalog}
+                  matches={matches}
+                  onSlip={chosen.includes(tip.chip.id)}
+                  onAdd={() => toggleChip(tip.chip)}
+                  onOpen={() => setOpenId(tip.chip.id)}
+                />
+              ))}
+            </section>
+          );
+        })}
       {state && shown.length === 0 && (
         <div className="empty">
           <h2>No picks on this board</h2>
           <p>Picks appear when an 80% trend has a price of 1.18 or higher.</p>
         </div>
       )}
-      {selected.length > 0 && total != null && (
+      {selected.length > 0 && (
         <Link className="pick-float" to="/slips">
           <span>
-            {selected.length} {selected.length === 1 ? 'leg' : 'legs'}
+            <b>{selected.length} {selected.length === 1 ? 'leg' : 'legs'} on slip</b>
+            <em>avg {average.toFixed(2)}</em>
           </span>
-          <strong>{total.toFixed(2)}</strong>
           <em>Open slip</em>
         </Link>
+      )}
+      {openTip && (
+        <ReasonSheet
+          tip={openTip}
+          catalog={catalog}
+          matches={matches}
+          onSlip={chosen.includes(openTip.chip.id)}
+          onClose={() => setOpenId(null)}
+          onAdd={() => toggleChip(openTip.chip)}
+        />
       )}
     </div>
   );
@@ -161,7 +241,7 @@ function HitRing({ rate }: { rate: number }) {
   const turn = 2 * Math.PI * radius;
   const dash = turn * Math.min(1, Math.max(0, rate));
   return (
-    <span className={cx('hit-ring', hot ? 'is-hot' : 'is-warm')} aria-label={`${pct}% hit rate`}>
+    <span className={cx('hit-ring', hot ? 'is-hot' : 'is-warm', pct >= 100 && 'is-full')} aria-label={`${pct}% hit rate`}>
       <svg viewBox="0 0 40 40" aria-hidden="true">
         <circle cx="20" cy="20" r={radius} className="hit-track" />
         <circle cx="20" cy="20" r={radius} className="hit-value" strokeDasharray={`${dash} ${turn - dash}`} />
@@ -171,112 +251,86 @@ function HitRing({ rate }: { rate: number }) {
   );
 }
 
-function TipRow({
+function sidesOf(tip: PickTip, catalog: CrestCatalog, matches: ReturnType<typeof useStore>['matches']) {
+  const live = matches.find((match) => match.id === tip.chip.eventId);
+  return {
+    home: teamOf(tip.home, tip.homeId, live?.home.abbr || '', live?.home.color || '#e11d2e', catalog, live?.home.crest || tip.homeCrest),
+    away: teamOf(tip.away, tip.awayId, live?.away.abbr || '', live?.away.color || '#3d7eff', catalog, live?.away.crest || tip.awayCrest),
+  };
+}
+
+function RingCard({
   tip,
   catalog,
   matches,
   onSlip,
-  hint,
-  onToggle,
+  onAdd,
+  onOpen,
 }: {
   tip: PickTip;
   catalog: CrestCatalog;
   matches: ReturnType<typeof useStore>['matches'];
   onSlip: boolean;
-  hint: boolean;
-  onToggle: () => void;
+  onAdd: () => void;
+  onOpen: () => void;
 }) {
-  const live = matches.find((match) => match.id === tip.chip.eventId);
-  const home = teamOf(tip.home, tip.homeId, live?.home.abbr || '', live?.home.color || '#e11d2e', catalog, live?.home.crest);
-  const away = teamOf(tip.away, tip.awayId, live?.away.abbr || '', live?.away.color || '#3d7eff', catalog, live?.away.crest);
-  const clock = kickoffClock(tip.kickoff);
-  const [offset, setOffset] = useState(0);
-  const shift = useRef(0);
-  const start = useRef<{ x: number; y: number; pointer: number } | null>(null);
-  const dragging = useRef(false);
-  const suppress = useRef(false);
-
-  const move = (next: number) => {
-    shift.current = next;
-    setOffset(next);
-  };
-
-  const end = (commit: boolean) => {
-    if (dragging.current) suppress.current = true;
-    if (commit && shift.current > 72) onToggle();
-    move(0);
-    start.current = null;
-    dragging.current = false;
-    window.setTimeout(() => {
-      suppress.current = false;
-    }, 350);
-  };
-
+  const { home, away } = sidesOf(tip, catalog, matches);
   return (
-    <article className={cx('tip-swipe', onSlip && 'is-on')}>
-      <span className="tip-reveal">Slip</span>
-      <div
-        className="tip-row"
-        style={{ transform: `translateX(${offset}px)` }}
-        onPointerDown={(event) => {
-          start.current = { x: event.clientX, y: event.clientY, pointer: event.pointerId };
-          dragging.current = false;
-        }}
-        onPointerMove={(event) => {
-          if (!start.current || start.current.pointer !== event.pointerId) return;
-          const dx = event.clientX - start.current.x;
-          const dy = event.clientY - start.current.y;
-          if (!dragging.current && Math.abs(dx) < 8) return;
-          if (!dragging.current && Math.abs(dy) > Math.abs(dx)) {
-            start.current = null;
-            return;
-          }
-          dragging.current = true;
-          event.currentTarget.setPointerCapture?.(event.pointerId);
-          move(Math.max(0, Math.min(120, dx)));
-        }}
-        onPointerUp={() => end(dragging.current)}
-        onPointerCancel={() => end(false)}
-      >
-        <button
-          type="button"
-          className="tip-main"
-          aria-pressed={onSlip}
-          onClick={() => {
-            if (suppress.current) return;
-            onToggle();
-          }}
-        >
-          {tip.chip.rate != null && <HitRing rate={tip.chip.rate} />}
-          <span className="tip-copy">
-            <strong>{marketLabel(tip.chip.market)}</strong>
-            <span className="tip-fixture">
-              <Crest team={home} size={18} />
-              <Crest team={away} size={18} />
-              <em>
-                {tip.home} vs {tip.away}
-                {clock ? ` - ${clock}` : ''}
-              </em>
-            </span>
-            {(tip.chip.form?.length || tip.chip.opponentHeld || tip.chip.exception || tip.chip.homeSample || tip.chip.leagueRisk) && (
-              <span className="tip-extra">
-                {tip.chip.form && tip.chip.form.length > 0 && <FormPips form={tip.chip.form} />}
-                {tip.chip.exception && <i className="exception-chip">Exception</i>}
-                {tip.chip.opponentHeld && <i className="held-chip">Held after opponent</i>}
-                {tip.chip.homeSample && tip.chip.awaySample && <i className="held-chip">{`Home ${tip.chip.homeSample} · Away ${tip.chip.awaySample}`}</i>}
-                {tip.chip.leagueRisk === 'penalise' && <i className="exception-chip">League risk</i>}
-                {tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line)) && (
-                  <i className="held-chip">{tip.chip.reasons.find((line) => /support|landed|blocked|90%/.test(line))}</i>
-                )}
-              </span>
-            )}
-          </span>
-          <span className="tip-price">
-            <b>{tip.chip.odds.toFixed(2)}</b>
-            {hint && <small>Swipe &gt;</small>}
-          </span>
-        </button>
-      </div>
+    <article className="ring-card">
+      {tip.chip.rate != null && <HitRing rate={tip.chip.rate} />}
+      <button type="button" className="ring-body" onClick={onOpen}>
+        <span className="ring-meta">
+          <b>{kickoffClock(tip.kickoff)}</b>
+          <em>{marketLabel(tip.chip.market)}</em>
+          {tip.chip.opponentHeld && <i className="sig-held" title="Held after opponent">Held</i>}
+          {tip.chip.exception && <i className="sig-exc">EXC</i>}
+        </span>
+        <span><Crest team={home} size={17} />{tip.home}</span>
+        <span><Crest team={away} size={17} />{tip.away}</span>
+      </button>
+      <button type="button" className={cx('ring-price', onSlip && 'is-on')} aria-pressed={onSlip} onClick={onAdd}>
+        <b>{tip.chip.odds.toFixed(2)}</b>
+        <small>{onSlip ? 'On slip' : 'Add'}</small>
+      </button>
     </article>
+  );
+}
+
+function ReasonSheet({
+  tip,
+  catalog,
+  matches,
+  onSlip,
+  onClose,
+  onAdd,
+}: {
+  tip: PickTip;
+  catalog: CrestCatalog;
+  matches: ReturnType<typeof useStore>['matches'];
+  onSlip: boolean;
+  onClose: () => void;
+  onAdd: () => void;
+}) {
+  const { home, away } = sidesOf(tip, catalog, matches);
+  const reasons = plainReasons(tip.chip.reasons);
+  return (
+    <div className="pick-sheet" role="dialog" aria-modal="true" aria-label="Why this pick">
+      <button type="button" className="pick-sheet-dim" aria-label="Close" onClick={onClose} />
+      <div className="pick-sheet-card">
+        <p>Why this pick</p>
+        <h2>{marketLabel(tip.chip.market)}</h2>
+        <p className="ring-meta">
+          <Crest team={home} size={18} />{tip.home}
+          <span>v</span>
+          <Crest team={away} size={18} />{tip.away}
+        </p>
+        {tip.chip.homeSample && tip.chip.awaySample && <p>Home {tip.chip.homeSample} · Away {tip.chip.awaySample}</p>}
+        {reasons.length > 0 ? reasons.map((line) => <p key={line}>{line}</p>) : <p>League record: building, no settled games yet.</p>}
+        <div>
+          <button type="button" className={cx('btn', onSlip && 'btn-quiet')} onClick={onAdd}>{onSlip ? 'On slip' : 'Add to slip'}</button>
+          <Link to={`/match/${tip.chip.eventId}`} className="btn btn-quiet">Open match</Link>
+        </div>
+      </div>
+    </div>
   );
 }

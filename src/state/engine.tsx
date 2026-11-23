@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { FeedPause } from '../lib/backoff';
 import { ENGINE_POLL_MS, fetchEngine, readEngineCache, writeEngineCache, type EngineState } from '../lib/engineSlips';
 
 type EngineBoard = { state: EngineState | null; problem: string | null };
@@ -13,7 +14,9 @@ export function EngineProvider({ children }: { children: ReactNode }) {
     let stop = false;
     const cached = readEngineCache();
     if (cached) setState(cached);
+    let pauseUntil = 0;
     const pull = async () => {
+      if (document.visibilityState === 'hidden' || Date.now() < pauseUntil) return;
       try {
         const next = await fetchEngine();
         if (stop) return;
@@ -21,6 +24,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         setState(next);
         setProblem(null);
       } catch (error) {
+        if (error instanceof FeedPause) pauseUntil = error.retryAt;
         if (!stop) setProblem(error instanceof Error ? error.message : 'Could not load the board');
       }
     };

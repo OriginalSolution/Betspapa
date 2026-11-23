@@ -2,7 +2,6 @@ package com.betspapa.scores;
 
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
-import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -57,7 +56,7 @@ public class MainActivity extends BridgeActivity {
         PushBridge.listen(this);
         deliverOpen(getIntent());
         if (getBridge() != null && getBridge().getWebView() != null) {
-            getBridge().getWebView().setBackgroundColor(Color.BLACK);
+            getBridge().getWebView().setBackgroundColor(0xFF07080C);
             getBridge().addWebViewListener(new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
@@ -76,11 +75,12 @@ public class MainActivity extends BridgeActivity {
 
     private void paintBlack() {
         if (getWindow() == null) return;
-        getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+        int theme = 0xFF07080C;
+        getWindow().setBackgroundDrawable(new ColorDrawable(theme));
         View decor = getWindow().getDecorView();
-        if (decor != null) decor.setBackgroundColor(Color.BLACK);
-        getWindow().setStatusBarColor(Color.BLACK);
-        getWindow().setNavigationBarColor(Color.BLACK);
+        if (decor != null) decor.setBackgroundColor(theme);
+        getWindow().setStatusBarColor(theme);
+        getWindow().setNavigationBarColor(theme);
     }
 
     @Override

@@ -155,6 +155,11 @@ export function createGuardian(options = {}) {
   let lastCycleAt = null;
   let lastNightly = null;
   let lastReport = null;
+  let heldVerdict = null;
+  let heldAt = 0;
+  let heldWhile = '';
+  let staleAfterBooking = false;
+  const healthCacheMs = options.healthCacheMs ?? 15_000;
   let timer = null;
   let running = false;
   const dir = options.dir || join(process.cwd(), 'data', 'engine', 'health');
@@ -208,19 +213,30 @@ export function createGuardian(options = {}) {
     return count;
   }
 
-  function evaluate() {
+  function evaluate({ fresh = false } = {}) {
+    const booking = Boolean(options.booking?.());
+    const idleFresh = heldWhile === 'idle' && !staleAfterBooking && Date.now() - heldAt < healthCacheMs;
+    if (!fresh && heldVerdict && (booking || idleFresh)) {
+      if (booking) staleAfterBooking = true;
+      return heldVerdict;
+    }
+    staleAfterBooking = false;
     const state = options.getState ? options.getState() : {};
     const raw = options.getRaw ? options.getRaw() : state;
     const push = options.push ? options.push() : { feedOk: null, sentOk: 0, sentError: 0, feedError: null };
     const dataDir = options.dataDir || null;
     const persistent = options.persistent ? Boolean(options.persistent()) : dataDir ? directoryPersistent(dataDir) : true;
+    const stored = options.persistence ? options.persistence() : null;
     const verdict = evaluateChecks({
       mode: options.mode ? options.mode() : 'live',
       state,
       raw: { ...raw, extraLegs: options.extraLegs ? options.extraLegs() : raw?.extraLegs },
       now: nowFn(),
-      booking: Boolean(options.booking?.()),
+      booking,
       persistent,
+      boardStored: stored ? stored.disk !== false : true,
+      diskError: stored?.error && stored.disk === false ? stored.error : '',
+      snapshot: stored?.snapshot || '',
       devices: deviceCount(),
       previousDevices,
       devicesLost,
@@ -229,10 +245,22 @@ export function createGuardian(options = {}) {
       sentOk: push.sentOk,
       sentError: push.sentError,
       pruned: Number(push.pruned) || 0,
-      payloadBytes: options.payloadBytes ? options.payloadBytes() : gzippedBytes(appEngineState(state)),
+      crests: options.crests ? safeCall(options.crests) : null,
+      payloadBytes: booking && heldVerdict ? 0 : (options.payloadBytes ? options.payloadBytes() : gzippedBytes(appEngineState(state))),
     });
     if (options.needsRepair?.() && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
+    heldVerdict = verdict;
+    heldAt = Date.now();
+    heldWhile = booking ? 'booking' : 'idle';
     return verdict;
+  }
+
+  function safeCall(fn) {
+    try {
+      return fn();
+    } catch {
+      return null;
+    }
   }
 
   async function heal(verdict) {
@@ -261,7 +289,7 @@ export function createGuardian(options = {}) {
       await options.runCycle();
       lastCycleAt = Date.now();
       fixes.push(attempt === 0 ? 'Ran a booking cycle.' : `Rebooked after a wait (${attempt + 1}).`);
-      const again = evaluate();
+      const again = evaluate({ fresh: true });
       if (again.ok || !again.actions.includes('rebook')) break;
     }
     return fixes;
@@ -269,6 +297,12 @@ export function createGuardian(options = {}) {
 
   async function check() {
     if (running) return status();
+    if (options.booking?.()) {
+      if (options.restartHung?.()) {
+        logIncident({ code: 'hung-cycle', level: 'attention', message: 'Restarted a booking cycle that ran longer than two intervals.', fixed: true });
+      }
+      return status();
+    }
     running = true;
     try {
       const boot = !sawBoot;
@@ -284,10 +318,17 @@ export function createGuardian(options = {}) {
         logIncident({ code: 'disk', level: 'attention', message: `Data disk is ${Math.round((disk.used || 0) * 100)}% full. Compacted ${removed.length} old files.`, fixed: removed.length > 0 });
       }
       const invalid = invalidDeskReports(options.getRaw ? options.getRaw() : options.getState?.());
-      let verdict = evaluate();
+      let verdict = evaluate({ fresh: true });
       if (invalid.length && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
       lastCheckAt = nowFn().toISOString();
       let fixes = [];
+      if (verdict.actions.includes('crests') && options.healCrests) {
+        const retried = Number(safeCall(options.healCrests)) || 0;
+        if (retried) {
+          const row = verdict.checks.find((item) => item.id === 'crests');
+          logIncident({ code: 'crests', level: 'warn', message: row?.message || 'Crest coverage is below target.', fixed: false, fix: `Queued ${retried} missing crests for another lookup.` });
+        }
+      }
       if (!verdict.ok || verdict.actions.includes('rebook') || verdict.actions.includes('switch-live')) {
         try {
           fixes = await heal(verdict);
@@ -298,7 +339,7 @@ export function createGuardian(options = {}) {
           repairFailed = true;
           logIncident({ code: 'repair-failed', level: 'attention', message: error instanceof Error ? error.message : 'Repair failed.', fixed: false });
         }
-        verdict = evaluate();
+        verdict = evaluate({ fresh: true });
         for (const row of verdict.checks.filter((item) => !item.ok && item.level === 'attention')) {
           logIncident({ code: row.id, level: row.level, message: row.message, fixed: false, fix: fixes.join(' ') });
         }
@@ -408,7 +449,8 @@ export function createGuardian(options = {}) {
   }
 
   function status() {
-    const state = options.getState ? options.getState() : null;
+    const booking = Boolean(options.booking?.());
+    const state = booking ? null : (options.getState ? options.getState() : null);
     const verdict = evaluate();
     return {
       name: 'Papa Guardian',

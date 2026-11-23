@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { bookAll, resetBookerCache } from './bookers.mjs';
-import { CODE_LIMIT, bookSlips, bookableLegs, codeGroups, codeLegs, tierSlips, trendGroups } from './slips.mjs';
+import { CODE_LIMIT, bookSlips, bookableLegs, bookingGroups, codeGroups, codeLegs, tierSlips, trendGroups } from './slips.mjs';
 import { selectionKey } from './selection.mjs';
 
 const now = new Date('2026-11-13T10:00:00.000Z');
@@ -51,8 +51,7 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
     { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },
     { ...leg(3, 'over25', 1.3), occurrence: 70, rate: 0.7, teamsAgree: true },
   ]);
-  const rescued = slips.find((slip) => slip.id === 'tier:80:over25');
-  assert.equal(rescued.legs.length, 1);
+  assert.equal(slips.find((slip) => slip.id === 'tier:80:over25'), undefined);
   assert.equal(slips.find((slip) => slip.id === 'tier:90:over25'), undefined);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:over25'), undefined);
   const ordered = codeGroups([
@@ -60,7 +59,7 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
     { ...leg(4, 'over25', 1.3), rate: 0.84 },
     { ...leg(5, 'over25', 1.3), rate: 1 },
   ], '80')[0];
-  assert.deepEqual(ordered.map((row) => row.rate), [0.84, 1, 0.7]);
+  assert.deepEqual(ordered.map((row) => row.rate), [0.84, 1]);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:dc-12'), undefined);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:over15').label, '100% Over 1.5 goals');
   const eighty = slips.find((slip) => slip.id === 'tier:80:dc-12');
@@ -135,6 +134,42 @@ test('a tier books a second part instead of dropping the extra legs', async () =
   assert.equal(parts.length, 2);
   assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
   assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
+});
+
+test('the master slip is booked in parts of 50, not one 18-leg code', async () => {
+  const calls = [];
+  const linkFor = (desk, code) => ({
+    sportybet: `https://www.sportybet.com/gh/?shareCode=${code}`,
+    footballcom: `https://www.football.com/gh/?shareCode=${code}`,
+    msport: `https://www.msport.com/gh/?shareCode=${code}`,
+    betika: `https://betika.com/en-gh/share/${code}`,
+    betpawa: `https://www.betpawa.com.gh/share-betslip/${code}`,
+  })[desk];
+  const book = async (legs, desks) => {
+    calls.push({ n: legs.length, desks: desks.slice() });
+    const code = `M${calls.length}CODE`;
+    return Object.fromEntries(desks.map((desk) => [desk, {
+      parts: [{ code, link: linkFor(desk, code), legs: legs.length, matches: legs.map((row) => row.eventId) }],
+      kept: [],
+      dropped: [],
+      error: null,
+    }]));
+  };
+  const legs = Array.from({ length: 60 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 }));
+  assert.deepEqual(bookingGroups({ id: 'master' }, legs).map((group) => group.length), [50, 10]);
+  assert.equal(bookingGroups({ id: '80:over15' }, legs).length, 1);
+  assert.equal(bookingGroups({ id: '80:over15' }, legs)[0].length, CODE_LIMIT);
+  const out = await bookSlips({
+    slips: [{ id: 'master', name: '80%+ Master Slip', legs }],
+    book,
+    now: now.getTime(),
+    log: () => {},
+  });
+  const parts = out.results[0].books.sportybet.parts;
+  assert.equal(parts.length, 2);
+  assert.deepEqual(parts.map((part) => part.legs), [50, 10]);
+  assert.ok(calls.every((call) => call.n === 50 || call.n === 10));
+  assert.equal(calls.some((call) => (call.desks || []).includes('betway')), false);
 });
 
 test('betPawa books second-half over 0.5 from market type 4976', async () => {

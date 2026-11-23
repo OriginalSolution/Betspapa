@@ -32,24 +32,26 @@ describe('alert setup version', () => {
     expect(parseSetupRecord(null)).toBeNull();
     expect(setupIsCurrent(null)).toBe(false);
     expect(shouldShowIntro(null, false)).toBe(true);
-    expect(ALERT_SETUP_VERSION).toBe(2);
+    expect(ALERT_SETUP_VERSION).toBe(3);
   });
 
   it('accepts only a finished record at this version or newer', () => {
-    expect(setupIsCurrent({ version: 2, finished: false })).toBe(false);
+    expect(setupIsCurrent({ version: 3, finished: false })).toBe(false);
+    expect(setupIsCurrent({ version: 0, finished: true })).toBe(false);
     expect(setupIsCurrent({ version: 1, finished: true })).toBe(false);
-    expect(setupIsCurrent({ version: 2, finished: true })).toBe(true);
+    expect(setupIsCurrent({ version: 2, finished: true })).toBe(false);
     expect(setupIsCurrent({ version: 3, finished: true })).toBe(true);
     expect(parseSetupRecord('{"version":1,"finished":true}')).toEqual({ version: 1, finished: true });
     expect(parseSetupRecord('nope')).toBeNull();
     expect(nativeSetupIsCurrent(device({ setupVersion: 1, setupFinished: true }))).toBe(false);
-    expect(nativeSetupIsCurrent(device({ setupVersion: 2, setupFinished: true }))).toBe(true);
+    expect(nativeSetupIsCurrent(device({ setupVersion: 2, setupFinished: true }))).toBe(false);
+    expect(nativeSetupIsCurrent(device({ setupVersion: 3, setupFinished: true }))).toBe(true);
     expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).notificationSound).toBe('on');
     expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).soundBlocked).toBe(true);
     expect(parseDeviceStatus({}).notificationSound).toBe('off');
     expect(emptyDeviceStatus().soundBlocked).toBe(false);
-    expect(shouldShowIntro({ version: 2, finished: true }, false)).toBe(false);
-    expect(shouldShowIntro({ version: 1, finished: true }, false)).toBe(true);
+    expect(shouldShowIntro({ version: 2, finished: true }, false)).toBe(true);
+    expect(shouldShowIntro({ version: 3, finished: true }, false)).toBe(false);
     expect(shouldShowIntro(null, true)).toBe(false);
   });
 });
@@ -86,7 +88,7 @@ describe('alert setup steps', () => {
 
   it('opens the banner fix at the failing step', () => {
     const status = device({ notifications: 'denied', batteryUnrestricted: false, exactAlarms: 'denied', oem: 'xiaomi' });
-    expect(fixSteps(status)).toEqual(['notifications', 'battery', 'exact', 'test']);
+    expect(fixSteps(status)).toEqual(['notifications', 'battery', 'exact', 'sound', 'test']);
     expect(bannerNeeded(true, false, status)).toBe(true);
     expect(bannerNeeded(false, false, status)).toBe(false);
     expect(bannerNeeded(true, true, status)).toBe(false);
@@ -97,6 +99,11 @@ describe('alert setup steps', () => {
     expect(retrySteps(device({ notifications: 'granted', batteryUnrestricted: false, exactAlarms: 'granted', oem: 'samsung' }))).toEqual(['battery', 'autostart', 'test']);
     expect(retrySteps(device({ notifications: 'granted', batteryUnrestricted: true, exactAlarms: 'granted', oem: 'oppo' }))).toEqual(['autostart', 'test']);
     expect(retrySteps(device({ notifications: 'granted', batteryUnrestricted: true, exactAlarms: 'granted' }))).toEqual(['test']);
+    expect(introSteps(device({ notifications: 'granted', batteryUnrestricted: true, exactAlarms: 'granted', oem: 'xiaomi' }))).toEqual(['autostart', 'sound', 'test']);
+    expect(introSteps(device({ notifications: 'granted', batteryUnrestricted: true, exactAlarms: 'unsupported', soundBlocked: true }))).toEqual(['sound', 'test']);
+    expect(stepCopy('sound', 'xiaomi', 'ask').body).toContain('HyperOS');
+    expect(stepCopy('sound', 'xiaomi', 'opened').action).toBe("I've turned it on");
+    expect(stepCopy('sound', null, 'ask').action).toBe('Open notification settings');
     expect(stepsFrom(device({ oem: 'vivo' }), 'autostart', true)).toEqual(['autostart', 'test']);
   });
 

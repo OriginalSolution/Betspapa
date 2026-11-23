@@ -21,6 +21,9 @@ const DESK_LABEL = {
   betpawa: 'betPawa',
 };
 
+export const CREST_TOP_TARGET = 95;
+export const CREST_ALL_TARGET = 85;
+
 export function isLiveMode(mode) {
   const value = String(mode || '').trim().toLowerCase();
   return value !== 'demo' && value !== 'simulated' && value !== 'simulation';
@@ -233,15 +236,17 @@ export function evaluateChecks(input = {}) {
   checks.push(check('kickoff', kicked.length === 0, 'attention', compact(kicked, 'Kicked-off legs are off the board.'), ['rebook']));
 
   const coverage = coverageIssues(state, now);
-  const coverageGaps = coverage.filter((row) => !row.empty);
+  const coverageGaps = booking ? [] : coverage.filter((row) => !row.empty);
   const coverageNote = coverage.filter((row) => row.empty).map((row) => row.message);
   if (coverageGaps.length) actions.add('rebook');
-  const coverageMessage = coverageGaps.length
-    ? compact(coverageGaps.map((row) => row.message), '')
-    : coverageNote.length
-      ? `Desk codes are booked. ${coverageNote.join(' ')}`
-      : 'Tiers and markets have codes on the five desks.';
-  checks.push(check('coverage', coverageGaps.length === 0, 'attention', coverageMessage, ['rebook']));
+  const coverageMessage = booking
+    ? 'A booking cycle is still running. Coverage is checked when it finishes.'
+    : coverageGaps.length
+      ? compact(coverageGaps.map((row) => row.message), '')
+      : coverageNote.length
+        ? `Desk codes are booked. ${coverageNote.join(' ')}`
+        : 'Tiers and markets have codes on the five desks.';
+  checks.push(check('coverage', coverageGaps.length === 0, 'attention', coverageMessage, booking ? [] : ['rebook']));
 
   const persistent = input.persistent !== false;
   const devices = Math.max(0, Number(input.devices) || 0);
@@ -249,12 +254,21 @@ export function evaluateChecks(input = {}) {
   const lost = Boolean(input.devicesLost) || (Boolean(input.restarted) && previous > 0 && devices === 0);
   const persistIssues = [];
   if (!persistent) persistIssues.push('The data directory is not a persistent disk.');
+  if (input.boardStored === false) {
+    const why = input.diskError ? ` ${input.diskError}` : '';
+    persistIssues.push(`Could not store the booked board on the data disk.${why}`);
+  }
+  if (input.snapshot === 'no-token' && !persistent) persistIssues.push('No snapshot token, so a restart cannot reload the booked board.');
   if (lost) persistIssues.push(`Device list was lost after a restart (was ${previous || 'some'}, now 0).`);
+  const deviceText = `${devices} ${devices === 1 ? 'device' : 'devices'}.`;
+  const persistOk = input.snapshot === 'no-token' && persistent && input.boardStored !== false
+    ? `Data directory is persistent. The booked board is on disk. ${deviceText}`
+    : `Data directory is persistent. ${deviceText}`;
   checks.push(check(
     'persist',
     persistIssues.length === 0,
     'attention',
-    persistIssues.length ? persistIssues.join(' ') : `Data directory is persistent. ${devices} ${devices === 1 ? 'device' : 'devices'}.`,
+    persistIssues.length ? persistIssues.join(' ') : persistOk,
   ));
 
   const feedOk = input.feedOk;
@@ -282,6 +296,24 @@ export function evaluateChecks(input = {}) {
       ? `The app board is ${Math.ceil(payloadBytes / 1024)}KB gzipped, over the 400KB limit.`
       : 'The app board is within 400KB gzipped.',
   ));
+
+  // Crest coverage for the next 48 hours. A warning, never a reason to page the
+  // AI fixer: the guardian retries the misses itself.
+  const crests = input.crests;
+  if (crests && crests.ready) {
+    const top = crests.tiers?.top || {};
+    const all = crests.tiers?.all || {};
+    const topOk = !top.teams || top.pct >= CREST_TOP_TARGET;
+    const allOk = !all.teams || all.pct >= CREST_ALL_TARGET;
+    const surfaces = Array.isArray(crests.surfaces) ? crests.surfaces : [];
+    const surfaceText = surfaces.length
+      ? ` App surfaces: ${surfaces.map((row) => `${row.name} ${row.real}/${row.total}${row.pct == null ? '' : ` (${row.pct}%)`}${row.broken ? `, ${row.broken} broken` : ''}${row.shield ? `, ${row.shield} shield` : ''}`).join('; ')}.`
+      : '';
+    const surfaceOk = surfaces.every((row) => !row.broken && (row.pct == null || row.pct >= CREST_ALL_TARGET));
+    const text = `Crests for the next 48 h: top leagues ${top.withCrest ?? 0}/${top.teams ?? 0}${top.teams ? ` (${top.pct}%)` : ''}, all teams ${all.withCrest ?? 0}/${all.teams ?? 0}${all.teams ? ` (${all.pct}%)` : ''}.${surfaceText}`;
+    const ok = topOk && allOk && surfaceOk;
+    checks.push(check('crests', ok, 'warn', ok ? text : `${text} Below the ${CREST_TOP_TARGET}% / ${CREST_ALL_TARGET}% target. Retrying the misses.`, ['crests']));
+  }
 
   const attention = checks.filter((row) => !row.ok && row.level === 'attention');
   for (const row of checks) {

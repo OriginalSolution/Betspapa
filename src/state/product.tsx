@@ -19,6 +19,7 @@ import { staleTrendIds, trendHitNotices } from '../lib/alerts';
 import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
+import { builderLegKeys, readBuilder } from '../lib/builderStore';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
 import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
@@ -134,6 +135,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       if (!pick.bookmarked || pick.softened) continue;
       const before = baseline.current.status.get(pick.id) ?? 'open';
       if (before === pick.status || pick.status === 'open') continue;
+      if (builderLegKeys().has(`${pick.matchId}|${pick.market}`)) continue;
       notes.push(
         notice(
           `settle:${t0}:${pick.id}:${pick.status}`,
@@ -204,10 +206,25 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
     const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
+    const tracked = readBuilder().tracked;
     void syncPushDevice({
       follows,
       trends: trendFollows,
       bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
+      builderSlip: tracked
+        ? {
+            id: tracked.id,
+            legs: tracked.legs.slice(0, 200).map((leg) => ({
+              eventId: leg.eventId,
+              market: leg.market,
+              home: leg.home,
+              away: leg.away,
+              odds: leg.odds,
+              label: leg.label,
+            })),
+          }
+        : null,
+      lineupOff: settings.lineupOff,
       settings: {
         kickoff: settings.kickoff,
         goal: settings.goal,
@@ -221,6 +238,9 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         varSound: settings.varSound,
         penaltySound: settings.penaltySound,
         promos: settings.promos,
+        lineups: settings.lineups,
+        lineupBig: settings.lineupBig,
+        bankerCodes: settings.bankerCodes,
       },
     });
   };

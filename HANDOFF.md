@@ -1,6 +1,6 @@
 # Betspapa hand-off
 
-Written 14 Nov 2026, about 7:30 PM Africa/Accra (UTC+0), so another bot or account can pick up the project from scratch. This document names secrets and says where they live. It does not contain passwords, API keys, tokens, private keys, or keystore material beyond the public sideload passwords already printed in [README.md](./README.md).
+Written 14 Nov 2026, about 7:30 PM Africa/Accra (UTC+0), so another bot or account can pick up the project from scratch. This document names secrets and says where they live. It does not contain passwords, API keys, tokens, private keys, or keystore material.
 
 The public website README is useful for product tone, but it lags the running system in several places (it still mentions football-data.org demo mode, version 0.4.4, and an empty Live tab). Trust this file and the live server for current state, then treat the README as the public-facing description.
 
@@ -16,7 +16,8 @@ Betspapa is Riddim Boss's football matchday app: live scores, trends, picks, boo
 - API: [https://api.betspapa.com](https://api.betspapa.com) on Render, service `srv-dbr5crdckfvc73d8i51g`, paid Starter plan, region Virginia. Default hostname: [https://betspapa-u7dd.onrender.com](https://betspapa-u7dd.onrender.com). The API root redirects to betspapa.com. Cloudflare sits in front of the custom API domain.
 - `GET https://api.betspapa.com/api/health` returned `ok: true`, `mode: live`, `provider: SportyBet`, `fixtures: live`, `push: true`, `guardian: ok`.
 - `GET /api/engine` (app view) was serving a fresh board (`updatedAt` 7:21 PM Africa/Accra) with booked codes on all five desks for the 100% and 90%+ tiers and their market splits. The in-process engine books on a cycle (20 seconds after boot, then about every 15 minutes) and Papa Guardian is the watchdog.
-- Latest **published** Android build: [Betspapa 0.4.8](https://github.com/OriginalSolution/Betspapa/releases/tag/v0.4.8) (versionName `0.4.8`, versionCode **30**), APK: `https://github.com/OriginalSolution/Betspapa/releases/download/v0.4.8/app-release.apk`. `main` still has this version in `android/app/build.gradle`.
+- Update 17 Nov 2026: public reads send ETag, short Cache-Control, and gzip or brotli. `/api/matches` without a football key answers a tiny 409 with `Retry-After: 300`, and a per-IP flood gets 429. The app backs off and does not poll while backgrounded or when no live match is on screen. The next sideload after that change is `0.4.10` / versionCode 33. The 15 Nov test build already used versionCode 32, so this one has to be higher or that phone will refuse the upgrade.
+- Latest **published** Android build at the 14 Nov hand-off: [Betspapa 0.4.8](https://github.com/OriginalSolution/Betspapa/releases/tag/v0.4.8) (versionName `0.4.8`, versionCode **30**), APK: `https://github.com/OriginalSolution/Betspapa/releases/download/v0.4.8/app-release.apk`. `main` still has this version in `android/app/build.gradle`.
 - A **v0.4.9 draft** exists (versionCode **31**, branch `cursor/apk-049-5587`) and is unpublished. The owner said to fix everything and verify it live before giving him a new APK. Do not publish 0.4.9 until the items in §7 are done.
 
 **What 0.4.8 already shipped:** faster tab switches (picks kept in memory, lists drawn in pages, slimmer engine payload, built-in crest map). Measured tab switches on a test phone were about 150–256 ms, down from around 10 seconds. That client build does not by itself fix notification delivery.
@@ -94,7 +95,7 @@ There is no `server/package.json`. npm walks up to the repo root, where `npm sta
 
 ### Android releases
 
-Signed sideload APKs are published as GitHub Releases with `npm run android:apk`. The keystore `android/betspapa-release.keystore` is committed. Alias, store password, and key password are the public sideload values in the README "Signing" table. This is not a Play Store upload key. Replacing the keystore breaks in-place upgrades.
+Signed sideload APKs are published as GitHub Releases with `npm run android:apk`, after `source scripts/signing-env.sh legacy` (README "Signing"). Since 21 Nov 2026 the keystore is no longer in the repository: it is in the GitHub secrets `LEGACY_KEYSTORE_*` and in the owner's secrets folder on the build box. Play bundles are signed with a separate private upload key (`PLAY_UPLOAD_*` secrets). Replacing the app signing key breaks in-place upgrades.
 
 Recent tags: 0.2.x through 0.4.8 (0.4.8 is the latest published release). 0.4.9 is a draft only (APK plus QC screenshots `picks-049.png` and `picks-049-codes.png` are attached to the untagged draft).
 
@@ -135,7 +136,7 @@ Never commit raw values. Never paste them into chat, PRs, or this file.
 | GitHub org secrets | Not listable with current auth (`404`) |
 | GitHub environment `github-pages` | No extra secrets listed |
 | Vault | Owner's Mastercard ending 1941, and other personal credentials. Every charge still needs a yes in chat |
-| Committed, intentionally public | `android/betspapa-release.keystore` plus the passwords in the README Signing table |
+| GitHub secrets + box secrets folder | Legacy app signing key (`LEGACY_KEYSTORE_*`) and Play upload key (`PLAY_UPLOAD_*`). Removed from the repo on 21 Nov 2026; it remains in older git history |
 | Committed client config | `android/app/google-services.json` — Firebase Android client config for `betspapa-app` / `com.betspapa.scores`. This is the mobile SDK file, not the service account. Do not add the service-account private key beside it |
 
 A service-account client email string `push@betspapa-app.iam.gserviceaccount.com` appears in the repo (not a human login).
@@ -184,7 +185,7 @@ Every charge needs Riddim Boss's explicit yes in chat first. About **$654** of t
 | Old Render service `srv-d9c2n3bbc2fs73b5eh80` | Suspended (user), plan **standard** | Leave suspended. Delete when the owner confirms, so it cannot accidentally start billing again |
 | Firebase project `betspapa-app` | FCM in use, **billing not enabled** | Stay on the no-billing plan unless a paid Firebase product is approved |
 | GitHub repo + Pages + Actions | Public repo | Pages and the scheduled monitor are free on a public repo. The Pages certificate expires **10 Feb 2027** |
-| Sideload keystore | Committed | No yearly fee. Do not reuse it for Play Console |
+| App signing keystore | GitHub secrets / box secrets | No yearly fee. Exported to Play App Signing with PEPK so Play and GitHub installs share one signature |
 | Bookmaker share endpoints | Free, no accounts | No subscription |
 
 ## 6. Routines and monitor
@@ -348,7 +349,7 @@ Bump `versionName` and `versionCode` in `android/app/build.gradle` for each stor
 
 QC on a real board with screenshots, including Picks codes, tab speed, and a closed-app notification, then create the GitHub Release and attach `app-release.apk`. Do not publish a draft until the owner-facing checklist in §7 is done. The current 0.4.9 draft is already sitting unpublished for that reason.
 
-Sideload signing values are public on purpose and are listed in the README Signing section (alias `betspapa`; store and key passwords are the same public value documented there). Do not reuse that keystore for a Play Console listing.
+Signing values are not in the repository. See README "Signing" for the environment variables and secrets.
 
 ### Admin and a push test
 
@@ -361,7 +362,7 @@ Tiers 100 / 90 / 80 (and per-market splits such as `tier:100:dc-12`) each get th
 
 ## 10. Repo visibility and document hygiene
 
-The repository is **public**. Assume anything committed is world-readable, including this file, the sideload keystore, `google-services.json`, QC screenshots, and the `engine-data` board snapshot.
+The repository is **public**. Assume anything committed is world-readable, including this file, `google-services.json`, QC screenshots, and the `engine-data` board snapshot.
 
 Do not commit: admin passwords or hashes, FCM service-account JSON, Render env files, GitHub tokens, deploy hooks, Gmail app passwords, or card details. If you add a secret, put it in Render env, GitHub Actions secrets, or `/home/box/secrets/betspapa-*`, and only name it here.
 
