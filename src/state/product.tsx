@@ -224,6 +224,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
             })),
           }
         : null,
+      lineupOff: settings.lineupOff,
       settings: {
         kickoff: settings.kickoff,
         goal: settings.goal,
@@ -237,6 +238,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         varSound: settings.varSound,
         penaltySound: settings.penaltySound,
         promos: settings.promos,
+        lineups: settings.lineups,
+        lineupBig: settings.lineupBig,
       },
     });
   };

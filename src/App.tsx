@@ -19,6 +19,7 @@ import { isNativeApp } from './lib/nativeHttp';
 import { longDay } from './lib/format';
 import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
+import { LineupProvider } from './components/Lineups';
 import { useSlipAlert } from './components/SlipTrack';
 import { RecordPage } from './pages/RecordPage';
 
@@ -123,6 +124,7 @@ export function App() {
 
   return (
     <AlertSetupProvider>
+      <LineupProvider>
       <div className="shell">
         <SideNav />
         <div className="center">
@@ -173,6 +175,7 @@ export function App() {
         <TabBar />
         <Toasts />
       </div>
+      </LineupProvider>
     </AlertSetupProvider>
   );
 }

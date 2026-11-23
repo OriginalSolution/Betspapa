@@ -87,7 +87,7 @@ export function serviceAccount(env = process.env) {
 }
 
 export function channelFor(kind, settings = {}) {
-  if (kind === 'slip') return 'betspapa.goal.off.v4';
+  if (kind === 'slip' || kind === 'lineup') return 'betspapa.goal.off.v4';
   if (kind === 'red') return settings.redSound === false ? 'betspapa.goal.off.v4' : 'betspapa.redcard.v1';
   if (kind === 'var') return settings.varSound === false ? 'betspapa.goal.off.v4' : 'betspapa.var.v1';
   if (kind === 'penalty') return settings.penaltySound === false ? 'betspapa.goal.off.v4' : 'betspapa.penalty.v1';
@@ -730,9 +730,12 @@ export function acceptDevice(body) {
         varSound: settings.varSound !== false,
         penaltySound: settings.penaltySound !== false,
         promos: settings.promos !== false,
+        lineups: settings.lineups !== false,
+        lineupBig: settings.lineupBig === true,
       },
       appVersion: cleanVersion(body?.appVersion),
       builderSlip: builderSlipFrom(body) || null,
+      lineupOff: Array.isArray(body?.lineupOff) ? body.lineupOff.filter((id) => typeof id === 'string').slice(0, 200) : [],
       sent: [],
       updatedAt: new Date().toISOString(),
     },
@@ -769,6 +772,7 @@ export function createDeviceBook(dir) {
         follows: body?.follows == null && existing?.follows ? existing.follows : accepted.device.follows,
         trends: body?.trends == null && existing?.trends ? existing.trends : accepted.device.trends,
         builderSlip: builderSlipFrom(body) === undefined ? existing?.builderSlip || null : accepted.device.builderSlip,
+        lineupOff: Array.isArray(body?.lineupOff) ? accepted.device.lineupOff : existing?.lineupOff || [],
         slipProgress: builderSlipFrom(body) === undefined || existing?.builderSlip?.id === accepted.device.builderSlip?.id ? existing?.slipProgress || {} : {},
         sent: existing?.sent || [],
         appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),
@@ -1336,11 +1340,31 @@ export function startPushWatch(options = {}) {
     return book;
   }
 
+  async function post(item, device) {
+    if (!item?.id || !device?.token || !fcmConfigured(env) || book.alreadySent(device.token, item.id)) return false;
+    const account = serviceAccount(env);
+    if (!account) return false;
+    try {
+      const result = await deliver(account, messageFor({ ...item, sentAt: Date.now() }, device));
+      if (result.dropped) {
+        book.drop(device.token);
+        return false;
+      }
+      book.remember(device.token, item.id);
+      alerts.record(item);
+      return true;
+    } catch (error) {
+      log(`Push failed: ${error instanceof Error ? error.message : error}`);
+      return false;
+    }
+  }
+
   return {
     book,
     alerts,
     start,
     tick,
+    post,
     stats: () => ({ ...stats }),
   };
 }

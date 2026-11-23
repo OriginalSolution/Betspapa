@@ -5,9 +5,11 @@ import { cx, minuteLabel } from '../lib/format';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
 import { IconStar } from './Icons';
+import { LineupStrip, useLineup } from './Lineups';
 
 export function MatchRow({ match }: { match: Match }) {
-  const { follows, toggleMatch, flash } = useStore();
+  const { follows, toggleMatch, flash, settings } = useStore();
+  const lineup = useLineup(match.id);
   const followed = follows.matches.includes(match.id);
   const homeFollow = follows.teams.some((team) => team.id === match.home.id);
   const awayFollow = follows.teams.some((team) => team.id === match.away.id);
@@ -37,6 +39,7 @@ export function MatchRow({ match }: { match: Match }) {
       >
         <IconStar filled={followed} />
       </button>
+      {settings.lineupCard && lineup && <LineupStrip lineup={lineup} />}
     </article>
   );
 }

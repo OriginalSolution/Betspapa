@@ -23,6 +23,7 @@ import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
 import { crestStore, scheduleNightly } from './crestStore.mjs';
 import { createResults } from './results.mjs';
+import { createLineups, lineupNote, lineupWanted } from './lineups.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 
@@ -122,6 +123,28 @@ const guardian = createGuardian({
 attachGuardian(guardian);
 onEngineCycle(() => guardian.check());
 const pushBook = pushWatch.book;
+const lineups = createLineups({
+  dir: dataDir,
+  crestFor: (id, name) => crests.crestFor(id, name) || '',
+});
+async function publishLineups(events) {
+  let fresh = [];
+  try {
+    fresh = await lineups.scan(events);
+  } catch (error) {
+    console.error(`[lineups] ${error instanceof Error ? error.message : error}`);
+    return;
+  }
+  for (const announcement of fresh) {
+    for (const device of pushBook.list()) {
+      if (!lineupWanted(device, announcement)) continue;
+      await pushWatch.post(lineupNote(announcement, device), device);
+    }
+  }
+}
+onEngineBoard(() => {
+  void publishLineups(getCachedEvents());
+});
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
@@ -397,6 +420,14 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/guardian') {
     if (String(getConfig().mode) !== 'live') forceLiveMode();
     send(req, res, 200, guardian.status());
+    return;
+  }
+  if (url.pathname === '/api/lineups') {
+    if (req.method !== 'GET') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    send(req, res, 200, { lineups: lineups.list() }, 'public, max-age=30');
     return;
   }
   if (url.pathname === '/api/results') {
@@ -681,6 +712,11 @@ if (invoked) {
     void results.settle();
   }, 3 * 60 * 1000);
   settleTimer.unref?.();
+  const lineupTimer = setInterval(() => {
+    void publishLineups(getCachedEvents());
+  }, 2 * 60 * 1000);
+  lineupTimer.unref?.();
+  void publishLineups(getCachedEvents());
   server.listen(port, '0.0.0.0', () => {
     console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
     loadUpcomingEvents()

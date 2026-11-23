@@ -18,6 +18,11 @@ public final class OpenMatch {
 
     static PendingIntent forNote(Context context, WatchNote note) {
         if (note == null) return view(context, "", "home", "", "open:home");
+        if ("lineup".equals(note.kind)) {
+            String matchId = note.matchId == null ? "" : note.matchId;
+            String key = "open:" + (note.id == null || note.id.isEmpty() ? matchId : note.id);
+            return view(context, matchId, "match", "", key);
+        }
         if ("slip".equals(note.kind)) {
             String key = "open:" + (note.id == null || note.id.isEmpty() ? "slip" : note.id);
             return view(context, "", "slip", "", key);
