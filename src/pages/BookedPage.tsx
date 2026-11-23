@@ -9,6 +9,7 @@ import { readBuilder } from '../lib/builderStore';
 import { DESKS, marketLabel, type DeskId } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
 import type { BuilderLeg } from '../lib/slipPacks';
+import { shareTrackedSlip } from '../lib/shareSlip';
 import { useFreshCodes } from '../lib/useFreshCodes';
 import type { Team } from '../types';
 
@@ -22,6 +23,7 @@ export function BookedPage() {
   const tracked = useMemo(() => readBuilder().tracked, []);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   useFreshCodes(tracked);
   const desks = tracked?.desks || [];
   const total = tracked?.legs.length || 0;
@@ -39,10 +41,9 @@ export function BookedPage() {
   };
 
   const share = () => {
-    const lines = desks.flatMap((desk) => desk.parts.map((part) => `${desk.name} ${part.code}`));
-    if (!lines.length) return;
-    const text = `Betspapa slip\n${lines.join('\n')}`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+    if (!tracked || sharing) return;
+    setSharing(true);
+    void shareTrackedSlip(tracked).finally(() => setSharing(false));
   };
 
   if (!tracked || !desks.length) {
@@ -68,7 +69,7 @@ export function BookedPage() {
       </section>
       <div className="booked-actions">
         <button type="button" className="btn booked-copyall" onClick={copyAll}>Copy all {codes} codes</button>
-        <button type="button" className="btn btn-quiet" onClick={share} aria-label="Share on WhatsApp">WhatsApp</button>
+        <button type="button" className="btn btn-quiet" onClick={share} aria-label="Share on WhatsApp" disabled={sharing} aria-busy={sharing}>{sharing ? 'Sharing…' : 'WhatsApp'}</button>
       </div>
       {DESKS.map((id) => desks.find((desk) => desk.desk === id)).filter((desk): desk is BookedDeskView => Boolean(desk)).map((desk) => (
         <DeskCard
