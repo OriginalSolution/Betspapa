@@ -1,0 +1,1 @@
+WhatsApp on Booked & tracking now sends a branded Betspapa ticket image with your codes, not just plain text. The share sheet attaches the picture; if a file cannot be sent, the old text link is used.
