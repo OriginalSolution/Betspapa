@@ -9,6 +9,7 @@ import { ListsPage } from './pages/ListsPage';
 import { LivePage } from './pages/LivePage';
 import { MatchPage } from './pages/MatchPage';
 import { MorePage } from './pages/MorePage';
+import { BookedPage } from './pages/BookedPage';
 import { PicksPage } from './pages/PicksPage';
 import { RankingsPage } from './pages/RankingsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -29,6 +30,7 @@ const titles: Record<string, string> = {
   '/picks': 'Picks',
   '/trends': 'Trends',
   '/slips': 'Slips',
+  '/slips/booked': 'Booked & tracking',
   '/record': 'Record',
   '/record/codes': 'Codes record',
   '/rankings': 'Rankings',
@@ -166,6 +168,7 @@ export function App() {
               <Route path="/more" element={<MorePage />} />
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/slips/booked" element={<BookedPage />} />
               <Route path="/match/:id" element={<MatchPage />} />
             </Routes>
             )}
