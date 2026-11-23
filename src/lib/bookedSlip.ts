@@ -8,6 +8,7 @@ export type BookedPartView = {
   matches: number;
   from: string;
   to: string;
+  link?: string;
 };
 
 export type BookedDeskView = {
@@ -21,7 +22,7 @@ export type BookedDeskView = {
 };
 
 type SentLeg = { eventId: string; kickoff: string };
-type ReturnedPart = { code?: string; legs?: number; matches?: string[] };
+type ReturnedPart = { code?: string; legs?: number; matches?: string[]; link?: string };
 type ReturnedBook = { parts?: ReturnedPart[]; error?: string | null; dropped?: unknown[] };
 type ReturnedGroup = { books?: Partial<Record<string, ReturnedBook>> };
 
@@ -55,12 +56,14 @@ export function desksFromBooking(totalLegs: number, sentGroups: SentLeg[][], gro
         const rows = ids.size ? sent.filter((leg) => ids.has(leg.eventId)) : sent;
         const times = rows.map((leg) => kickoffClock(leg.kickoff)).filter(Boolean);
         const matchCount = ids.size || new Set(rows.map((leg) => leg.eventId)).size;
+        const link = typeof part.link === 'string' && part.link.startsWith('https:') ? part.link : undefined;
         parts.push({
           code,
           legs: Number(part.legs) || rows.length,
           matches: matchCount,
           from: times[0] || '',
           to: times[times.length - 1] || '',
+          ...(link ? { link } : {}),
         });
       }
     });

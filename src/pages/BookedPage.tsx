@@ -3,32 +3,15 @@ import { Link } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
 import { Crest } from '../components/Crest';
 import { coverageLine, partSummary, type BookedDeskView, type BookedPartView } from '../lib/bookedSlip';
+import { copyText, deskName, openBookmaker } from '../lib/bookmakerLink';
 import { readBuilder } from '../lib/builderStore';
-import { DESKS, marketLabel } from '../lib/engineSlips';
+import { DESKS, marketLabel, type DeskId } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
 import type { BuilderLeg } from '../lib/slipPacks';
 import { useFreshCodes } from '../lib/useFreshCodes';
 import type { Team } from '../types';
 
 const SHOW_PARTS = 2;
-
-async function copyText(value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    /* the WebView can refuse the async clipboard */
-  }
-  const area = document.createElement('textarea');
-  area.value = value;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  area.remove();
-}
 
 function teamOf(name: string, crest: string | null): Team {
   return { id: name || 'side', name, shortName: name, abbr: '', color: '#2a303c', crest };
@@ -98,6 +81,11 @@ export function BookedPage() {
             setToast(`Copied ${code}`);
             window.setTimeout(() => setToast(null), 1800);
           }}
+          onLoad={(code, link) => {
+            void openBookmaker(desk.desk, code, link);
+            setToast(`Opening ${desk.name} with ${code}`);
+            window.setTimeout(() => setToast(null), 1800);
+          }}
         />
       ))}
       <section className="booked-legs">
@@ -126,12 +114,14 @@ function DeskCard({
   expanded,
   onToggle,
   onCopy,
+  onLoad,
 }: {
   desk: BookedDeskView;
   total: number;
   expanded: boolean;
   onToggle: () => void;
   onCopy: (code: string) => void;
+  onLoad: (code: string, link?: string) => void;
 }) {
   const visible = expanded ? desk.parts : desk.parts.slice(0, SHOW_PARTS);
   const hidden = desk.parts.length - visible.length;
@@ -152,7 +142,14 @@ function DeskCard({
       {desk.error && !desk.parts.length && <p className="lede">{desk.error}</p>}
       <ul>
         {visible.map((part, index) => (
-          <PartRow key={`${part.code}-${index}`} part={part} index={index} onCopy={() => onCopy(part.code)} />
+          <PartRow
+            key={`${part.code}-${index}`}
+            desk={desk.desk}
+            part={part}
+            index={index}
+            onCopy={() => onCopy(part.code)}
+            onLoad={() => onLoad(part.code, part.link)}
+          />
         ))}
       </ul>
       {hidden > 0 && (
@@ -164,15 +161,38 @@ function DeskCard({
   );
 }
 
-function PartRow({ part, index, onCopy }: { part: BookedPartView; index: number; onCopy: () => void }) {
+function PartRow({
+  desk,
+  part,
+  index,
+  onCopy,
+  onLoad,
+}: {
+  desk: DeskId;
+  part: BookedPartView;
+  index: number;
+  onCopy: () => void;
+  onLoad: () => void;
+}) {
   return (
     <li>
       <div>
         <span>Part {index + 1}</span>
-        <b data-booking-code={part.code}>{part.code}</b>
+        <button
+          type="button"
+          className="booked-code"
+          data-booking-code={part.code}
+          onClick={onLoad}
+          aria-label={`Load ${part.code} in ${deskName(desk)}`}
+        >
+          {part.code}
+        </button>
         <small>{partSummary(part)}</small>
       </div>
-      <button type="button" className="btn btn-quiet btn-tiny" onClick={onCopy}>Copy</button>
+      <div className="booked-part-actions">
+        <button type="button" className="btn btn-quiet btn-tiny" onClick={onCopy}>Copy</button>
+        <button type="button" className="btn btn-tiny" onClick={onLoad}>Load</button>
+      </div>
     </li>
   );
 }

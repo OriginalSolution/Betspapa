@@ -120,17 +120,37 @@ export function SlipBuilder() {
         {problem && <p className="lede">{problem}</p>}
       </section>
 
-      <div className="pack-bar">
+      <div className={cx('pack-bar', busy && 'is-busy')} aria-busy={busy}>
+        {busy && <i className="pack-bar-progress" aria-hidden="true" />}
         <div>
           <p>Slip · {added.size} {added.size === 1 ? 'trend' : 'trends'}</p>
           <strong className="pack-facts">{selected.length} legs · {matchCount} matches</strong>
-          <span>{selected.length ? `Avg price ${average.toFixed(2)} · ${partCount} ${partCount === 1 ? 'part' : 'parts'} (max ${PART_SIZE})` : 'Add a whole trend'}</span>
+          <span role={busy ? 'status' : undefined}>
+            {busy
+              ? 'Booking your codes… this can take a moment'
+              : selected.length
+                ? `Avg price ${average.toFixed(2)} · ${partCount} ${partCount === 1 ? 'part' : 'parts'} (max ${PART_SIZE})`
+                : 'Add a whole trend'}
+          </span>
         </div>
-        <button type="button" className="pack-edit" onClick={() => setEditing((value) => !value)} disabled={!selected.length}>
+        <button type="button" className="pack-edit" onClick={() => setEditing((value) => !value)} disabled={!selected.length || busy}>
           {editing ? 'Done' : 'Edit'}
         </button>
-        <button type="button" className="pack-book" onClick={() => void book()} disabled={!selected.length || busy}>
-          {busy ? 'Booking' : 'Book + track'}
+        <button
+          type="button"
+          className={cx('pack-book', busy && 'is-busy')}
+          onClick={() => void book()}
+          disabled={!selected.length || busy}
+          aria-busy={busy}
+        >
+          {busy ? (
+            <>
+              <i className="pack-book-spin" aria-hidden="true" />
+              <span className="pack-book-label">Booking…</span>
+            </>
+          ) : (
+            'Book + track'
+          )}
         </button>
       </div>
     </div>
