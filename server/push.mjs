@@ -21,6 +21,20 @@ import { expandAlias, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog } from './crestResolve.mjs';
 import { crestStore } from './crestStore.mjs';
 import { isDummyId, isSimulated } from './upcoming.mjs';
+import {
+  disallowedCopy,
+  fixtureLine,
+  fullTimeCopy,
+  goalCopy,
+  halfTimeCopy,
+  incidentCopy,
+  kickoffCopy,
+  legFixture,
+  legScore,
+  legList,
+  trendCopy,
+  varReviewCopy,
+} from '../src/lib/noteCopy.mjs';
 
 export const MIN_ODDS = 1.2;
 const LIVE = 'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1';
@@ -149,8 +163,10 @@ export function messageFor(note, device) {
     away,
     homeScore: match.homeScore == null ? '' : String(match.homeScore),
     awayScore: match.awayScore == null ? '' : String(match.awayScore),
-    minute: match.minute == null ? '' : String(match.minute),
+    minute: note.minute != null && note.minute !== '' ? String(note.minute) : match.minute == null ? '' : String(match.minute),
     status: String(match.status || ''),
+    player: String(note.player || ''),
+    side: note.side === 'home' || note.side === 'away' ? note.side : '',
     homeCrest: String(match.homeCrest || teamCrest(match.homeCompetitor, home)),
     awayCrest: String(match.awayCrest || teamCrest(match.awayCompetitor, away)),
     competition: String(match.competition || ''),
@@ -338,8 +354,17 @@ function revsOf(row) {
   };
 }
 
+/** Which side a VAR review is about, or '' when the feed's team id matches neither. */
+function reviewSide(match) {
+  const id = String(match?.varReview?.teamId || '');
+  if (!id) return '';
+  if (id === String(match.homeCompetitor || '') || id === String(match.homeId || '')) return 'home';
+  if (id === String(match.awayCompetitor || '') || id === String(match.awayId || '')) return 'away';
+  return '';
+}
+
 function kickoffNote(match) {
-  return { id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', title: 'Kick-off', body: `${match.home} vs ${match.away} is underway`, match };
+  return { id: `${match.id}:kickoff`, matchId: match.id, kind: 'kickoff', ...kickoffCopy(match), match };
 }
 
 /**
@@ -362,7 +387,6 @@ export function diffMatches(previous, next) {
       notes.push(kickoffNote(match));
     }
     for (const side of ['home', 'away']) {
-      const team = side === 'home' ? match.home : match.away;
       const was = Number(before[`${side}Score`]) || 0;
       const now = Number(match[`${side}Score`]) || 0;
       if (now < was) {
@@ -374,8 +398,7 @@ export function diffMatches(previous, next) {
             id: `${goalId}:cancelled`,
             matchId: match.id,
             kind: 'var',
-            title: `VAR · ${team}`,
-            body: `Goal disallowed · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`,
+            ...disallowedCopy(match, side),
             disallowed: true,
             replaces: goalId,
             match,
@@ -390,23 +413,22 @@ export function diffMatches(previous, next) {
           id: goalNoteId(match.id, side, index, rev),
           matchId: match.id,
           kind: 'goal',
-          title: `Goal · ${team}`,
-          body: `${team} score · ${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`,
+          ...goalCopy(match, side),
+          side,
           match,
         });
       }
     }
     // Half-time only when the feed actually shows the break. A match first seen as finished is not half-time.
     if (before.status !== 'halftime' && before.status !== 'finished' && match.status === 'halftime') {
-      notes.push({ id: `${match.id}:ht`, matchId: match.id, kind: 'ht', title: 'Half-time', body: `${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
+      notes.push({ id: `${match.id}:ht`, matchId: match.id, kind: 'ht', ...halfTimeCopy(match), match });
     }
     if (before.status !== 'finished' && match.status === 'finished') {
-      notes.push({ id: `${match.id}:ft`, matchId: match.id, kind: 'ft', title: 'Full-time', body: `${match.home} ${match.homeScore}–${match.awayScore} ${match.away}`, match });
+      notes.push({ id: `${match.id}:ft`, matchId: match.id, kind: 'ft', ...fullTimeCopy(match), match });
     }
     const seen = new Set((before.incidents || []).map((item) => item.key));
     for (const incident of match.incidents || []) {
       if (seen.has(incident.key)) continue;
-      const team = incident.side === 'away' ? match.away : match.home;
       const title = incident.type === 'red' ? 'Red card' : incident.type === 'penalty' ? 'Penalty' : 'VAR';
       const player = incident.player || title;
       notes.push({
@@ -414,8 +436,10 @@ export function diffMatches(previous, next) {
         id: `${match.id}:${incident.type}:${incident.side}:${incident.minute}:${player}`,
         matchId: match.id,
         kind: incident.type,
-        title: `${title} · ${team}`,
-        body: `${player} ${incident.minute}′ · ${match.home} vs ${match.away}`,
+        ...incidentCopy(match, incident.type, incident.side, { player: incident.player, minute: incident.minute }),
+        player: incident.player || '',
+        side: incident.side,
+        minute: incident.minute,
         match,
       });
     }
@@ -424,8 +448,10 @@ export function diffMatches(previous, next) {
         id: `${match.id}:var:${match.varReview.minute}:${match.varReview.player || 'Goal'}`,
         matchId: match.id,
         kind: 'var',
-        title: 'VAR',
-        body: `${match.varReview.player || 'Goal'} ${match.varReview.minute || ''}′ · goal under review`,
+        ...varReviewCopy(match, reviewSide(match), { player: match.varReview.player, minute: match.varReview.minute }),
+        player: match.varReview.player || '',
+        side: reviewSide(match),
+        minute: match.varReview.minute,
         match,
       });
     }
@@ -594,8 +620,9 @@ export function trendNotes(previous, next, device) {
       id: `trend:${id}:hit`,
       matchId,
       kind: 'win',
-      title: `Trend hit · ${label}`,
-      body: `${match.home} vs ${match.away} · ${label}`,
+      ...trendCopy(match, label),
+      marketLabel: label,
+      fixture: fixtureLine(match),
       match,
     });
   }
@@ -634,13 +661,12 @@ function slipCopy(legs, progress) {
   if (!played.length) return null;
   const won = played.filter((row) => row.status === 'won');
   const lost = played.filter((row) => row.status === 'lost');
-  const names = won.map((row) => String(row.home || '').replace(/\s+(FC|AFC|CF)$/i, '').trim()).filter(Boolean);
-  const landed = names.length <= 1 ? names[0] || '' : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
   const missed = lost[0];
   const title = lost.length ? `Slip lost · ${won.length} of ${played.length} legs won` : `Slip won · ${won.length} of ${played.length} legs`;
-  const landedLine = names.length === 1 ? `${names[0]} landed.` : names.length ? `${landed} legs all landed.` : '';
+  const landed = legList(won, (row) => legScore(row), 3);
+  const landedLine = landed ? `${landed} landed.` : '';
   const body = missed
-    ? `${missed.home} ${missed.ft || ''} ${missed.away} missed ${missed.label}.${landedLine ? ` ${landedLine}` : ''}`.replace(/\s+/g, ' ').trim()
+    ? `${legScore(missed)} missed ${missed.label}.${landedLine ? ` ${landedLine}` : ''}`.replace(/\s+/g, ' ').trim()
     : landedLine;
   return { title, body, kind: lost.length ? 'bust' : 'win' };
 }
@@ -935,13 +961,14 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
   const allowed = new Set(['goal', 'kickoff', 'win', 'red', 'var', 'penalty']);
   const kind = allowed.has(body?.kind) ? body.kind : 'goal';
   const matchId = typeof body?.matchId === 'string' && body.matchId.trim() ? body.matchId.trim() : 'qc-arsenal';
+  const sample = { home: 'Arsenal', away: 'Chelsea', homeScore: 2, awayScore: 1, competition: 'Premier League' };
   const copy = {
-    goal: { title: 'Goal · Arsenal', body: 'Saka score · Arsenal 2–1 Chelsea', minute: 54 },
-    kickoff: { title: 'Kick-off', body: 'Arsenal vs Chelsea is underway', minute: 1 },
-    win: { title: 'Trend hit · Over 2.5 goals', body: 'Arsenal vs Chelsea · Over 2.5 goals', minute: 54 },
-    red: { title: 'Red card · Chelsea', body: 'Keeper 50′ · Arsenal vs Chelsea', minute: 50 },
-    var: { title: 'VAR', body: 'Saka 54′ · Arsenal goal under review', minute: 54 },
-    penalty: { title: 'Penalty · Arsenal', body: 'Saka 61′ · Arsenal vs Chelsea', minute: 61 },
+    goal: { ...goalCopy({ ...sample, minute: 54 }, 'home', { player: 'Saka' }), minute: 54, player: 'Saka', side: 'home' },
+    kickoff: { ...kickoffCopy(sample), minute: 1 },
+    win: { ...trendCopy(sample, 'Over 2.5 goals'), minute: 54 },
+    red: { ...incidentCopy(sample, 'red', 'away', { player: 'Keeper', minute: 50 }), minute: 50, player: 'Keeper', side: 'away' },
+    var: { ...varReviewCopy(sample, 'home', { player: 'Saka', minute: 54 }), minute: 54, player: 'Saka', side: 'home' },
+    penalty: { ...incidentCopy(sample, 'penalty', 'home', { player: 'Saka', minute: 61 }), minute: 61, player: 'Saka', side: 'home' },
   }[kind];
   const note = {
     id: `test:${kind}:${Date.now()}`,
@@ -949,10 +976,13 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
     kind,
     title: copy.title,
     body: copy.body,
+    player: copy.player || '',
+    side: copy.side || '',
+    minute: copy.minute,
     market: kind === 'win' ? 'over25' : '',
     marketLabel: kind === 'win' ? 'Over 2.5 goals' : '',
     trendId: kind === 'win' ? `${matchId}:over25` : '',
-    fixture: 'ARS vs CHE',
+    fixture: fixtureLine(sample),
     odds: kind === 'win' ? '1.72' : '',
     match: {
       id: matchId,

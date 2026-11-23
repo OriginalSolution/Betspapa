@@ -86,7 +86,7 @@ describe('slip packs', () => {
     expect(done?.kind).toBe('bust');
     expect(done?.title).toBe('Slip lost · 2 of 3 legs won');
     expect(done?.body).toContain('Aston Villa 0-0 Sunderland missed Over 1.5 goals');
-    expect(done?.body).toContain('Chelsea and West Ham legs all landed.');
+    expect(done?.body).toContain('Chelsea 1-4 Sunderland and West Ham 2-0 Sunderland landed.');
     expect(gradeScore('over15', { home: 0, away: 0 }, null)).toBe('lost');
     expect(gradeScore('sh-over05', { home: 2, away: 0 }, null)).toBe('open');
   });

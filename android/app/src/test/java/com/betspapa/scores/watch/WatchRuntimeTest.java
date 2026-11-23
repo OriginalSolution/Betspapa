@@ -69,8 +69,8 @@ public class WatchRuntimeTest {
         assertTrue(scored.hot);
         Notification goal = goalNamed(context);
         assertTrue(goal != null);
-        assertEquals("Goal · Hearts", goal.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
-        assertTrue(goal.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Kotoko"));
+        assertEquals("GOAL! Hearts 1-0 Kotoko", goal.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
+        assertEquals("12′ · Hearts score", goal.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
         assertEquals(AlertPoster.GOAL_CROWD, goal.getChannelId());
         assertEquals("android.resource://" + context.getPackageName() + "/raw/cheer_crowd", String.valueOf(goal.sound));
         assertEquals(0, goal.flags & Notification.FLAG_ONLY_ALERT_ONCE);
@@ -104,7 +104,7 @@ public class WatchRuntimeTest {
         WatchRuntime.pollOnce(context);
         Notification goal = null;
         for (Notification note : notifications(context)) {
-            if ("Goal · Hearts".equals(String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)))) goal = note;
+            if (String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("GOAL! Hearts")) goal = note;
         }
         assertTrue(goal != null);
         assertEquals(AlertPoster.GOAL_CROWD, goal.getChannelId());
@@ -164,14 +164,14 @@ public class WatchRuntimeTest {
     private static int goalCount(Context context) {
         int goals = 0;
         for (Notification note : notifications(context)) {
-            if ("Goal · Hearts".equals(String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)))) goals++;
+            if (String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("GOAL! Hearts")) goals++;
         }
         return goals;
     }
 
     private static Notification goalNamed(Context context) {
         for (Notification note : notifications(context)) {
-            if ("Goal · Hearts".equals(String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)))) return note;
+            if (String.valueOf(note.extras.getCharSequence(Notification.EXTRA_TITLE)).startsWith("GOAL! Hearts")) return note;
         }
         return null;
     }

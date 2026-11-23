@@ -122,7 +122,7 @@ describe('diffAlerts', () => {
     ];
     const reds = diffAlerts(live, sent, ctx());
     expect(reds.map((alert) => alert.kind)).toContain('red');
-    expect(reds.find((alert) => alert.kind === 'red')?.title).toBe('Red card · Away');
+    expect(reds.find((alert) => alert.kind === 'red')?.title).toBe('RED CARD! Home FC 0-0 Away FC');
   });
 
   it('does not raise half-time for a match already in the second half on the first compare after baseline', () => {
@@ -171,6 +171,26 @@ describe('diffAlerts', () => {
         ],
       }),
     ];
-    expect(diffAlerts(prev, next, ctx())[0]?.body).toContain('Own goal · Defender');
+    expect(diffAlerts(prev, next, ctx())[0]?.body).toContain('Defender (own goal)');
+  });
+
+  it('names both clubs in full in every alert, never the short name or abbreviation', () => {
+    const home = { id: 'h', name: 'Hearts of Oak', shortName: 'Hearts', abbr: 'HOO', color: '#111' };
+    const away = { id: 'a', name: 'Asante Kotoko', shortName: 'Kotoko', abbr: 'AK', color: '#222' };
+    const prev = [match({ status: 'scheduled', minute: null, home, away })];
+    const live = [match({ status: 'live', minute: 30, home, away, homeScore: 1, events: [{ id: 'g1', type: 'goal', minute: 30, teamId: 'h', player: 'Afriyie Barnieh', detail: null, homeScore: 1, awayScore: 0 }] })];
+    const alerts = diffAlerts(prev, live, ctx());
+    const kickoff = alerts.find((alert) => alert.kind === 'kickoff');
+    const goal = alerts.find((alert) => alert.kind === 'goal');
+    expect(kickoff?.title).toBe('Kick-off: Hearts of Oak vs Asante Kotoko');
+    expect(goal?.title).toBe('GOAL! Hearts of Oak 1-0 Asante Kotoko');
+    expect(goal?.body).toBe('Afriyie Barnieh 30′ · Hearts of Oak');
+    const finished = [match({ status: 'finished', minute: 90, home, away, homeScore: 1, htHome: 0, htAway: 0, events: live[0].events })];
+    const end = diffAlerts(live, finished, ctx());
+    expect(end.find((alert) => alert.kind === 'ht')?.title).toBe('Half-time: Hearts of Oak 0-0 Asante Kotoko');
+    expect(end.find((alert) => alert.kind === 'ft')?.title).toBe('Full-time: Hearts of Oak 1-0 Asante Kotoko');
+    for (const alert of [...alerts, ...end]) {
+      expect(`${alert.title} ${alert.body}`).not.toMatch(/\bHOO\b|\bAK\b|Hearts vs|Kotoko vs/);
+    }
   });
 });

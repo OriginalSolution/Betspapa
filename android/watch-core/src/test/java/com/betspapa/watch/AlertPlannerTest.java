@@ -81,7 +81,7 @@ public class AlertPlannerTest {
         long kickoffAt = KICK + 60_000L;
         List<WatchNote> kickoff = AlertPlanner.notices(java.util.Collections.singletonList(scheduled), state, kickoffAt);
         assertEquals("kickoff", kinds(kickoff));
-        assertTrue(kickoff.get(0).body.contains("Al Astiklal"));
+        assertEquals("Kick-off: Al Astiklal vs Nashama", kickoff.get(0).title);
         state.record(kickoff.get(0), kickoffAt);
         assertTrue(AlertPlanner.notices(java.util.Collections.singletonList(scheduled), state, kickoffAt).isEmpty());
 
@@ -105,7 +105,7 @@ public class AlertPlannerTest {
         done.minute = 90;
         List<WatchNote> full = AlertPlanner.notices(java.util.Collections.singletonList(done), state, KICK + 100 * 60_000L);
         assertEquals("ft", kinds(full));
-        assertTrue(full.get(0).body.contains("1" + "\u2013" + "0"));
+        assertEquals("Full-time: Al Astiklal 1-0 Nashama", full.get(0).title);
     }
 
     @Test

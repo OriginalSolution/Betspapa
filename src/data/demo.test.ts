@@ -117,7 +117,7 @@ describe('demo alerts', () => {
   it('sends VAR before the Arsenal goal, then the goal only after confirmation', () => {
     const review = diffAlerts(board(0), board(16_000), ctx);
     expect(review.some((alert) => alert.kind === 'goal')).toBe(false);
-    expect(review.find((alert) => alert.kind === 'var')?.title).toBe('VAR');
+    expect(review.find((alert) => alert.kind === 'var')?.title).toBe('VAR CHECK: Arsenal 2-1 Liverpool');
     expect(review.find((alert) => alert.kind === 'var')?.body).toContain('under review');
 
     const waiting = diffAlerts(board(16_000), board(24_000), ctx);
@@ -125,9 +125,9 @@ describe('demo alerts', () => {
 
     const alerts = diffAlerts(board(24_000), board(32_000), ctx);
     const goal = alerts.find((alert) => alert.kind === 'goal');
-    expect(goal?.title).toBe('Goal · Arsenal');
+    expect(goal?.title).toBe('GOAL! Arsenal 3-1 Liverpool');
     expect(goal?.body).toContain('Havertz');
-    expect(goal?.body).toContain('3–1');
+    expect(goal?.body).toBe('Havertz 68′ · Arsenal');
   });
 
   it('stays quiet for the same goal when the match is not followed', () => {
@@ -142,6 +142,6 @@ describe('demo alerts', () => {
       followedTeamIds: new Set(['mci']),
     });
     expect(alerts.map((alert) => alert.kind)).toEqual(['kickoff']);
-    expect(alerts[0]?.body).toContain('Man City');
+    expect(alerts[0]?.title).toBe('Kick-off: Chelsea vs Manchester City');
   });
 });

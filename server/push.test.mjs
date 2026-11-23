@@ -343,7 +343,7 @@ test('a followed match that leaves the live list at the end gets full time and s
   await watch.tick();
   const kinds = sent.map((data) => data.kind);
   assert.deepEqual(kinds.sort(), ['ft', 'win']);
-  assert.equal(sent.find((data) => data.kind === 'ft').body, 'Hearts 2–0 Kotoko');
+  assert.equal(sent.find((data) => data.kind === 'ft').title, 'Full-time: Hearts 2-0 Kotoko');
 });
 
 test('a goal FCM refused with 503 is sent on the next poll, once', async () => {
@@ -398,6 +398,6 @@ test('a tracked slip alerts once, only after every leg has a final score', () =>
   assert.equal(done.note.route, 'slip');
   assert.match(done.note.title, /Slip lost · 1 of 2 legs won/);
   assert.match(done.note.body, /Aston Villa 0-0 Sunderland missed Over 1.5 goals/);
-  assert.match(done.note.body, /Chelsea landed/);
+  assert.match(done.note.body, /Chelsea 2-1 Leeds landed/);
   assert.equal(channelFor('slip', {}), 'betspapa.goal.off.v4');
 });

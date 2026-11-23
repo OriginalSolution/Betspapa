@@ -360,7 +360,7 @@ export function stepHint(step: AlertStepId, oem: OemBrand | null, phase: FlowPha
     return {
       screen: 'Your notifications',
       caption: 'This card should appear even when Betspapa is closed.',
-      rows: [row('Goal · Arsenal', 'allow', true, false, 'Saka scores · Arsenal 1–0 Chelsea')],
+      rows: [row('GOAL! Arsenal 1-0 Chelsea', 'allow', true, false, 'Saka 54′ · Arsenal')],
     };
   }
   if (step === 'notifications') {

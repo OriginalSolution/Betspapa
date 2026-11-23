@@ -62,7 +62,7 @@ describe('live scores', () => {
     const now = Date.parse('2026-11-10T18:02:00.000Z');
     const notes = kickoffNotices([match()], follows, settings, 5, new Set(), now);
     expect(notes.map((note) => note.kind)).toEqual(['kickoff']);
-    expect(notes[0]?.body).toContain('Man City vs Fulham');
+    expect(notes[0]?.title).toBe('Kick-off: Man City vs Fulham');
     const again = kickoffNotices([match()], follows, settings, 5, new Set([notes[0]!.id]), now);
     expect(again).toEqual([]);
     const later = kickoffNotices([match()], follows, settings, 9, new Set(), Date.parse('2026-11-10T20:30:00.000Z'));

@@ -49,7 +49,7 @@ public class GoalCardLayoutTest {
         assertEquals("1 – 0", text(card, R.id.score_big));
         assertTrue(text(card, R.id.strip_status), text(card, R.id.strip_status).startsWith("GOAL 54"));
         View collapsed = apply(context, ScoreCards.collapsed(context, note, match), 300);
-        assertEquals("HEA 1–0 KOT", text(collapsed, R.id.collapsed_score));
+        assertEquals("Hearts of Oak 1–0 Asante Kotoko", text(collapsed, R.id.collapsed_score));
     }
 
     @Test

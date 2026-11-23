@@ -140,7 +140,8 @@ public class TestAlertReceiver extends BroadcastReceiver {
             /* the card still posts if the seen file cannot be written */
         }
         String id = text(intent, "id", "qc-goal");
-        WatchNote note = new WatchNote(id, matchId, kind, "Goal · " + home, home + " " + match.homeScore + "–" + match.awayScore + " " + away);
+        com.betspapa.watch.NoteCopy.Copy copy = com.betspapa.watch.NoteCopy.goal(match, "home", text(intent, "player", ""), match.minute);
+        WatchNote note = new WatchNote(id, matchId, kind, copy.title, copy.body);
         note.minute = match.minute;
         AlertPoster.post(app, note, sound);
     }
