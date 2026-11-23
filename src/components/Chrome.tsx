@@ -71,7 +71,9 @@ export function TabBar() {
 
 function topSubtitle(pathname: string, date: string): string {
   if (pathname === '/') return longDay(date);
+  if (pathname === '/picks') return 'Today · picks at 80%+';
   if (pathname === '/trends') return 'Add a whole trend to your slip';
+  if (pathname === '/slips/booked') return 'Codes for every bookmaker';
   if (pathname === '/record') return 'Every 80%+ pick, graded';
   if (pathname === '/record/picks') return 'Graded picks · top leagues';
   if (pathname === '/record/codes') return 'Booked codes settle with their legs';
@@ -82,11 +84,15 @@ export function TopBar({ title }: { title: string }) {
   const { unread, refresh, date } = useStore();
   const { pathname } = useLocation();
   const [params] = useSearchParams();
-  const back = pathname === '/record/picks' ? `/record?day=${encodeURIComponent(params.get('day') || date)}` : '';
+  const back = pathname === '/record/picks'
+    ? `/record?day=${encodeURIComponent(params.get('day') || date)}`
+    : pathname === '/slips/booked'
+      ? '/trends'
+      : '';
   return (
     <header className="topbar">
       {back ? (
-        <NavLink to={back} className="icon-btn rec-back" aria-label="Back to the record">
+        <NavLink to={back} className="icon-btn rec-back" aria-label={pathname === '/slips/booked' ? 'Back to Trends' : 'Back to the record'}>
           ‹
         </NavLink>
       ) : (

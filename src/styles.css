@@ -1435,7 +1435,13 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   place-items: center;
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
 }
+.hit-ring b small { font-size: 0.62em; font-weight: 750; }
+.ring-card .hit-ring { width: 40px; height: 40px; }
+.ring-card .hit-ring svg { width: 40px; height: 40px; }
+.ring-card .hit-ring b { display: flex; align-items: baseline; justify-content: center; white-space: nowrap; font-size: 12px; letter-spacing: -0.04em; }
+.ring-card .hit-ring.is-full b { font-size: 11px; }
 .hit-ring.is-hot b { color: var(--green); }
 .hit-ring.is-warm b { color: var(--gold); }
 .tip-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -2109,7 +2115,8 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 }
 .pack-bar div { flex: 1; }
 .pack-bar p { margin: 0; color: var(--faint); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 750; }
-.pack-bar strong { font-family: var(--score); font-size: 28px; line-height: 1; }
+.pack-bar strong { font-family: var(--sans); font-size: 16px; line-height: 1.2; font-weight: 750; }
+.pack-bar span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 650; }
 .pack-edit { background: #1c222e; color: var(--text); padding: 10px 14px; }
 .pack-book { background: var(--red); color: #fff; padding: 10px 14px; }
 .slip-time-day { margin: 0; color: var(--faint); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 750; }
@@ -2160,5 +2167,86 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 @media (min-width: 960px) {
   .pack-bar { position: sticky; bottom: 12px; left: auto; right: auto; }
   .slip-builder { padding-bottom: 12px; }
+  .booked-foot { position: sticky; }
 }
+
+.pick-tiers { display: flex; gap: 6px; margin: 4px 0 8px; }
+.pick-tier { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 6px; font-weight: 800; }
+.pick-tier small { display: block; font-size: 11px; font-weight: 650; color: var(--faint); }
+.pick-tier.is-on { background: var(--red); color: #fff; border-color: transparent; }
+.pick-tier.is-on small { color: rgba(255, 255, 255, 0.82); }
+.master-code { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; display: grid; gap: 8px; }
+.master-code header, .master-code > div, .master-part, .pick-group header, .ring-meta, .ring-body span, .booked-status header, .booked-desk header, .booked-desk li, .booked-legs li, .booked-actions, .booked-foot { display: flex; align-items: center; gap: 8px; }
+.master-code header span { color: var(--faint); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.master-code label { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.master-code label img, .master-code label .book-mark { width: 18px; height: 18px; }
+.master-code select { background: transparent; color: inherit; border: 0; font: inherit; font-size: 13px; font-weight: 750; max-width: 128px; }
+.master-part em { font-style: normal; font-size: 12px; font-weight: 750; color: var(--muted); }
+.master-part { background: transparent; border: 0; color: inherit; padding: 0; }
+.master-part span, .pick-group-code span { color: var(--faint); font-size: 11px; font-weight: 750; }
+.master-part b, .pick-group-code b { font-family: var(--score); font-size: 20px; letter-spacing: 0.03em; }
+.pick-markets { margin-top: 4px; }
+.pick-markets .market-filter { display: flex; flex-direction: column; align-items: flex-start; min-width: 92px; white-space: normal; }
+.pick-markets .market-filter b { font-weight: 650; opacity: 0.7; }
+.pick-group header { justify-content: space-between; padding: 8px 2px 4px; }
+.pick-group header button { background: transparent; border: 0; color: inherit; font-weight: 800; display: inline-flex; gap: 6px; align-items: center; }
+.pick-group header small { color: var(--faint); font-weight: 700; }
+.pick-group-code { margin-left: auto; }
+.ring-card { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.ring-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: left; background: transparent; border: 0; color: inherit; padding: 0; }
+.ring-body span { min-width: 0; font-size: 13px; font-weight: 650; }
+.ring-body span .crest { flex: none; }
+.ring-meta { color: var(--faint); font-size: 12px; font-weight: 700; }
+.ring-meta b { color: var(--muted); font-family: var(--score); font-size: 13px; }
+.ring-meta em { color: #ff6b75; font-style: normal; font-weight: 800; }
+.sig-held, .sig-exc { font-style: normal; font-size: 9px; font-weight: 800; border-radius: 999px; padding: 1px 5px; }
+.sig-held { color: #9ee8c4; background: rgba(61, 220, 151, 0.12); }
+.sig-exc { color: var(--gold); background: rgba(240, 201, 74, 0.12); }
+.ring-price { width: 64px; flex: none; border-radius: 11px; border: 1px solid var(--line-strong); background: transparent; color: inherit; padding: 6px 0; }
+.ring-price b { display: block; font-family: var(--score); font-size: 20px; line-height: 1; }
+.ring-price small { display: block; margin-top: 2px; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; color: var(--faint); text-transform: uppercase; }
+.ring-price.is-on { background: var(--red); border-color: transparent; }
+.ring-price.is-on small { color: #ffd5d8; }
+.pick-float { background: #fff; color: #12141a; }
+.pick-float span { display: flex; flex-direction: column; gap: 2px; }
+.pick-float b { font-size: 14px; }
+.pick-float span em { color: #5d6475; background: none; padding: 0; }
+.pick-float > em { margin-left: auto; background: var(--red); color: #fff; border-radius: 12px; padding: 8px 12px; font-weight: 800; }
+.pick-sheet { position: fixed; inset: 0; z-index: 60; }
+.pick-sheet-dim { position: absolute; inset: 0; border: 0; background: rgba(0, 0, 0, 0.55); }
+.pick-sheet-card { position: absolute; left: 0; right: 0; bottom: 0; background: #12151c; border-radius: 18px 18px 0 0; padding: calc(18px) 16px calc(22px + var(--safe-area-inset-bottom)); display: grid; gap: 8px; }
+.pick-sheet-card h2 { margin: 0; font-size: 18px; }
+.pick-sheet-card p { margin: 0; color: var(--muted); font-size: 13px; }
+.pick-sheet-card div { display: flex; gap: 8px; }
+.booked-status { margin: 4px 0 8px; border-radius: 16px; padding: 12px 14px; background: linear-gradient(135deg, rgba(61, 220, 151, 0.16), rgba(61, 220, 151, 0.04)); border: 1px solid rgba(61, 220, 151, 0.28); }
+.booked-status strong { color: var(--green); }
+.booked-status span { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 700; }
+.booked-status p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.booked-actions { margin-bottom: 8px; }
+.booked-copyall { flex: 1; background: #fff; color: #12141a; }
+.booked-desk { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.booked-desk header .book-mark { width: 26px; height: 26px; border-radius: 6px; }
+.booked-desk header, .booked-desk li { padding: 10px 12px; }
+.booked-desk header { border-bottom: 1px solid var(--line); }
+.booked-desk header div { flex: 1; min-width: 0; }
+.booked-desk header small, .booked-desk li small { display: block; color: var(--muted); font-size: 11px; }
+.booked-desk ul { list-style: none; margin: 0; padding: 0; }
+.booked-desk li { border-top: 1px solid var(--line); }
+.booked-desk li div { flex: 1; min-width: 0; }
+.booked-desk li b { font-family: var(--score); font-size: 20px; letter-spacing: 0.03em; }
+.booked-desk li span { color: var(--faint); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.booked-more { width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--muted); padding: 10px; font-weight: 750; }
+.booked-legs header { display: flex; justify-content: space-between; align-items: baseline; }
+.booked-legs h2 { margin: 8px 0; font-size: 14px; }
+.booked-legs h2 b { color: var(--muted); }
+.booked-legs ul { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.booked-legs li { padding: 8px 12px; border-top: 1px solid var(--line); }
+.booked-legs li div { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.booked-legs li span { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; }
+.booked-legs time { width: 42px; color: var(--muted); font-family: var(--score); }
+.booked-legs em { width: 64px; color: #ff6b75; font-style: normal; font-size: 11px; font-weight: 800; }
+.booked-legs b { font-family: var(--score); font-size: 16px; }
+.booked-foot { position: sticky; bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 8px); display: flex; gap: 8px; padding-top: 8px; background: linear-gradient(180deg, transparent, var(--bg) 30%); }
+.booked-foot .btn { flex: 1; }
+.booked-toast { position: fixed; left: 50%; bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 72px); transform: translateX(-50%); background: #1c212c; color: #fff; border-radius: 999px; padding: 8px 14px; z-index: 40; }
 

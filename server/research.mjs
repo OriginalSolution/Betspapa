@@ -199,7 +199,10 @@ function settledRate(rows) {
 function fromRates(record, implied, label) {
   if (!record || record.sample < LEAGUE_MIN) {
     const count = record?.sample || 0;
-    return { action: 'thin', reasons: [`${label}: ${count} finished matches, under ${LEAGUE_MIN}, so this league is not blocked yet.`] };
+    const line = count <= 0
+      ? 'League record: building, no settled games yet.'
+      : `League record: building, ${count} settled ${count === 1 ? 'game' : 'games'} so far.`;
+    return { action: 'thin', reasons: [line] };
   }
   const landed = `${label} landed ${textRate(record.hits, record.sample)} (${Math.round(record.rate * 100)}%). Price implies ${Math.round(implied * 100)}%.`;
   if (record.rate + IMPLIED_GAP < implied || record.rate + 1e-12 < WEAK_LEAGUE) {

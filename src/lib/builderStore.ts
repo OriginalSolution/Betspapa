@@ -1,3 +1,4 @@
+import type { BookedDeskView } from './bookedSlip';
 import type { BuilderLeg } from './slipPacks';
 
 const KEY = 'betspapa.builder.v1';
@@ -10,6 +11,7 @@ export type TrackedSlip = {
   legs: BuilderLeg[];
   bookedAt: string;
   parts: BookedPart[];
+  desks: BookedDeskView[];
   alerted: boolean;
 };
 
@@ -24,7 +26,7 @@ export function readBuilder(): BuilderState {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || '');
     const packIds = Array.isArray(parsed?.packIds) ? parsed.packIds.filter((id: unknown) => typeof id === 'string') : [];
-    const tracked = parsed?.tracked && Array.isArray(parsed.tracked.legs) ? (parsed.tracked as TrackedSlip) : null;
+    const tracked = parsed?.tracked && Array.isArray(parsed.tracked.legs) ? normaliseTracked(parsed.tracked) : null;
     return { packIds, tracked };
   } catch {
     return empty;
@@ -48,6 +50,12 @@ export function subscribeBuilder(onChange: () => void): () => void {
     window.removeEventListener(EVENT, run);
     window.removeEventListener('storage', run);
   };
+}
+
+function normaliseTracked(value: TrackedSlip): TrackedSlip {
+  const parts = Array.isArray(value.parts) ? value.parts.filter((part) => part && typeof part.code === 'string' && typeof part.desk === 'string') : [];
+  const desks = Array.isArray(value.desks) ? value.desks : [];
+  return { ...value, parts, desks, alerted: Boolean(value.alerted) };
 }
 
 export function builderLegKeys(): Set<string> {
