@@ -159,7 +159,7 @@ final class ScoreCards {
     }
 
     private static boolean trend(WatchNote note) {
-        return note != null && ("win".equals(note.kind) || "bust".equals(note.kind));
+        return note != null && ("win".equals(note.kind) || "bust".equals(note.kind) || "slip".equals(note.kind));
     }
 
     private static boolean goalish(WatchNote note) {
@@ -170,6 +170,8 @@ final class ScoreCards {
         if (note != null && note.disallowed) return "NO GOAL";
         if (note != null && "win".equals(note.kind)) return "TREND HIT";
         if (note != null && "bust".equals(note.kind)) return "BUST";
+        if (note != null && "slip".equals(note.kind)) return "SLIP";
+        if (note != null && "lineup".equals(note.kind)) return "LINEUPS";
         int at = minute(note, match);
         String mark = at < 0 ? "" : at + "′";
         if (goalish(note)) return mark.isEmpty() ? "GOAL" : "GOAL " + mark;

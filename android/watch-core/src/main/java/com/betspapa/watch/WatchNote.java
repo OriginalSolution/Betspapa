@@ -16,6 +16,8 @@ public final class WatchNote {
     public String bookId;
     public String bookCode;
     public String fixture;
+    /** For a goal VAR took back: the goal note this card replaces on the shade. */
+    public String replaces;
 
     public WatchNote(String id, String matchId, String kind, String title, String body) {
         this.id = id;

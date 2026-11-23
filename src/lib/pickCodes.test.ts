@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEngine } from './engineSlips';
-import { slipParts, tierSlip } from './pickCodes';
+import { showsInTier, slipParts, tierSlip } from './pickCodes';
 import { legsForTier } from './bookFollow';
 
 const state = parseEngine({
@@ -55,5 +55,11 @@ describe('pick codes', () => {
     const now = Date.parse('2026-11-13T18:00:00.000Z');
     expect(legsForTier(legs, '100', null, now).map((leg) => leg.eventId)).toEqual(['sr:match:1']);
     expect(legsForTier(legs, '80', 'over25', now).map((leg) => leg.eventId)).toEqual(['sr:match:2']);
+    const agreed = { eventId: 'sr:match:5', market: 'over15', odds: 1.25, kickoff: '2026-11-13T22:00:00.000Z', rate: 0.6, teamsAgree: true };
+    expect(legsForTier([agreed], '80', null, now)).toEqual([]);
+    expect(legsForTier([agreed], '90', null, now)).toEqual([]);
+    expect(showsInTier(0.6, '80', true)).toBe(false);
+    expect(showsInTier(0.6, '100', true)).toBe(false);
+    expect(showsInTier(1, '100', false)).toBe(true);
   });
 });

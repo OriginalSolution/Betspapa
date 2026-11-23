@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import smtplib
 import ssl
 import time
@@ -171,10 +172,62 @@ def write_summary(results: list[Result], extra: list[str]) -> None:
             f.write("## Monitor\n\n" + text)
 
 
+def _json_hint(body: bytes, contains: str) -> str:
+    """Quote the JSON fields a body check was looking for, plus a short reason when one is present."""
+    if not body:
+        return " (empty body)"
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return " (body was not JSON)"
+    if not isinstance(data, dict):
+        return ""
+    bits: list[str] = []
+    seen: list[str] = []
+    for key in re.findall(r'"([^"\\]+)"\s*:', contains or ""):
+        value = data.get(key)
+        if key in data and not isinstance(value, (dict, list)):
+            bits.append(f"{key} is {json.dumps(value, ensure_ascii=False)}")
+            seen.append(key)
+    reason = data.get("reason")
+    if isinstance(reason, str) and reason and "reason" not in seen:
+        bits.append(reason)
+    if not bits:
+        return ""
+    text = "; ".join(bits)
+    if len(text) > 400:
+        text = text[:397] + "..."
+    return f" ({text})"
+
+
+def judge(status: int, body: bytes, err: str = "", *, expect: int = 200, contains: str | None = None,
+          json_ok_field: str | None = None) -> tuple[bool, str]:
+    """Decide a URL check. The detail names the condition that failed.
+
+    A matching status is not described as a status miss. Body text and a JSON flag are
+    reported on their own, with the actual JSON value when the body parses.
+    """
+    if status != expect:
+        return False, f"answered {status or err} (expected {expect})"
+    raw = body or b""
+    if contains and contains.encode() not in raw:
+        return False, f"answered {status} but body did not contain {contains}{_json_hint(raw, contains)}"
+    if json_ok_field:
+        try:
+            data = json.loads(raw) if raw else None
+        except ValueError:
+            return False, f"answered {status} but body was not JSON ({json_ok_field} must be true)"
+        value = data.get(json_ok_field) if isinstance(data, dict) else None
+        if not value:
+            extra = ""
+            reason = data.get("reason") if isinstance(data, dict) else None
+            if isinstance(reason, str) and reason:
+                extra = f" ({reason[:400]})"
+            return False, f"answered {status} but JSON field {json_ok_field} is {json.dumps(value)}{extra}"
+    return True, f"{status}"
+
+
 def http_check(name: str, url: str, expect: int = 200, contains: str | None = None, timeout: float = 20) -> Result:
     status, body, err = http(url, timeout=timeout)
-    if status != expect:
-        return Result(name, False, f"{url} answered {status or err} (expected {expect})")
-    if contains and contains.encode() not in body:
-        return Result(name, False, f"{url} answered {status} but without the expected text")
-    return Result(name, True, f"{status}")
+    ok, detail = judge(status, body, err, expect=expect, contains=contains)
+    return Result(name, ok, detail)

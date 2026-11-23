@@ -15,6 +15,12 @@ export function tierMin(tier: CodeTier): number {
   return tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;
 }
 
+/** A band shows a pick only when its grade clears that band. Agreement does not lower the bar. */
+export function showsInTier(rate: number | null, tier: CodeTier, teamsAgree = false): boolean {
+  void teamsAgree;
+  return (rate ?? 0) + 1e-12 >= tierMin(tier);
+}
+
 /** The booked slip for a confidence band. A market of null is every qualifying pick in that band. */
 export function tierSlip(state: EngineState | null, tier: CodeTier, market: string | null): EngineSlip | null {
   const id = market ? `tier:${tier}:${market}` : `tier:${tier}`;

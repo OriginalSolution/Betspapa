@@ -94,8 +94,10 @@ export function applyLiveUpdates(matches: Match[], updates: LiveUpdate[]): Match
 export function applyCrests(matches: Match[], crests: Record<string, string>): Match[] {
   if (!Object.keys(crests).length) return matches;
   const paint = (team: Match['home']) => {
+    // The server's crest (our own copy by team id) wins; the map only fills gaps.
+    if (team.crest) return team;
     const url = crests[crestKey(team.name)];
-    if (!url || team.crest === url) return team;
+    if (!url) return team;
     return { ...team, crest: url };
   };
   return matches.map((match) => {

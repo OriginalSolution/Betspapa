@@ -1,8 +1,30 @@
 /**
  * One odds table for every pick, tip, slip, flyer, notification, and booked leg.
  * Ranges are inclusive. A market that is not listed is not shown and not booked.
- * A 100% record whose opponent also agrees may use a ceiling of 1.60.
+ * The board and the codes use this band. A price above the band is listed only as a 1.60 exception when both samples are 10/10.
+ * MARKET_RULES_PATH or ENGINE_DATA_DIR/market-rules.json can replace one market's band.
  */
+import { meetsConfidence } from './thresholds.mjs';
+
+let rangeOverrides = {};
+
+/** Per-market min/max from the owner's rules file. Known markets only. */
+export function setRangeOverrides(map) {
+  rangeOverrides = map && typeof map === 'object' ? map : {};
+}
+
+export function rangeFor(market) {
+  const id = String(market || '');
+  const base = ODDS_RANGES[id];
+  if (!base) return null;
+  const extra = rangeOverrides[id];
+  if (!extra) return base;
+  const min = Number.isFinite(Number(extra.min)) ? Number(extra.min) : base.min;
+  const max = Number.isFinite(Number(extra.max)) ? Number(extra.max) : base.max;
+  if (!(max + 1e-9 >= min)) return base;
+  const maxExclusive = extra.maxExclusive == null ? Boolean(base.maxExclusive) : Boolean(extra.maxExclusive);
+  return { min, max, maxExclusive };
+}
 
 export const PERFECT_CEILING = 1.6;
 /** How far a catalogue price may sit outside the band before other books are not asked. */
@@ -85,8 +107,13 @@ function ceiling(range, leg) {
   return { max: range.max, exclusive: Boolean(range.maxExclusive) };
 }
 
+/** The published band, with no 1.60 exception. */
+export function strictInRange(market, price) {
+  return priceInRange(market, price, null);
+}
+
 export function priceInRange(market, price, leg) {
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   if (!range) return false;
   const value = Number(price);
   if (!Number.isFinite(value) || value <= 1) return false;
@@ -100,7 +127,7 @@ export function priceInRange(market, price, leg) {
 /** Close enough that another book might still price the leg inside the band. */
 export function priceNearRange(market, price, leg) {
   if (priceInRange(market, price, leg)) return false;
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   if (!range) return false;
   const value = Number(price);
   if (!Number.isFinite(value) || value <= 1) return false;
@@ -110,7 +137,7 @@ export function priceNearRange(market, price, leg) {
 }
 
 export function rangeReason(market, price) {
-  const range = ODDS_RANGES[String(market || '')];
+  const range = rangeFor(market);
   const shown = Number.isFinite(Number(price)) ? Number(price).toFixed(2) : 'missing';
   if (!range) return `${shown} is on a market that is not priced.`;
   const top = range.maxExclusive ? `under ${range.max.toFixed(2)}` : range.max.toFixed(2);
@@ -129,7 +156,7 @@ function keptPrices(slip, leg) {
     const book = slip?.books?.[desk];
     const kept = (book?.kept || []).find((item) => item?.eventId === leg.eventId && item?.market === leg.market);
     const price = Number(kept?.odds);
-    if (Number.isFinite(price) && priceInRange(leg.market, price, leg)) rows.push({ desk, odds: Math.round(price * 100) / 100 });
+    if (Number.isFinite(price) && strictInRange(leg.market, price)) rows.push({ desk, odds: Math.round(price * 100) / 100 });
   }
   return rows;
 }
@@ -159,7 +186,7 @@ export function projectSlip(slip, now = Date.now()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   const legs = [];
   for (const leg of slip.legs || []) {
-    if (!legOpen(leg, clock)) continue;
+    if (!legOpen(leg, clock) || !meetsConfidence(leg)) continue;
     const shown = shownLeg(slip, leg);
     if (shown) legs.push(shown);
   }
@@ -168,14 +195,20 @@ export function projectSlip(slip, now = Date.now()) {
   const books = {};
   for (const [desk, book] of Object.entries(slip.books || {})) {
     if (!book || typeof book !== 'object') continue;
-    const parts = (book.parts || []).filter((part) => {
-      const matches = Array.isArray(part?.matches) ? part.matches : null;
-      if (matches && matches.length) return matches.every((id) => openIds.has(id));
+    const parts = [];
+    for (const part of book.parts || []) {
+      const listed = Array.isArray(part?.matches) ? part.matches : [];
+      if (listed.length) {
+        const matches = listed.filter((id) => openIds.has(id));
+        if (!matches.length) continue;
+        parts.push({ ...part, matches, legs: matches.length });
+        continue;
+      }
       const count = Number(part?.legs);
-      if (Number.isFinite(count) && count > legs.length) return false;
-      if (removed) return false;
-      return true;
-    });
+      if (Number.isFinite(count) && count > legs.length) continue;
+      if (removed || !part?.code) continue;
+      parts.push(part);
+    }
     books[desk] = {
       ...book,
       parts,

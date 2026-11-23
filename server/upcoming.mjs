@@ -5,7 +5,12 @@
  * ever produced: if the catalogue is unreachable the caller gets an error.
  */
 
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { catalogueShape, shapeSample } from './guardianOps.mjs';
+
 const BASE = 'https://www.sportybet.com/api/gh';
+const PREMATCH = `${BASE}/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1`;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const CACHE_TTL_MS = 5 * 60_000;
@@ -13,7 +18,81 @@ const STALE_MS = 60 * 60_000;
 export const CATALOGUE_MARKETS = '1,10,11,18,19,20,29,31,32,60,68,90';
 const EXTRA_MARKETS = '166,800063';
 
-const cache = { loadedAt: 0, events: [], pending: null };
+/** Catalogue kept on disk so a restart during an upstream outage still has the week's fixtures. */
+const CATALOGUE_KEEP_MS = 6 * 60 * 60_000;
+/** A kicked-off fixture stays in a kept catalogue this long, then only the live list can carry it. */
+const KICKED_OFF_KEEP_MS = 3 * 60 * 60_000;
+/** Smaller market groups for when the full request times out upstream. The first group carries 1X2. */
+export const MARKET_GROUPS = ['1,10,11,18', '19,20,29,31', '32,60,68,90'];
+
+const cache = { loadedAt: 0, events: [], pending: null, catalogue: null };
+
+function cataloguePath(env = process.env) {
+  return env.ENGINE_DATA_DIR ? join(env.ENGINE_DATA_DIR, 'fixtures-catalogue.json') : '';
+}
+
+function saveCatalogue(events, now = Date.now(), env = process.env) {
+  cache.catalogue = { savedAt: now, events };
+  const file = cataloguePath(env);
+  if (!file) return;
+  try {
+    mkdirSync(env.ENGINE_DATA_DIR, { recursive: true });
+    writeFileSync(`${file}.tmp`, JSON.stringify({ savedAt: now, events }));
+    renameSync(`${file}.tmp`, file);
+  } catch (error) {
+    console.error(`[fixtures] Could not keep the catalogue on disk: ${error.message}`);
+  }
+}
+
+function keptCatalogue(now = Date.now(), env = process.env) {
+  if (!cache.catalogue) {
+    const file = cataloguePath(env);
+    if (file) {
+      try {
+        const saved = JSON.parse(readFileSync(file, 'utf8'));
+        if (Number.isFinite(saved?.savedAt) && Array.isArray(saved?.events)) cache.catalogue = saved;
+      } catch {
+        /* no kept catalogue yet */
+      }
+    }
+  }
+  if (!cache.catalogue || now - cache.catalogue.savedAt > CATALOGUE_KEEP_MS) return null;
+  return cache.catalogue;
+}
+
+/**
+ * The live list only has in-play and about-to-start rows. When the catalogue fails, lay those rows
+ * over the last good catalogue instead of replacing the week's fixtures with them.
+ */
+export function overlayLive(catalogue, live, now = Date.now()) {
+  const byId = new Map();
+  for (const event of catalogue || []) {
+    if (Date.parse(event.kickoff) >= now - KICKED_OFF_KEEP_MS) byId.set(event.eventId, event);
+  }
+  for (const event of live || []) {
+    const kept = byId.get(event.eventId);
+    byId.set(event.eventId, kept ? { ...kept, ...event, odds: { ...(kept.odds || {}), ...(event.odds || {}) } } : event);
+  }
+  return [...byId.values()].sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+}
+
+/** Loads the catalogue in smaller market groups and merges the prices. The 1X2 group must load. */
+async function loadSplit(fetchImpl) {
+  const [base, ...rest] = MARKET_GROUPS;
+  const events = await loadAll(fetchImpl, base);
+  const byId = new Map(events.map((event) => [event.eventId, { ...event, odds: { ...(event.odds || {}) } }]));
+  for (const markets of rest) {
+    try {
+      for (const extra of await loadAll(fetchImpl, markets)) {
+        const row = byId.get(extra.eventId);
+        if (row) Object.assign(row.odds, extra.odds || {});
+      }
+    } catch (error) {
+      console.error(`[fixtures] Market group ${markets} failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+  return [...byId.values()];
+}
 
 function price(outcome) {
   if (outcome?.isActive === 0 || outcome?.isActive === false) return null;
@@ -118,23 +197,78 @@ export function flattenPage(payload) {
   return events;
 }
 
-async function fetchPage(pageNum, fetchImpl, markets = CATALOGUE_MARKETS) {
+const FEED_HEADERS = {
+  Accept: 'application/json',
+  OperId: '3',
+  Platform: 'web',
+  Referer: 'https://www.sportybet.com/gh/sport/football',
+  Origin: 'https://www.sportybet.com',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+};
+
+async function pause(ms) {
+  if (!ms) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchPage(pageNum, fetchImpl, markets = CATALOGUE_MARKETS, delays = [200, 800]) {
   const url = `${BASE}/factsCenter/pcUpcomingEvents?sportId=sr%3Asport%3A1&marketId=${encodeURIComponent(markets)}&pageSize=${PAGE_SIZE}&pageNum=${pageNum}`;
-  const response = await fetchImpl(url, {
-    headers: {
-      Accept: 'application/json',
-      OperId: '3',
-      Platform: 'web',
-      Referer: 'https://www.sportybet.com/gh/sport/football',
-      Origin: 'https://www.sportybet.com',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`Fixture page ${pageNum} returned ${response.status}`);
+  let last = new Error('Fixture page failed');
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, { headers: FEED_HEADERS, signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`Fixture page ${pageNum} returned ${response.status}`);
+      const payload = await response.json();
+      if (!catalogueShape(payload)) {
+        console.error(`[fixtures] Catalogue schema changed: ${shapeSample(payload)}`);
+        throw new Error('Fixture catalogue schema changed');
+      }
+      if (Number(payload?.bizCode) !== 10000) throw new Error(`Fixture page ${pageNum} was rejected`);
+      return { events: flattenPage(payload), total: Number(payload?.data?.totalNum) || 0 };
+    } catch (error) {
+      last = error instanceof Error ? error : new Error(String(error));
+      if (attempt < delays.length) await pause(delays[attempt]);
+    }
+  }
+  throw last;
+}
+
+/** Prematch rows from the live list, used only when the catalogue page changes shape or fails. */
+export function flattenPrematch(payload) {
+  if (catalogueShape(payload)) return flattenPage(payload);
+  const events = [];
+  const groups = Array.isArray(payload?.data) ? payload.data : [];
+  for (const group of groups) {
+    for (const event of group?.events || []) {
+      const kickoffMs = Number(event?.estimateStartTime);
+      if (!event?.eventId || !event?.homeTeamName || !event?.awayTeamName || !Number.isFinite(kickoffMs)) continue;
+      const record = {
+        eventId: String(event.eventId),
+        home: String(event.homeTeamName),
+        away: String(event.awayTeamName),
+        kickoff: new Date(kickoffMs).toISOString(),
+        homeId: event.homeTeamId ? String(event.homeTeamId) : null,
+        awayId: event.awayTeamId ? String(event.awayTeamId) : null,
+        tournament: group.name || event.sport?.category?.tournament?.name || 'Fixture',
+        country: event.sport?.category?.name || '',
+        odds: parseOdds(event.markets),
+      };
+      if (!isDummyId(record.eventId) && !isSimulated(record)) events.push(record);
+    }
+  }
+  return events;
+}
+
+async function fetchPrematch(fetchImpl) {
+  const response = await fetchImpl(PREMATCH, { headers: FEED_HEADERS, signal: AbortSignal.timeout(20_000) });
+  if (!response.ok) throw new Error(`Prematch list returned ${response.status}`);
   const payload = await response.json();
-  if (Number(payload?.bizCode) !== 10000) throw new Error(`Fixture page ${pageNum} was rejected`);
-  return { events: flattenPage(payload), total: Number(payload?.data?.totalNum) || 0 };
+  const events = flattenPrematch(payload);
+  if (!events.length) {
+    console.error(`[fixtures] Prematch schema changed: ${shapeSample(payload)}`);
+    throw new Error('Prematch list schema changed');
+  }
+  return events;
 }
 
 async function loadAll(fetchImpl, markets = CATALOGUE_MARKETS) {
@@ -158,6 +292,23 @@ async function loadAll(fetchImpl, markets = CATALOGUE_MARKETS) {
 function refresh(fetchImpl) {
   if (cache.pending) return cache.pending;
   cache.pending = loadAll(fetchImpl)
+    .catch(async (error) => {
+      console.error(`[fixtures] Catalogue failed (${error instanceof Error ? error.message : error}). Trying smaller market groups.`);
+      return loadSplit(fetchImpl);
+    })
+    .then((events) => {
+      if (events.length) saveCatalogue(events);
+      return events;
+    })
+    .catch(async (error) => {
+      console.error(`[fixtures] Catalogue failed (${error instanceof Error ? error.message : error}). Trying the prematch list.`);
+      const live = await fetchPrematch(fetchImpl);
+      const kept = keptCatalogue();
+      if (!kept) return live;
+      const merged = overlayLive(kept.events, live);
+      console.error(`[fixtures] Kept the last catalogue from ${new Date(kept.savedAt).toISOString()} with ${live.length} live-list rows on top (${merged.length} fixtures).`);
+      return merged;
+    })
     .then((events) => {
       if (!events.length) throw new Error('Fixture catalogue returned no events');
       cache.events = events;

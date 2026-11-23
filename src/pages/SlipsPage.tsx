@@ -19,6 +19,7 @@ import {
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 import type { Team } from '../types';
+import { SlipTimeline } from '../components/SlipTrack';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
@@ -116,6 +117,7 @@ export function SlipsPage() {
 
   return (
     <div className="stack slips-page">
+      <SlipTimeline />
       <div className="book-switch" role="tablist" aria-label="Bookmaker">
         {DESKS.map((id) => (
           <button
@@ -293,11 +295,11 @@ function TrendSlip({
           {picksLabel(count)}
           {odds.length ? ` · ${odds.join(' · ')}` : ''}
         </p>
-        {codes.length > 0 && (
-          <button type="button" className="btn btn-quiet btn-tiny" onClick={() => onCopy(copyId, codes.join('\n'))}>
-            {copied === copyId ? 'Copied' : 'Copy'}
+        {book.parts.map((part, index) => (
+          <button key={part.code} type="button" className="btn btn-quiet btn-tiny" onClick={() => onCopy(`${copyId}:${part.code}`, part.code)}>
+            {copied === `${copyId}:${part.code}` ? 'Copied' : book.parts.length > 1 ? `Copy ${index + 1}` : 'Copy'}
           </button>
-        )}
+        ))}
       </div>
       {open && (
         <ul className="slip-legs">

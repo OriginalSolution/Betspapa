@@ -3,39 +3,142 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { encodePayload, etagMatches, NOT_LIVE_RETRY_SECONDS, publicCacheControl, staticCacheControl, takeRequest, clientIp } from './bandwidth.mjs';
 import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
-import { getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, getCachedEvents, getEngineSchedule, getEngineState, getEventOccurrence, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { forceLiveMode, getConfig } from './config.mjs';
+import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, paintEngineCrests, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { crestSurfaces } from './crestSurfaces.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
+import { gzippedBytes } from './guardianChecks.mjs';
+import { readIncidents } from './guardianOps.mjs';
+import { bookAll } from './bookers.mjs';
+import { requestJson } from './curl-request.mjs';
+import { legOpen, priceInRange } from './oddsRange.mjs';
 import { createClient, filterByRange, providerDates } from './football.mjs';
 import { countryForRequest } from './geo.mjs';
-import { fcmConfigured, sendTestPush, startPushWatch } from './push.mjs';
+import { fcmConfigured, pruneStaleDevices, sendTestPush, startPushWatch } from './push.mjs';
 import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './promo/service.mjs';
 import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
+import { crestStore, scheduleNightly } from './crestStore.mjs';
+import { createResults } from './results.mjs';
+import { createLineups, lineupNote, lineupWanted } from './lineups.mjs';
+import { bankerNote, bankerWanted, createBanker } from './banker.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
+import { loadMarketRules } from './marketRules.mjs';
+
+loadMarketRules();
+
+const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+const results = createResults({
+  dir: dataDir,
+  crestFor: (id, name) => crests.crestFor(id, name) || null,
+});
+onEngineBoard((state) => results.ingest(state));
+
+async function tinySelfTest() {
+  let parsed = false;
+  try {
+    const view = JSON.parse(JSON.stringify(engineView()));
+    parsed = Boolean(view && typeof view === 'object' && ('master' in view || Array.isArray(view.tiers)));
+  } catch {
+    parsed = false;
+  }
+  const raw = getEngineRaw();
+  const pool = [...(raw?.legs || []), ...(raw?.master?.legs || [])];
+  const leg = pool.find((item) => legOpen(item) && priceInRange(item?.market, item?.odds, item));
+  if (!leg) return { ok: parsed, message: parsed ? 'App view parses. No open leg for a desk test.' : 'App view did not parse.' };
+  const books = await bookAll([leg], requestJson);
+  const coded = Object.entries(books || {}).filter(([, book]) => (book?.parts || []).some((part) => part?.code)).map(([desk]) => desk);
+  return { ok: parsed, message: `Desk test ${coded.length ? `booked ${coded.join(', ')}` : 'returned no code'}. App view ${parsed ? 'parses' : 'failed'}.` };
+}
+forceLiveMode();
+const crests = crestStore();
+scheduleNightly(async () => {
+  try {
+    crests.prewarm(await loadUpcomingEvents(), { days: 7 });
+  } catch (error) {
+    console.error(`[crests] Nightly pre-warm failed: ${error instanceof Error ? error.message : error}`);
+  }
+});
+function engineView() {
+  const full = getEngineState();
+  return paintEngineCrests(appEngineState(full), full?.events || getCachedEvents(), (id, name) => crests.crestFor(id, name) || '');
+}
+
+onEngineCycle(() => {
+  try {
+    const extra = [];
+    for (const row of Object.values(banker?.state?.codes || {})) {
+      for (const leg of row.legs || []) {
+        extra.push({
+          home: leg.home,
+          away: leg.away,
+          homeId: leg.homeId,
+          awayId: leg.awayId,
+          kickoff: leg.kickMs ? new Date(leg.kickMs).toISOString() : new Date().toISOString(),
+          country: '',
+          tournament: '',
+        });
+      }
+    }
+    crests.prewarm([...getCachedEvents(), ...extra], { days: 2 });
+  } catch {
+    /* the nightly pass still runs */
+  }
+});
+
+/** Board, search and live rows carry our own crest URL for each side. */
+function withCrests(events) {
+  crests.remember(events);
+  return events.map((event) => {
+    const homeCrest = crests.crestFor(event.homeId, event.home);
+    const awayCrest = crests.crestFor(event.awayId, event.away);
+    return homeCrest || awayCrest ? { ...event, homeCrest: homeCrest || undefined, awayCrest: awayCrest || undefined } : event;
+  });
+}
 
 const pushWatch = startPushWatch();
+let prunedTokens = 0;
 const guardian = createGuardian({
-  dir: join(process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine'), 'health'),
+  dir: join(dataDir, 'health'),
+  dataDir,
   getState: getEngineState,
+  getRaw: getEngineRaw,
   booking: () => Boolean(getEngineSchedule().running),
+  persistence: enginePersistence,
   needsRepair: engineNeedsRepair,
   runCycle: runEngineCycle,
   restore: restoreEngine,
   fcm: fcmConfigured,
-  pruneDevices: async () => {
-    let removed = 0;
-    for (const device of pushWatch.book.list()) {
-      if (String(device?.token || '').trim().length < 20) {
-        pushWatch.book.drop(device.token);
-        removed += 1;
-      }
+  mode: () => getConfig().mode,
+  forceLive: () => forceLiveMode(),
+  restartHung: restartEngineIfHung,
+  selfTest: tinySelfTest,
+  deviceCount: () => pushWatch.book.list().length,
+  push: () => ({ ...pushWatch.stats(), pruned: prunedTokens }),
+  crests: () => {
+    const cover = crests.coverage({ hours: 48 });
+    const look = (id, name) => crests.crestFor(id, name) || '';
+    try {
+      cover.surfaces = crestSurfaces({
+        events: getCachedEvents(),
+        engine: getEngineState(),
+        codes: banker?.view?.() || null,
+        crestFor: look,
+      });
+    } catch {
+      cover.surfaces = [];
     }
-    return removed;
+    return cover;
+  },
+  healCrests: () => crests.healMisses({ hours: 48 }),
+  payloadBytes: () => gzippedBytes(engineView()),
+  pruneDevices: async () => {
+    prunedTokens = pruneStaleDevices(pushWatch.book);
+    return prunedTokens;
   },
   prunePromos: async () => {
     const cutoff = Date.now() - 21 * 86_400_000;
@@ -53,7 +156,52 @@ const guardian = createGuardian({
   },
 });
 attachGuardian(guardian);
+onEngineCycle(() => guardian.check());
 const pushBook = pushWatch.book;
+const lineups = createLineups({
+  dir: dataDir,
+  crestFor: (id, name) => crests.crestFor(id, name) || '',
+});
+async function publishLineups(events) {
+  let fresh = [];
+  try {
+    fresh = await lineups.scan(events);
+  } catch (error) {
+    console.error(`[lineups] ${error instanceof Error ? error.message : error}`);
+    return;
+  }
+  for (const announcement of fresh) {
+    for (const device of pushBook.list()) {
+      if (!lineupWanted(device, announcement)) continue;
+      await pushWatch.post(lineupNote(announcement, device), device);
+    }
+  }
+}
+onEngineBoard(() => {
+  void publishLineups(getCachedEvents());
+});
+const banker = createBanker({
+  dir: dataDir,
+  request: requestJson,
+  fetchImpl: fetch,
+  results,
+  coverage: () => getCachedEvents(),
+  crestFor: (id, name) => crests.crestFor(id, name) || '',
+});
+async function publishCodes(forceRead = false) {
+  try {
+    if (forceRead) await banker.refresh();
+    else await banker.tick();
+    for (const alert of banker.drain()) {
+      for (const device of pushBook.list()) {
+        if (!bankerWanted(device, alert)) continue;
+        await pushWatch.post(bankerNote(alert), device);
+      }
+    }
+  } catch (error) {
+    console.error(`[codes] ${error instanceof Error ? error.message : error}`);
+  }
+}
 const pushAlerts = pushWatch.alerts;
 const config = getConfig();
 const dist = join(process.cwd(), 'dist');
@@ -74,31 +222,38 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 
-function send(req, res, status, body, cacheControl = 'private, no-cache') {
+function send(req, res, status, body, cacheControl, extraHeaders = {}) {
   const startedAt = Date.now();
+  const path = String(req?.url || '/').split('?')[0];
   const json = JSON.stringify(body);
   const etag = `"${createHash('sha1').update(json).digest('hex')}"`;
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': cacheControl,
+    'Cache-Control': cacheControl || ((req?.method || 'GET') === 'GET' ? publicCacheControl(path, status) : 'private, no-store'),
     ETag: etag,
     'Access-Control-Allow-Origin': '*',
     Vary: 'Accept-Encoding',
+    ...extraHeaders,
   };
-  if (status === 200 && req?.headers?.['if-none-match'] === etag) {
+  if ((status === 200 || status === 409) && etagMatches(req?.headers?.['if-none-match'], etag)) {
+    headers['Content-Length'] = 0;
     res.writeHead(304, headers);
     res.end();
+    noteRequest(path, Date.now() - startedAt, 0);
     return;
   }
   let payload = Buffer.from(json);
-  if (status === 200 && payload.length > 800 && /\bgzip\b/.test(String(req?.headers?.['accept-encoding'] || ''))) {
-    payload = gzipSync(payload);
-    headers['Content-Encoding'] = 'gzip';
-  }
+  const encoded = status === 200 ? encodePayload(payload, req?.headers?.['accept-encoding']) : { body: payload, encoding: '' };
+  payload = encoded.body;
+  if (encoded.encoding) headers['Content-Encoding'] = encoded.encoding;
   headers['Content-Length'] = payload.length;
   res.writeHead(status, headers);
   res.end(payload);
-  noteRequest(String(req?.url || '/').split('?')[0], Date.now() - startedAt, payload.length);
+  noteRequest(path, Date.now() - startedAt, payload.length);
+}
+
+function sendNotLive(req, res, error) {
+  send(req, res, 409, { error }, `public, max-age=${NOT_LIVE_RETRY_SECONDS}`, { 'Retry-After': String(NOT_LIVE_RETRY_SECONDS) });
 }
 
 async function cached(key, ttl, fn) {
@@ -151,6 +306,13 @@ function readJson(req) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === 'GET') {
+    const limit = takeRequest(clientIp(req), url.pathname);
+    if (limit.limited) {
+      send(req, res, 429, { error: 'Slow down.' }, 'private, no-store', { 'Retry-After': String(limit.retryAfter) });
+      return;
+    }
+  }
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -184,7 +346,7 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname.startsWith('/api/admin/')) {
-    await handleAdminApi(req, res, url, { book: pushBook, alerts: pushAlerts, fcm: fcmConfigured });
+    await handleAdminApi(req, res, url, { book: pushBook, alerts: pushAlerts, fcm: fcmConfigured, crests });
     return;
   }
   if (url.pathname === '/api/devices/test') {
@@ -293,8 +455,62 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/health') {
+    const live = getConfig();
     const watch = guardian.status();
-    send(req, res, 200, { ok: true, mode: config.mode, fixtures: 'live', push: fcmConfigured(), guardian: watch.ok ? 'ok' : 'attention' });
+    send(req, res, 200, {
+      ok: true,
+      mode: live.mode,
+      provider: live.provider,
+      fixtures: 'live',
+      push: fcmConfigured(),
+      guardian: watch.ok ? 'ok' : 'attention',
+      reason: watch.reason,
+      devices: watch.devices,
+      checks: watch.checks,
+    });
+    return;
+  }
+  if (url.pathname === '/api/guardian/incidents') {
+    send(req, res, 200, { incidents: readIncidents(dataDir) });
+    return;
+  }
+  if (url.pathname === '/api/guardian') {
+    if (String(getConfig().mode) !== 'live') forceLiveMode();
+    send(req, res, 200, guardian.status());
+    return;
+  }
+  if (url.pathname === '/api/codes') {
+    if (req.method === 'GET') {
+      send(req, res, 200, banker.view(), 'public, max-age=30');
+      return;
+    }
+    if (req.method === 'POST') {
+      send(req, res, 200, await banker.refresh(), 'no-store');
+      for (const alert of banker.drain()) {
+        for (const device of pushBook.list()) {
+          if (!bankerWanted(device, alert)) continue;
+          await pushWatch.post(bankerNote(alert), device);
+        }
+      }
+      return;
+    }
+    send(req, res, 405, { error: 'Method not allowed' });
+    return;
+  }
+  if (url.pathname === '/api/lineups') {
+    if (req.method !== 'GET') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    send(req, res, 200, { lineups: lineups.list() }, 'public, max-age=30');
+    return;
+  }
+  if (url.pathname === '/api/results') {
+    if (req.method !== 'GET') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    send(req, res, 200, results.view(url.searchParams.get('day') || ''), 'public, max-age=15');
     return;
   }
   if (url.pathname === '/api/engine') {
@@ -303,7 +519,7 @@ async function handleApi(req, res, url) {
       return;
     }
     const full = getEngineState();
-    send(req, res, 200, url.searchParams.get('view') === 'app' ? appEngineState(full) : full);
+    send(req, res, 200, url.searchParams.get('view') === 'app' ? engineView() : full);
     return;
   }
   if (url.pathname === '/api/config') {
@@ -326,13 +542,13 @@ async function handleApi(req, res, url) {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
               Referer: 'https://www.sportybet.com/gh/sport/football',
             },
-            signal: AbortSignal.timeout(20_000),
+            signal: AbortSignal.timeout(45_000),
           },
         );
         if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
         return response.json();
       });
-      send(req, res, 200, slimLivePayload(events), 'public, max-age=20');
+      send(req, res, 200, slimLivePayload(events, (id, name) => crests.crestFor(id, name)), 'public, max-age=20');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'In-play scores failed' });
     }
@@ -342,7 +558,7 @@ async function handleApi(req, res, url) {
     // Public fixture feed the Android app reads directly. Real fixtures only.
     try {
       const events = await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' });
-      const decorated = withOccurrence(events);
+      const decorated = withCrests(withOccurrence(events));
       send(req, res, 200, { source: 'betspapa', generatedAt: new Date().toISOString(), count: decorated.length, events: decorated }, 'public, max-age=60');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Fixture feed failed' });
@@ -371,14 +587,29 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
-      send(req, res, 200, { source: 'betspapa', events: withOccurrence(filtered) }, 'public, max-age=60');
+      send(req, res, 200, { source: 'betspapa', events: withCrests(withOccurrence(filtered)) }, 'public, max-age=60');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Fixture feed failed' });
     }
     return;
   }
-  if (config.mode !== 'live') {
-    send(req, res, 409, { error: 'Demo mode is active. Scores are simulated in the browser.' });
+  if (getConfig().mode !== 'live') {
+    forceLiveMode();
+  }
+  if (getConfig().mode !== 'live') {
+    sendNotLive(req, res, 'Not live.');
+    return;
+  }
+  if (url.pathname.startsWith('/api/matches') && !config.footballData) {
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const dates = from && to ? providerDates(from, to) : null;
+    const saved = dates ? cache.get(`list:${dates.dateFrom}:${dates.dateTo}`) : null;
+    if (saved && Array.isArray(saved.value)) {
+      send(req, res, 200, { matches: saved.value, stale: true }, 'public, max-age=60');
+      return;
+    }
+    sendNotLive(req, res, 'Not live.');
     return;
   }
 
@@ -427,9 +658,10 @@ function publicAsset(requested) {
 function streamFile(res, file, requested) {
   const ext = extname(file);
   const hashed = requested.startsWith('/assets/');
+  const frozen = staticCacheControl(requested);
   res.writeHead(200, {
     'Content-Type': TYPES[ext] || 'application/octet-stream',
-    'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+    'Cache-Control': frozen || (hashed ? 'public, max-age=31536000, immutable' : ext === '.html' ? 'no-cache' : 'public, max-age=3600'),
   });
   createReadStream(file).pipe(res);
 }
@@ -456,8 +688,35 @@ function redirectToSite(res) {
   res.end();
 }
 
+function serveCrest(req, res, pathname) {
+  if (pathname === '/crests/id/index.json') {
+    send(req, res, 200, crests.publicList(), 'public, max-age=300');
+    return true;
+  }
+  const match = pathname.match(/^\/crests\/id\/(\d{1,12})\.png$/);
+  if (!match) return false;
+  const file = crests.imagePath(match[1]);
+  if (!file) {
+    res.writeHead(404, { 'Cache-Control': 'no-store', 'Content-Length': 9, 'Access-Control-Allow-Origin': '*' });
+    res.end('Not found');
+    return true;
+  }
+  const size = statSync(file).size;
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Content-Length': size,
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Access-Control-Allow-Origin': '*',
+  });
+  if (req.method === 'HEAD') res.end();
+  else createReadStream(file).pipe(res);
+  noteRequest('/crests/id', 0, size);
+  return true;
+}
+
 function serveStatic(req, res, url) {
   const requested = decodeURIComponent(url.pathname);
+  if (requested.startsWith('/crests/id/') && serveCrest(req, res, requested)) return;
   const bundled = publicAsset(requested);
   if (bundled) {
     streamFile(res, bundled, requested);
@@ -518,6 +777,26 @@ const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.arg
 if (invoked) {
   const server = createBetspapaServer();
   restoreEngine().finally(() => {
+  try {
+    results.ingest(getEngineRaw());
+  } catch (error) {
+    console.error(`[results] Could not record the board already in memory: ${error instanceof Error ? error.message : error}`);
+  }
+  void results.settle();
+  const settleTimer = setInterval(() => {
+    void results.settle();
+  }, 3 * 60 * 1000);
+  settleTimer.unref?.();
+  const lineupTimer = setInterval(() => {
+    void publishLineups(getCachedEvents());
+  }, 2 * 60 * 1000);
+  lineupTimer.unref?.();
+  void publishLineups(getCachedEvents());
+  const codeTimer = setInterval(() => {
+    void publishCodes(false);
+  }, 60 * 1000);
+  codeTimer.unref?.();
+  void publishCodes(false);
   server.listen(port, '0.0.0.0', () => {
     console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
     loadUpcomingEvents()

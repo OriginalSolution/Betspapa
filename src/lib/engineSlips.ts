@@ -1,5 +1,6 @@
 import { CapacitorHttp } from '@capacitor/core';
 import { publishableOdds } from './oddsFloor';
+import { FeedPause, headerValue } from './backoff';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 
 /** Production engine. It is not origin-locked. Codes only come from this payload. */
@@ -62,6 +63,7 @@ const MARKET_LABELS: Record<string, string> = {
   'fh-away': 'First-half away win',
   'fh-over05': 'First-half over 0.5',
   'fh-over15': 'First-half over 1.5',
+  'sh-over05': '2nd half over 0.5',
   'corners-over75': 'Over 7.5 corners',
   'corners-over85': 'Over 8.5 corners',
   'corners-over95': 'Over 9.5 corners',
@@ -90,6 +92,23 @@ export type EngineLeg = {
   opponentSample?: string | null;
   /** True only for a 10/10 record whose opponent is also 10/10, so the price may exceed the strict band. */
   exception?: boolean | null;
+  /** Published grade, 0–1. Lower than the sample when a league penalty marked the pick down. */
+  rate?: number | null;
+  /** Both teams' own records support this outcome, including when the rate is under 80%. */
+  teamsAgree?: boolean | null;
+  /** Home side's own sample, such as 8/10. */
+  homeSample?: string | null;
+  /** Away side's own sample, such as 6/10. */
+  awaySample?: string | null;
+  /** Set when the price sits in that league's dangerous band and the pick was kept at a lower grade. */
+  leagueRisk?: 'penalise' | null;
+  agreement?: string | null;
+  /** Why the research step kept this pick. */
+  reasons?: string[];
+  homeId?: string | null;
+  awayId?: string | null;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
 };
 
 export type EnginePart = {
@@ -206,6 +225,7 @@ function parseLeg(value: unknown): EngineLeg | null {
   const odds = Number(row.odds);
   if (!eventId || !market || !match || !kickoff || !publishableOdds(odds)) return null;
   const occurrence = Number(row.occurrence);
+  const graded = Number(row.rate);
   const form = Array.isArray(row.form)
     ? row.form.filter((mark): mark is FormMark => mark === 'W' || mark === 'D' || mark === 'L').slice(0, 5)
     : [];
@@ -217,10 +237,17 @@ function parseLeg(value: unknown): EngineLeg | null {
     odds,
     occurrence: Number.isFinite(occurrence) ? occurrence : null,
     sample: text(row.sample),
+    rate: Number.isFinite(graded) ? (graded > 1 ? graded / 100 : graded) : null,
     form: form.length ? form : null,
     opponentHeld: row.opponentHeld === true ? true : null,
     opponentSample: text(row.opponentSample),
     exception: row.exception === true ? true : null,
+    teamsAgree: row.teamsAgree === true ? true : null,
+    homeSample: text(row.homeSample),
+    awaySample: text(row.awaySample),
+    leagueRisk: row.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: text(row.agreement),
+    reasons: Array.isArray(row.reasons) ? row.reasons.filter((line): line is string => typeof line === 'string').slice(0, 8) : [],
   };
 }
 
@@ -320,6 +347,9 @@ export async function fetchEngine(): Promise<EngineState> {
   const finish = (state: EngineState) => preferEngine(state, cached);
   if (isNativeApp()) {
     const response = await CapacitorHttp.request(nativeRequestOptions('GET', ENGINE_URL, { connectMs: 20_000, readMs: 30_000 }));
+    if (response.status === 409 || response.status === 429 || response.status >= 500) {
+      throw new FeedPause(response.status, headerValue(response.headers, 'retry-after'));
+    }
     if (response.status < 200 || response.status >= 300) {
       if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
       throw new Error(`Slips returned ${response.status}`);
@@ -328,18 +358,26 @@ export async function fetchEngine(): Promise<EngineState> {
   }
   try {
     const local = await fetch('/api/engine?view=app');
+    if (local.status === 409 || local.status === 429 || local.status >= 500) {
+      throw new FeedPause(local.status, local.headers.get('retry-after'));
+    }
     if (local.ok) {
       const state = parseEngine(await local.json());
       if (engineHasRows(state)) return finish(state);
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof FeedPause) throw error;
     /* GitHub Pages has no API process */
   }
   try {
     const response = await fetch(ENGINE_URL);
+    if (response.status === 409 || response.status === 429 || response.status >= 500) {
+      throw new FeedPause(response.status, response.headers.get('retry-after'));
+    }
     if (!response.ok) throw new Error(`Slips returned ${response.status}`);
     return finish(parseEngine(await response.json()));
   } catch (error) {
+    if (error instanceof FeedPause) throw error;
     if (cached && engineHasCodes(cached)) return { ...cached, showingCached: true };
     throw error;
   }

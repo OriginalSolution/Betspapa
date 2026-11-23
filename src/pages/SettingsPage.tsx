@@ -5,6 +5,7 @@ import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
 import { openNotificationSound, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
+import { useLineupList } from '../components/Lineups';
 import { useStore } from '../state/store';
 
 const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'browser' | 'promos'; label: string; detail: string }> = [
@@ -97,6 +98,9 @@ export function SettingsPage() {
           </div>
         ))}
       </section>
+
+      <LineupSettings />
+      <BankerSettings />
 
       <section className="panel">
         <h2>Fixtures</h2>
@@ -382,16 +386,21 @@ function AndroidWatchStatus() {
         <span>Notification sound</span>
         <strong className={status.notificationSound === 'on' ? 'is-good' : 'is-bad'}>{status.notificationSound === 'on' ? 'On' : 'Off'}</strong>
       </div>
-      {status.soundBlocked && (
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            void openNotificationSound().then(applyStatus);
-          }}
-        >
-          Turn notification sound on
-        </button>
+      {(status.oem === 'xiaomi' || status.soundBlocked) && (
+        <>
+          {status.oem === 'xiaomi' && (
+            <p className="lede">HyperOS keeps Sound off for a new app. Turn it on for Betspapa, or the cheer stays silent.</p>
+          )}
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              void openNotificationSound().then(applyStatus);
+            }}
+          >
+            Turn notification sound on
+          </button>
+        </>
       )}
       {pollIsStale(status.lastPollAt) && (
         <button type="button" className="btn" onClick={startAgain}>
@@ -433,6 +442,94 @@ function Permission({ permission, onEnable }: { permission: string; onEnable: ()
     <button type="button" className="btn" onClick={onEnable}>
       Enable browser alerts
     </button>
+  );
+}
+
+function LineupSettings() {
+  const { settings, setSetting, follows } = useStore();
+  const lineups = useLineupList();
+  const sample = lineups.find((row) => (row.homeXi || []).length >= 8) || null;
+  const people = [
+    ...follows.teams.map((team) => ({ id: team.id, label: team.name || team.shortName })),
+    ...follows.matches.map((id) => ({ id, label: id.replace('sr:match:', 'Match ') })),
+  ].slice(0, 12);
+  const flip = (id: string, on: boolean) => {
+    const off = on ? settings.lineupOff.filter((item) => item !== id) : [...settings.lineupOff, id];
+    setSetting('lineupOff', off);
+  };
+  return (
+    <section className="panel" aria-label="Lineup alerts">
+      <h2>Lineup alerts</h2>
+      <p className="lede">For picks and teams you follow. One alert when the starting XI is named, compared with that team’s previous match.</p>
+      <div className="setting">
+        <div>
+          <strong>Lineups announced</strong>
+          <span>One alert per followed team or match, about an hour before kick-off.</span>
+        </div>
+        <Switch on={settings.lineups} label="Lineups announced" onChange={(value) => setSetting('lineups', value)} />
+      </div>
+      <div className="setting">
+        <div>
+          <strong>Only big rotation</strong>
+          <span>Alert only when a team makes 3 or more changes.</span>
+        </div>
+        <Switch on={settings.lineupBig} label="Only big rotation" onChange={(value) => setSetting('lineupBig', value)} />
+      </div>
+      <div className="setting">
+        <div>
+          <strong>Show on the match card</strong>
+          <span>Gold strip with the change count.</span>
+        </div>
+        <Switch on={settings.lineupCard} label="Show on the match card" onChange={(value) => setSetting('lineupCard', value)} />
+      </div>
+      {people.map((person) => (
+        <div className="setting" key={person.id}>
+          <div>
+            <strong>{person.label}</strong>
+            <span>Lineup alert for this follow.</span>
+          </div>
+          <Switch on={!settings.lineupOff.includes(person.id)} label={person.label} onChange={(value) => flip(person.id, value)} />
+        </div>
+      ))}
+      {sample && (
+        <article className="slip-alert">
+          <p>Betspapa · Lineups</p>
+          <strong>{sample.home} v {sample.away}</strong>
+          <span>{sample.homeChanges == null ? 'Lineup in' : `${sample.home} make ${sample.homeChanges} changes`}. {(sample.homeIn || []).slice(0, 3).join(', ')}{(sample.homeIn || []).length ? ' start.' : ''}</span>
+        </article>
+      )}
+    </section>
+  );
+}
+
+const BANKER = [
+  { id: 'classic', label: 'Banker Classic' },
+  { id: 'gold', label: 'Banker Gold' },
+  { id: 'shield', label: 'Banker Shield' },
+  { id: 'capped', label: 'Banker Capped' },
+  { id: 'ladder', label: 'Banker Ladder' },
+];
+
+function BankerSettings() {
+  const { settings, setSetting } = useStore();
+  const flip = (id: string, on: boolean) => {
+    const next = on ? [...settings.bankerCodes, id] : settings.bankerCodes.filter((item) => item !== id);
+    setSetting('bankerCodes', [...new Set(next)]);
+  };
+  return (
+    <section className="panel" aria-label="Banker code alerts">
+      <h2>Banker codes</h2>
+      <p className="lede">Off until you turn a strategy on. One alert when a code is booked, replaced, or settled. Tapping it opens that code.</p>
+      {BANKER.map((row) => (
+        <div className="setting" key={row.id}>
+          <div>
+            <strong>{row.label}</strong>
+            <span>Code booked, replaced, or settled.</span>
+          </div>
+          <Switch on={settings.bankerCodes.includes(row.id)} label={row.label} onChange={(value) => flip(row.id, value)} />
+        </div>
+      ))}
+    </section>
   );
 }
 

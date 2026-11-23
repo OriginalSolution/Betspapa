@@ -10,6 +10,7 @@ import { fetchLiveMatch } from '../data/remote';
 import { FormPips } from '../components/PickCard';
 import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/format';
 import type { EventType, Match, MatchEvent } from '../types';
+import { LineupXI, useLineup } from '../components/Lineups';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
 
@@ -20,6 +21,7 @@ export function MatchPage() {
   const [params] = useSearchParams();
   const focus = params.get('trend');
   const { findMatch, mode, setActiveMatch, follows, toggleMatch, toggleTeam } = useStore();
+  const lineup = useLineup(id);
   const local = findMatch(id);
   const [remote, setRemote] = useState<Match | null>(null);
 
@@ -33,6 +35,8 @@ export function MatchPage() {
     let cancelled = false;
     fetchLiveMatch(id).then((match) => {
       if (!cancelled) setRemote(match);
+    }).catch(() => {
+      /* a 409 or 429 waits; the board match is enough */
     });
     return () => {
       cancelled = true;
@@ -112,6 +116,12 @@ export function MatchPage() {
           </button>
         </div>
       </section>
+      {lineup && (
+        <>
+          <LineupXI lineup={lineup} side="home" />
+          <LineupXI lineup={lineup} side="away" />
+        </>
+      )}
       <HitMarkets matchId={match.id} focus={focus} />
       {(match.status === 'live' || match.status === 'halftime' || match.status === 'finished') && <PitchLine match={match} />}
       <section className="timeline-wrap">

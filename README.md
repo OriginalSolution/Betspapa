@@ -1,5 +1,7 @@
 # Betspapa
 
+**Hand-off:** bots and other accounts should start with [HANDOFF.md](./HANDOFF.md) (current state, services, secret locations, rules, and how to build, deploy, and ship an APK).
+
 Football matchday board. Today is a week of roomy kick-off cards, with Live and Following views, a match timeline, and alerts for kick-off, goals, red cards, half-time and full-time.
 
 Betspapa tracks a matchday: scores, trends, picks, slips, and results. Club names identify fixtures. The board is today’s real kickoffs and prices. There is no simulated matchday.
@@ -64,9 +66,21 @@ Vite, React, TypeScript, and a small Node server that proxies football-data.org 
 
 The sideload APK is Betspapa (`com.betspapa.scores`), version 0.4.4 (versionCode 26). Picks lists each 80%+ tip as a compact row sorted by confidence, and the bottom bar opens Trends instead of Alerts. Alerts stays on the bell. Goal, kick-off, and followed-trend alerts are sent through Firebase Cloud Messaging, and the on-phone poller remains the fallback. It packages the same boards as the site. Fixtures load from the Betspapa fixtures API with Android’s native HTTP client, which does not send the WebView origin (`https://localhost`). That download can take a while on a slow connection, so the read timeout is 90 seconds. The last good board stays on screen if a later refresh times out. The board refreshes every 2 minutes, and a new request does not start while one is already running. In-play matches are merged onto today’s board with the score when it is known, so a kickoff that has passed no longer stays under Upcoming. The website reads that in-play list through `/api/live`. The phone reads it with the same native client. Share codes for the master slip and each trend are read from https://api.betspapa.com/api/engine. The phone does not book those slips. Slips shows SportyBet, Football.com, MSport, Betika, and BetPawa. The selected desk’s master code can be copied or loaded, and each trend expands to its legs. Betway is skipped. Each desk’s card uses that bookmaker’s official mark and colors: SportyBet red and white, Football.com navy with a lime dot, MSport gold on charcoal, Betika’s B! on lime, and BetPawa’s grey-and-lime bP on charcoal. Fixture groups show the country flag beside its three-letter code. The source label stays Betspapa fixtures. Android 13 and newer will ask for notification permission when you enable browser alerts. With that permission on, kick-off, confirmed goals, half-time, full-time, and a followed trend hit are posted even when the app is on the home screen, in another app, or the screen is off. The first time the app opens after the splash, a full-screen setup walks through notifications, background activity, exact alarms when Android 12 or newer is blocking them, and Autostart on Tecno, Infinix, itel, Xiaomi, Redmi, POCO, Oppo, Realme, Vivo, iQOO, Huawei, Honor, and Samsung, then sends a test alert. Steps that are already allowed are skipped. Each step checks again when you come back and moves on when it is allowed. Skip for now leaves that step, and the phone remembers that this setup version was finished so it does not repeat on the next launch. Today and Alerts show “Live alerts are off — Fix now” when notifications, battery optimization, or exact alarms are still blocking alerts, including after you follow a team, match, or trend. Settings can run the setup again. A goal is held back only while the feed actually has a VAR review for that side, and a score is compared with the last confirmed tally stored on the phone. While a followed match is about to kick off or in play, a foreground watcher polls the feed about every 30 seconds and shows a low-priority notice, “Betspapa is watching N live matches”. That notice stays up with the app closed or swiped away, and it goes away when no followed match is live. A 15-minute worker and an exact alarm start the watcher before kick-off and after reboot. Settings shows whether notifications are allowed, whether battery optimization is unrestricted, and whether exact alarms are allowed, with buttons for each, a short note for Tecno, Infinix, itel, Xiaomi, Oppo, Realme, Vivo, Huawei, and Samsung autostart, a button that sends a test alert about 10 seconds later so you can close the app and confirm it arrives, and Run alert setup again. The full fixture list is not polled every few seconds; the tighter live check runs only in that window. Opening the app later does not repeat a notification or add a second Alerts row for the same event. Alerts has Clear old alerts, and Following has Clear old trends. Both ask you to confirm. Finished matches, settled trends, and alerts from before today are removed. Today’s live alerts, and follows for upcoming or live matches, stay. The removed rows stay gone after a restart because the seen-id record is kept.
 
+## Grading
+
+A booking code is published only when every leg has passed the odds range, the 80% trend, the team check, and the league check. Each pick carries the reasons. Picks that fail are listed on `researchDrops` in `GET /api/engine`, with the same reasons.
+
+The team check uses each side's recent goals scored, goals conceded, over/under and both-teams-to-score rates, and the home/away split. Both sides have to support the pick. The grade is the weaker record. One team's 10/10 is not a sure pick. If one side has no sample of 8 games, the trend stands.
+
+The league check uses finished matches from the same Sportradar last-X feed as the team history, grouped by competition. With 12 or more matches, a pick is blocked when that league hits the market much less often than the price implies, or the results are very jumpy (the grade is then capped at 90% instead of blocked). Under 12 matches, nothing is blocked. Settled picks are remembered in `research-settled.json` under `ENGINE_DATA_DIR` and, once 8 share a league, market, and odds band, that band's record is used too.
+
+`server/leagueRisk.json` is an optional extra. It can force another exclude or markdown. It starts empty and is not how the defaults are chosen. No new API key. The detail is in [HANDOFF.md](./HANDOFF.md).
+
+Package version 3.1.0 is this grading release. The Android app version is separate.
+
 ## Unattended engine
 
-`npm start` starts a booking cycle 20 seconds after boot and then every 15 minutes. It pulls the fixture feed, keeps the last good copy if the feed fails, qualifies tips above 80%, and books the master slip and each trend on the same five Ghana desks. It stores only codes a bookmaker returned. Invalid or missing codes are removed and those desks are retried. A stored win or loss that does not match the score is corrected when a score is present. The upcoming feed has no scores, so legs stay open until then. Failures are written to the process log and to the engine snapshot at `GET /api/engine`.
+`npm start` starts a booking cycle 20 seconds after boot and then every 15 minutes. It pulls the fixture feed, keeps the last good copy if the feed fails, qualifies tips that pass the trend, team, and league checks, and books the master slip and each trend on the same five Ghana desks. It stores only codes a bookmaker returned. Invalid or missing codes are removed and those desks are retried. A stored win or loss that does not match the score is corrected when a score is present. The upcoming feed has no scores, so legs stay open until then. Failures are written to the process log and to the engine snapshot at `GET /api/engine`.
 
 The snapshot is written to `data/engine/engine-state.json` (or `ENGINE_DATA_DIR`). On Render that file lasts until the service restarts; the next cycle then rebuilds it and rebooks any open legs that no longer have a valid code. A cron job every 15 minutes calls `POST /api/engine/run` with `ENGINE_RUN_TOKEN` so a sleeping service still runs a cycle. The cron does not book by itself and does not call Predict2u.
 
@@ -88,12 +102,16 @@ The signed APK is written to `android/app/build/outputs/apk/release/app-release.
 
 ### Signing
 
-The release build is signed with `android/betspapa-release.keystore`, which is committed so a rebuild can be installed as an update over the GitHub APK. This key is only for that sideload distribution. It is not a Play Store upload key, and the password is public on purpose:
+No keystore or signing password is kept in the repository. Gradle signs a release only when these environment variables are set; otherwise the release output is unsigned.
 
-| Field | Value |
+| Variable | Meaning |
 | --- | --- |
-| Alias | `betspapa` |
-| Store password | `betspapa` |
-| Key password | `betspapa` |
+| `BETSPAPA_STORE_FILE` | Path to the keystore |
+| `BETSPAPA_STORE_PASSWORD` | Keystore password |
+| `BETSPAPA_KEY_ALIAS` | Key alias |
+| `BETSPAPA_KEY_PASSWORD` | Key password (defaults to the store password) |
 
-Replacing the keystore makes Android treat the result as a different app, so existing installs will not upgrade in place. Do not reuse this keystore for a Play Console listing.
+- **Google Play bundles** are signed with the private **upload key**. The `Play bundle` workflow reads it from the GitHub secrets `PLAY_UPLOAD_KEYSTORE_BASE64`, `PLAY_UPLOAD_KEYSTORE_PASSWORD` and `PLAY_UPLOAD_KEY_ALIAS`. Google Play re-signs installs with the app signing key.
+- **The legacy GitHub APK** must keep the original app signing key so existing installs upgrade in place. That key lives in the GitHub secrets `LEGACY_KEYSTORE_BASE64`, `LEGACY_KEYSTORE_PASSWORD` and `LEGACY_KEY_ALIAS`, and in the owner's secrets folder on the build box. Never commit it.
+
+Replacing the app signing key makes Android treat the result as a different app, so existing installs will not upgrade in place.

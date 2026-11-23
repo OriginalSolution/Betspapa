@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { boardHasCodes, createEngine, preserveBoard } from './engine.mjs';
+import { boardHasCodes, createEngine, holdMasterCodes, preserveBoard } from './engine.mjs';
+import { publishEngineSnapshot } from './engineSnapshot.mjs';
 
 const now = new Date('2026-11-10T12:00:00.000Z');
 const events = [
@@ -115,6 +116,80 @@ test('an empty cycle keeps the last booked board until those legs kick off', () 
   assert.equal(boardHasCodes(afterKick), false);
   const fresh = { books: { sportybet: { parts: [{ code: 'NEW1' }] } }, master: null, trends: [], legs: [] };
   assert.equal(preserveBoard(previous, fresh, new Date('2026-11-10T12:00:00.000Z')).books.sportybet.parts[0].code, 'NEW1');
+  const many = {
+    ...previous,
+    legs: Array.from({ length: 10 }, (_, index) => ({ eventId: `sr:match:${index}`, kickoff: '2026-11-10T18:00:00.000Z' })),
+  };
+  const thin = {
+    books: { sportybet: { parts: [{ code: 'THIN' }] } },
+    master: { legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z' }, { eventId: 'sr:match:2', kickoff: '2026-11-10T18:00:00.000Z' }] },
+    trends: [],
+    legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z' }, { eventId: 'sr:match:2', kickoff: '2026-11-10T18:00:00.000Z' }],
+  };
+  const held = preserveBoard(many, thin, new Date('2026-11-10T12:00:00.000Z'));
+  assert.equal(held.books.sportybet.parts[0].code, 'KEEP1');
+  assert.match(held.issues[0], /30%/);
+});
+
+test('a cycle with no master codes keeps the previous master codes', () => {
+  const previous = {
+    books: { sportybet: { parts: [{ code: 'MASTER1' }] } },
+    master: {
+      id: 'master',
+      legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.4 }],
+      books: { sportybet: { parts: [{ code: 'MASTER1', matches: ['sr:match:1'] }] } },
+    },
+    trends: [],
+  };
+  const partial = {
+    books: { sportybet: { parts: [], error: 'No valid share code.' } },
+    master: { id: 'master', legs: [{ eventId: 'sr:match:1', kickoff: '2026-11-10T18:00:00.000Z', odds: 1.4 }], books: {} },
+    trends: [{ id: '80:over15', books: { sportybet: { parts: [{ code: 'TREND1' }] } }, legs: [] }],
+    issues: [],
+  };
+  const held = holdMasterCodes(previous, partial, new Date('2026-11-10T12:00:00.000Z'));
+  assert.equal(held.master.books.sportybet.parts[0].code, 'MASTER1');
+  assert.equal(held.books.sportybet.parts[0].code, 'MASTER1');
+  assert.match(held.issues[0], /last master codes/);
+  const booked = holdMasterCodes(previous, {
+    ...partial,
+    master: { ...partial.master, books: { sportybet: { parts: [{ code: 'NEW1' }] } } },
+  }, new Date('2026-11-10T12:00:00.000Z'));
+  assert.equal(booked.master.books.sportybet.parts[0].code, 'NEW1');
+});
+
+test('a missing snapshot token is logged once and the booked board stays on disk', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'betspapa-engine-'));
+  const logs = [];
+  let fetches = 0;
+  const quiet = createEngine({
+    dir,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ events }) }),
+    request: async (method, url) => {
+      if (url.includes('pcUpcomingEvents')) return {};
+      if (url.includes('sportybet.com')) return { bizCode: 10000, data: { shareCode: 'SB1001', outcomes: [{ matchStatus: 'Not start' }] } };
+      return {};
+    },
+    loadHistories: async () => new Map([[4716, recentWins()], [4708, []]]),
+    now: () => now,
+    retryMs: 0,
+    snapshotToken: '',
+    diskGapMs: 0,
+    log: (level, message) => logs.push(`${level}:${message}`),
+  });
+  const board = await quiet.run();
+  assert.equal(board.books.sportybet.parts[0].code, 'SB1001');
+  const skips = logs.filter((line) => line.includes('No snapshot token'));
+  assert.equal(skips.length, 1);
+  assert.equal(logs.filter((line) => line.includes('Could not store the booked board: no snapshot token')).length, 0);
+  const stored = JSON.parse(readFileSync(join(dir, 'engine-state.json'), 'utf8'));
+  assert.equal(stored.books.sportybet.parts[0].code, 'SB1001');
+  const blocked = await publishEngineSnapshot({ updatedAt: 'x' }, async () => {
+    fetches += 1;
+    return { ok: false, status: 500, text: async () => '', json: async () => ({}) };
+  }, '');
+  assert.equal(fetches, 0);
+  assert.deepEqual(blocked, { ok: false, error: 'no snapshot token' });
 });
 
 test('boot restores a booked snapshot and a failed cycle does not clear it', async () => {

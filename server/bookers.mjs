@@ -1,5 +1,6 @@
 /** No-login Ghana share booking. Betway is omitted because it needs a logged-in account. */
 import { priceInRange, rangeReason } from './oddsRange.mjs';
+import { responseShape } from './guardianOps.mjs';
 import { loadOfferIndex, stillOffered, toSelection } from './selection.mjs';
 
 const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
@@ -7,7 +8,14 @@ const FOOTBALL_SHARE = 'https://www.football.com/api/gh/orders/share';
 const MSPORT_SHARE = 'https://www.msport.com/api/gh/orders/real-sports/order/share';
 const BETIKA_SHARE = 'https://api.betika.com.gh/v2/share/';
 const BETPAWA = 'https://www.betpawa.com.gh/api/sportsbook/';
-const CHUNK = 30;
+/** Selections one share code can hold. SportyBet and Football.com take 50. The others are smaller. */
+export const DESK_MAX = {
+  sportybet: 50,
+  footballcom: 50,
+  msport: 30,
+  betika: 20,
+  betpawa: 20,
+};
 
 const LINKS = {
   sportybet: (code) => `https://www.sportybet.com/gh/?shareCode=${code}`,
@@ -29,13 +37,17 @@ const BP_MARKETS = {
   32: ['3807', null, { 74: 'Yes', 76: 'No' }],
   60: ['3668', null, { 1: '1', 2: 'X', 3: '2' }],
   68: ['4958', 't', { 12: 'Over', 13: 'Under' }],
+  // 2nd half total. betPawa market type 4976, same quarter-goal handicap as the other totals (0.5 → 2).
+  90: ['4976', 't', { 12: 'Over', 13: 'Under' }],
   166: ['1096783', 't', { 12: 'Over', 13: 'Under' }],
 };
+
+/** Bump when a desk map changes, so slips that already used their hourly retries are asked again. */
+export const BOOKING_MAP_VERSION = 2;
 
 const eventCache = new Map();
 const priceCache = new Map();
 let offerCache = null;
-const ONE_CODE = 18;
 const DESK_LIMIT = 2;
 const deskLanes = new Map();
 
@@ -70,9 +82,10 @@ function product(values) {
   return Math.round(total * 100) / 100;
 }
 
-function chunks(list) {
+function chunks(list, size) {
   const out = [];
-  for (let index = 0; index < list.length; index += CHUNK) out.push(list.slice(index, index + CHUNK));
+  const width = Math.max(1, size);
+  for (let index = 0; index < list.length; index += width) out.push(list.slice(index, index + width));
   return out;
 }
 
@@ -265,9 +278,23 @@ function betikaRowKey(row) {
 }
 
 async function betikaTry(legs, request) {
-  let group = legs.filter((leg) => leg.marketId && leg.outcomeId);
   const dropped = [];
-  if (!group.length) return { booked: null, dropped: legs.map((leg) => drop(leg, 'Market not supported on Betika.')) };
+  const supported = [];
+  for (const leg of legs) {
+    if (!leg.marketId || !leg.outcomeId) {
+      dropped.push(drop(leg, 'Market not supported on Betika.'));
+      continue;
+    }
+    // Betika Ghana's prematch list has "1st half - total" (sub type 68) and no "2nd half - total".
+    // Encode with sub type 90 answers "odds have expired" on matches that do sell the full-time total.
+    if (leg.market === 'sh-over05' || String(leg.marketId) === '90') {
+      dropped.push(drop(leg, 'Betika does not list second-half over 0.5.'));
+      continue;
+    }
+    supported.push(leg);
+  }
+  let group = supported;
+  if (!group.length) return { booked: null, dropped };
   const encode = (groupToBook) =>
     request('POST', `${BETIKA_SHARE}encode`, {
       body: {
@@ -399,7 +426,10 @@ async function betpawaTry(legs, request) {
   const chosen = [];
   const dropped = [];
   const seen = new Set();
+  let scanned = 0;
   for (const leg of legs) {
+    if (chosen.length >= DESK_MAX.betpawa) break;
+    scanned += 1;
     if (seen.has(leg.eventId)) {
       dropped.push(drop(leg, 'betPawa takes one selection per match on a shared slip.'));
       continue;
@@ -416,12 +446,12 @@ async function betpawaTry(legs, request) {
     seen.add(leg.eventId);
     chosen.push({ id: price[0], odds: price[1], eventId: leg.eventId, market: leg.market });
   }
-  if (!chosen.length) return { booked: null, dropped };
+  if (!chosen.length) return { booked: null, dropped, scanned };
   const booked = await betpawaCall('POST', 'v3/booking-number', request, {
     selections: { selections: [{ type: chosen.length > 1 ? 'COMBO' : 'SINGLE', selections: chosen.map((row) => row.id) }] },
   });
   const code = booked?.code;
-  if (!code) return { booked: null, dropped: legs.map((leg) => drop(leg, 'betPawa refused the slip.')) };
+  if (!code) return { booked: null, dropped: legs.slice(0, scanned).map((leg) => drop(leg, 'betPawa refused the slip.')), scanned };
   const view = await betpawaCall('GET', `v3/booking-number/${code}`, request);
   const count = (view?.items || []).reduce((sum, item) => sum + (item.selections || []).length, 0) || chosen.length;
   return {
@@ -434,6 +464,7 @@ async function betpawaTry(legs, request) {
       kept: chosen.map((row) => keptRow(row, row.odds)),
     },
     dropped,
+    scanned,
   };
 }
 
@@ -450,29 +481,36 @@ function withoutKept(booked) {
   return { part: part.code ? part : null, kept };
 }
 
-async function placeChunk(group, fn) {
+async function placeChunk(group, fn, max) {
   const result = await fn(group);
-  if (!wholeSlipRefused(result, group) || group.length <= ONE_CODE) {
+  if (!wholeSlipRefused(result, group) || group.length <= max) {
     const taken = withoutKept(result?.booked);
-    return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept };
+    return { parts: taken.part ? [taken.part] : [], dropped: result?.dropped || [], kept: taken.kept, scanned: result?.scanned || 0 };
   }
   const mid = Math.ceil(group.length / 2);
-  const left = await placeChunk(group.slice(0, mid), fn);
-  const right = await placeChunk(group.slice(mid), fn);
-  return { parts: [...left.parts, ...right.parts], dropped: [...left.dropped, ...right.dropped], kept: [...left.kept, ...right.kept] };
+  const left = await placeChunk(group.slice(0, mid), fn, max);
+  const right = await placeChunk(group.slice(mid), fn, max);
+  return {
+    parts: [...left.parts, ...right.parts],
+    dropped: [...left.dropped, ...right.dropped],
+    kept: [...left.kept, ...right.kept],
+    scanned: (left.scanned || 0) + (right.scanned || 0),
+  };
 }
 
-async function chunked(legs, fn) {
+async function chunked(legs, fn, max) {
   const parts = [];
   const dropped = [];
   const kept = [];
-  for (const chunk of chunks(legs)) {
-    const placed = await placeChunk(chunk, fn);
+  let scanned = 0;
+  for (const chunk of chunks(legs, max)) {
+    const placed = await placeChunk(chunk, fn, max);
     parts.push(...placed.parts);
     dropped.push(...placed.dropped);
     kept.push(...(placed.kept || []));
+    scanned += placed.scanned || 0;
   }
-  return { parts, dropped, kept };
+  return { parts, dropped, kept, scanned };
 }
 
 function withLink(name, booked) {
@@ -507,6 +545,18 @@ async function cachedIndex(request) {
 
 export async function bookAll(legs, request, onBook, only) {
   if (typeof request !== 'function') throw new Error('Booking needs an HTTP client.');
+  const rawRequest = request;
+  request = async (method, url, opts) => {
+    let last;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      last = await rawRequest(method, url, opts);
+      const shape = responseShape(last);
+      if (shape.ok) return last;
+      console.error(`[book] Response schema changed: ${shape.sample}`);
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+    return last;
+  };
   const mapped = [];
   const seen = new Set();
   for (const leg of legs.map(toSelection).filter(Boolean)) {
@@ -520,11 +570,11 @@ export async function bookAll(legs, request, onBook, only) {
   const closed = mapped.filter((leg) => !stillOffered(index, leg)).map((leg) => drop(leg, 'Closed or suspended in the latest price scan.'));
   const allowed = Array.isArray(only) ? new Set(only) : null;
   const runners = [
-    ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request))],
-    ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request))],
-    ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request))],
-    ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request))],
-    ['betpawa', (group) => chunked(group, (chunk) => betpawaTry(chunk, request))],
+    ['sportybet', (group) => chunked(group, (chunk) => sportyTry(chunk, request), DESK_MAX.sportybet)],
+    ['footballcom', (group) => chunked(group, (chunk) => footballTry(chunk, request), DESK_MAX.footballcom)],
+    ['msport', (group) => chunked(group, (chunk) => msportTry(chunk, request), DESK_MAX.msport)],
+    ['betika', (group) => chunked(group, (chunk) => betikaTry(chunk, request), DESK_MAX.betika)],
+    ['betpawa', (group) => chunked(group, (chunk) => betpawaTry(chunk, request), DESK_MAX.betpawa)],
   ].filter(([name]) => !allowed || allowed.has(name));
   const books = {};
   await Promise.all(
@@ -536,6 +586,7 @@ export async function bookAll(legs, request, onBook, only) {
         const dropped = [...closed, ...done.dropped];
         const kept = done.kept || [];
         result = parts.length ? { parts, error: null, dropped, kept } : { parts: [], error: 'No open selections on this bookmaker.', dropped, kept };
+        if (done.scanned != null) result.scanned = done.scanned;
       } catch (error) {
         result = { parts: [], error: publicError(error?.message || error), dropped: closed };
       }

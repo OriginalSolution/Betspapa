@@ -15,6 +15,15 @@ public final class MatchParser {
 
     private MatchParser() {}
 
+    /** Our own crest copy from the server list; anything else is ignored. */
+    static String serverCrest(String url) {
+        String value = url == null ? "" : url.trim();
+        if (!value.startsWith("https://")) return "";
+        String lower = value.toLowerCase(Locale.US);
+        if (lower.contains("sofascore") || lower.contains("sportybet")) return "";
+        return value;
+    }
+
     public static List<WatchMatch> parseUpcoming(String json) {
         List<WatchMatch> matches = new ArrayList<WatchMatch>();
         JSONArray events = new JSONObject(json == null ? "{}" : json).optJSONArray("events");
@@ -28,7 +37,10 @@ public final class MatchParser {
             long kick = WatchClock.parseIso(event.optString("kickoff", ""));
             if (id.isEmpty() || home.isEmpty() || away.isEmpty() || kick <= 0) continue;
             if (simulatedFixture(event.optString("country", ""), event.optString("tournament", ""), home, away)) continue;
-            matches.add(scheduled(id, home, away, kick));
+            WatchMatch row = scheduled(id, home, away, kick);
+            row.homeCrest = serverCrest(event.optString("homeCrest", ""));
+            row.awayCrest = serverCrest(event.optString("awayCrest", ""));
+            matches.add(row);
         }
         return matches;
     }
@@ -77,6 +89,8 @@ public final class MatchParser {
         WatchMatch match = scheduled(id, home, away, kick);
         match.homeFull = home;
         match.awayFull = away;
+        match.homeCrest = serverCrest(event.optString("homeCrest", ""));
+        match.awayCrest = serverCrest(event.optString("awayCrest", ""));
         match.competition = competition == null ? "" : competition.trim();
         match.status = status;
         match.minute = liveMinute(event.optString("playedSeconds", ""), event.optString("matchStatus", ""));

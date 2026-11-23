@@ -5,10 +5,12 @@ import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
 import { assertBookingRanges, boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
+import { loadSettled, rememberSettled, saveSettled } from './research.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
-import { CODE_LIMIT, SLIP_CONCURRENCY, bookSlips, bookableLegs, codeLegs, slipView, tierSlips, trendGroups } from './slips.mjs';
+import { SLIP_CONCURRENCY, bookSlips, bookableLegs, bookingGroups, slipView, tierSlips, trendGroups } from './slips.mjs';
 import { loadExtraPrices, loadUpcomingEvents, mergePrices } from './upcoming.mjs';
 import { loadEngineSnapshot, publishEngineSnapshot } from './engineSnapshot.mjs';
+import { collapsedLegs, shapeSample } from './guardianOps.mjs';
 
 const FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
 const INTERVAL_MS = 15 * 60 * 1000;
@@ -47,6 +49,7 @@ function publicState(state, now = new Date()) {
     tiers: view.tiers || [],
     issues: view.issues,
     cycleNotes: Array.isArray(view.cycleNotes) ? view.cycleNotes : null,
+    researchDrops: Array.isArray(view.researchDrops) ? view.researchDrops.slice(0, 40) : [],
   };
 }
 
@@ -63,6 +66,13 @@ function slimLeg(leg) {
     opponentHeld: leg.opponentHeld === true ? true : null,
     opponentSample: leg.opponentSample || null,
     exception: leg.exception === true ? true : null,
+    rate: Number.isFinite(Number(leg.rate)) ? Number(leg.rate) : null,
+    teamsAgree: leg.teamsAgree === true ? true : null,
+    homeSample: leg.homeSample || null,
+    awaySample: leg.awaySample || null,
+    leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+    agreement: leg.agreement || null,
+    reasons: Array.isArray(leg.reasons) ? leg.reasons.slice(0, 8) : [],
   };
 }
 
@@ -140,6 +150,29 @@ export function restartSnapshot(full, now = new Date()) {
 }
 
 /** The phone board. Tier slips keep their codes and drop the duplicated leg lists. */
+/** Attach the crest the board would paint, looked up from the fixture the leg belongs to. */
+export function paintEngineCrests(view, events, crestFor = () => '') {
+  const byId = new Map((events || []).map((event) => [String(event.eventId), event]));
+  const paintLeg = (leg) => {
+    const event = byId.get(String(leg?.eventId || ''));
+    if (!event) return leg;
+    return {
+      ...leg,
+      homeId: event.homeId || null,
+      awayId: event.awayId || null,
+      homeCrest: crestFor(event.homeId, event.home) || null,
+      awayCrest: crestFor(event.awayId, event.away) || null,
+    };
+  };
+  const paintSlip = (slip) => (slip ? { ...slip, legs: (slip.legs || []).map(paintLeg) } : slip);
+  if (!view) return view;
+  return {
+    ...view,
+    master: paintSlip(view.master),
+    trends: (view.trends || []).map(paintSlip),
+  };
+}
+
 export function appEngineState(full) {
   const state = full || {};
   return {
@@ -171,10 +204,7 @@ function stillOpen(slip, now) {
   return { ...slip, legs, legCount: legs.length };
 }
 
-/** A cycle with no codes must not wipe a board that still has a booked slip. Legs leave only after kickoff. */
-export function preserveBoard(previous, next, now = new Date()) {
-  if (boardHasCodes(next)) return next;
-  if (!boardHasCodes(previous)) return next;
+function keptBoard(previous, next, now, note) {
   const master = stillOpen(previous.master, now);
   const trends = (previous.trends || []).map((trend) => stillOpen(trend, now)).filter((trend) => (trend?.legs || []).length || slipHasCode(trend));
   const tierRows = (previous.tiers || []).map((tier) => stillOpen(tier, now)).filter((tier) => (tier?.legs || []).length || slipHasCode(tier));
@@ -193,8 +223,36 @@ export function preserveBoard(previous, next, now = new Date()) {
     legs,
     slipKey: previous.slipKey,
     slipCache: previous.slipCache,
-    issues: ['Keeping the last booked board. This cycle did not return codes.', ...(next.issues || [])].slice(0, 40),
+    issues: [note, ...(next.issues || [])].slice(0, 40),
   };
+}
+
+/**
+ * A progress save must not replace a coded master with an empty one.
+ * The master slip is booked last, so mid-cycle reads keep the previous codes.
+ */
+export function holdMasterCodes(previous, next, now = new Date()) {
+  if (!next || slipHasCode(next.master) || !slipHasCode(previous?.master)) return next;
+  const master = stillOpen(previous.master, now);
+  if (!slipHasCode(master)) return next;
+  const note = 'Keeping the last master codes until this cycle books the master slip.';
+  return {
+    ...next,
+    master,
+    books: slipHasCode({ books: previous.books }) ? previous.books : next.books,
+    issues: [note, ...(next.issues || []).filter((line) => line !== note)].slice(0, 40),
+  };
+}
+
+/** A cycle with no codes, or one that keeps less than 30% of the open legs, must not wipe the last booked board. */
+export function preserveBoard(previous, next, now = new Date()) {
+  if (collapsedLegs(previous, next, now)) {
+    const kept = keptBoard(previous, next, now, 'Keeping the last booked board. This cycle kept less than 30% of the open legs.');
+    if (kept !== next) return kept;
+  }
+  if (boardHasCodes(next)) return next;
+  if (!boardHasCodes(previous)) return next;
+  return keptBoard(previous, next, now, 'Keeping the last booked board. This cycle did not return codes.');
 }
 
 async function pause(ms) {
@@ -212,11 +270,32 @@ export function createEngine(options = {}) {
   });
   let state = load();
   let running = null;
+  let published = null;
+  let servedView = null;
+  let servedAt = 0;
+  let activeGen = 0;
+  let cycleStartedAt = null;
+  const hangMs = options.hangMs ?? INTERVAL_MS * 2;
   let publishChain = Promise.resolve();
+  let pendingSnapshot = null;
+  let snapshotBusy = false;
   let timer = null;
   let kick = null;
   let nextRunAt = null;
+  let diskOk = true;
+  let diskError = '';
+  let diskLogged = false;
+  let lastDiskWrite = 0;
+  let snapshotMode = 'disk';
+  let snapshotError = '';
+  let snapshotLogged = '';
   const historyCache = { teams: new Map(), stats: new Map() };
+  const diskGapMs = options.diskGapMs ?? 20_000;
+
+  function snapshotKey() {
+    if (Object.prototype.hasOwnProperty.call(options, 'snapshotToken')) return String(options.snapshotToken || '');
+    return process.env.ENGINE_SNAPSHOT_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  }
 
   function teamIds(events, now) {
     const ids = [];
@@ -239,26 +318,73 @@ export function createEngine(options = {}) {
     }
   }
 
-  function save(next) {
+  function save(next, gen = activeGen, force = true) {
+    if (gen !== activeGen) return;
     state = next;
+    if (!force && Date.now() - lastDiskWrite < diskGapMs) return;
     try {
       mkdirSync(dir, { recursive: true });
       writeFileSync(file, JSON.stringify(next));
+      lastDiskWrite = Date.now();
+      diskOk = true;
+      diskError = '';
+      diskLogged = false;
     } catch (error) {
-      log('error', `Could not store engine state: ${error.message}`);
+      diskOk = false;
+      diskError = error instanceof Error ? error.message : 'disk write failed';
+      if (!diskLogged) {
+        diskLogged = true;
+        log('error', `Could not store the booked board on the data disk: ${diskError}`);
+      }
     }
   }
 
-  function remember(next, now = new Date()) {
-    save(next);
-    if (!boardHasCodes(next)) return;
+  function noteSnapshot(mode, error, message, level = 'log') {
+    snapshotMode = mode;
+    snapshotError = error || '';
+    if (snapshotLogged === `${mode}:${error || ''}`) return;
+    snapshotLogged = `${mode}:${error || ''}`;
+    if (message) log(level, message);
+  }
+
+  function queueSnapshot(next, now) {
     const publish = options.publishSnapshot || publishEngineSnapshot;
-    const body = restartSnapshot(publicState(next, now), now);
+    const custom = Boolean(options.publishSnapshot);
+    if (!custom && !snapshotKey()) {
+      noteSnapshot('no-token', 'no snapshot token', 'Booked board is on the data disk. No snapshot token, so the GitHub copy is skipped.');
+      return;
+    }
+    pendingSnapshot = restartSnapshot(publicState(next, now), now);
+    if (snapshotBusy) return;
+    snapshotBusy = true;
     publishChain = publishChain.then(async () => {
-      const result = await publish(body);
-      if (!result || result.ok === false) log('error', `Could not store the booked board: ${result?.error || 'refused'}`);
-      else log('log', 'Stored the booked board for the next restart.');
-    }).catch((error) => log('error', `Could not store the booked board: ${error instanceof Error ? error.message : error}`));
+      while (pendingSnapshot) {
+        const body = pendingSnapshot;
+        pendingSnapshot = null;
+        try {
+          const result = await publish(body);
+          if (!result || result.ok === false) {
+            const error = result?.error || 'refused';
+            noteSnapshot('failed', error, `Could not store the booked board: ${error}`, 'error');
+          } else {
+            snapshotLogged = '';
+            snapshotMode = 'published';
+            snapshotError = '';
+            log('log', 'Stored the booked board for the next restart.');
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'snapshot failed';
+          noteSnapshot('failed', message, `Could not store the booked board: ${message}`, 'error');
+        }
+      }
+      snapshotBusy = false;
+    });
+  }
+
+  function remember(next, now = new Date(), gen = activeGen, { publish = false, force = false } = {}) {
+    save(next, gen, force);
+    if (gen !== activeGen || !publish || !boardHasCodes(next)) return;
+    queueSnapshot(next, now);
   }
 
   async function fetchFeed() {
@@ -271,7 +397,10 @@ export function createEngine(options = {}) {
         const response = await fetchImpl(FEED, { signal: AbortSignal.timeout(25_000) });
         if (!response.ok) throw new Error(`Betspapa fixtures returned ${response.status}`);
         const body = await response.json();
-        if (!Array.isArray(body.events)) throw new Error('Fixture feed failed');
+        if (!Array.isArray(body?.events)) {
+          log('error', `Fixture schema changed: ${shapeSample(body)}`);
+          throw new Error('Fixture feed schema changed');
+        }
         return body.events;
       } catch (error) {
         last = error instanceof Error ? error : new Error(String(error));
@@ -282,9 +411,20 @@ export function createEngine(options = {}) {
     throw last;
   }
 
+  function snapshotBoard(board) {
+    if (!options.beforeBoard) return;
+    try {
+      options.beforeBoard(board);
+    } catch (error) {
+      log('error', `Board watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
   async function cycle() {
+    const gen = activeGen;
     const issues = [];
     const now = options.now ? options.now() : new Date();
+    snapshotBoard(state);
     let events = state.events;
     try {
       events = await fetchFeed();
@@ -318,18 +458,20 @@ export function createEngine(options = {}) {
       issues.push(`Team history failed: ${message}. Keeping the previous slips.`);
       log('error', message);
       const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
-      save(kept);
+      save(kept, gen);
       return publicState(kept, now);
     }
     if (!options.loadHistories && loaded.teams > 0 && loaded.teamErrors === loaded.teams) {
       issues.push('Team history failed for every side. Keeping the previous slips.');
       log('error', issues[issues.length - 1]);
       const kept = projectBoard({ ...state, events, updatedAt: new Date().toISOString(), issues: [...issues, ...(state.issues || [])].slice(0, 40) }, now);
-      save(kept);
+      save(kept, gen);
       return publicState(kept, now);
     }
 
-    const board = buildOccurrenceBoard(events, loaded.histories, now);
+    const settledFile = join(dir, 'research-settled.json');
+    const settledRows = loadSettled(settledFile);
+    const board = buildOccurrenceBoard(events, loaded.histories, now, { settled: settledRows });
     if (loaded.statsMissing) board.notes.push(`No corner or card count for ${loaded.statsMissing} recent matches, so those lines were skipped where the sample fell under 8.`);
     if (loaded.statsDeferred) board.notes.push(`Corner and card counts for ${loaded.statsDeferred} recent matches wait for the next cycle.`);
     const fresh = board.legs.map((leg) => {
@@ -340,6 +482,11 @@ export function createEngine(options = {}) {
     if (settled.changed) {
       issues.push(...settled.issues);
       for (const issue of settled.issues) log('error', `Settlement repair: ${issue}`);
+    }
+    try {
+      saveSettled(settledFile, rememberSettled(settledRows, settled.legs));
+    } catch (error) {
+      log('error', `Could not store league results: ${error instanceof Error ? error.message : error}`);
     }
 
     const legs = bookableLegs(settled.legs, now);
@@ -367,16 +514,19 @@ export function createEngine(options = {}) {
       trends,
       tiers,
       occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
       settlement: settled.status,
       cycleNotes: issues,
       issues: issues.slice(0, 40),
     }, now);
-    if ((legs.length || !beforeOpen) && !boardHasCodes(before)) save(preview);
+    if ((legs.length || !beforeOpen) && !boardHasCodes(before)) save(preview, gen);
     const request = legs.length ? options.request || (await import('./curl-request.mjs')).requestJson : null;
     const bookNow = () => (options.now ? options.now() : new Date()).getTime();
     const priorCache = state.slipCache && Object.keys(state.slipCache).length ? state.slipCache : {};
-    const queue = [...tiers, ...trends, master];
-    const payload = queue.flatMap((slip) => codeLegs(bookableLegs(slip.legs, now)));
+    const headlines = tiers.filter((slip) => !slip.market);
+    const markets = tiers.filter((slip) => slip.market);
+    const queue = [...headlines, ...markets, ...trends, master];
+    const payload = queue.flatMap((slip) => bookingGroups(slip, bookableLegs(slip.legs, now)).flat());
     let booking = { results: queue.map((slip) => ({ ...slip, books: {}, bookedAt: null })), cache: priorCache, issues: [] };
     try {
       assertBookingRanges(payload);
@@ -384,7 +534,7 @@ export function createEngine(options = {}) {
         booking = await bookSlips({
           slips: queue,
           cache: priorCache,
-          book: (slipLegs, desks) => bookAll(slipLegs.slice(0, CODE_LIMIT), request, undefined, desks),
+          book: (slipLegs, desks) => bookAll(slipLegs, request, undefined, desks),
           now: bookNow,
           gapMs: 0,
           concurrency: options.slipConcurrency ?? SLIP_CONCURRENCY,
@@ -411,12 +561,13 @@ export function createEngine(options = {}) {
           tiers: tiers.map(viewOf),
           slipCache: progress.cache,
           occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
           settlement: settled.status,
           cycleNotes: [...issues, ...progress.issues],
           issues: [...issues, ...progress.issues].slice(0, 40),
         };
-        const nextBoard = projectBoard(partial, clock);
-        if (!boardHasCodes(before)) remember(nextBoard, clock);
+        const nextBoard = projectBoard(holdMasterCodes(before, partial, clock), clock);
+        if (boardHasCodes(nextBoard)) remember(nextBoard, clock, gen);
       },
         });
       }
@@ -448,37 +599,78 @@ export function createEngine(options = {}) {
       tiers: tierViews,
       slipCache: booking.cache,
       occurrenceByEvent: board.byEvent,
+      researchDrops: board.researchDrops || [],
       settlement: settled.status,
       cycleNotes: issues,
       issues: issues.slice(0, 40),
     };
-    const kept = projectBoard(preserveBoard(before, next, now), now);
-    remember(kept, now);
-    if (options.crests !== false && !options.fetchImpl) {
-      const fromDay = now.toISOString().slice(0, 10);
-      const toDay = new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);
-      import('./crestResolve.mjs')
-        .then(({ syncFixtureCrests }) => syncFixtureCrests(events, { fromDay, toDay, limit: 24 }))
-        .catch((error) => log('error', `Crest resolve failed: ${error instanceof Error ? error.message : 'crest resolve failed'}`));
-    }
+    const publishing = holdMasterCodes(before, next, now);
+    const keptSource = preserveBoard(before, publishing, now);
+    snapshotBoard(keptSource);
+    const kept = projectBoard(keptSource, now);
+    if (gen !== activeGen) return publicState(state, now);
+    remember(kept, now, gen, { publish: true, force: true });
     return publicState(kept, now);
   }
 
+  function hung() {
+    return Boolean(running) && cycleStartedAt && Date.now() - cycleStartedAt > hangMs;
+  }
+
   function run() {
+    if (hung()) {
+      activeGen += 1;
+      running = null;
+      cycleStartedAt = null;
+      log('error', 'The booking cycle hung past two intervals. Starting another.');
+    }
     if (!running) {
-      running = cycle().finally(() => {
-        running = null;
-      });
+      const gen = activeGen;
+      cycleStartedAt = Date.now();
+      running = cycle()
+        .finally(() => {
+          if (gen === activeGen) {
+            running = null;
+            cycleStartedAt = null;
+          }
+        })
+        .then(async (result) => {
+          if (options.onCycle) {
+            try {
+              await options.onCycle(result);
+            } catch (error) {
+              log('error', `Cycle watch failed: ${error instanceof Error ? error.message : error}`);
+            }
+          }
+          return result;
+        });
     }
     return running;
   }
 
+  function viewed(now = options.now ? options.now() : new Date()) {
+    if (running && servedView && Date.now() - servedAt < 15_000) return servedView;
+    const view = publicState(state, now);
+    const shown = running && published && boardHasCodes(published) && !boardHasCodes(view) ? published : view;
+    if (boardHasCodes(view)) published = view;
+    servedView = shown;
+    servedAt = Date.now();
+    return shown;
+  }
+
   return {
-    getState: () => publicState(state, options.now ? options.now() : new Date()),
+    getState: () => viewed(),
+    getRaw: () => state,
+    getPersistence: () => ({ disk: diskOk, snapshot: snapshotMode, error: snapshotError || diskError }),
     needsRepair: () => boardDirty(state, options.now ? options.now() : new Date()),
     getEvents: () => state.events,
     getOccurrence: () => state.occurrenceByEvent || {},
-    getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running) }),
+    getSchedule: () => ({ intervalMs: INTERVAL_MS, nextRunAt, running: Boolean(running), startedAt: cycleStartedAt, hangMs }),
+    restartIfHung() {
+      if (!hung()) return false;
+      void run();
+      return true;
+    },
     run,
     stop() {
       clearTimeout(kick);
@@ -528,17 +720,68 @@ export function createEngine(options = {}) {
 }
 
 // In production the engine reads the catalogue directly instead of calling its own public URL.
+const boardListeners = [];
+
+export function onEngineBoard(fn) {
+  boardListeners.push(fn);
+  return () => {
+    const index = boardListeners.indexOf(fn);
+    if (index >= 0) boardListeners.splice(index, 1);
+  };
+}
+
+function notifyEngineBoard(state) {
+  for (const fn of boardListeners) {
+    try {
+      fn(state);
+    } catch (error) {
+      console.error(`[engine] Board watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+}
+
 const engine = createEngine({
   loadEvents: () => loadUpcomingEvents({ force: true }),
   loadExtraPrices: () => loadExtraPrices(),
+  onCycle: (result) => notifyEngineCycle(result),
+  beforeBoard: (state) => notifyEngineBoard(state),
 });
+
+async function notifyEngineCycle(result) {
+  for (const fn of cycleListeners) {
+    try {
+      await fn(result);
+    } catch (error) {
+      console.error(`[engine] Cycle watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+  return result;
+}
 
 export function startEngine() {
   engine.start();
 }
 
+const cycleListeners = [];
+
+export function onEngineCycle(fn) {
+  cycleListeners.push(fn);
+  return () => {
+    const index = cycleListeners.indexOf(fn);
+    if (index >= 0) cycleListeners.splice(index, 1);
+  };
+}
+
 export function getEngineState() {
   return engine.getState();
+}
+
+export function enginePersistence() {
+  return engine.getPersistence();
+}
+
+export function getEngineRaw() {
+  return engine.getRaw();
 }
 
 export function engineNeedsRepair() {
@@ -559,6 +802,10 @@ export function getEventOccurrence() {
 
 export function runEngineCycle() {
   return engine.run();
+}
+
+export function restartEngineIfHung() {
+  return engine.restartIfHung();
 }
 
 export function restoreEngine() {

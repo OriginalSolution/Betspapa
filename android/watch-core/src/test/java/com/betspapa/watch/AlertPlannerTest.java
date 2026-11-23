@@ -94,7 +94,8 @@ public class AlertPlannerTest {
         live.htAway = 0;
         String kinds = kinds(AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 80 * 60_000L));
         assertTrue(kinds.contains("goal"));
-        assertTrue(kinds.contains("ht"));
+        // 76' with no break seen: a late "Half-time" card would be stale.
+        assertFalse(kinds.contains("ht"));
         assertFalse(kinds.contains("var"));
         for (WatchNote note : AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 80 * 60_000L)) state.record(note, KICK);
         assertTrue(AlertPlanner.notices(java.util.Collections.singletonList(live), state, KICK + 80 * 60_000L).isEmpty());
@@ -529,6 +530,92 @@ public class AlertPlannerTest {
         assertEquals(0L, fresh.lastPollAt);
     }
 
+    @Test
+    public void halfTimeOnlyDuringTheBreakAndNeverAtFullTime() {
+        WatchState state = followed();
+        WatchMatch brk = match();
+        brk.status = "halftime";
+        brk.minute = 45;
+        brk.homeScore = 0;
+        brk.awayScore = 0;
+        assertEquals("kickoff ht", kinds(AlertPlanner.notices(java.util.Collections.singletonList(brk), state, KICK + 50 * 60_000L)));
+        WatchState other = followed();
+        WatchMatch done = match();
+        done.status = "finished";
+        done.minute = 90;
+        done.homeScore = 0;
+        done.awayScore = 0;
+        assertFalse(kinds(AlertPlanner.notices(java.util.Collections.singletonList(done), other, KICK + 100 * 60_000L)).contains("ht"));
+    }
+
+    @Test
+    public void goalTakenBackIsDisallowedAndTheReScoredGoalStillAlerts() {
+        WatchState state = followed();
+        WatchMatch live = match();
+        live.status = "live";
+        live.minute = 30;
+        live.homeScore = 1;
+        live.awayScore = 0;
+        state.matches.add(live);
+        for (WatchNote note : AlertPlanner.notices(state.matches, state, KICK + 31 * 60_000L)) state.record(note, KICK);
+        state.commitScores();
+        assertTrue(state.seen("sr:match:1:goal:home:1"));
+
+        live.homeScore = 0;
+        live.minute = 32;
+        List<WatchNote> cancelled = AlertPlanner.notices(state.matches, state, KICK + 33 * 60_000L);
+        assertEquals(1, cancelled.size());
+        assertEquals("sr:match:1:goal:home:1:cancelled", cancelled.get(0).id);
+        assertEquals("var", cancelled.get(0).kind);
+        assertTrue(cancelled.get(0).disallowed);
+        assertEquals("sr:match:1:goal:home:1", cancelled.get(0).replaces);
+        state.record(cancelled.get(0), KICK);
+        state.commitScores();
+        assertTrue(AlertPlanner.notices(state.matches, state, KICK + 34 * 60_000L).isEmpty());
+
+        live.homeScore = 1;
+        live.minute = 40;
+        List<WatchNote> again = AlertPlanner.notices(state.matches, state, KICK + 41 * 60_000L);
+        assertEquals(1, again.size());
+        assertEquals("sr:match:1:goal:home:1:r1", again.get(0).id);
+        assertEquals("goal", again.get(0).kind);
+        assertEquals("sr:match:1:goal:home:1:cancelled", state.pendingNotifications().get(0).id);
+        assertEquals("sr:match:1:goal:home:1", state.pendingNotifications().get(0).replaces);
+    }
+
+    @Test
+    public void fixtureListCannotLowerALiveScore() {
+        WatchState state = followed();
+        WatchMatch live = match();
+        live.status = "live";
+        live.minute = 60;
+        live.homeScore = 2;
+        live.awayScore = 1;
+        state.matches.add(live);
+        WatchMatch stale = match();
+        stale.status = "live";
+        stale.homeScore = 1;
+        stale.awayScore = 1;
+        state.replaceFromFeed(java.util.Collections.singletonList(stale), KICK + 61 * 60_000L);
+        assertEquals(Integer.valueOf(2), state.matches.get(0).homeScore);
+    }
+
+    @Test
+    public void endedEventFinishesAMatchThatLeftTheLiveList() {
+        WatchState state = followed();
+        WatchMatch live = match();
+        live.status = "live";
+        live.minute = 89;
+        live.homeScore = 2;
+        live.awayScore = 0;
+        state.matches.add(live);
+        assertEquals(java.util.Collections.singletonList("sr:match:1"), state.vanishedLate(new java.util.ArrayList<WatchMatch>()));
+        assertFalse(state.finishFromDetail("sr:match:1", "H2", 1, 2, 0));
+        assertTrue(state.finishFromDetail("sr:match:1", "Ended", 3, 2, 1));
+        assertEquals("finished", state.matches.get(0).status);
+        assertEquals(Integer.valueOf(1), state.matches.get(0).awayScore);
+    }
+
     private static WatchMatch ghana() {
         WatchMatch match = new WatchMatch();
         match.id = "sr:match:gha";
@@ -567,5 +654,19 @@ public class AlertPlannerTest {
             builder.append(note.kind);
         }
         return builder.toString();
+    }
+
+    @Test
+    public void parserKeepsTheServerCrestAndDropsOtherHosts() {
+        String upcoming = "{\"events\":[{\"eventId\":\"sr:match:9\",\"home\":\"Chelsea\",\"away\":\"Leeds United\",\"kickoff\":\"2026-11-21T15:00:00Z\",\"country\":\"England\",\"tournament\":\"Premier League\","
+            + "\"homeCrest\":\"https://api.betspapa.com/crests/id/38.png?v=abc\",\"awayCrest\":\"https://img.sofascore.com/x.png\"}]}";
+        WatchMatch fixture = MatchParser.parseUpcoming(upcoming).get(0);
+        assertEquals("https://api.betspapa.com/crests/id/38.png?v=abc", fixture.homeCrest);
+        assertEquals("", fixture.awayCrest);
+        String live = "{\"data\":[{\"name\":\"Premier League\",\"categoryName\":\"England\",\"events\":[{\"eventId\":\"sr:match:9\",\"homeTeamName\":\"Chelsea\",\"awayTeamName\":\"Leeds United\","
+            + "\"matchStatus\":\"H1\",\"status\":1,\"setScore\":\"1:0\",\"playedSeconds\":\"12:00\",\"homeCrest\":\"https://api.betspapa.com/crests/id/38.png?v=abc\",\"awayCrest\":\"http://plain.example/x.png\"}]}]}";
+        WatchMatch scored = MatchParser.parseLive(live).get(0);
+        assertEquals("https://api.betspapa.com/crests/id/38.png?v=abc", scored.homeCrest);
+        assertEquals("", scored.awayCrest);
     }
 }

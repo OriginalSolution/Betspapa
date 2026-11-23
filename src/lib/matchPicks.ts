@@ -29,6 +29,12 @@ export type PickChip = {
   opponentHeld: boolean;
   /** True when this price is allowed only because both sides are 10/10. */
   exception: boolean;
+  /** Both teams' records support the pick. The 80% list keeps it even under 80%. */
+  teamsAgree: boolean;
+  homeSample: string | null;
+  awaySample: string | null;
+  leagueRisk: 'penalise' | null;
+  reasons: string[];
 };
 
 export type MatchPickCard = {
@@ -37,6 +43,8 @@ export type MatchPickCard = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -53,16 +61,22 @@ export function chipLabel(market: string): { label: string; short: string } {
   return { label: marketLabel(market), short: marketLabel(market) };
 }
 
-/** Real hit rate from the engine. A missing sample is not replaced with 1/odds. */
-export function hitRate(occurrence: number | null, sample: string | null): number | null {
-  if (sample) {
-    const match = SAMPLE.exec(sample.trim());
-    if (match) {
-      const hits = Number(match[1]);
-      const played = Number(match[2]);
-      if (played > 0) return hits / played;
-    }
-  }
+function sampleRate(sample: string | null): number | null {
+  if (!sample) return null;
+  const match = SAMPLE.exec(sample.trim());
+  if (!match) return null;
+  const hits = Number(match[1]);
+  const played = Number(match[2]);
+  if (played <= 0) return null;
+  return hits / played;
+}
+
+/** Real hit rate from the engine. A lower graded rate wins over a hotter sample. A missing sample is not replaced with 1/odds. */
+export function hitRate(occurrence: number | null, sample: string | null, graded?: number | null): number | null {
+  const fromSample = sampleRate(sample);
+  const fromGrade = graded == null || !Number.isFinite(graded) ? null : graded > 1 ? graded / 100 : graded;
+  if (fromGrade != null && fromGrade > 0 && fromGrade <= 1 && (fromSample == null || fromGrade + 1e-9 < fromSample)) return fromGrade;
+  if (fromSample != null) return fromSample;
   if (occurrence == null || !Number.isFinite(occurrence)) return null;
   if (occurrence > 1) return occurrence / 100;
   return occurrence;
@@ -86,7 +100,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
   const seen = new Set<string>();
   for (const leg of legs) {
     if (!publishableOdds(leg.odds)) continue;
-    const rate = hitRate(leg.occurrence, leg.sample);
+    const rate = hitRate(leg.occurrence, leg.sample, leg.rate);
     if (rate != null && rate + 1e-12 < 0.8) continue;
     const id = `${leg.eventId}:${leg.market}`;
     if (seen.has(id)) continue;
@@ -116,6 +130,11 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
       form: leg.form?.length ? leg.form : null,
       opponentHeld: leg.opponentHeld === true,
       exception: leg.exception === true,
+      teamsAgree: leg.teamsAgree === true,
+      homeSample: leg.homeSample || null,
+      awaySample: leg.awaySample || null,
+      leagueRisk: leg.leagueRisk === 'penalise' ? 'penalise' : null,
+      reasons: Array.isArray(leg.reasons) ? leg.reasons.slice(0, 8) : [],
     });
   }
   return chips;
@@ -146,8 +165,10 @@ export function cardsFromEngine(state: EngineState | null, matches: Match[], sor
       eventId,
       home: match?.home.shortName || homeName,
       away: match?.away.shortName || awayName,
-      homeId: match?.home.id || slug(homeName),
-      awayId: match?.away.id || slug(awayName),
+      homeId: match?.home.id || legs[0]?.homeId || slug(homeName),
+      awayId: match?.away.id || legs[0]?.awayId || slug(awayName),
+      homeCrest: match?.home.crest || legs[0]?.homeCrest || null,
+      awayCrest: match?.away.crest || legs[0]?.awayCrest || null,
       league: match?.competition.name || 'Fixture',
       competitionId: match?.competition.id || '',
       kickoff,
@@ -179,6 +200,8 @@ export type PickTip = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -248,6 +271,8 @@ export function tipsFromEngine(state: EngineState | null, matches: Match[]): Pic
         away: card.away,
         homeId: card.homeId,
         awayId: card.awayId,
+        homeCrest: card.homeCrest || null,
+        awayCrest: card.awayCrest || null,
         league: card.league,
         competitionId: card.competitionId,
         kickoff: card.kickoff,
@@ -284,6 +309,10 @@ export function combinedOdds(chips: PickChip[]): number | null {
 }
 
 export function rateLabel(chip: PickChip): string {
+  if (chip.sample && chip.rate != null) {
+    const fromSample = hitRate(null, chip.sample);
+    if (fromSample != null && chip.rate + 1e-9 < fromSample) return `${Math.round(chip.rate * 100)}%`;
+  }
   if (chip.sample) return chip.sample;
   if (chip.occurrence != null && Number.isFinite(chip.occurrence)) {
     const percent = chip.occurrence > 1 ? chip.occurrence : chip.occurrence * 100;
@@ -299,7 +328,7 @@ export function trendMarketName(market: string): string {
 }
 
 export function trendChipText(chip: PickChip): string {
-  const rate = chip.sample || rateLabel(chip);
+  const rate = rateLabel(chip);
   return [trendMarketName(chip.market), rate, chip.odds.toFixed(2)].filter(Boolean).join(' · ');
 }
 

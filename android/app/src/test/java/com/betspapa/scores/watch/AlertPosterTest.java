@@ -11,8 +11,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
+import android.content.Intent;
 import android.net.Uri;
+import android.provider.Settings;
+import com.betspapa.scores.R;
 import com.betspapa.watch.WatchNote;
+import java.io.InputStream;
 import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -177,5 +182,64 @@ public class AlertPosterTest {
         manager.createNotificationChannel(muted);
         AlertPoster.ensure(context);
         assertEquals(NotificationManager.IMPORTANCE_LOW, manager.getNotificationChannel(AlertPoster.GOAL_CROWD).getImportance());
+    }
+
+    @Test
+    public void xiaomiPlaysTheRawCheerInProcessAndOpensAppNotificationSettings() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        shadowOf((Application) context).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+        AlertSound.brandOverride = "xiaomi";
+        AlertSound.lastPlayed = null;
+        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        audio.setRingerMode(AudioManager.RINGER_MODE_NORMAL);
+        audio.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 7, 0);
+        try {
+            assertTrue(AlertSound.playsInProcess("xiaomi"));
+            assertTrue(!AlertSound.playsInProcess("samsung"));
+            assertTrue(!AlertSound.playsInProcess(""));
+            assertTrue(AlertPoster.post(context, new WatchNote("qc:xiaomi", "sr:match:1", "goal", "Goal", "Crowd"), "crowd"));
+            assertEquals(
+                "android.resource://" + context.getPackageName() + "/raw/cheer_crowd",
+                String.valueOf(AlertSound.lastPlayed)
+            );
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            Notification posted = shadowOf(manager).getAllNotifications().get(0);
+            assertEquals(AlertPoster.GOAL_CROWD, posted.getChannelId());
+            assertEquals(AlertPoster.soundFor(context, "goal", "crowd"), posted.sound);
+            Intent settings = AlertPoster.notificationSettingsIntent(context, "xiaomi", false, AlertPoster.GOAL_CROWD);
+            assertEquals(Settings.ACTION_APP_NOTIFICATION_SETTINGS, settings.getAction());
+            assertEquals(context.getPackageName(), settings.getStringExtra(Settings.EXTRA_APP_PACKAGE));
+            Intent channel = AlertPoster.notificationSettingsIntent(context, "", true, AlertPoster.RED_CARD);
+            assertEquals(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS, channel.getAction());
+            assertEquals(AlertPoster.RED_CARD, channel.getStringExtra(Settings.EXTRA_CHANNEL_ID));
+            Intent ringer = AlertPoster.notificationSettingsIntent(context, "", false, AlertPoster.GOAL_CROWD);
+            assertEquals(Settings.ACTION_SOUND_SETTINGS, ringer.getAction());
+        } finally {
+            AlertSound.brandOverride = null;
+            AlertSound.lastPlayed = null;
+        }
+    }
+
+    @Test
+    public void rawAlertSoundsAreInThePackage() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        int[] raw = {
+            R.raw.cheer_crowd,
+            R.raw.cheer_afro,
+            R.raw.cheer_chant,
+            R.raw.cheer_papa,
+            R.raw.goal_horn,
+            R.raw.goal_arp,
+            R.raw.red_card,
+            R.raw.var_check,
+            R.raw.penalty
+        };
+        for (int id : raw) {
+            InputStream in = context.getResources().openRawResource(id);
+            byte[] sample = new byte[32];
+            int read = in.read(sample);
+            in.close();
+            assertTrue(context.getResources().getResourceEntryName(id) + " is empty", read > 0);
+        }
     }
 }

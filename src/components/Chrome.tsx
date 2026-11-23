@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom';
 import { addDays } from '../lib/dates';
 import { ago, cx, dayWord, formatDay, longDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
-import { IconBell, IconLive, IconPicks, IconRank, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
+import { IconBell, IconCodes, IconLive, IconPicks, IconRank, IconRecord, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
 
 const sideLinks = [
   { to: '/', label: 'Today', icon: <IconToday />, end: true },
   { to: '/live', label: 'Live', icon: <IconLive />, end: false },
   { to: '/picks', label: 'Picks', icon: <IconPicks />, end: false },
+  { to: '/codes', label: 'Codes', icon: <IconCodes />, end: false },
   { to: '/trends', label: 'Trends', icon: <IconTrends />, end: false },
+  { to: '/record', label: 'Record', icon: <IconRecord />, end: false },
   { to: '/slips', label: 'Slips', icon: <IconSlip />, end: false },
   { to: '/rankings', label: 'Rankings', icon: <IconRank />, end: false },
   { to: '/following', label: 'Following', icon: <IconStar />, end: false },
@@ -22,6 +24,7 @@ const sideLinks = [
 const tabLinks = [
   { to: '/', label: 'Today', icon: <IconToday />, end: true },
   { to: '/picks', label: 'Picks', icon: <IconPicks />, end: false },
+  { to: '/codes', label: 'Codes', icon: <IconCodes />, end: false },
   { to: '/slips', label: 'Slips', icon: <IconSlip />, end: false },
   { to: '/trends', label: 'Trends', icon: <IconTrends />, end: false },
   { to: '/more', label: 'More', icon: <IconSettings />, end: false },
@@ -68,16 +71,43 @@ export function TabBar() {
   );
 }
 
+function topSubtitle(pathname: string, date: string): string {
+  if (pathname === '/') return longDay(date);
+  if (pathname === '/picks') return 'Today · picks at 80%+';
+  if (pathname.startsWith('/codes')) return 'Banker rules - own odds limits';
+  if (pathname === '/trends') return 'Add a whole trend to your slip';
+  if (pathname === '/slips/booked') return 'Codes for every bookmaker';
+  if (pathname === '/record') return 'Every 80%+ pick, graded';
+  if (pathname === '/record/picks') return 'Graded picks · top leagues';
+  if (pathname === '/record/codes') return 'Booked codes settle with their legs';
+  return 'Today’s fixtures';
+}
+
 export function TopBar({ title }: { title: string }) {
   const { unread, refresh, date } = useStore();
+  const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const back = pathname.startsWith('/codes/')
+    ? '/codes'
+    : pathname === '/record/picks'
+    ? `/record?day=${encodeURIComponent(params.get('day') || date)}`
+    : pathname === '/slips/booked'
+      ? '/trends'
+      : '';
   return (
     <header className="topbar">
-      <NavLink to="/" className="brand mobile-brand" end aria-label="Betspapa home">
-        <Mark size={26} />
-      </NavLink>
+      {back ? (
+        <NavLink to={back} className="icon-btn rec-back" aria-label={pathname.startsWith('/codes/') ? 'Back to Codes' : pathname === '/slips/booked' ? 'Back to Trends' : 'Back to the record'}>
+          ‹
+        </NavLink>
+      ) : (
+        <NavLink to="/" className="brand mobile-brand" end aria-label="Betspapa home">
+          <Mark size={26} />
+        </NavLink>
+      )}
       <div className="top-title">
         <h1>{title}</h1>
-        <p>{title === 'Today' ? longDay(date) : title === 'Trends' ? 'Flip the code to see legs' : 'Today’s fixtures'}</p>
+        <p>{topSubtitle(pathname, date)}</p>
       </div>
       <div className="top-actions">
         <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh scores">

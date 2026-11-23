@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 30
-        versionName "0.4.8"
+        versionCode 42
+        versionName "0.4.19"
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -24,18 +24,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing comes from the environment (CI secrets or the box secrets folder), never from the repo.
+    // Play bundles use the upload key; the legacy GitHub APK uses the original app signing key. See README "Signing".
+    def signingStore = System.getenv("BETSPAPA_STORE_FILE")
+    def releaseSigned = signingStore != null && !signingStore.isEmpty()
     signingConfigs {
-        release {
-            // Public sideload key. Password and alias are documented in the README.
-            storeFile file("${rootDir}/betspapa-release.keystore")
-            storePassword "betspapa"
-            keyAlias "betspapa"
-            keyPassword "betspapa"
+        if (releaseSigned) {
+            release {
+                storeFile file(signingStore)
+                storePassword System.getenv("BETSPAPA_STORE_PASSWORD")
+                keyAlias System.getenv("BETSPAPA_KEY_ALIAS")
+                keyPassword System.getenv("BETSPAPA_KEY_PASSWORD") ?: System.getenv("BETSPAPA_STORE_PASSWORD")
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (releaseSigned) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

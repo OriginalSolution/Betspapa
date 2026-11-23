@@ -38,8 +38,22 @@ public class WatchPlugin extends Plugin {
         data.put("route", route == null ? "" : route);
         data.put("matchId", matchId == null ? "" : matchId);
         data.put("trendId", trendId == null ? "" : trendId);
-        pendingOpen = data;
+        // Keep it for a cold start only. A warm tap is delivered to the live listener; leaving it
+        // pending made the next re-mount navigate to that match a second time.
+        pendingOpen = hasListeners("open") ? null : data;
         notifyListeners("open", data);
+    }
+
+    /** The last device registration the app sent. A token refreshed while the app is closed re-sends it natively. */
+    @PluginMethod
+    public void stashDevice(PluginCall call) {
+        String payload = call.getString("payload", "");
+        if (getContext() == null || payload == null || payload.isEmpty() || payload.length() > 200_000) {
+            call.resolve();
+            return;
+        }
+        getContext().getSharedPreferences(DeviceRegistrar.PREFS, Context.MODE_PRIVATE).edit().putString(DeviceRegistrar.KEY, payload).apply();
+        call.resolve();
     }
 
     @PluginMethod
@@ -228,7 +242,17 @@ public class WatchPlugin extends Plugin {
             note.fixture = json.optString("fixture", "");
             rememberMatch(json);
             String sound = json.optString("goalSound", "crowd");
-            AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            // FCM or the native poller may already have posted this id. The gate keeps the cheer to one.
+            if (!AlertGate.claim(getContext(), note.id)) {
+                call.resolve();
+                return;
+            }
+            boolean posted = false;
+            try {
+                posted = AlertPoster.post(getContext(), note, sound == null || sound.isEmpty() ? "crowd" : sound);
+            } finally {
+                AlertGate.finish(getContext(), note.id, posted);
+            }
             call.resolve();
         } catch (Exception error) {
             call.reject("Could not post the alert", error);
@@ -322,19 +346,13 @@ public class WatchPlugin extends Plugin {
         }
         AlertPoster.ensure(context);
         boolean channelMuted = false;
+        String channelId = AlertPoster.channelIdForSelected(context);
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
-            NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(AlertPoster.channelIdForSelected(context));
+            NotificationChannel channel = manager == null ? null : manager.getNotificationChannel(channelId);
             channelMuted = channel == null || channel.getImportance() < NotificationManager.IMPORTANCE_DEFAULT || channel.getSound() == null;
         }
-        Intent intent;
-        if (channelMuted && Build.VERSION.SDK_INT >= 26) {
-            intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
-            intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
-            intent.putExtra(Settings.EXTRA_CHANNEL_ID, AlertPoster.channelIdForSelected(context));
-        } else {
-            intent = new Intent(Settings.ACTION_SOUND_SETTINGS);
-        }
+        Intent intent = AlertPoster.notificationSettingsIntent(context, oemId(context), channelMuted, channelId);
         if (!(context instanceof android.app.Activity)) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             context.startActivity(intent);

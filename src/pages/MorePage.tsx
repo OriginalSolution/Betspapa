@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 const links = [
+  { to: '/record', title: 'Record', detail: 'Every 80%+ pick, graded from the full-time score' },
   { to: '/live', title: 'Live', detail: 'In-play scores' },
   { to: '/trends', title: 'Trends', detail: 'Rates above 80% are tipped' },
   { to: '/rankings', title: 'Rankings', detail: 'Week, month, and year' },
@@ -19,6 +20,10 @@ export function MorePage() {
             <span>{link.detail}</span>
           </Link>
         ))}
+        <a href="https://betspapa.com/privacy/" target="_blank" rel="noopener noreferrer">
+          <strong>Privacy policy</strong>
+          <span>What alerts send and how to delete it</span>
+        </a>
       </nav>
     </div>
   );

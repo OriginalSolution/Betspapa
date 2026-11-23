@@ -4,7 +4,9 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { boardHasCodes } from './engine.mjs';
+import { appEngineState, boardHasCodes } from './engine.mjs';
+import { directoryPersistent, evaluateChecks, gzippedBytes, noteDeviceCount } from './guardianChecks.mjs';
+import { appendIncident, attentionStreak, compactDataDir, diskPressure, dispatchAttention, invalidDeskReports, memoryHot, noteSelfTest, readDiskUsage, readMemoryLimit, selfTestDue } from './guardianOps.mjs';
 import { priceInRange, rangeReason } from './oddsRange.mjs';
 
 const DESKS = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'];
@@ -153,6 +155,11 @@ export function createGuardian(options = {}) {
   let lastCycleAt = null;
   let lastNightly = null;
   let lastReport = null;
+  let heldVerdict = null;
+  let heldAt = 0;
+  let heldWhile = '';
+  let staleAfterBooking = false;
+  const healthCacheMs = options.healthCacheMs ?? 15_000;
   let timer = null;
   let running = false;
   const dir = options.dir || join(process.cwd(), 'data', 'engine', 'health');
@@ -160,8 +167,14 @@ export function createGuardian(options = {}) {
   const nowFn = options.now || (() => new Date());
 
   function logIncident(incident) {
-    incidents.unshift({ at: new Date().toISOString(), ...incident });
+    const record = { at: new Date().toISOString(), fixed: false, ...incident };
+    incidents.unshift(record);
     if (incidents.length > 40) incidents.length = 40;
+    try {
+      appendIncident(options.dataDir, record);
+    } catch {
+      /* a full disk is reported by the disk check */
+    }
   }
 
   function note(path, ms, bytes) {
@@ -169,50 +182,173 @@ export function createGuardian(options = {}) {
     if (samples.length > 400) samples.splice(0, samples.length - 400);
   }
 
-  async function repair(verdict) {
+  let sawBoot = false;
+  let devicesLost = false;
+  let previousDevices = 0;
+  let streaks = {};
+  let selfTestState = { bootDone: false, gmtDay: null };
+  let memoryHigh = 0;
+
+  function pause(ms) {
+    if (!ms) return Promise.resolve();
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function deviceCount() {
+    return options.deviceCount ? Number(options.deviceCount()) || 0 : 0;
+  }
+
+  function rememberDevices(boot) {
+    const count = deviceCount();
+    const dataDir = options.dataDir || null;
+    if (dataDir) {
+      const noted = noteDeviceCount(dataDir, count, { boot, now: nowFn() });
+      if (noted.lost) devicesLost = true;
+      if (noted.previous) previousDevices = noted.previous;
+    }
+    if (count > 0) {
+      devicesLost = false;
+      previousDevices = count;
+    }
+    return count;
+  }
+
+  function evaluate({ fresh = false } = {}) {
+    const booking = Boolean(options.booking?.());
+    const idleFresh = heldWhile === 'idle' && !staleAfterBooking && Date.now() - heldAt < healthCacheMs;
+    if (!fresh && heldVerdict && (booking || idleFresh)) {
+      if (booking) staleAfterBooking = true;
+      return heldVerdict;
+    }
+    staleAfterBooking = false;
+    const state = options.getState ? options.getState() : {};
+    const raw = options.getRaw ? options.getRaw() : state;
+    const push = options.push ? options.push() : { feedOk: null, sentOk: 0, sentError: 0, feedError: null };
+    const dataDir = options.dataDir || null;
+    const persistent = options.persistent ? Boolean(options.persistent()) : dataDir ? directoryPersistent(dataDir) : true;
+    const stored = options.persistence ? options.persistence() : null;
+    const verdict = evaluateChecks({
+      mode: options.mode ? options.mode() : 'live',
+      state,
+      raw: { ...raw, extraLegs: options.extraLegs ? options.extraLegs() : raw?.extraLegs },
+      now: nowFn(),
+      booking,
+      persistent,
+      boardStored: stored ? stored.disk !== false : true,
+      diskError: stored?.error && stored.disk === false ? stored.error : '',
+      snapshot: stored?.snapshot || '',
+      devices: deviceCount(),
+      previousDevices,
+      devicesLost,
+      feedOk: push.feedOk,
+      feedError: push.feedError,
+      sentOk: push.sentOk,
+      sentError: push.sentError,
+      pruned: Number(push.pruned) || 0,
+      crests: options.crests ? safeCall(options.crests) : null,
+      payloadBytes: booking && heldVerdict ? 0 : (options.payloadBytes ? options.payloadBytes() : gzippedBytes(appEngineState(state))),
+    });
+    if (options.needsRepair?.() && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
+    heldVerdict = verdict;
+    heldAt = Date.now();
+    heldWhile = booking ? 'booking' : 'idle';
+    return verdict;
+  }
+
+  function safeCall(fn) {
+    try {
+      return fn();
+    } catch {
+      return null;
+    }
+  }
+
+  async function heal(verdict) {
     const fixes = [];
+    if (verdict.actions.includes('switch-live') && options.forceLive?.()) fixes.push('Switched to live.');
     const state = options.getState ? options.getState() : null;
     if (verdict.actions.includes('restore') && options.restore && !boardHasCodes(state)) {
       const restored = await options.restore();
       if (restored) fixes.push('Restored the last booked board.');
     }
-    const since = lastCycleAt ? Date.now() - lastCycleAt : Infinity;
-    const repair = Boolean(options.needsRepair?.());
-    const urgent = !boardHasCodes(options.getState ? options.getState() : null) || repair;
-    if ((verdict.actions.includes('rerun') || repair) && options.runCycle && (urgent || since > 10 * 60 * 1000)) {
+    if (options.pruneDevices) {
+      const removed = Number(await options.pruneDevices()) || 0;
+      if (removed) fixes.push(`Removed ${removed} stale tokens.`);
+    }
+    return fixes;
+  }
+
+  async function rebook() {
+    if (options.booking?.() || !options.runCycle) return [];
+    const fixes = [];
+    const delays = Array.isArray(options.backoffMs) ? options.backoffMs : [2000, 8000, 20000];
+    const attempts = Math.max(1, delays.length);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      if (attempt > 0) await pause(delays[attempt - 1] || delays[delays.length - 1]);
+      if (options.booking?.()) break;
       await options.runCycle();
       lastCycleAt = Date.now();
-      fixes.push('Ran a booking cycle.');
+      fixes.push(attempt === 0 ? 'Ran a booking cycle.' : `Rebooked after a wait (${attempt + 1}).`);
+      const again = evaluate({ fresh: true });
+      if (again.ok || !again.actions.includes('rebook')) break;
     }
     return fixes;
   }
 
   async function check() {
     if (running) return status();
+    if (options.booking?.()) {
+      if (options.restartHung?.()) {
+        logIncident({ code: 'hung-cycle', level: 'attention', message: 'Restarted a booking cycle that ran longer than two intervals.', fixed: true });
+      }
+      return status();
+    }
     running = true;
     try {
-      const state = options.getState ? options.getState() : null;
-      const booking = Boolean(options.booking?.());
-      const verdict = inspectEngine(state, nowFn().getTime(), { booking });
+      const boot = !sawBoot;
+      sawBoot = true;
+      let repairFailed = false;
+      rememberDevices(boot);
+      if (options.restartHung?.()) {
+        logIncident({ code: 'hung-cycle', level: 'attention', message: 'Restarted a booking cycle that ran longer than two intervals.', fixed: true });
+      }
+      const disk = options.disk ? options.disk() : options.dataDir ? diskPressure(readDiskUsage(options.dataDir)) : { full: false, used: 0 };
+      if (disk.full && options.dataDir) {
+        const removed = compactDataDir(options.dataDir, nowFn());
+        logIncident({ code: 'disk', level: 'attention', message: `Data disk is ${Math.round((disk.used || 0) * 100)}% full. Compacted ${removed.length} old files.`, fixed: removed.length > 0 });
+      }
+      const invalid = invalidDeskReports(options.getRaw ? options.getRaw() : options.getState?.());
+      let verdict = evaluate({ fresh: true });
+      if (invalid.length && !verdict.actions.includes('rebook')) verdict.actions.push('rebook');
       lastCheckAt = nowFn().toISOString();
       let fixes = [];
-      if (!verdict.ok) {
+      if (verdict.actions.includes('crests') && options.healCrests) {
+        const retried = Number(safeCall(options.healCrests)) || 0;
+        if (retried) {
+          const row = verdict.checks.find((item) => item.id === 'crests');
+          logIncident({ code: 'crests', level: 'warn', message: row?.message || 'Crest coverage is below target.', fixed: false, fix: `Queued ${retried} missing crests for another lookup.` });
+        }
+      }
+      if (!verdict.ok || verdict.actions.includes('rebook') || verdict.actions.includes('switch-live')) {
         try {
-          fixes = await repair(verdict);
+          fixes = await heal(verdict);
+          if (verdict.actions.includes('rebook') || verdict.actions.includes('rerun') || options.needsRepair?.()) {
+            fixes.push(...await rebook());
+          }
         } catch (error) {
+          repairFailed = true;
           logIncident({ code: 'repair-failed', level: 'attention', message: error instanceof Error ? error.message : 'Repair failed.', fixed: false });
         }
-        const after = options.getState ? options.getState() : state;
-        const still = inspectEngine(after, Date.now(), { booking: Boolean(options.booking?.()) });
-        for (const issue of verdict.issues.filter((item) => item.level !== 'info')) {
-          logIncident({ ...issue, fixed: !still.issues.some((item) => item.code === issue.code), fix: fixes.join(' ') });
+        verdict = evaluate({ fresh: true });
+        for (const row of verdict.checks.filter((item) => !item.ok && item.level === 'attention')) {
+          logIncident({ code: row.id, level: row.level, message: row.message, fixed: false, fix: fixes.join(' ') });
         }
       }
       if (options.fcm && !options.fcm()) {
         logIncident({ code: 'fcm-off', level: 'info', message: 'FCM is not configured on this process.', fixed: false });
       }
-      const slow = latencySummary(samples).filter((row) => row.slow);
-      const live = new Set(verdict.issues.filter((issue) => issue.level === 'attention' || issue.level === 'warn').map((issue) => issue.code));
+      const slow = latencySummary(samples).filter((row) => row.slow && row.path !== '/api/engine');
+      const live = new Set(verdict.checks.filter((row) => !row.ok && row.level === 'attention').map((row) => row.id));
       for (const row of slow) {
         live.add('slow-endpoint');
         logIncident({ code: 'slow-endpoint', level: 'attention', message: `${row.path} p95 is ${row.p95}ms.`, fixed: false });
@@ -221,9 +357,46 @@ export function createGuardian(options = {}) {
         if (!live.has(item.code)) item.fixed = true;
       }
       if (nightlyDue(lastNightly, nowFn())) await nightly();
+      await maybeSelfTest(boot);
+      const streak = attentionStreak(streaks, verdict.checks);
+      streaks = streak.streaks;
+      if (repairFailed || streak.fired.length) {
+        const incident = {
+          at: new Date().toISOString(),
+          code: repairFailed ? 'repair-failed' : streak.fired[0],
+          message: repairFailed ? 'Self-repair failed.' : verdict.reason || 'A check stayed in attention.',
+          action: fixes.join(' '),
+          fixed: false,
+          checks: streak.fired,
+        };
+        logIncident({ code: 'ai-fixer', level: 'attention', message: incident.message, fixed: false });
+        const sent = await dispatchAttention(incident, options.env || process.env, options.fetchImpl || fetch);
+        if (!sent.sent) logIncident({ code: 'ai-fixer', level: 'info', message: sent.reason || 'Attention was logged for the fixer.', fixed: false });
+      }
+      const rss = options.rss ? options.rss() : process.memoryUsage().rss;
+      const limit = options.memoryLimit ? options.memoryLimit() : readMemoryLimit();
+      memoryHigh = memoryHot(rss, limit) ? memoryHigh + 1 : 0;
+      if (memoryHigh >= 3) {
+        logIncident({ code: 'memory', level: 'attention', message: 'Memory stayed over 85%. Exiting so the host can restart the process.', fixed: false });
+        (options.exit || ((code) => process.exit(code)))(0);
+      }
       return status();
     } finally {
       running = false;
+    }
+  }
+
+  async function maybeSelfTest(boot) {
+    if (!options.selfTest) return;
+    const clock = nowFn();
+    const due = selfTestDue(selfTestState, clock, boot);
+    if (!due.due) return;
+    selfTestState = noteSelfTest(selfTestState, { ...due, hour: clock.getUTCHours() });
+    try {
+      const result = await options.selfTest();
+      logIncident({ code: 'self-test', level: result?.ok ? 'info' : 'attention', message: result?.message || 'Self-test finished.', fixed: Boolean(result?.ok) });
+    } catch (error) {
+      logIncident({ code: 'self-test', level: 'attention', message: error instanceof Error ? error.message : 'Self-test failed.', fixed: false });
     }
   }
 
@@ -276,13 +449,16 @@ export function createGuardian(options = {}) {
   }
 
   function status() {
-    const state = options.getState ? options.getState() : null;
-    const verdict = inspectEngine(state || {}, Date.now(), { booking: Boolean(options.booking?.()) });
-    const attention = incidents.filter((item) => item.level === 'attention' && !item.fixed);
+    const booking = Boolean(options.booking?.());
+    const state = booking ? null : (options.getState ? options.getState() : null);
+    const verdict = evaluate();
     return {
       name: 'Papa Guardian',
-      ok: verdict.ok && attention.length === 0,
-      needsAttention: attention.length > 0,
+      ok: verdict.ok,
+      needsAttention: !verdict.ok,
+      reason: verdict.reason,
+      checks: verdict.checks,
+      devices: deviceCount(),
       lastCheckAt,
       lastCycleAt: lastCycleAt ? new Date(lastCycleAt).toISOString() : state?.updatedAt || null,
       lastNightly,

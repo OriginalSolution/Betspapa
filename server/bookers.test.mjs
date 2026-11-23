@@ -31,7 +31,7 @@ test('books an open SportyBet slip, splits a long slip, and reports the other de
     calls.push({ method, url, count });
     if (url.includes('pcUpcomingEvents')) return {};
     if (url.includes('sportybet.com')) {
-      if (count > 30) return { bizCode: 19000, message: 'too many' };
+      if (count > 50) return { bizCode: 19000, message: 'too many' };
       if (count === 2) {
         return { bizCode: 10000, data: { shareCode: 'BOTH', outcomes: [{ matchStatus: 'Not start' }, { matchStatus: 'Ended' }] } };
       }
@@ -81,9 +81,11 @@ test('books an open SportyBet slip, splits a long slip, and reports the other de
   }));
   const long = await bookAll(longLegs, request);
   const sportySizes = calls.filter((call) => call.url.includes('sportybet.com') && call.count > 1).map((call) => call.count);
-  assert.ok(sportySizes.includes(30));
-  assert.equal(long.sportybet.parts.length, 2);
-  assert.deepEqual(long.sportybet.parts.map((part) => part.legs).sort((a, b) => a - b), [1, 30]);
+  assert.ok(sportySizes.includes(31));
+  assert.equal(long.sportybet.parts.length, 1);
+  assert.equal(long.sportybet.parts[0].legs, 31);
+  const betikaSizes = calls.filter((call) => call.url.includes('betika.com') && call.url.includes('encode') && call.count > 1).map((call) => call.count);
+  assert.ok(betikaSizes.includes(20) && betikaSizes.includes(11));
 });
 
 test('does not share a selection the facts scan says is absent', async () => {

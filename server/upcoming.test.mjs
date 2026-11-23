@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { flattenPage, isDummyId, isSimulated, loadUpcomingEvents, parseOdds } from './upcoming.mjs';
+import { flattenPage, isDummyId, isSimulated, loadUpcomingEvents, overlayLive, parseOdds } from './upcoming.mjs';
 
 const page = {
   bizCode: 10000,
@@ -93,4 +93,65 @@ test('loads every page and never invents events when the catalogue fails', async
   assert.equal(events.length, 1);
   const down = async () => ({ ok: false, status: 503, json: async () => ({}) });
   await assert.rejects(loadUpcomingEvents({ force: true, fetchImpl: down }), /503/);
+});
+
+function futurePage(kickoffMs, markets) {
+  return {
+    bizCode: 10000,
+    data: {
+      totalNum: 1,
+      tournaments: [
+        {
+          name: 'Premier League',
+          events: [{ eventId: 'sr:match:9', homeTeamName: 'Chelsea', awayTeamName: 'Leeds United', estimateStartTime: kickoffMs, sport: { category: { name: 'England' } }, markets }],
+        },
+      ],
+    },
+  };
+}
+const oneXTwo = { id: '1', outcomes: [{ id: '1', odds: '1.40' }, { id: '2', odds: '4.5' }, { id: '3', odds: '7.0' }] };
+const ggNg = { id: '29', outcomes: [{ id: '74', desc: 'Yes', odds: '1.8' }, { id: '76', desc: 'No', odds: '1.9' }] };
+
+test('a timed-out full request loads in smaller market groups and merges the prices', async () => {
+  const kickoff = Date.now() + 4 * 3_600_000;
+  const urls = [];
+  const fetchImpl = async (url) => {
+    urls.push(url);
+    const markets = decodeURIComponent(new URL(url).searchParams.get('marketId') || '');
+    if (markets.split(',').length > 4) return { ok: false, status: 504, json: async () => ({}) };
+    if (markets.startsWith('1,')) return { ok: true, json: async () => futurePage(kickoff, [oneXTwo]) };
+    if (markets.startsWith('19,')) return { ok: true, json: async () => futurePage(kickoff, [ggNg]) };
+    return { ok: false, status: 504, json: async () => ({}) };
+  };
+  const events = await loadUpcomingEvents({ force: true, fetchImpl });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].home, 'Chelsea');
+  assert.ok(events[0].odds.home, '1X2 price from the first group');
+  assert.ok(Object.keys(events[0].odds).length > 3, 'GG/NG prices merged from the second group');
+  assert.ok(!urls.some((url) => url.includes('liveOrPrematchEvents')), 'the live list is not needed');
+});
+
+test('a failed catalogue keeps the last good one and lays live-list rows over it', async () => {
+  const kickoff = Date.now() + 4 * 3_600_000;
+  const live = {
+    bizCode: 10000,
+    data: [{ name: 'Serie A', events: [{ eventId: 'sr:match:77', homeTeamName: 'Como 1907', awayTeamName: 'Lazio', estimateStartTime: Date.now() - 30 * 60_000, sport: { category: { name: 'Italy' } }, markets: [] }] }],
+  };
+  await loadUpcomingEvents({ force: true, fetchImpl: async () => ({ ok: true, json: async () => futurePage(kickoff, [oneXTwo]) }) });
+  const fetchImpl = async (url) =>
+    url.includes('liveOrPrematchEvents') ? { ok: true, json: async () => live } : { ok: false, status: 504, json: async () => ({}) };
+  const events = await loadUpcomingEvents({ force: true, fetchImpl });
+  assert.deepEqual(events.map((event) => event.eventId).sort(), ['sr:match:77', 'sr:match:9']);
+});
+
+test('overlayLive drops long-finished kept rows and lets the live list win', () => {
+  const now = Date.UTC(2026, 10, 21, 12);
+  const kept = [
+    { eventId: 'a', kickoff: '2026-11-21T06:00:00.000Z', odds: {} },
+    { eventId: 'b', kickoff: '2026-11-21T15:00:00.000Z', odds: { home: 1.3, gg: 1.8 } },
+  ];
+  const live = [{ eventId: 'b', kickoff: '2026-11-21T15:00:00.000Z', odds: { home: 1.35 } }];
+  const merged = overlayLive(kept, live, now);
+  assert.deepEqual(merged.map((event) => event.eventId), ['b']);
+  assert.deepEqual(merged[0].odds, { home: 1.35, gg: 1.8 });
 });
