@@ -1,0 +1,1 @@
+Book + track comes back sooner if one bookmaker is slow: the other codes still arrive, and that desk can be retried. Total odds stay on one line in the slip bar. The new-code hint no longer covers the buttons on Booked & tracking.
