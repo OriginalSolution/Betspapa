@@ -10,7 +10,7 @@ describe('booked slip coverage', () => {
       [[{ eventId: 'a', kickoff: '2026-11-23T10:00:00.000Z' }, { eventId: 'b', kickoff: '2026-11-23T12:00:00.000Z' }]],
       [{
         books: {
-          sportybet: { parts: [{ code: 'D9A890', legs: 2, matches: ['a', 'b'] }] },
+          sportybet: { parts: [{ code: 'D9A890', legs: 2, matches: ['a', 'b'], link: 'https://www.sportybet.com/gh/?shareCode=D9A890' }] },
           betpawa: { parts: [{ code: 'PNS1K6', legs: 1, matches: ['a'] }], error: null },
           msport: { parts: [], error: 'No open selections' },
         },
@@ -19,6 +19,7 @@ describe('booked slip coverage', () => {
     expect(desks.map((desk) => desk.desk)).toEqual(['sportybet', 'msport', 'betpawa']);
     expect(desks[0].missed).toBe(1);
     expect(desks[0].parts[0].matches).toBe(2);
+    expect(desks[0].parts[0].link).toBe('https://www.sportybet.com/gh/?shareCode=D9A890');
     expect(partSummary(desks[0].parts[0])).toContain('2 legs · 2 matches');
     expect(desks[2].bookedLegs).toBe(1);
     expect(desks[2].missed).toBe(2);
