@@ -1,26 +1,8 @@
-import { useState } from 'react';
 import { BookMark } from './BookMark';
+import { CodeActions } from './CodeActions';
 import { DESKS, DESK_NAMES, type DeskId } from '../lib/engineSlips';
 import { kickoffClock, cx } from '../lib/format';
 import { CODE_TIERS, TIER_LABEL, type CodePartView, type CodeTier } from '../lib/pickCodes';
-
-async function copyText(value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    /* the WebView can refuse the async clipboard */
-  }
-  const area = document.createElement('textarea');
-  area.value = value;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  area.remove();
-}
 
 export function CodeStrip({
   desk,
@@ -43,7 +25,6 @@ export function CodeStrip({
   onDesk: (desk: DeskId) => void;
   onTier: (tier: CodeTier) => void;
 }) {
-  const [copied, setCopied] = useState<string | null>(null);
   const when = kickoffClock(bookedAt || '');
   return (
     <section className="code-strip" aria-label={title}>
@@ -75,28 +56,9 @@ export function CodeStrip({
                   Part {part.index}/{part.total}
                 </p>
               )}
-              <p className="code-value" data-booking-code={part.code}>
-                {part.code}
-              </p>
+              <CodeActions code={part.code} desk={desk} link={part.link} codeClassName="code-value" />
               <div className="code-part-row">
                 <span>{bits.join(' · ')}</span>
-                <span className="code-actions">
-                  <button
-                    type="button"
-                    className={cx('btn', 'btn-tiny', copied === part.code && 'is-on')}
-                    onClick={() => {
-                      void copyText(part.code);
-                      setCopied(part.code);
-                    }}
-                  >
-                    {copied === part.code ? 'Copied' : 'Copy'}
-                  </button>
-                  {part.link && (
-                    <a className="btn btn-tiny" href={part.link} target="_blank" rel="noreferrer">
-                      Load
-                    </a>
-                  )}
-                </span>
               </div>
             </div>
           );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { friendlyError } from '../lib/apiJson';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
+import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { DESK_NAMES, DESKS, type DeskId } from '../lib/engineSlips';
 import { cx, longDay, weekdayChip } from '../lib/format';
@@ -44,24 +45,6 @@ function teamOf(name: string, crest: string | null): Team {
   return { id: name || 'team', name, shortName: name, abbr: '', color: '#2a303c', crest };
 }
 
-async function copyText(value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    /* the WebView can refuse the async clipboard */
-  }
-  const area = document.createElement('textarea');
-  area.value = value;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  area.remove();
-}
-
 export function RecordPage() {
   const { pathname } = useLocation();
   const [params, setParams] = useSearchParams();
@@ -69,7 +52,6 @@ export function RecordPage() {
   const requested = params.get('day') || '';
   const [view, setView] = useState<ResultsView | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'won' | 'lost' | 'league'>('all');
 
   useEffect(() => {
@@ -105,13 +87,6 @@ export function RecordPage() {
     return graded;
   }, [filter, graded]);
 
-  const copy = (id: string, value: string) => {
-    void copyText(value).then(() => {
-      setCopied(id);
-      window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1400);
-    });
-  };
-
   return (
     <div className="stack record-page">
       {pathname === '/record' && <DayStrip day={day} onChoose={choose} />}
@@ -126,7 +101,7 @@ export function RecordPage() {
           onFilter={setFilter}
         />
       )}
-      {view && pathname === '/record/codes' && <CodesRecord view={view} copied={copied} onCopy={copy} />}
+      {view && pathname === '/record/codes' && <CodesRecord view={view} />}
     </div>
   );
 }
@@ -331,7 +306,7 @@ function PickRow({ pick }: { pick: RecordPick }) {
   );
 }
 
-function CodesRecord({ view, copied, onCopy }: { view: ResultsView; copied: string | null; onCopy: (id: string, value: string) => void }) {
+function CodesRecord({ view }: { view: ResultsView }) {
   const master = view.codes.filter((code) => code.slipId === 'master');
   const codes = master.length ? master : view.codes;
   const legs = codes.reduce((sum, code) => sum + code.legCount, 0);
@@ -350,7 +325,7 @@ function CodesRecord({ view, copied, onCopy }: { view: ResultsView; copied: stri
       ) : (
         <ul className="rec-codes">
           {codeRows(codes).map((row) => (
-            <CodeRow key={row.code.id} code={row.code} part={row.part} parts={row.parts} copied={copied === row.code.id} onCopy={() => onCopy(row.code.id, row.code.code)} />
+            <CodeRow key={row.code.id} code={row.code} part={row.part} parts={row.parts} />
           ))}
         </ul>
       )}
@@ -406,7 +381,7 @@ function Band({ won, graded }: { won: number; graded: number }) {
   );
 }
 
-function CodeRow({ code, part, parts, copied, onCopy }: { code: RecordCode; part: number; parts: number; copied: boolean; onCopy: () => void }) {
+function CodeRow({ code, part, parts }: { code: RecordCode; part: number; parts: number }) {
   const desk = code.desk as DeskId;
   const name = DESK_NAMES[desk] || code.desk;
   const state = code.status === 'open' ? `${code.settled}/${code.legCount} settled` : code.status === 'won' ? 'Won' : code.status === 'lost' ? 'Lost' : 'Void';
@@ -417,8 +392,7 @@ function CodeRow({ code, part, parts, copied, onCopy }: { code: RecordCode; part
         <strong>{name}{part ? ` · part ${part}/${parts}` : ''}</strong>
         <span className={cx('rec-code-state', `is-${code.status}`)}>{state}</span>
       </div>
-      <b>{code.code}</b>
-      <button type="button" className="rec-copy" onClick={onCopy}>{copied ? 'Copied' : 'Copy'}</button>
+      <CodeActions code={code.code} desk={code.desk} />
     </li>
   );
 }

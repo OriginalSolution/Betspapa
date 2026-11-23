@@ -4,6 +4,7 @@ import { CountryBadge } from '../components/CountryBadge';
 import { Crest } from '../components/Crest';
 import { IconBall, IconCard } from '../components/Icons';
 import { BookMark } from '../components/BookMark';
+import { CodeActions } from '../components/CodeActions';
 import { bookingForPick, DESK_NAMES, readEngineCache, type BookingChip } from '../lib/engineSlips';
 import { profile, squadLabel, marketInfo, type MarketId } from '../data/board';
 import { fetchLiveMatch } from '../data/remote';
@@ -177,11 +178,11 @@ function HitMarkets({ matchId, focus }: { matchId: string; focus: string | null 
         </p>
       )}
       {booked.map((code) => (
-        <p key={`${code.bookId}:${code.code}`} className="booking-chip">
+        <div key={`${code.bookId}:${code.code}`} className="booking-chip">
           <BookMark id={code.bookId} />
           <span>{DESK_NAMES[code.bookId]}</span>
-          <b>{code.code}</b>
-        </p>
+          <CodeActions code={code.code} desk={code.bookId} />
+        </div>
       ))}
     </section>
   );

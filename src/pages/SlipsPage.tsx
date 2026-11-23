@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
+import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { PickCard } from '../components/PickCard';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
@@ -55,24 +56,6 @@ function namedTeam(name: string, catalog: CrestCatalog): Team {
   return crest ? { ...team, crest } : team;
 }
 
-async function copyText(value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    return;
-  } catch {
-    /* the WebView can refuse the async clipboard */
-  }
-  const area = document.createElement('textarea');
-  area.value = value;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.appendChild(area);
-  area.select();
-  document.execCommand('copy');
-  area.remove();
-}
-
 function useEngineSlips() {
   return useEngineBoard();
 }
@@ -88,7 +71,6 @@ export function SlipsPage() {
   const [visible, setVisible] = useState(30);
   const [openTrend, setOpenTrend] = useState<string | null>(focus);
   const [dropsOpen, setDropsOpen] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CrestCatalog>(emptyCatalog);
 
   useEffect(() => {
@@ -107,13 +89,6 @@ export function SlipsPage() {
   const legs = picks.filter((pick) => slip.includes(pick.id));
   const won = legs.filter((pick) => pick.status === 'won').length;
   const bust = legs.filter((pick) => pick.status === 'bust').length;
-
-  const copy = (id: string, value: string) => {
-    void copyText(value).then(() => {
-      setCopied(id);
-      window.setTimeout(() => setCopied((current) => (current === id ? null : current)), 1500);
-    });
-  };
 
   return (
     <div className="stack slips-page">
@@ -139,7 +114,7 @@ export function SlipsPage() {
 
       {!state && <p className="lede">{problem ? 'Could not load slips. Codes appear when the engine responds.' : 'Loading slips.'}</p>}
 
-      <MasterHero desk={desk} book={book} master={master} copied={copied} onCopy={copy} />
+      <MasterHero desk={desk} book={book} master={master} />
 
       {book.dropped.length > 0 && (
         <section className="drop-note">
@@ -173,11 +148,9 @@ export function SlipsPage() {
               desk={desk}
               open={openTrend === trend.id}
               focused={focus === trend.id}
-              copied={copied}
               catalog={catalog}
               matches={matches}
               onToggle={() => setOpenTrend((current) => (current === trend.id ? null : trend.id))}
-              onCopy={copy}
             />
           ))
         )}
@@ -208,14 +181,10 @@ function MasterHero({
   desk,
   book,
   master,
-  copied,
-  onCopy,
 }: {
   desk: DeskId;
   book: EngineBook;
   master: EngineSlip | null;
-  copied: string | null;
-  onCopy: (id: string, value: string) => void;
 }) {
   const booked = when(master?.bookedAt);
   return (
@@ -230,22 +199,13 @@ function MasterHero({
       {book.parts.length ? (
         book.parts.map((part) => {
           const odds = showOdds(part.totalOdds);
-          const id = `master:${desk}:${part.code}`;
           return (
             <div className="master-part" key={part.code}>
-              <p className="master-code">{part.code}</p>
+              <CodeActions code={part.code} desk={desk} link={part.link} codeClassName="master-code" compact={false} />
               <p className="master-meta">
                 {picksLabel(part.legs)}
                 {odds ? ` · ${odds}` : ''}
               </p>
-              <div className="master-actions">
-                <button type="button" className="btn" onClick={() => onCopy(id, part.code)}>
-                  {copied === id ? 'Copied' : 'Copy'}
-                </button>
-                <a className="btn" href={part.link} target="_blank" rel="noreferrer">
-                  Load
-                </a>
-              </div>
             </div>
           );
         })
@@ -262,27 +222,22 @@ function TrendSlip({
   desk,
   open,
   focused,
-  copied,
   catalog,
   matches,
   onToggle,
-  onCopy,
 }: {
   trend: EngineSlip;
   desk: DeskId;
   open: boolean;
   focused: boolean;
-  copied: string | null;
   catalog: CrestCatalog;
   matches: ReturnType<typeof useStore>['matches'];
   onToggle: () => void;
-  onCopy: (id: string, value: string) => void;
 }) {
   const book = deskBook(trend, desk);
   const codes = book.parts.map((part) => part.code);
   const odds = book.parts.map((part) => showOdds(part.totalOdds)).filter((value): value is string => Boolean(value));
   const count = book.parts.length ? book.parts.reduce((sum, part) => sum + part.legs, 0) : visibleLegs(trend).length;
-  const copyId = `trend:${desk}:${trend.id}`;
   const legs = visibleLegs(trend);
   return (
     <article id={`slip-${trend.id}`} className={cx('slip-trend', open && 'is-open', focused && 'trend-focus')}>
@@ -295,10 +250,8 @@ function TrendSlip({
           {picksLabel(count)}
           {odds.length ? ` · ${odds.join(' · ')}` : ''}
         </p>
-        {book.parts.map((part, index) => (
-          <button key={part.code} type="button" className="btn btn-quiet btn-tiny" onClick={() => onCopy(`${copyId}:${part.code}`, part.code)}>
-            {copied === `${copyId}:${part.code}` ? 'Copied' : book.parts.length > 1 ? `Copy ${index + 1}` : 'Copy'}
-          </button>
+        {book.parts.map((part) => (
+          <CodeActions key={part.code} code={part.code} desk={desk} link={part.link} showCode={book.parts.length > 1} />
         ))}
       </div>
       {open && (
