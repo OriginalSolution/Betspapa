@@ -246,7 +246,7 @@ function HitRing({ rate }: { rate: number }) {
         <circle cx="20" cy="20" r={radius} className="hit-track" />
         <circle cx="20" cy="20" r={radius} className="hit-value" strokeDasharray={`${dash} ${turn - dash}`} />
       </svg>
-      <b>{pct}<small>%</small></b>
+      <b>{pct}%</b>
     </span>
   );
 }

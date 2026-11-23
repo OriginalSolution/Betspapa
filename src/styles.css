@@ -1438,9 +1438,31 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   line-height: 1;
 }
 .hit-ring b small { font-size: 0.62em; font-weight: 750; }
-.ring-card .hit-ring { width: 40px; height: 40px; }
+.ring-card .hit-ring {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+}
+.ring-card .hit-ring svg,
+.ring-card .hit-ring b { grid-area: 1 / 1; }
 .ring-card .hit-ring svg { width: 40px; height: 40px; }
-.ring-card .hit-ring b { display: flex; align-items: baseline; justify-content: center; white-space: nowrap; font-size: 12px; letter-spacing: -0.04em; }
+.ring-card .hit-ring b {
+  position: static;
+  inset: auto;
+  display: block;
+  margin: 0;
+  padding: 0;
+  width: auto;
+  font-family: var(--score);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
 .ring-card .hit-ring.is-full b { font-size: 11px; }
 .hit-ring.is-hot b { color: var(--green); }
 .hit-ring.is-warm b { color: var(--gold); }
