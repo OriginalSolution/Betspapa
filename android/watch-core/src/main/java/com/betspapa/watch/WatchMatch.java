@@ -253,7 +253,7 @@ public final class WatchMatch {
         return clean.length() <= 3 ? clean : clean.substring(0, 3);
     }
 
-    JSONObject toJson() {
+    public JSONObject toJson() {
         JSONObject json = new JSONObject();
         json.put("id", id);
         json.put("homeId", homeId);
@@ -303,7 +303,7 @@ public final class WatchMatch {
         return json;
     }
 
-    static WatchMatch fromJson(JSONObject json) {
+    public static WatchMatch fromJson(JSONObject json) {
         WatchMatch match = new WatchMatch();
         if (json == null) return match;
         match.id = json.optString("id", "");
