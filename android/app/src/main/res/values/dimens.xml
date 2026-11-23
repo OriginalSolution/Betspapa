@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Narrow shades first: the Galaxy Z Fold cover screen and small phones (under 380dp). -->
+<resources>
+    <dimen name="notif_crest_lg">30dp</dimen>
+    <dimen name="notif_board_min">44dp</dimen>
+    <dimen name="notif_score_min">48dp</dimen>
+    <dimen name="notif_score_text">20sp</dimen>
+    <dimen name="notif_name_text">12sp</dimen>
+    <dimen name="notif_action_text">12sp</dimen>
+    <dimen name="notif_action_height">32dp</dimen>
+</resources>

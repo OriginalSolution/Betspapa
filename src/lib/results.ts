@@ -1,3 +1,4 @@
+import { apiJson, apiUrl } from './apiJson';
 import { marketLabel } from './engineSlips';
 
 export type PickStatus = 'open' | 'won' | 'lost' | 'void';
@@ -60,15 +61,15 @@ export type ResultsView = {
 };
 
 export function resultsUrl(day?: string): string {
-  const host = typeof location !== 'undefined' ? location.hostname : '';
-  const base = host === 'localhost' || host === '127.0.0.1' ? '/api/results' : 'https://api.betspapa.com/api/results';
-  return day ? `${base}?day=${encodeURIComponent(day)}` : base;
+  return apiUrl(resultsPath(day));
+}
+
+function resultsPath(day?: string): string {
+  return day ? `/api/results?day=${encodeURIComponent(day)}` : '/api/results';
 }
 
 export async function fetchResults(day?: string): Promise<ResultsView> {
-  const response = await fetch(resultsUrl(day));
-  if (!response.ok) throw new Error(`Record returned ${response.status}`);
-  return response.json();
+  return apiJson<ResultsView>(resultsPath(day), 'The record');
 }
 
 /** Accra calendar day, which is the matchday the record uses. */

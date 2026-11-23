@@ -173,3 +173,24 @@ test('misses saved by an older image check are due again after an upgrade', asyn
   const store = createCrestStore({ dir, log: () => {}, fetchImpl: async () => response(404, '') });
   assert.equal(store.index.misses['44'].nextAt, 0);
 });
+
+test('youth and reserve sides wear the senior club crest; a women side keeps its own', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'crests-'));
+  const { writeFileSync } = await import('node:fs');
+  const row = (name, hash) => ({ name, country: 'England', competition: '', source: 'sportradar', remote: '', hash, size: 100, at: '' });
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({
+    version: 1,
+    overrides: {},
+    misses: {},
+    teams: { 10: row('Birmingham City', 'senior'), 11: row('Birmingham City U21', 'youth'), 20: row('Arsenal', 'ars'), 21: row('Arsenal Women', 'arsw') },
+  }));
+  const store = createCrestStore({ dir, log: () => {}, origin: 'https://api.test', root: dir, fetchImpl: async () => response(404, '') });
+  assert.equal(store.crestFor('sr:competitor:11', 'Birmingham City U21'), 'https://api.test/crests/id/10.png?v=senior');
+  assert.equal(store.crestFor('', 'Birmingham City U23'), 'https://api.test/crests/id/10.png?v=senior');
+  assert.equal(store.crestFor('sr:competitor:21', 'Arsenal Women'), 'https://api.test/crests/id/21.png?v=arsw');
+  assert.equal(store.crestFor('', 'Arsenal Ladies'), 'https://api.test/crests/id/20.png?v=ars');
+  assert.equal(store.crestFor('', 'Jong Arsenal'), 'https://api.test/crests/id/20.png?v=ars');
+  assert.equal(store.crestFor('sr:competitor:10', 'Birmingham City'), 'https://api.test/crests/id/10.png?v=senior');
+  // No senior crest stored: the junior side keeps whatever it has.
+  assert.equal(store.crestFor('', 'Gillingham U23'), '');
+});

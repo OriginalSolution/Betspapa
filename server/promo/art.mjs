@@ -1,3 +1,4 @@
+import { juniorSide } from '../../src/lib/crestMatch.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { esc, pickPair, playerBox, playerGlow, playerImage } from './players.mjs';
@@ -44,9 +45,16 @@ export function crestPathForName(name, root = process.cwd()) {
 export function crestForName(name, root = process.cwd()) {
   try {
     const catalog = JSON.parse(readFileSync(join(root, 'public', 'crests', 'crests.json'), 'utf8'));
-    const key = String(name || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-    const file = catalog.byKey?.[key] || catalog.byId?.[key.replace(/ /g, '-')] || '';
-    return crestData(typeof file === 'string' ? file : '', root);
+    const find = (value) => {
+      const key = String(value || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+      const file = catalog.byKey?.[key] || catalog.byId?.[key.replace(/ /g, '-')] || '';
+      return typeof file === 'string' ? file : '';
+    };
+    // Share art: youth and reserve sides wear the senior crest, a women's side only when it has none.
+    const junior = juniorSide(name);
+    const senior = junior ? find(junior.senior) : '';
+    const file = junior && junior.kind !== 'women' && senior ? senior : find(name) || senior;
+    return crestData(file, root);
   } catch {
     return '';
   }

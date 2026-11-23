@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { friendlyError } from '../lib/apiJson';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
 import { Crest } from '../components/Crest';
@@ -82,7 +83,7 @@ export function RecordPage() {
         }
       })
       .catch((error: unknown) => {
-        if (!stop) setProblem(error instanceof Error ? error.message : 'Could not load the record');
+        if (!stop) setProblem(friendlyError(error, 'Could not load the record. Check your connection and try again.'));
       });
     return () => {
       stop = true;

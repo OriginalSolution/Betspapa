@@ -426,6 +426,30 @@ async function handleApi(req, res, url) {
     }
     return;
   }
+  // Codes read back with POST, so the route sits above the GET-only guard.
+  if (url.pathname === '/api/codes') {
+    if (req.method === 'GET') {
+      send(req, res, 200, banker.view(), 'public, max-age=30');
+      return;
+    }
+    if (req.method === 'POST') {
+      const limit = takeRequest(clientIp(req), url.pathname);
+      if (limit.limited) {
+        send(req, res, 429, { error: 'Slow down.' }, 'private, no-store', { 'Retry-After': String(limit.retryAfter) });
+        return;
+      }
+      send(req, res, 200, await banker.refresh(), 'no-store');
+      for (const alert of banker.drain()) {
+        for (const device of pushBook.list()) {
+          if (!bankerWanted(device, alert)) continue;
+          await pushWatch.post(bankerNote(alert), device);
+        }
+      }
+      return;
+    }
+    send(req, res, 405, { error: 'Method not allowed' });
+    return;
+  }
   if (req.method !== 'GET') {
     send(req, res, 405, { error: 'Method not allowed' });
     return;
@@ -477,24 +501,6 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/guardian') {
     if (String(getConfig().mode) !== 'live') forceLiveMode();
     send(req, res, 200, guardian.status());
-    return;
-  }
-  if (url.pathname === '/api/codes') {
-    if (req.method === 'GET') {
-      send(req, res, 200, banker.view(), 'public, max-age=30');
-      return;
-    }
-    if (req.method === 'POST') {
-      send(req, res, 200, await banker.refresh(), 'no-store');
-      for (const alert of banker.drain()) {
-        for (const device of pushBook.list()) {
-          if (!bankerWanted(device, alert)) continue;
-          await pushWatch.post(bankerNote(alert), device);
-        }
-      }
-      return;
-    }
-    send(req, res, 405, { error: 'Method not allowed' });
     return;
   }
   if (url.pathname === '/api/lineups') {

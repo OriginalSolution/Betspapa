@@ -1,3 +1,4 @@
+import { ApiError, apiJson, apiUrl } from './apiJson';
 /** Client for GET /api/codes. The server is the only place a code is booked. */
 
 export type CodeLeg = {
@@ -81,21 +82,21 @@ export type CodesView = {
 };
 
 export function codesUrl(): string {
-  const host = typeof location !== 'undefined' ? location.hostname : '';
-  return host === 'localhost' || host === '127.0.0.1' ? '/api/codes' : 'https://api.betspapa.com/api/codes';
+  return apiUrl('/api/codes');
+}
+
+function codesView(body: CodesView): CodesView {
+  if (!body || !Array.isArray(body.strategies)) throw new ApiError('Codes could not be read. Check your connection and try again.', 200);
+  return body;
 }
 
 export async function fetchCodes(): Promise<CodesView> {
-  const response = await fetch(codesUrl());
-  if (!response.ok) throw new Error(`Codes returned ${response.status}`);
-  return response.json();
+  return codesView(await apiJson<CodesView>('/api/codes', 'Codes'));
 }
 
 /** Read the open codes back. This does not book. */
 export async function refreshCodes(): Promise<CodesView> {
-  const response = await fetch(codesUrl(), { method: 'POST' });
-  if (!response.ok) throw new Error(`Codes returned ${response.status}`);
-  return response.json();
+  return codesView(await apiJson<CodesView>('/api/codes', 'Codes', 'POST'));
 }
 
 export function oddsText(value: number): string {

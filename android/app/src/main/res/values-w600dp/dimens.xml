@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tablets and the open Fold. -->
+<resources>
+    <dimen name="notif_crest_lg">40dp</dimen>
+    <dimen name="notif_board_min">54dp</dimen>
+    <dimen name="notif_score_min">72dp</dimen>
+    <dimen name="notif_score_text">26sp</dimen>
+    <dimen name="notif_name_text">14sp</dimen>
+    <dimen name="notif_action_text">14sp</dimen>
+    <dimen name="notif_action_height">36dp</dimen>
+</resources>

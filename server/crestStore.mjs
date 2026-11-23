@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { coreName, flagUrl, isNationalSide, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
+import { coreName, flagUrl, isNationalSide, juniorSide, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog, loadOverrides, pacer, sportsDb, wikidata } from './crestResolve.mjs';
 import { prepareCrest } from './crestImage.mjs';
 
@@ -152,13 +152,59 @@ export function createCrestStore(options = {}) {
   }
 
   /** Crest URL for a team: our copy by id, else the bundled catalogue by name, else ''. */
-  function crestFor(rawId, name) {
+  function ownCrest(rawId, name) {
     const cid = competitorId(rawId);
     if (cid && index.teams[cid]) return urlFor(cid);
-    const file = name ? legacyPath(name) : '';
+    return fileUrl(name ? legacyPath(name) : '');
+  }
+
+  function fileUrl(file) {
     if (!file) return '';
     if (/^https?:\/\//i.test(file)) return file;
     return `${origin}${file.startsWith('/') ? file : `/${file}`}`;
+  }
+
+  let seniorIndex = null;
+  let seniorCount = -1;
+  /** Senior clubs we hold a crest for, by loose and core name. Junior rows are left out. */
+  function seniorIds() {
+    const count = Object.keys(index.teams).length;
+    if (seniorIndex && count === seniorCount) return seniorIndex;
+    seniorIndex = new Map();
+    seniorCount = count;
+    for (const [cid, row] of Object.entries(index.teams)) {
+      const name = row?.name || '';
+      if (!name || juniorSide(name)) continue;
+      for (const key of [looseKey(name), coreName(name)]) {
+        if (key && !seniorIndex.has(key)) seniorIndex.set(key, cid);
+      }
+    }
+    return seniorIndex;
+  }
+
+  /** The senior club's crest for a youth, reserve, or women's side, or ''. */
+  function seniorCrest(senior) {
+    const ids = seniorIds();
+    for (const key of [looseKey(senior), coreName(senior)]) {
+      const cid = key ? ids.get(key) : '';
+      if (cid) return urlFor(cid);
+    }
+    return fileUrl(legacyPath(senior));
+  }
+
+  /**
+   * Youth and reserve sides wear the senior crest (Birmingham U21 shows Birmingham).
+   * A women's side keeps its own badge and borrows the senior one only when it has none.
+   */
+  function crestFor(rawId, name) {
+    const junior = name ? juniorSide(name) : null;
+    if (junior && junior.kind !== 'women') {
+      const senior = seniorCrest(junior.senior);
+      if (senior) return senior;
+    }
+    const own = ownCrest(rawId, name);
+    if (own || !junior) return own;
+    return seniorCrest(junior.senior);
   }
 
   async function download(url) {

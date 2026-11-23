@@ -20,7 +20,18 @@ final class ScoreCards {
     static void attach(Context context, NotificationCompat.Builder builder, WatchNote note, WatchMatch match, boolean dark) {
         builder.setCustomContentView(collapsed(context, note, match));
         builder.setCustomBigContentView(expanded(context, note, match, dark));
+        // The pop-up uses the heads-up view. Without one Android shows the one-line pill,
+        // so the alert arrives looking closed. This is the scoreboard without the timeline.
+        builder.setCustomHeadsUpContentView(headsUp(context, note, match, dark));
         builder.setStyle(new NotificationCompat.DecoratedCustomViewStyle());
+    }
+
+    /** Scoreboard card for the pop-up. The heads-up slot is short, so the timeline and buttons stay in the shade card. */
+    static RemoteViews headsUp(Context context, WatchNote note, WatchMatch match, boolean dark) {
+        RemoteViews views = expanded(context, note, match, dark);
+        views.setViewVisibility(R.id.timeline, View.GONE);
+        views.setViewVisibility(R.id.actions, View.GONE);
+        return views;
     }
 
     static RemoteViews collapsed(Context context, WatchNote note, WatchMatch match) {
@@ -61,27 +72,37 @@ final class ScoreCards {
         if (trend(note)) views.setViewVisibility(R.id.strip_dot, View.GONE);
 
         boolean showTrend = trend(note);
-        views.setViewVisibility(R.id.line_compact, !showTrend && dark ? View.VISIBLE : View.GONE);
-        views.setViewVisibility(R.id.line_board, !showTrend && !dark ? View.VISIBLE : View.GONE);
+        // No match on the phone: show the alert text, never an empty Home / Away board.
+        boolean board = !showTrend && match != null;
+        views.setViewVisibility(R.id.line_compact, board && dark ? View.VISIBLE : View.GONE);
+        views.setViewVisibility(R.id.line_board, board && !dark ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.trend_block, showTrend ? View.VISIBLE : View.GONE);
-        views.setViewVisibility(R.id.timeline, showTrend ? View.GONE : View.VISIBLE);
-        views.setViewVisibility(R.id.competition, !showTrend && competition(match).length() > 0 && !goalish(note) ? View.VISIBLE : View.GONE);
+        views.setViewVisibility(R.id.timeline, board ? View.VISIBLE : View.GONE);
+        views.setViewVisibility(R.id.competition, board && competition(match).length() > 0 && !goalish(note) ? View.VISIBLE : View.GONE);
+        if (!showTrend && match == null) {
+            views.setViewVisibility(R.id.trend_block, View.VISIBLE);
+            views.setViewVisibility(R.id.book_row, View.GONE);
+            views.setTextViewText(R.id.trend_market, note == null || note.title == null ? "Betspapa" : note.title);
+            views.setTextColor(R.id.trend_market, text);
+            views.setTextViewText(R.id.trend_fixture, note == null || note.body == null ? "" : note.body);
+            views.setTextColor(R.id.trend_fixture, muted);
+        }
 
-        if (!showTrend && dark) {
+        if (board && dark) {
             views.setTextViewText(R.id.score_line, compactScore(note, match));
             views.setTextColor(R.id.score_line, text);
             views.setImageViewBitmap(R.id.crest_home, crest(context, match, true, dp(context, 22)));
             views.setImageViewBitmap(R.id.crest_away, crest(context, match, false, dp(context, 22)));
         }
-        if (!showTrend && !dark) {
+        if (board && !dark) {
             views.setTextViewText(R.id.name_home, name(match, true));
             views.setTextViewText(R.id.name_away, name(match, false));
             views.setTextColor(R.id.name_home, text);
             views.setTextColor(R.id.name_away, text);
             views.setTextViewText(R.id.score_big, bigScore(match));
             views.setTextColor(R.id.score_big, text);
-            views.setImageViewBitmap(R.id.crest_home_lg, crest(context, match, true, dp(context, 36)));
-            views.setImageViewBitmap(R.id.crest_away_lg, crest(context, match, false, dp(context, 36)));
+            views.setImageViewBitmap(R.id.crest_home_lg, crest(context, match, true, context.getResources().getDimensionPixelSize(R.dimen.notif_crest_lg)));
+            views.setImageViewBitmap(R.id.crest_away_lg, crest(context, match, false, context.getResources().getDimensionPixelSize(R.dimen.notif_crest_lg)));
         }
         String scorer = scorer(note, match);
         boolean chip = note.varCheck || note.disallowed;
@@ -107,8 +128,9 @@ final class ScoreCards {
         }
         views.setTextViewText(R.id.competition, competition(match));
         views.setTextColor(R.id.competition, muted);
-        if (!showTrend) {
-            int width = Math.max(dp(context, 280), context.getResources().getDisplayMetrics().widthPixels - dp(context, 48));
+        if (board) {
+            // Fold cover screens are about 300dp of shade. The image scales to the slot either way.
+            int width = Math.max(dp(context, 200), context.getResources().getDisplayMetrics().widthPixels - dp(context, 48));
             List<WatchMatch.Marker> markers = match == null ? null : match.markers;
             views.setImageViewBitmap(R.id.timeline, TimelineArt.draw(markers, minute(note, match), dark, width, dp(context, 40)));
         }
@@ -148,11 +170,14 @@ final class ScoreCards {
             views.setViewVisibility(R.id.action_tertiary, View.GONE);
             views.setOnClickPendingIntent(R.id.action_primary, open);
         } else {
-            views.setTextViewText(R.id.action_primary, "Open");
-            views.setTextViewText(R.id.action_secondary, "Mute match");
-            views.setTextViewText(R.id.action_tertiary, "Share");
+            views.setTextViewText(R.id.action_primary, context.getString(R.string.notif_action_primary));
+            // "Mute match" on regular phones, "Mute" under 380dp so it never wraps on a Fold cover.
+            views.setTextViewText(R.id.action_secondary, context.getString(R.string.notif_action_secondary));
+            views.setTextViewText(R.id.action_tertiary, context.getString(R.string.notif_action_tertiary));
             views.setOnClickPendingIntent(R.id.action_primary, open);
-            views.setOnClickPendingIntent(R.id.action_secondary, mute(context, note.matchId));
+            boolean muteable = note.matchId != null && !note.matchId.isEmpty() && match != null;
+            views.setViewVisibility(R.id.action_secondary, muteable ? View.VISIBLE : View.GONE);
+            if (muteable) views.setOnClickPendingIntent(R.id.action_secondary, mute(context, note.matchId));
             views.setOnClickPendingIntent(R.id.action_tertiary, share(context, note, match));
         }
         return views;

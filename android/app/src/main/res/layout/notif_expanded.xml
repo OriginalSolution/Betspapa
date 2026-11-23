@@ -50,6 +50,7 @@
             android:id="@+id/strip_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:maxLines="1"
             android:layout_marginStart="4dp"
             android:textColor="#FFFFFF"
             android:textSize="12sp"
@@ -103,68 +104,76 @@
         <LinearLayout
             android:id="@+id/line_board"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
+            android:minHeight="@dimen/notif_board_min"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:visibility="gone">
 
             <ImageView
                 android:id="@+id/crest_home_lg"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="@dimen/notif_crest_lg"
+                android:layout_height="@dimen/notif_crest_lg"
                 android:contentDescription="" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/name_home"
-                    android:layout_width="72dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
                     android:textColor="#14161C"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/notif_name_text"
                     android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/role_home"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Home"
+                    android:maxLines="1"
+                    android:text="@string/notif_role_home"
                     android:textColor="#6B7280"
                     android:textSize="10sp" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/score_big"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
                 android:gravity="center"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:minWidth="@dimen/notif_score_min"
                 android:textColor="#14161C"
-                android:textSize="26sp"
+                android:textSize="@dimen/notif_score_text"
                 android:textStyle="bold" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="6dp"
+                android:layout_weight="1"
                 android:gravity="end"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/name_away"
-                    android:layout_width="72dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:gravity="end"
                     android:maxLines="1"
                     android:textColor="#14161C"
-                    android:textSize="12sp"
+                    android:textSize="@dimen/notif_name_text"
                     android:textStyle="bold" />
 
                 <TextView
@@ -172,15 +181,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="end"
-                    android:text="Away"
+                    android:maxLines="1"
+                    android:text="@string/notif_role_away"
                     android:textColor="#6B7280"
                     android:textSize="10sp" />
             </LinearLayout>
 
             <ImageView
                 android:id="@+id/crest_away_lg"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="@dimen/notif_crest_lg"
+                android:layout_height="@dimen/notif_crest_lg"
                 android:contentDescription="" />
         </LinearLayout>
 
@@ -197,6 +207,8 @@
                 android:id="@+id/scorer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -310,7 +322,7 @@
         <LinearLayout
             android:id="@+id/actions"
             android:layout_width="match_parent"
-            android:layout_height="34dp"
+            android:layout_height="@dimen/notif_action_height"
             android:layout_marginTop="6dp"
             android:orientation="horizontal">
 
@@ -321,10 +333,14 @@
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1.15"
                 android:background="@drawable/notif_btn_primary"
+                android:ellipsize="end"
                 android:gravity="center"
-                android:text="Open"
+                android:maxLines="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/notif_action_primary"
                 android:textColor="#FFFFFF"
-                android:textSize="13sp"
+                android:textSize="@dimen/notif_action_text"
                 android:textStyle="bold" />
 
             <TextView
@@ -334,10 +350,14 @@
                 android:layout_marginEnd="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/notif_btn_secondary_dark"
+                android:ellipsize="end"
                 android:gravity="center"
-                android:text="Mute match"
+                android:maxLines="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/notif_action_secondary"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/notif_action_text"
                 android:textStyle="bold" />
 
             <TextView
@@ -346,10 +366,14 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:background="@drawable/notif_btn_secondary_dark"
+                android:ellipsize="end"
                 android:gravity="center"
-                android:text="Share"
+                android:maxLines="1"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="@string/notif_action_tertiary"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="@dimen/notif_action_text"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
