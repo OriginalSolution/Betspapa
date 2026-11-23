@@ -1,0 +1,1 @@
+Crests load straight away and retry before a plain shield. A badge is shown only when the file is stored. Each Codes card keeps its booking code next to Copy.
