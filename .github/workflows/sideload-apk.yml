@@ -1,0 +1,131 @@
+name: Sideload APK
+# Builds a signed universal release APK for phones that cannot use Google Play.
+# Signed with the original app signing key (LEGACY_KEYSTORE_*), the same key
+# exported to Play App Signing, so a later Play install can update this APK.
+# It never creates a GitHub release, pushes a tag, or uploads to Play.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/sideload-apk.yml
+      - android/app/build.gradle
+      - android/app/src/main/AndroidManifest.xml
+      - android/app/src/debug/AndroidManifest.xml
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Read version from build.gradle
+        id: version
+        run: |
+          set -euo pipefail
+          CODE=$(grep -m1 -o 'versionCode [0-9]*' android/app/build.gradle | awk '{print $2}')
+          NAME=$(grep -m1 -o 'versionName "[^"]*"' android/app/build.gradle | cut -d'"' -f2)
+          grep -q "APP_VERSION = '$NAME'" src/lib/appVersion.ts || { echo "src/lib/appVersion.ts does not say $NAME"; exit 1; }
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon :watch-core:test :app:testReleaseUnitTest
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          LEGACY_KEYSTORE_BASE64: ${{ secrets.LEGACY_KEYSTORE_BASE64 }}
+          BETSPAPA_STORE_PASSWORD: ${{ secrets.LEGACY_KEYSTORE_PASSWORD }}
+          BETSPAPA_KEY_ALIAS: ${{ secrets.LEGACY_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          test -n "$LEGACY_KEYSTORE_BASE64" || { echo "LEGACY_KEYSTORE_BASE64 secret is missing"; exit 1; }
+          export BETSPAPA_STORE_FILE="$RUNNER_TEMP/legacy-release.keystore"
+          cleanup() { rm -f "$BETSPAPA_STORE_FILE"; }
+          trap cleanup EXIT
+          printf '%s' "$LEGACY_KEYSTORE_BASE64" | base64 -d > "$BETSPAPA_STORE_FILE"
+          ./gradlew --no-daemon :app:assembleRelease
+      - name: Check version, package and signing
+        env:
+          # Public certificate fingerprint of the original app signing key (not a secret).
+          # Taken from the published v0.4.10 APK, which Play App Signing also uses.
+          EXPECTED_APP_SHA256: 6B:1F:7F:97:64:BE:50:5E:46:15:B1:AD:BF:91:DC:48:90:F5:DF:BC:AE:4A:EC:D0:B9:59:F5:27:35:C6:26:5D
+          EXPECTED_CODE: ${{ steps.version.outputs.code }}
+          EXPECTED_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          META=android/app/build/outputs/apk/release/output-metadata.json
+          test -f "$APK"
+          python3 - "$APK" "$META" "$EXPECTED_APP_SHA256" "$EXPECTED_CODE" "$EXPECTED_NAME" <<'PY'
+          import hashlib, json, struct, sys
+          apk_path, meta_path, expected_fp, expected_code, expected_name = sys.argv[1:]
+          meta = json.load(open(meta_path))
+          app_id = meta.get("applicationId")
+          el = meta["elements"][0]
+          code, name, out = str(el["versionCode"]), str(el["versionName"]), el["outputFile"]
+          print(f"applicationId {app_id}")
+          print(f"versionCode {code}")
+          print(f"versionName {name}")
+          print(f"outputFile {out}")
+          assert app_id == "com.betspapa.scores", app_id
+          assert code == expected_code, (code, expected_code)
+          assert name == expected_name, (name, expected_name)
+          assert out == "app-release.apk", out
+          data = open(apk_path, "rb").read()
+          magic = b"APK Sig Block 42"
+          magic_off = data.rfind(magic)
+          assert magic_off != -1, "APK is not signed (no v2/v3 signing block)"
+          block_size = struct.unpack_from("<Q", data, magic_off - 8)[0]
+          block_start = magic_off + 8 - block_size
+          assert struct.unpack_from("<Q", data, block_start)[0] == block_size
+          off, end, fingerprints = block_start + 8, magic_off - 8, []
+          def u32(buf, i):
+              return struct.unpack_from("<I", buf, i)[0]
+          def prefixed(buf, i):
+              n = u32(buf, i)
+              return buf[i + 4:i + 4 + n], i + 4 + n
+          V2, V3 = 0x7109871A, 0xF05368C0
+          while off < end:
+              pair_len = struct.unpack_from("<Q", data, off)[0]
+              pair_id = struct.unpack_from("<I", data, off + 8)[0]
+              value = data[off + 12: off + 8 + pair_len]
+              off += 8 + pair_len
+              if pair_id not in (V2, V3):
+                  continue
+              seq, _ = prefixed(value, 0)
+              j = 0
+              while j < len(seq):
+                  signer, j = prefixed(seq, j)
+                  signed_data, _ = prefixed(signer, 0)
+                  _, s = prefixed(signed_data, 0)
+                  certs_blob, _ = prefixed(signed_data, s)
+                  t = 0
+                  while t < len(certs_blob):
+                      cert, t = prefixed(certs_blob, t)
+                      fp = ":".join(f"{b:02X}" for b in hashlib.sha256(cert).digest())
+                      fingerprints.append(fp)
+          print("apk signer     " + " ".join(fingerprints))
+          print("app signing    " + expected_fp)
+          assert fingerprints, "no signing certificate found"
+          assert all(fp == expected_fp for fp in fingerprints), fingerprints
+          PY
+          OUT="betspapa-${EXPECTED_NAME}.apk"
+          cp -f "$APK" "$OUT"
+          sha256sum "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: betspapa-${{ steps.version.outputs.name }}-vc${{ steps.version.outputs.code }}-apk
+          path: betspapa-${{ steps.version.outputs.name }}.apk
+          if-no-files-found: error
+          retention-days: 30
