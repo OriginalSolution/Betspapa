@@ -133,3 +133,57 @@ export function readbackLine(part: CodePart): string {
   const result = part.status === 'lost' ? 'lost' : part.status === 'won' ? 'won' : part.status === 'void' ? 'void' : 'in play';
   return `Readback OK · ${part.legCount} legs, market ids ${markets}, ${open} · ${result} · ${part.settled} of ${part.legCount} settled`;
 }
+
+/** Dailies are booked at 21:00 GMT the evening before their day. */
+export const BOOK_HOUR_GMT = 21;
+const DAY_MS = 86_400_000;
+
+/** A slot counts as having a code when at least one part carries a share code. Settled codes still count. */
+export function hasCode(slot: CodeSlot | null | undefined): slot is CodeSlot {
+  return !!slot && Array.isArray(slot.parts) && slot.parts.some((part) => !!part?.code);
+}
+
+function shortWeekday(ms: number): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(new Date(ms)).replace(/\./g, '').slice(0, 3);
+}
+
+/** The next 21:00 GMT booking run strictly after `now`. */
+export function nextBookingAt(now: number): number {
+  const date = new Date(now);
+  let at = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), BOOK_HOUR_GMT);
+  if (at <= now) at += DAY_MS;
+  return at;
+}
+
+/**
+ * One quiet line in place of the hidden empty cards. A future day names its own run;
+ * anything else names the soonest run.
+ */
+export function bookingLine(now: number, day?: string): string {
+  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const at = Date.parse(`${day}T00:00:00Z`) - (24 - BOOK_HOUR_GMT) * 3_600_000;
+    if (Number.isFinite(at) && at > now && at > nextBookingAt(now)) {
+      return `${shortWeekday(at + DAY_MS)} codes book ${shortWeekday(at)} ${BOOK_HOUR_GMT}:00 GMT`;
+    }
+  }
+  return `Next codes book ${shortWeekday(nextBookingAt(now))} ${BOOK_HOUR_GMT}:00 GMT`;
+}
+
+/** Week view: a strategy shows when it has a week code or a code for today. */
+export function weekCards(view: CodesView): CodeStrategy[] {
+  return view.strategies.filter((item) => hasCode(item.week) || hasCode(item.today));
+}
+
+/** Daily view: only strategies with a code on that day. */
+export function dailyCards(view: CodesView, day: string): Array<{ strategy: CodeStrategy; slot: CodeSlot }> {
+  return view.strategies
+    .map((strategy) => ({ strategy, slot: view.dailies[day]?.[strategy.id] }))
+    .filter((row): row is { strategy: CodeStrategy; slot: CodeSlot } => hasCode(row.slot));
+}
+
+/** Ladder dailies this week, only the days that have a code. */
+export function ladderDays(view: CodesView): Array<{ iso: string; slot: CodeSlot }> {
+  return view.days
+    .map((iso) => ({ iso, slot: view.dailies[iso]?.ladder }))
+    .filter((row): row is { iso: string; slot: CodeSlot } => hasCode(row.slot));
+}

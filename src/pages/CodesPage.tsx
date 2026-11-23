@@ -3,10 +3,14 @@ import { friendlyError } from '../lib/apiJson';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Crest } from '../components/Crest';
 import {
+  bookingLine,
+  dailyCards,
   dayChip,
   fetchCodes,
   gmtClock,
   gmtDay,
+  hasCode,
+  ladderDays,
   mixText,
   oddsText,
   readbackLine,
@@ -15,6 +19,7 @@ import {
   type CodePart,
   type CodeSlot,
   type CodesView,
+  weekCards,
 } from '../lib/codes';
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
@@ -121,6 +126,19 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
       {mixText(part.mix) && <p className="code-mix">{mixText(part.mix)}</p>}
     </article>
   );
+}
+
+/** Empty strategies are hidden; this one quiet line says when the next codes come. */
+function NextBooking({ line, none, title }: { line: string; none: boolean; title: string }) {
+  if (none) {
+    return (
+      <div className="code-none">
+        <strong>{title}</strong>
+        <p className="code-when">{line}</p>
+      </div>
+    );
+  }
+  return <p className="code-when code-next">{line}</p>;
 }
 
 function SlotLine({ slot }: { slot: CodeSlot }) {
@@ -251,7 +269,11 @@ export function CodesPage() {
   }
 
   const selected = day || data?.today || '';
-  const ladder = data?.dailies && selected ? data.days.map((iso) => ({ iso, slot: data.dailies[iso]?.ladder })) : [];
+  const ladder = data?.dailies && selected ? ladderDays(data) : [];
+  const now = Date.now();
+  const weekShown = data ? weekCards(data) : [];
+  const dailyShown = data && selected ? dailyCards(data, selected) : [];
+  const quiet = !!data?.reading;
 
   return (
     <div className="codes">
@@ -280,28 +302,31 @@ export function CodesPage() {
 
       {segment === 'week' && data && (
         <div className="code-list">
-          {data.strategies.map((item) => {
-            const part = item.week.parts[0];
+          {!quiet && weekShown.length < data.strategies.length && (
+            <NextBooking line={bookingLine(now)} none={weekShown.length === 0} title="No codes right now" />
+          )}
+          {weekShown.map((item) => {
+            const part = hasCode(item.week) ? item.week.parts[0] : undefined;
             return (
               <article className="code-card" key={item.id}>
                 <Link to={`/codes/${item.id}`} className="code-card-main">
                   <i>{item.code}</i>
                   <div>
                     <strong>{item.name}</strong>
-                    {part ? (
+                    {part && (
                       <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}{item.week.parts.length > 1 ? ` · +${item.week.parts.length - 1} more code` : ''}</span>
-                    ) : (
-                      <span>{item.week.empty}</span>
                     )}
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </Link>
                 {part && <CodeCopy code={part.code} />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
-                <div className="code-today">
-                  <span>Today</span>
-                  <SlotLine slot={item.today} />
-                </div>
+                {hasCode(item.today) && (
+                  <div className="code-today">
+                    <span>Today</span>
+                    <SlotLine slot={item.today} />
+                  </div>
+                )}
               </article>
             );
           })}
@@ -322,8 +347,10 @@ export function CodesPage() {
             })}
           </div>
           <p className="code-when">{gmtDay(selected).toUpperCase()} · one code per strategy · up to 25 legs · target {data.target}+</p>
-          {data.strategies.map((item) => {
-            const slot = data.dailies[selected]?.[item.id] || { parts: [], empty: '' };
+          {!quiet && dailyShown.length < data.strategies.length && (
+            <NextBooking line={bookingLine(now, selected)} none={dailyShown.length === 0} title={`No codes for ${gmtDay(selected)} yet`} />
+          )}
+          {dailyShown.map(({ strategy: item, slot }) => {
             const part = slot.parts[0];
             return (
               <article className="code-card" key={item.id}>
@@ -331,7 +358,7 @@ export function CodesPage() {
                   <i>{item.code}</i>
                   <div>
                     <strong>{item.name}</strong>
-                    {part ? <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · lost (${part.settled} of ${part.legCount} settled)` : ''}</span> : <span>{slot.empty}</span>}
+                    {part && <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · lost (${part.settled} of ${part.legCount} settled)` : part.status === 'won' ? ' · won' : ''}</span>}
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </div>
@@ -340,14 +367,14 @@ export function CodesPage() {
               </article>
             );
           })}
-          <h2 className="code-sub">Ladder dailies this week</h2>
+          {ladder.length > 0 && <h2 className="code-sub">Ladder dailies this week</h2>}
           {ladder.map((row) => {
-            const part = row.slot?.parts[0];
+            const part = row.slot.parts[0];
             return (
               <article className="code-card code-card-slim" key={row.iso}>
                 <div>
                   <strong>{dayChip(row.iso).weekday}</strong>
-                  {part ? <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}</span> : <span>{row.slot?.empty}</span>}
+                  {part && <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}</span>}
                   {part?.highRisk && <em>HIGH RISK</em>}
                 </div>
                 {part && <CodeCopy code={part.code} />}
