@@ -27,6 +27,11 @@ public final class OpenMatch {
             String key = "open:" + (note.id == null || note.id.isEmpty() ? "slip" : note.id);
             return view(context, "", "slip", "", key);
         }
+        if ("code".equals(note.kind)) {
+            String strategy = note.fixture == null ? "" : note.fixture;
+            String key = "open:" + (note.id == null || note.id.isEmpty() ? "code" : note.id);
+            return view(context, "", "codes", strategy, key);
+        }
         if ("win".equals(note.kind) || "bust".equals(note.kind)) {
             String trendId = trendId(note);
             String matchId = note.matchId == null ? "" : note.matchId;

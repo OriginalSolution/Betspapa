@@ -732,6 +732,7 @@ export function acceptDevice(body) {
         promos: settings.promos !== false,
         lineups: settings.lineups !== false,
         lineupBig: settings.lineupBig === true,
+        bankerCodes: Array.isArray(settings.bankerCodes) ? settings.bankerCodes.filter((id) => typeof id === 'string').slice(0, 8) : [],
       },
       appVersion: cleanVersion(body?.appVersion),
       builderSlip: builderSlipFrom(body) || null,

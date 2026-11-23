@@ -23,6 +23,7 @@ const settings: Settings = {
   lineupBig: false,
   lineupCard: true,
   lineupOff: [],
+  bankerCodes: [],
 };
 
 function match(patch: Partial<Match>): Match {

@@ -10,6 +10,7 @@ import { LivePage } from './pages/LivePage';
 import { MatchPage } from './pages/MatchPage';
 import { MorePage } from './pages/MorePage';
 import { BookedPage } from './pages/BookedPage';
+import { CodesPage } from './pages/CodesPage';
 import { PicksPage } from './pages/PicksPage';
 import { RankingsPage } from './pages/RankingsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -28,6 +29,7 @@ const titles: Record<string, string> = {
   '/': 'Today',
   '/live': 'Live',
   '/picks': 'Picks',
+  '/codes': 'Codes',
   '/trends': 'Trends',
   '/slips': 'Slips',
   '/slips/booked': 'Booked & tracking',
@@ -42,6 +44,16 @@ const titles: Record<string, string> = {
 };
 
 function screenTitle(pathname: string, search: string): string {
+  if (pathname.startsWith('/codes/')) {
+    const names: Record<string, string> = {
+      classic: 'Banker Classic',
+      gold: 'Banker Gold',
+      shield: 'Banker Shield',
+      capped: 'Banker Capped',
+      ladder: 'Banker Ladder',
+    };
+    return names[pathname.split('/')[2] || ''] || 'Codes';
+  }
   if (pathname === '/record/picks') {
     const day = new URLSearchParams(search).get('day');
     return day ? longDay(day) : 'Graded picks';
@@ -88,6 +100,10 @@ export function App() {
       }
       if (open.route === 'slip') {
         navigate('/slips');
+        return;
+      }
+      if (open.route === 'codes') {
+        navigate(open.trendId ? `/codes/${open.trendId}` : '/codes');
         return;
       }
       if (open.route === 'picks') {
@@ -169,6 +185,8 @@ export function App() {
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/slips/booked" element={<BookedPage />} />
+              <Route path="/codes" element={<CodesPage />} />
+              <Route path="/codes/:strategy" element={<CodesPage />} />
               <Route path="/match/:id" element={<MatchPage />} />
             </Routes>
             )}

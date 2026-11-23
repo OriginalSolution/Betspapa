@@ -100,6 +100,7 @@ export function SettingsPage() {
       </section>
 
       <LineupSettings />
+      <BankerSettings />
 
       <section className="panel">
         <h2>Fixtures</h2>
@@ -497,6 +498,37 @@ function LineupSettings() {
           <span>{sample.homeChanges == null ? 'Lineup in' : `${sample.home} make ${sample.homeChanges} changes`}. {(sample.homeIn || []).slice(0, 3).join(', ')}{(sample.homeIn || []).length ? ' start.' : ''}</span>
         </article>
       )}
+    </section>
+  );
+}
+
+const BANKER = [
+  { id: 'classic', label: 'Banker Classic' },
+  { id: 'gold', label: 'Banker Gold' },
+  { id: 'shield', label: 'Banker Shield' },
+  { id: 'capped', label: 'Banker Capped' },
+  { id: 'ladder', label: 'Banker Ladder' },
+];
+
+function BankerSettings() {
+  const { settings, setSetting } = useStore();
+  const flip = (id: string, on: boolean) => {
+    const next = on ? [...settings.bankerCodes, id] : settings.bankerCodes.filter((item) => item !== id);
+    setSetting('bankerCodes', [...new Set(next)]);
+  };
+  return (
+    <section className="panel" aria-label="Banker code alerts">
+      <h2>Banker codes</h2>
+      <p className="lede">Off until you turn a strategy on. One alert when a code is booked, replaced, or settled. Tapping it opens that code.</p>
+      {BANKER.map((row) => (
+        <div className="setting" key={row.id}>
+          <div>
+            <strong>{row.label}</strong>
+            <span>Code booked, replaced, or settled.</span>
+          </div>
+          <Switch on={settings.bankerCodes.includes(row.id)} label={row.label} onChange={(value) => flip(row.id, value)} />
+        </div>
+      ))}
     </section>
   );
 }

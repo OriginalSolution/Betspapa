@@ -45,6 +45,8 @@ public class AlertGateTest {
         assertFalse(AlertGate.stale("goal", 2L * 60_000L));
         assertFalse(AlertGate.stale("win", 30L * 60_000L));
         assertFalse(AlertGate.stale("promo", 10L * 60L * 60_000L));
+        assertFalse(AlertGate.stale("code", 5L * 60L * 60_000L));
+        assertTrue(AlertGate.stale("code", 7L * 60L * 60_000L));
     }
 
     @Test
