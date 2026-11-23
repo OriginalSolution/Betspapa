@@ -261,7 +261,7 @@ test('betPawa fills past unlisted legs up to the code cap', async () => {
   assert.equal(books.betpawa.parts[0].code, 'PAWA1234');
   assert.equal(books.betpawa.parts[0].legs, 12);
   assert.equal(books.betpawa.scanned, 17);
-  assert.ok(books.betpawa.dropped.some((row) => /Not listed/.test(row.reason)));
+  assert.ok(books.betpawa.dropped.some((row) => /does not list this match/.test(row.reason)));
 });
 
 test('Betika records a leg it silently left off the shared slip', async () => {
