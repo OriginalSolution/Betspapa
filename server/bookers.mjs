@@ -43,11 +43,36 @@ const BP_MARKETS = {
 };
 
 /** Bump when a desk map changes, so slips that already used their hourly retries are asked again. */
-export const BOOKING_MAP_VERSION = 2;
+export const BOOKING_MAP_VERSION = 3;
 
+/**
+ * betPawa lookups are cached for a while, never for the life of the process.
+ * A found event keeps its id for hours. A miss is asked again after a few minutes,
+ * because betPawa lists matches later than the feed. Prices are refetched every cycle.
+ */
+export const BETPAWA_EVENT_TTL_MS = 6 * 60 * 60 * 1000;
+export const BETPAWA_MISS_TTL_MS = 10 * 60 * 1000;
+export const BETPAWA_PRICE_TTL_MS = 2 * 60 * 1000;
 const eventCache = new Map();
 const priceCache = new Map();
 let offerCache = null;
+
+function cacheGet(cache, key, now = Date.now()) {
+  const row = cache.get(key);
+  if (!row) return undefined;
+  if (row.expires <= now) {
+    cache.delete(key);
+    return undefined;
+  }
+  return row.value;
+}
+
+function cacheSet(cache, key, value, ttl, now = Date.now()) {
+  if (cache.size > 5000) {
+    for (const [stale, row] of cache) if (row.expires <= now) cache.delete(stale);
+  }
+  cache.set(key, { value, expires: now + ttl });
+}
 const DESK_LIMIT = 2;
 const deskLanes = new Map();
 
@@ -381,37 +406,53 @@ function searchTerms(match) {
 
 async function findBetpawaEvent(leg, request) {
   const sr = leg.eventId.split(':').pop();
-  if (eventCache.has(sr)) return eventCache.get(sr);
+  const cached = cacheGet(eventCache, sr);
+  if (cached !== undefined) return cached;
+  let answered = false;
   for (const term of searchTerms(leg.match)) {
     const body = await betpawaCall('GET', `v3/search?name=${encodeURIComponent(term)}`, request);
+    if (body && Array.isArray(body.events)) answered = true;
     for (const event of body?.events || []) {
       const widgets = event.widgets || [];
       if (widgets.some((widget) => widget.type === 'SPORTRADAR' && String(widget.id) === sr)) {
-        eventCache.set(sr, event.id);
+        cacheSet(eventCache, sr, event.id, BETPAWA_EVENT_TTL_MS);
         return event.id;
       }
     }
   }
-  eventCache.set(sr, null);
+  // Only a search betPawa answered counts as a miss. A failed call is asked again next time.
+  if (answered) cacheSet(eventCache, sr, null, BETPAWA_MISS_TTL_MS);
   return null;
 }
 
+/** Why betPawa has no price for a leg. "does not list" means betPawa does not sell it, not a booking fault. */
+export const BETPAWA_NO_EVENT = 'betPawa does not list this match.';
+export const BETPAWA_NO_MARKET = 'betPawa does not list this market for this match.';
+export const BETPAWA_CLOSED = 'Not open on betPawa.';
+
+/** [priceId, odds] when betPawa sells the leg, otherwise { reason }. */
 async function betpawaPrice(leg, request) {
   const market = BP_MARKETS[String(leg.marketId)];
-  if (!market) return null;
+  if (!market) return { reason: BETPAWA_NO_MARKET };
   const eventId = await findBetpawaEvent(leg, request);
-  if (!eventId) return null;
-  if (!priceCache.has(eventId)) priceCache.set(eventId, await betpawaCall('GET', `v4/events/${eventId}`, request));
-  const full = priceCache.get(eventId) || {};
+  if (!eventId) return { reason: BETPAWA_NO_EVENT };
+  let full = cacheGet(priceCache, eventId);
+  if (full === undefined) {
+    full = await betpawaCall('GET', `v4/events/${eventId}`, request);
+    if (full && Array.isArray(full.markets)) cacheSet(priceCache, eventId, full, BETPAWA_PRICE_TTL_MS);
+  }
+  if (!full || !Array.isArray(full.markets)) return { reason: BETPAWA_CLOSED };
   const wanted = market[2][String(leg.outcomeId)];
   let handicap = null;
   if (market[1]) {
     const line = /total=([\d.]+)/.exec(leg.specifier || '');
-    if (!line) return null;
+    if (!line) return { reason: BETPAWA_NO_MARKET };
     handicap = Math.round(Number(line[1]) * 4);
   }
-  for (const rowMarket of full.markets || []) {
+  let listed = false;
+  for (const rowMarket of full.markets) {
     if (String(rowMarket.marketType?.id) !== market[0]) continue;
+    listed = true;
     for (const row of rowMarket.row || []) {
       if (handicap != null && Number(row.handicap) !== handicap) continue;
       for (const price of row.prices || []) {
@@ -419,7 +460,7 @@ async function betpawaPrice(leg, request) {
       }
     }
   }
-  return null;
+  return { reason: listed ? BETPAWA_CLOSED : BETPAWA_NO_MARKET };
 }
 
 async function betpawaTry(legs, request) {
@@ -435,8 +476,8 @@ async function betpawaTry(legs, request) {
       continue;
     }
     const price = await betpawaPrice(leg, request);
-    if (!price) {
-      dropped.push(drop(leg, 'Not listed or not open on betPawa.'));
+    if (!Array.isArray(price)) {
+      dropped.push(drop(leg, price?.reason || BETPAWA_CLOSED));
       continue;
     }
     if (!priceInRange(leg.market, price[1], leg)) {

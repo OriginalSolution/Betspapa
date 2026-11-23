@@ -117,3 +117,57 @@ test('does not share a selection the facts scan says is absent', async () => {
   assert.equal(posts.length, 0);
   assert.match(books.sportybet.error, /No open selections/);
 });
+
+test('betPawa says which leg it does not sell, and asks again after a miss expires', async () => {
+  resetBookerCache();
+  let listed = false;
+  let searches = 0;
+  const events = {
+    100: { markets: [{ marketType: { id: '5000' }, row: [{ handicap: 10, prices: [{ id: 'P1', name: 'Over', odds: 1.3, suspended: false }] }] }] },
+    200: { markets: [{ marketType: { id: '3743' }, row: [{ prices: [{ id: 'P2', name: '1', odds: 1.4 }] }] }] },
+  };
+  const request = async (method, url) => {
+    if (url.includes('pcUpcomingEvents')) return {};
+    if (!url.includes('betpawa.com')) return {};
+    if (url.includes('search')) {
+      searches += 1;
+      if (url.includes('Alpha')) return { events: listed ? [{ id: 100, widgets: [{ type: 'SPORTRADAR', id: '1' }] }] : [] };
+      if (url.includes('Gamma')) return { events: [{ id: 200, widgets: [{ type: 'SPORTRADAR', id: '2' }] }] };
+      return { events: [] };
+    }
+    if (url.includes('v4/events/100')) return events[100];
+    if (url.includes('v4/events/200')) return events[200];
+    if (url.includes('booking-number') && method === 'POST') return { code: 'BP1' };
+    if (url.includes('booking-number')) return { items: [{ selections: ['P1'] }] };
+    return {};
+  };
+  const legs = [
+    { eventId: 'sr:match:1', market: 'over25', odds: 1.3, match: 'Alpha vs Beta' },
+    { eventId: 'sr:match:2', market: 'btts-no', odds: 1.3, match: 'Gamma vs Delta' },
+  ];
+  const first = await bookAll(legs, request, undefined, ['betpawa']);
+  const reasons = Object.fromEntries(first.betpawa.dropped.map((row) => [row.eventId, row.reason]));
+  assert.equal(reasons['sr:match:1'], 'betPawa does not list this match.');
+  assert.equal(reasons['sr:match:2'], 'betPawa does not list this market for this match.');
+
+  // betPawa lists the match later. Within the miss window it is not searched again.
+  listed = true;
+  const before = searches;
+  await bookAll(legs.slice(0, 1), request, undefined, ['betpawa']);
+  assert.equal(searches, before);
+
+  const realNow = Date.now;
+  Date.now = () => realNow() + 11 * 60 * 1000;
+  try {
+    const later = await bookAll(legs.slice(0, 1), request, undefined, ['betpawa']);
+    assert.equal(later.betpawa.parts[0]?.code, 'BP1');
+  } finally {
+    Date.now = realNow;
+  }
+
+  // A suspended price is "not open", which the guardian still treats as a gap.
+  resetBookerCache();
+  events[100].markets[0].row[0].prices[0].suspended = true;
+  const closed = await bookAll(legs.slice(0, 1), request, undefined, ['betpawa']);
+  assert.equal(closed.betpawa.dropped[0].reason, 'Not open on betPawa.');
+});

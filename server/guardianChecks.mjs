@@ -49,15 +49,33 @@ function codedParts(slip, desk) {
   return (slip?.books?.[desk]?.parts || []).filter((part) => part?.code);
 }
 
-/** The booker recorded that this desk does not sell the market. A missing code is not a gap. */
+/**
+ * Drop reasons that mean the desk cannot book the leg under the rules, not that booking broke:
+ * the desk does not sell the match or market, its price is outside the market's odds band,
+ * or it takes one selection per match.
+ */
+const CANNOT_BOOK = /does not list|market not supported|is outside \d|one selection per match/i;
+
+export function deskCannotBookReason(reason) {
+  return CANNOT_BOOK.test(String(reason || ''));
+}
+
+/** Every open leg was dropped by this desk for a reason above. A missing code is not a gap. */
 function deskDoesNotSell(slip, desk, now) {
   const dropped = slip?.books?.[desk]?.dropped || [];
   if (!dropped.length) return false;
-  const unlisted = dropped.every((row) => /does not list|market not supported/i.test(String(row?.reason || '')));
-  if (!unlisted) return false;
   const open = openLegs(slip, now);
-  const ids = new Set(dropped.map((row) => row?.eventId));
-  return open.length > 0 && open.every((leg) => ids.has(leg.eventId));
+  if (!open.length) return false;
+  const reasons = new Map();
+  for (const row of dropped) {
+    const key = `${row?.eventId}|${row?.market ?? ''}`;
+    if (!reasons.has(key)) reasons.set(key, []);
+    reasons.get(key).push(row?.reason);
+  }
+  return open.every((leg) => {
+    const rows = reasons.get(`${leg.eventId}|${leg.market ?? ''}`) || reasons.get(`${leg.eventId}|`);
+    return Boolean(rows?.length) && rows.every(deskCannotBookReason);
+  });
 }
 
 function partLegs(part) {

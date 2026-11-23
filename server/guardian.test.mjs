@@ -470,3 +470,42 @@ test('crest coverage below target is a warning with a crest retry, never an atte
   assert.equal(good.checks.find((item) => item.id === 'crests').ok, true);
   assert.equal(evaluateChecks({}).checks.some((item) => item.id === 'crests'), false);
 });
+
+test('a desk priced outside the band, or one that does not list the match, is not a missing code', () => {
+  const now = Date.now();
+  const future = new Date(now + 3_600_000).toISOString();
+  const legs = [
+    { eventId: 'sr:match:91', market: 'btts-no', odds: 1.3, kickoff: future },
+    { eventId: 'sr:match:92', market: 'btts-no', odds: 1.3, kickoff: future },
+  ];
+  const books = codedBooks(2);
+  books.msport = {
+    parts: [],
+    error: 'No open selections on this bookmaker.',
+    dropped: [
+      { eventId: 'sr:match:91', market: 'btts-no', reason: 'MSport price 1.52 is outside 1.20–1.49.' },
+      { eventId: 'sr:match:92', market: 'btts-no', reason: 'MSport price 1.55 is outside 1.20–1.49.' },
+    ],
+  };
+  books.betpawa = {
+    parts: [],
+    error: 'No open selections on this bookmaker.',
+    dropped: [
+      { eventId: 'sr:match:91', market: 'btts-no', reason: 'betPawa does not list this market for this match.' },
+      { eventId: 'sr:match:92', market: 'btts-no', reason: 'betPawa does not list this match.' },
+    ],
+  };
+  const input = healthyInput(now);
+  input.state.trends = [{ id: '80:btts-no', label: '80%+ Both teams not to score', market: 'btts-no', legs, books }];
+  assert.equal(evaluateChecks(input).checks.find((row) => row.id === 'coverage').ok, true);
+
+  // One leg the desk should have booked is still a gap.
+  books.betpawa.dropped[1] = { eventId: 'sr:match:92', market: 'btts-no', reason: 'Not open on betPawa.' };
+  const gap = evaluateChecks(input).checks.find((row) => row.id === 'coverage');
+  assert.equal(gap.ok, false);
+  assert.match(gap.message, /betPawa/);
+
+  // A refused slip is a gap even when the other leg was out of band.
+  books.betpawa.dropped[1] = { eventId: 'sr:match:92', market: 'btts-no', reason: 'betPawa refused the slip.' };
+  assert.equal(evaluateChecks(input).checks.find((row) => row.id === 'coverage').ok, false);
+});
