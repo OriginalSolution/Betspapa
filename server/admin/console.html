@@ -26,17 +26,22 @@
       --line: rgba(255, 255, 255, .08);
       --green: #3ddc97;
       --gold: #f0c94a;
+      --safe-area-inset-top: env(safe-area-inset-top, 0px);
+      --safe-area-inset-right: env(safe-area-inset-right, 0px);
+      --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-area-inset-left: env(safe-area-inset-left, 0px);
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; background:
       radial-gradient(900px 420px at 50% -120px, rgba(225, 29, 46, .22), transparent 60%),
       var(--bg); color: var(--text); font-family: "Avenir Next", "Segoe UI", sans-serif; }
-    body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 2px; z-index: 20;
+    body { padding-left: var(--safe-area-inset-left); padding-right: var(--safe-area-inset-right); }
+    body::before { content: ""; position: fixed; top: var(--safe-area-inset-top); left: 0; right: 0; height: 2px; z-index: 20;
       background: linear-gradient(90deg, transparent, var(--red) 20%, #ffb703 50%, var(--red) 80%, transparent); }
     button, input { font: inherit; color: inherit; }
     button { cursor: pointer; }
     button:disabled { opacity: .45; cursor: default; }
-    .top { position: sticky; top: 0; z-index: 10; background: rgba(7, 8, 12, .9); backdrop-filter: blur(16px); border-bottom: 1px solid var(--line); }
+    .top { position: sticky; top: 0; z-index: 10; background: #07080c; backdrop-filter: blur(16px); border-bottom: 1px solid var(--line); padding-top: var(--safe-area-inset-top); }
     .bar, .wrap { width: min(1180px, calc(100% - 28px)); margin: 0 auto; }
     .bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 72px; padding: 10px 0; }
     .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -47,7 +52,7 @@
     .who { display: flex; align-items: center; gap: 10px; }
     .signed { font-size: 13px; color: var(--gold); }
     .who button, .ghost { border: 1px solid var(--line); background: transparent; border-radius: 999px; min-height: 40px; padding: 0 14px; }
-    .wrap { padding: 16px 0 48px; }
+    .wrap { padding: 16px 0 calc(48px + var(--safe-area-inset-bottom)); }
     .status-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
     .chip { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; min-width: 0; }
     .chip span { display: block; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
