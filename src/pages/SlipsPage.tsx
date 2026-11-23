@@ -19,6 +19,7 @@ import {
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 import type { Team } from '../types';
+import { SlipTimeline } from '../components/SlipTrack';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
@@ -116,6 +117,7 @@ export function SlipsPage() {
 
   return (
     <div className="stack slips-page">
+      <SlipTimeline />
       <div className="book-switch" role="tablist" aria-label="Bookmaker">
         {DESKS.map((id) => (
           <button

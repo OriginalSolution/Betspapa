@@ -167,7 +167,7 @@ public final class AlertPoster {
         if ("var".equals(kind)) return preview || sounds.varOn;
         if ("penalty".equals(kind)) return preview || sounds.penalty;
         if ("off".equals(goalSound)) return false;
-        if (kind == null || "live".equals(kind)) return false;
+        if (kind == null || "live".equals(kind) || "slip".equals(kind)) return false;
         return true;
     }
 

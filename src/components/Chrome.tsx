@@ -71,7 +71,7 @@ export function TabBar() {
 
 function topSubtitle(pathname: string, date: string): string {
   if (pathname === '/') return longDay(date);
-  if (pathname === '/trends') return 'Flip the code to see legs';
+  if (pathname === '/trends') return 'Add a whole trend to your slip';
   if (pathname === '/record') return 'Every 80%+ pick, graded';
   if (pathname === '/record/picks') return 'Graded picks · top leagues';
   if (pathname === '/record/codes') return 'Booked codes settle with their legs';
