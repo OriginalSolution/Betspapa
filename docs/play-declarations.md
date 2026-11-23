@@ -1,4 +1,4 @@
-# Google Play: permissions and declarations for 0.4.27 (versionCode 50)
+# Google Play: permissions and declarations for 0.4.28 (versionCode 51)
 
 The bundle comes from the **Play bundle** workflow (`.github/workflows/play-aab.yml`), signed with the private Play **upload key** (GitHub secrets `PLAY_UPLOAD_*`; certificate SHA-256 `D0:B4:D5:86:87:33:F9:3E:05:50:77:FB:47:27:E4:D5:28:D4:25:65:D9:8C:7C:13:A5:8E:F7:84:3B:3C:A5:E7`). The original v0.4.10 key is exported to Play App Signing with PEPK, so Play installs and GitHub APK installs share one app signature.
 

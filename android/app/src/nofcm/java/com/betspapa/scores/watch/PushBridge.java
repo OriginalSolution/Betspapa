@@ -16,4 +16,12 @@ public final class PushBridge {
     public static String currentToken(Context context) {
         return "";
     }
+
+    public static boolean playServices(Context context) {
+        return false;
+    }
+
+    public static String lastError(Context context) {
+        return "no-fcm-build";
+    }
 }

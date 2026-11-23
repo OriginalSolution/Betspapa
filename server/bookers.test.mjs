@@ -234,3 +234,22 @@ test('a slow desk is cut off so the other desks can return', async () => {
   assert.equal(result.sportybet.parts[0].code, 'NOW');
   assert.match(result.betpawa.error, /took too long/i);
 });
+
+test('a slow price scan does not hold up Book + track', async () => {
+  resetBookerCache();
+  const request = async (method, url) => {
+    if (String(url).includes('pcUpcomingEvents')) return new Promise(() => {});
+    return { bizCode: 10000, data: { shareCode: 'FAST', outcomes: [{ matchStatus: 'Not start' }] } };
+  };
+  const started = Date.now();
+  const result = await bookAll(
+    [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, match: 'A vs B' }],
+    request,
+    undefined,
+    ['sportybet'],
+    { interactive: true, deadline: Date.now() + 5_000, deskMs: 2_000, indexWaitMs: 30 },
+  );
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(result.sportybet.parts[0].code, 'FAST');
+  resetBookerCache();
+});

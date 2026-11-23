@@ -1,7 +1,7 @@
 import { CapacitorHttp } from '@capacitor/core';
 import type { Follows, Settings } from '../types';
 import { APP_VERSION } from './appVersion';
-import { readPushToken } from './deviceWatch';
+import { readPushToken, type PushState } from './deviceWatch';
 import { isNativeApp, nativeRequestOptions } from './nativeHttp';
 
 /** Same host as the slips feed. The phone posts its token here when FCM is compiled in. */
@@ -24,10 +24,10 @@ export type DeviceRegistration = {
   >;
 };
 
-let tokenWait: Promise<{ token: string; enabled: boolean }> | null = null;
+let tokenWait: Promise<PushState> | null = null;
 
 /** Play Services often returns the token a few seconds after the first read. */
-async function waitForPushToken(): Promise<{ token: string; enabled: boolean }> {
+async function waitForPushToken(): Promise<PushState> {
   const push = await readPushToken();
   if (!push.enabled || push.token) return push;
   if (!tokenWait) {

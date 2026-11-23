@@ -336,8 +336,11 @@ public class WatchPlugin extends Plugin {
         Context context = getContext();
         if (context != null) PushBridge.listen(context);
         JSObject result = new JSObject();
-        boolean enabled = context != null && PushBridge.enabled();
+        boolean services = context != null && PushBridge.playServices(context);
+        boolean enabled = context != null && PushBridge.enabled() && services;
         result.put("enabled", enabled);
+        result.put("playServices", services);
+        result.put("error", context == null ? "" : PushBridge.lastError(context));
         result.put("token", context == null ? "" : PushBridge.currentToken(context));
         call.resolve(result);
     }

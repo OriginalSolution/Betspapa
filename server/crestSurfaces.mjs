@@ -65,8 +65,9 @@ function codePairs(codes, crestFor) {
     for (const day of codes?.days || []) parts.push(...(codes.dailies?.[day]?.[strategy.id]?.parts || []));
     for (const part of parts) {
       for (const leg of part.legs || []) {
-        pairs.push(pair(leg.home, leg.homeId, crestFor(leg.homeId, leg.home)));
-        pairs.push(pair(leg.away, leg.awayId, crestFor(leg.awayId, leg.away)));
+        // Code legs carry the URL the app paints (homeCrest), not team ids.
+        pairs.push(pair(leg.home, leg.homeId, leg.homeCrest || crestFor(leg.homeId, leg.home)));
+        pairs.push(pair(leg.away, leg.awayId, leg.awayCrest || crestFor(leg.awayId, leg.away)));
       }
     }
   }

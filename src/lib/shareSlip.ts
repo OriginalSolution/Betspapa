@@ -98,6 +98,15 @@ function canShareFiles(file: File): boolean {
   }
 }
 
+/** Capacitor Share rejects with "Share canceled"; the Web Share API throws AbortError. */
+export function isShareCancel(error: unknown): boolean {
+  if (!error) return false;
+  const name = (error as { name?: unknown }).name;
+  if (name === 'AbortError') return true;
+  const message = String((error as { message?: unknown }).message ?? error);
+  return /cancel/i.test(message);
+}
+
 /** Render the branded card and share it with the caption. Falls back to wa.me text if files cannot be attached. */
 export async function shareTrackedSlip(tracked: TrackedSlip | SlipShareSource | null | undefined, hooks: ShareHooks = {}): Promise<ShareChannel | null> {
   const model = slipShareModel(tracked);
@@ -121,7 +130,9 @@ export async function shareTrackedSlip(tracked: TrackedSlip | SlipShareSource | 
       await shareWeb({ title: 'Betspapa slip', text, files: [file] });
       return 'web';
     }
-  } catch {
+  } catch (error) {
+    // Closing the share sheet is a choice, not a failure: do not open WhatsApp behind it.
+    if (isShareCancel(error)) return null;
     /* fall through to the text-only WhatsApp link */
   }
   openWhatsApp(text, openUrl);

@@ -42,3 +42,15 @@ test('engine crests come from the fixture, and a missing file stays empty', () =
   assert.equal(view.master.legs[0].awayCrest, null);
   assert.equal(view.master.legs[1].homeCrest, undefined);
 });
+
+test('code legs count the crest URL they carry', async () => {
+  const { crestSurfaces } = await import('./crestSurfaces.mjs');
+  const codes = {
+    strategies: [{ id: 's', week: { parts: [{ legs: [{ home: 'A', away: 'B', homeCrest: 'https://api.betspapa.com/crests/id/1.png?v=a', awayCrest: '' }] }] } }],
+    days: [],
+    dailies: {},
+  };
+  const row = crestSurfaces({ codes, crestFor: () => '' }).find((item) => item.name === 'codes');
+  assert.equal(row.real, 1);
+  assert.equal(row.shield, 1);
+});
