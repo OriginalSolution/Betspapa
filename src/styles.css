@@ -2336,7 +2336,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .booked-desk ul { list-style: none; margin: 0; padding: 0; }
 .booked-desk li { border-top: 1px solid var(--line); }
 .booked-desk li div { flex: 1; min-width: 0; }
-.booked-desk li b { font-family: var(--score); font-size: 20px; letter-spacing: 0.03em; }
+.booked-desk li b { font-family: var(--score); font-size: 20px; letter-spacing: 0.03em; margin-left: 6px; }
 .booked-desk li span { color: var(--faint); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .booked-more { width: 100%; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--muted); padding: 10px; font-weight: 750; }
 .booked-legs header { display: flex; justify-content: space-between; align-items: baseline; }
@@ -2413,3 +2413,40 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   .codes { max-width: 760px; }
 }
 
+
+/* Just-booked codes: arrive, glow, and open the bookmaker on tap. */
+@keyframes fresh-arrive { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes fresh-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 202, 39, 0.9), 0 0 6px 2px rgba(255, 202, 39, 0.35); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 202, 39, 1), 0 0 22px 8px rgba(255, 202, 39, 0.55); }
+}
+main.main.fresh-arrive { animation: fresh-arrive 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+[data-booking-code].is-fresh {
+  cursor: pointer;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 202, 39, 0.9);
+  background: rgba(255, 202, 39, 0.12);
+}
+[data-booking-code].is-fresh.fresh-pulse { animation: fresh-glow 900ms ease-in-out 5; }
+.fresh-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  max-width: min(92vw, 420px);
+  margin: 0;
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  background: #1c2230;
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  animation: fresh-hint-in 260ms ease-out both;
+}
+@keyframes fresh-hint-in { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  main.main.fresh-arrive, [data-booking-code].is-fresh.fresh-pulse, .fresh-hint { animation: none; }
+  .fresh-hint { transform: translateX(-50%); }
+}
