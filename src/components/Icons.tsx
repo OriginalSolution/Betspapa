@@ -103,6 +103,15 @@ export function IconPicks() {
   );
 }
 
+export function IconRecord() {
+  return (
+    <Svg>
+      <circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M12 12l3.2-2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export function IconTrends() {
   return (
     <Svg>

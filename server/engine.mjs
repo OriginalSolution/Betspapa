@@ -372,10 +372,20 @@ export function createEngine(options = {}) {
     throw last;
   }
 
+  function snapshotBoard(board) {
+    if (!options.beforeBoard) return;
+    try {
+      options.beforeBoard(board);
+    } catch (error) {
+      log('error', `Board watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
   async function cycle() {
     const gen = activeGen;
     const issues = [];
     const now = options.now ? options.now() : new Date();
+    snapshotBoard(state);
     let events = state.events;
     try {
       events = await fetchFeed();
@@ -555,7 +565,10 @@ export function createEngine(options = {}) {
       cycleNotes: issues,
       issues: issues.slice(0, 40),
     };
-    const kept = projectBoard(preserveBoard(before, holdMasterCodes(before, next, now), now), now);
+    const publishing = holdMasterCodes(before, next, now);
+    const keptSource = preserveBoard(before, publishing, now);
+    snapshotBoard(keptSource);
+    const kept = projectBoard(keptSource, now);
     if (gen !== activeGen) return publicState(state, now);
     remember(kept, now, gen, { publish: true, force: true });
     return publicState(kept, now);
@@ -668,10 +681,31 @@ export function createEngine(options = {}) {
 }
 
 // In production the engine reads the catalogue directly instead of calling its own public URL.
+const boardListeners = [];
+
+export function onEngineBoard(fn) {
+  boardListeners.push(fn);
+  return () => {
+    const index = boardListeners.indexOf(fn);
+    if (index >= 0) boardListeners.splice(index, 1);
+  };
+}
+
+function notifyEngineBoard(state) {
+  for (const fn of boardListeners) {
+    try {
+      fn(state);
+    } catch (error) {
+      console.error(`[engine] Board watch failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+}
+
 const engine = createEngine({
   loadEvents: () => loadUpcomingEvents({ force: true }),
   loadExtraPrices: () => loadExtraPrices(),
   onCycle: (result) => notifyEngineCycle(result),
+  beforeBoard: (state) => notifyEngineBoard(state),
 });
 
 async function notifyEngineCycle(result) {

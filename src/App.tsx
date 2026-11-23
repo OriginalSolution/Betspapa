@@ -16,8 +16,10 @@ import { SlipsPage } from './pages/SlipsPage';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
 import { isNativeApp } from './lib/nativeHttp';
+import { longDay } from './lib/format';
 import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
+import { RecordPage } from './pages/RecordPage';
 
 const titles: Record<string, string> = {
   '/': 'Today',
@@ -25,6 +27,8 @@ const titles: Record<string, string> = {
   '/picks': 'Picks',
   '/trends': 'Trends',
   '/slips': 'Slips',
+  '/record': 'Record',
+  '/record/codes': 'Codes record',
   '/rankings': 'Rankings',
   '/lists': 'Lists',
   '/more': 'More',
@@ -32,6 +36,14 @@ const titles: Record<string, string> = {
   '/inbox': 'Alerts',
   '/settings': 'Settings',
 };
+
+function screenTitle(pathname: string, search: string): string {
+  if (pathname === '/record/picks') {
+    const day = new URLSearchParams(search).get('day');
+    return day ? longDay(day) : 'Graded picks';
+  }
+  return titles[pathname] ?? 'Betspapa';
+}
 
 type OpenTarget = { route?: string; matchId?: string; trendId?: string };
 
@@ -42,7 +54,7 @@ export function App() {
   const match = location.pathname.startsWith('/match/')
     ? matches.find((item) => location.pathname === `/match/${item.id}`)
     : undefined;
-  const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : titles[location.pathname] ?? 'Betspapa';
+  const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : screenTitle(location.pathname, location.search);
   const kept = ['/', '/picks', '/trends', '/slips', '/following'];
   const [seen, setSeen] = useState<string[]>(() => [location.pathname]);
   useEffect(() => {
@@ -142,6 +154,9 @@ export function App() {
             {!kept.includes(location.pathname) && (
             <Routes>
               <Route path="/live" element={<LivePage />} />
+              <Route path="/record" element={<RecordPage />} />
+              <Route path="/record/picks" element={<RecordPage />} />
+              <Route path="/record/codes" element={<RecordPage />} />
               <Route path="/rankings" element={<RankingsPage />} />
               <Route path="/lists" element={<ListsPage />} />
               <Route path="/more" element={<MorePage />} />

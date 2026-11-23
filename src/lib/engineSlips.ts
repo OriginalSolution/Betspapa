@@ -63,6 +63,7 @@ const MARKET_LABELS: Record<string, string> = {
   'fh-away': 'First-half away win',
   'fh-over05': 'First-half over 0.5',
   'fh-over15': 'First-half over 1.5',
+  'sh-over05': '2nd half over 0.5',
   'corners-over75': 'Over 7.5 corners',
   'corners-over85': 'Over 8.5 corners',
   'corners-over95': 'Over 9.5 corners',

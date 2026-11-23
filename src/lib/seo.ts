@@ -9,6 +9,9 @@ const descriptions: Record<string, string> = {
   '/picks': 'Betspapa picks: one card per match with every 80%+ trend and its real hit rate.',
   '/trends': 'Every tracked football trend on Betspapa with its real record, plus developing form.',
   '/slips': 'Slips built from 80%+ Betspapa tips, tracked to a win or a bust.',
+  '/record': 'The Betspapa record: every published 80%+ pick, graded from the full-time score.',
+  '/record/picks': 'Graded Betspapa picks with the full-time and half-time score.',
+  '/record/codes': 'Booked Betspapa codes and hit rate by odds band.',
   '/following': 'The teams and matches you follow on Betspapa, pinned with live scores.',
   '/rankings': 'Your settled Betspapa tips by market, team and competition for the week, month and year.',
 };

@@ -8,7 +8,7 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { forceLiveMode, getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
 import { readIncidents } from './guardianOps.mjs';
@@ -22,12 +22,18 @@ import { deletePromo, listPromos, promoPng, publicPromos, syncPromos } from './p
 import { bookGroups } from './bookOnDemand.mjs';
 import { slimLivePayload } from './liveSlim.mjs';
 import { crestStore, scheduleNightly } from './crestStore.mjs';
+import { createResults } from './results.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 
 loadMarketRules();
 
 const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+const results = createResults({
+  dir: dataDir,
+  crestFor: (id, name) => crests.crestFor(id, name) || null,
+});
+onEngineBoard((state) => results.ingest(state));
 
 async function tinySelfTest() {
   let parsed = false;
@@ -393,6 +399,14 @@ async function handleApi(req, res, url) {
     send(req, res, 200, guardian.status());
     return;
   }
+  if (url.pathname === '/api/results') {
+    if (req.method !== 'GET') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    send(req, res, 200, results.view(url.searchParams.get('day') || ''), 'public, max-age=15');
+    return;
+  }
   if (url.pathname === '/api/engine') {
     if (req.method !== 'GET') {
       send(req, res, 405, { error: 'Method not allowed' });
@@ -657,6 +671,16 @@ const invoked = process.argv[1] && import.meta.url === pathToFileURL(process.arg
 if (invoked) {
   const server = createBetspapaServer();
   restoreEngine().finally(() => {
+  try {
+    results.ingest(getEngineRaw());
+  } catch (error) {
+    console.error(`[results] Could not record the board already in memory: ${error instanceof Error ? error.message : error}`);
+  }
+  void results.settle();
+  const settleTimer = setInterval(() => {
+    void results.settle();
+  }, 3 * 60 * 1000);
+  settleTimer.unref?.();
   server.listen(port, '0.0.0.0', () => {
     console.log(`Betspapa listening on http://0.0.0.0:${port} (fixtures: live catalogue)`);
     loadUpcomingEvents()

@@ -1935,3 +1935,126 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   .trend-confetti { display: none; }
 }
 
+.record-page { gap: 14px; }
+.rec-back { font-size: 28px; line-height: 1; text-decoration: none; }
+.rec-days { display: flex; gap: 8px; }
+.rec-day {
+  flex: 1;
+  border: 0;
+  border-radius: 16px;
+  background: #141820;
+  color: var(--muted);
+  padding: 8px 0 10px;
+}
+.rec-day small { display: block; font-size: 10px; letter-spacing: 0.08em; font-weight: 700; }
+.rec-day strong { display: block; margin-top: 2px; font-size: 18px; color: var(--text); }
+.rec-day.is-on { background: var(--red); color: #fff; }
+.rec-day.is-on strong { color: #fff; }
+.rec-hero {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  text-decoration: none;
+  background: #12151c;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 16px 14px;
+}
+.rec-ring { position: relative; width: 108px; height: 108px; flex: none; }
+.rec-ring svg { width: 108px; height: 108px; transform: rotate(-90deg); }
+.rec-ring circle { fill: none; stroke: #1d232e; stroke-width: 8; }
+.rec-ring circle + circle { stroke: #3ddc97; stroke-linecap: round; }
+.rec-ring div { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.rec-ring strong { font-family: var(--score); font-size: 28px; line-height: 1; }
+.rec-ring span { display: block; margin-top: 2px; color: var(--faint); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 750; }
+.rec-kicker { margin: 0; color: var(--faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 750; }
+.rec-hero-title { display: block; margin-top: 4px; font-size: 16px; letter-spacing: -0.03em; line-height: 1.25; }
+.rec-pills, .rec-open-count, .rec-since { margin: 6px 0 0; font-size: 12px; }
+.rec-pills { display: flex; gap: 8px; }
+.rec-won, .rec-lost { border-radius: 999px; padding: 3px 8px; font-weight: 700; }
+.rec-won { color: #083222; background: #3ddc97; }
+.rec-lost { color: #fff; background: #e11d2e; }
+.rec-open-count, .rec-since, .rec-note { color: var(--muted); }
+.rec-note { margin: 0; font-size: 12px; }
+.rec-markets { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.rec-market-top { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 13px; }
+.rec-market-top b { color: var(--muted); font-weight: 650; }
+.rec-market-top em { font-style: normal; font-weight: 800; }
+.rec-market-top em.is-good, .rec-band b.is-good { color: #3ddc97; }
+.rec-market-top em.is-bad, .rec-band b.is-bad { color: #ff5d6a; }
+.rec-bar { height: 6px; border-radius: 999px; background: #1c222e; margin-top: 6px; overflow: hidden; }
+.rec-bar-fill { display: block; height: 100%; border-radius: inherit; }
+.rec-bar-fill.is-red { background: #e11d2e; }
+.rec-bar-fill.is-gold { background: #f0c94a; }
+.rec-bar-fill.is-green { background: #3ddc97; }
+.rec-codes-link { display: inline-block; margin-top: 12px; color: var(--gold); font-size: 13px; font-weight: 700; text-decoration: none; }
+.rec-filters { display: flex; gap: 8px; overflow: auto; }
+.rec-filter {
+  border: 0;
+  border-radius: 999px;
+  background: #171b24;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rec-filter.is-on { background: #fff; color: #111; }
+.rec-league { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.rec-pick {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.rec-sides { display: grid; gap: 4px; }
+.rec-pick-main strong { display: block; font-size: 14px; letter-spacing: -0.02em; }
+.rec-pick-main p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+.rec-result { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.rec-result b { font-family: var(--score); font-size: 26px; line-height: 1; font-weight: 650; }
+.rec-result small, .rec-wait { color: var(--muted); font-size: 11px; font-family: var(--sans); font-weight: 650; }
+.rec-mark {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.rec-mark.is-won { background: #3ddc97; }
+.rec-mark.is-won::after { content: ""; width: 8px; height: 4px; border-left: 2px solid #083222; border-bottom: 2px solid #083222; transform: rotate(-45deg) translate(1px, -1px); }
+.rec-mark.is-lost { background: #e11d2e; }
+.rec-mark.is-lost::before, .rec-mark.is-lost::after { content: ""; position: absolute; width: 8px; height: 2px; background: #fff; }
+.rec-mark.is-lost { position: relative; }
+.rec-mark.is-lost::before { transform: rotate(45deg); }
+.rec-mark.is-lost::after { transform: rotate(-45deg); }
+.rec-mark.is-open, .rec-mark.is-void { background: #2a3140; }
+.rec-slip-head p { margin: 0; color: var(--faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 750; }
+.rec-slip-head strong { display: block; margin-top: 3px; font-size: 14px; }
+.rec-codes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rec-code {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  background: #12151c;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.rec-code strong { display: block; font-size: 14px; }
+.rec-code-state { color: var(--muted); font-size: 12px; }
+.rec-code-state.is-won { color: #3ddc97; }
+.rec-code-state.is-lost { color: #ff5d6a; }
+.rec-code > b { font-family: ui-monospace, monospace; letter-spacing: 0.04em; font-size: 13px; }
+.rec-copy { border: 0; border-radius: 999px; background: #fff; color: #111; font-weight: 750; padding: 6px 10px; }
+.rec-table { display: grid; gap: 8px; }
+.rec-table-head, .rec-table-row { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 8px; align-items: center; }
+.rec-table-head { color: var(--faint); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 750; }
+.rec-table-row { font-size: 13px; padding: 6px 0; border-top: 1px solid var(--line); }
+.rec-band { display: grid; justify-items: start; }
+.rec-band b { font-size: 16px; }
+.rec-band small { color: var(--muted); font-size: 11px; }
+.rec-block { background: #10141b; border: 1px solid var(--line); border-radius: 20px; padding: 14px; }
+
