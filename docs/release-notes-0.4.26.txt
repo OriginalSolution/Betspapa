@@ -1,0 +1,1 @@
+Book + track no longer spins forever. If a booking cannot finish, the app shows a clear error and a Retry button. After a successful or partial book it still opens Booked & tracking with the new codes glowing, and names any bookmaker that failed. The slip bar and Booked & tracking now show the total odds of your slip.
