@@ -3,6 +3,7 @@ import {
   ALERT_SETUP_VERSION,
   OEM_INSTRUCTION,
   bannerNeeded,
+  doneCopy,
   emptyDeviceStatus,
   failingStep,
   fixSteps,
@@ -17,6 +18,7 @@ import {
   setupIsCurrent,
   shouldShowIntro,
   stepCopy,
+  stepHint,
   stepsFrom,
   type AlertDeviceStatus,
 } from './alertSetup';
@@ -30,24 +32,26 @@ describe('alert setup version', () => {
     expect(parseSetupRecord(null)).toBeNull();
     expect(setupIsCurrent(null)).toBe(false);
     expect(shouldShowIntro(null, false)).toBe(true);
-    expect(ALERT_SETUP_VERSION).toBe(2);
+    expect(ALERT_SETUP_VERSION).toBe(3);
   });
 
   it('accepts only a finished record at this version or newer', () => {
-    expect(setupIsCurrent({ version: 1, finished: false })).toBe(false);
+    expect(setupIsCurrent({ version: 3, finished: false })).toBe(false);
     expect(setupIsCurrent({ version: 0, finished: true })).toBe(false);
     expect(setupIsCurrent({ version: 1, finished: true })).toBe(false);
-    expect(setupIsCurrent({ version: 2, finished: true })).toBe(true);
+    expect(setupIsCurrent({ version: 2, finished: true })).toBe(false);
+    expect(setupIsCurrent({ version: 3, finished: true })).toBe(true);
     expect(parseSetupRecord('{"version":1,"finished":true}')).toEqual({ version: 1, finished: true });
     expect(parseSetupRecord('nope')).toBeNull();
     expect(nativeSetupIsCurrent(device({ setupVersion: 1, setupFinished: true }))).toBe(false);
-    expect(nativeSetupIsCurrent(device({ setupVersion: 2, setupFinished: true }))).toBe(true);
+    expect(nativeSetupIsCurrent(device({ setupVersion: 2, setupFinished: true }))).toBe(false);
+    expect(nativeSetupIsCurrent(device({ setupVersion: 3, setupFinished: true }))).toBe(true);
     expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).notificationSound).toBe('on');
     expect(parseDeviceStatus({ notificationSound: 'on', soundBlocked: true }).soundBlocked).toBe(true);
     expect(parseDeviceStatus({}).notificationSound).toBe('off');
     expect(emptyDeviceStatus().soundBlocked).toBe(false);
-    expect(shouldShowIntro({ version: 1, finished: true }, false)).toBe(true);
-    expect(shouldShowIntro({ version: 2, finished: true }, false)).toBe(false);
+    expect(shouldShowIntro({ version: 2, finished: true }, false)).toBe(true);
+    expect(shouldShowIntro({ version: 3, finished: true }, false)).toBe(false);
     expect(shouldShowIntro(null, true)).toBe(false);
   });
 });
@@ -56,7 +60,7 @@ describe('alert setup steps', () => {
   it('asks for every missing check, then the test', () => {
     const status = device({ notifications: 'prompt', batteryUnrestricted: false, exactAlarms: 'denied', oem: 'transsion' });
     expect(introSteps(status)).toEqual(['notifications', 'battery', 'exact', 'autostart', 'test']);
-    expect(stepCopy('autostart', 'transsion', 'ask').body).toContain('Phone Master');
+    expect(stepCopy('autostart', 'transsion', 'ask').body).toContain('switch');
     expect(pollIsStale(Date.now() - 11 * 60 * 1000)).toBe(true);
     expect(pollIsStale(Date.now() - 2 * 60 * 1000)).toBe(false);
     expect(pollIsStale(0)).toBe(false);
@@ -104,12 +108,13 @@ describe('alert setup steps', () => {
   });
 
   it('uses one brand line and the return question', () => {
-    expect(stepCopy('notifications', null, 'ask').action).toBe('Allow notifications');
-    expect(stepCopy('battery', null, 'ask').action).toBe('Allow background activity');
-    expect(stepCopy('exact', null, 'ask').action).toBe('Allow exact alarms');
-    expect(stepCopy('autostart', 'huawei', 'opened').action).toBe("I've turned it on");
-    expect(stepCopy('test', null, 'confirm').title).toBe('Did you get it?');
-    expect(sentCopy()).toContain('Leave Betspapa');
+    expect(stepCopy('notifications', null, 'ask').action).toBe('Allow alerts');
+    expect(stepCopy('battery', null, 'ask').action).toBe('Open battery settings');
+    expect(stepCopy('exact', null, 'ask').action).toBe('Open alarm settings');
+    expect(stepCopy('autostart', 'huawei', 'opened').action).toBe('I turned it on');
+    expect(stepCopy('test', null, 'confirm').title).toBe('Did the alert show up?');
+    expect(sentCopy()).toContain('Close Betspapa');
+    expect(doneCopy('notifications')).toBe('Alerts are allowed.');
     expect(OEM_INSTRUCTION.vivo).toContain('iQOO');
     expect(parseDeviceStatus({ notifications: 'granted', oem: 'samsung', exactAlarms: 'denied', setupFinished: true, setupVersion: 1 })).toMatchObject({
       notifications: 'granted',
@@ -118,5 +123,22 @@ describe('alert setup steps', () => {
       setupFinished: true,
     });
     expect(parseDeviceStatus(null).notifications).toBe('prompt');
+  });
+
+  it('marks the control to tap on every phone brand', () => {
+    const allow = stepHint('notifications', null, 'ask');
+    expect(allow?.caption).toContain('Allow');
+    expect(allow?.rows.find((item) => item.target)?.label).toBe('Allow');
+    expect(stepHint('battery', null, 'ask')?.rows.find((item) => item.target)?.label).toBe('Unrestricted');
+    expect(stepHint('exact', null, 'ask')?.rows.find((item) => item.target)?.control).toBe('switch');
+    expect(stepHint('test', null, 'ask')?.screen).toBe('Your notifications');
+    expect(stepHint('notifications', null, 'confirm')).toBeNull();
+    expect(stepHint('autostart', 'transsion', 'ask')?.screen).toContain('Phone Master');
+    expect(stepHint('autostart', 'xiaomi', 'ask')?.rows.every((item) => item.label === 'Betspapa' && item.target)).toBe(true);
+    expect(stepHint('autostart', 'oppo', 'ask')?.rows.filter((item) => item.target).map((item) => item.label)).toEqual(['Auto launch', 'Background activity']);
+    expect(stepHint('autostart', 'vivo', 'ask')?.rows[0]?.control).toBe('switch');
+    expect(stepHint('autostart', 'huawei', 'ask')?.caption).toContain('Auto-launch');
+    expect(stepHint('autostart', 'samsung', 'ask')?.rows.find((item) => item.target)?.label).toBe('Unrestricted');
+    expect(stepHint('autostart', null, 'ask')?.screen).toContain('Battery');
   });
 });
