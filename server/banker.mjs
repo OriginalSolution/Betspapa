@@ -158,6 +158,8 @@ export function bankerWanted(device, alert) {
   return Array.isArray(chosen) && chosen.includes(alert?.strategy);
 }
 
+const REFRESH_COOLDOWN_MS = 60 * 1000;
+
 export function createBanker(options = {}) {
   const now = options.now || (() => Date.now());
   const request = options.request;
@@ -603,6 +605,9 @@ export function createBanker(options = {}) {
 
   async function refresh() {
     if (busy) return view();
+    // Read back is a public button. One read a minute is plenty and spares the bookmakers.
+    const last = Date.parse(state.readAt || '');
+    if (Number.isFinite(last) && now() - last < REFRESH_COOLDOWN_MS) return view();
     busy = true;
     try {
       await readAll();

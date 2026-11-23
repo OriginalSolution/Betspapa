@@ -1,3 +1,4 @@
+import { apiJson, apiUrl } from './apiJson';
 export type XiPlayer = { id: number; name: string; pos: string; order: number };
 
 export type Lineup = {
@@ -21,15 +22,16 @@ export type Lineup = {
 };
 
 export function lineupsUrl(): string {
-  const host = typeof location !== 'undefined' ? location.hostname : '';
-  return host === 'localhost' || host === '127.0.0.1' ? '/api/lineups' : 'https://api.betspapa.com/api/lineups';
+  return apiUrl('/api/lineups');
 }
 
 export async function fetchLineups(): Promise<Lineup[]> {
-  const response = await fetch(lineupsUrl());
-  if (!response.ok) return [];
-  const body = await response.json();
-  return Array.isArray(body?.lineups) ? body.lineups : [];
+  try {
+    const body = await apiJson<{ lineups?: Lineup[] }>('/api/lineups', 'Line-ups');
+    return Array.isArray(body?.lineups) ? body.lineups : [];
+  } catch {
+    return [];
+  }
 }
 
 export function changeLabel(count: number | null, name: string): string {

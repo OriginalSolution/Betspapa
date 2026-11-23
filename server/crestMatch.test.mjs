@@ -6,6 +6,7 @@ import {
   coreName,
   flagUrl,
   isNationalSide,
+  juniorSide,
   nameSimilarity,
   pickBest,
   providerLogo,
@@ -140,4 +141,28 @@ test('national teams can fall back to a flag and club searches stay on the club'
   const parsed = sportsDbCandidates({ teams: [{ idTeam: '1', strTeam: 'Arsenal', strSport: 'Soccer', strCountry: 'England', strBadge: 'https://example.com/a.png', strTeamAlternate: 'Arsenal FC, AFC' }] });
   assert.equal(parsed[0].badge, 'https://example.com/a.png');
   assert.ok(parsed[0].aliases.includes('Arsenal FC'));
+});
+
+test('junior sides name their senior club for the crest', () => {
+  const cases = {
+    'Birmingham U21': ['birmingham', 'youth'],
+    'Gillingham U23': ['gillingham', 'youth'],
+    'Chelsea U-18': ['chelsea', 'youth'],
+    'Ajax U19': ['ajax', 'youth'],
+    'Flamengo Sub-20': ['flamengo', 'youth'],
+    'Leeds United Under 21': ['leeds united', 'youth'],
+    'Jong Ajax': ['ajax', 'reserve'],
+    'Bayern Munich II': ['bayern munich', 'reserve'],
+    'Barcelona B': ['barcelona', 'reserve'],
+    'Manchester United Reserves': ['manchester united', 'reserve'],
+    'Celtic Youth': ['celtic', 'reserve'],
+    'Real Madrid Castilla': ['real madrid', 'reserve'],
+    'Arsenal Women': ['arsenal', 'women'],
+  };
+  for (const [name, [senior, kind]] of Object.entries(cases)) {
+    assert.deepEqual(juniorSide(name), { senior, kind }, name);
+  }
+  for (const name of ['Hearts of Oak', 'Asante Kotoko', 'Wolverhampton Wanderers', 'Inter', 'Boys Town', 'Al Ahly', 'Young Boys', 'FC B']) {
+    assert.equal(juniorSide(name), null, name);
+  }
 });

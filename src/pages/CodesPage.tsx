@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { friendlyError } from '../lib/apiJson';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Crest } from '../components/Crest';
 import {
@@ -159,7 +160,7 @@ export function CodesPage() {
     let stop = false;
     const run = () => {
       load(false).catch((reason) => {
-        if (!stop) setError(reason instanceof Error ? reason.message : 'Codes are not available');
+        if (!stop) setError(friendlyError(reason, 'Codes could not load. Check your connection and try again.'));
       });
     };
     run();
@@ -189,7 +190,7 @@ export function CodesPage() {
     try {
       await load(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Readback failed');
+      setError(friendlyError(reason, 'Read back did not finish. Try again in a moment.'));
     } finally {
       setBusy(false);
     }

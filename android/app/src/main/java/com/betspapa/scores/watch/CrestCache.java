@@ -50,8 +50,16 @@ final class CrestCache {
     private static String storedPath(Context context, String name) {
         Map<String, String> map = crestIndex(context);
         if (map.isEmpty() || name == null) return "";
-        String path = map.get(loose(name));
-        return path == null ? "" : path;
+        JuniorSide junior = JuniorSide.of(name);
+        String senior = junior == null ? "" : orEmpty(map.get(loose(junior.senior)));
+        // Youth and reserve sides wear the senior crest. A women's side keeps its own when it has one.
+        if (junior != null && !JuniorSide.WOMEN.equals(junior.kind) && !senior.isEmpty()) return senior;
+        String own = orEmpty(map.get(loose(name)));
+        return own.isEmpty() ? senior : own;
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private static Map<String, String> crestIndex(Context context) {

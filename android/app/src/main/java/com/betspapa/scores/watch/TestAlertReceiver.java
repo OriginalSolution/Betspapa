@@ -57,8 +57,41 @@ public class TestAlertReceiver extends BroadcastReceiver {
         } else if ("horn".equals(sound) || "arp".equals(sound)) {
             body = "horn".equals(sound) ? "Test horn" : "Test arpeggio";
         }
-        AlertPoster.post(app, new WatchNote("test:" + kind + ":" + System.currentTimeMillis(), "", kind, title, body), sound);
+        WatchMatch shown = sampleMatch(kind);
+        WatchNote note = new WatchNote("test:" + kind + ":" + System.currentTimeMillis(), "", kind, title, body);
+        // The card shows a sample match so the test looks like a real alert, not a blank Home / Away board.
+        note.player = sampleLine(kind);
+        AlertPoster.post(app, note, sound, 0, false, shown);
         holdForSound();
+    }
+
+    /** Sample fixture for the test card. It is never saved, so no live card or follow is created. */
+    static WatchMatch sampleMatch(String kind) {
+        WatchMatch match = new WatchMatch();
+        match.id = "";
+        match.home = "Hearts of Oak";
+        match.away = "Asante Kotoko";
+        match.homeFull = "Hearts of Oak";
+        match.awayFull = "Asante Kotoko";
+        match.homeAbbr = "HEA";
+        match.awayAbbr = "KOT";
+        match.homeColor = "#e11d2e";
+        match.awayColor = "#f5c518";
+        match.competition = "Ghana Premier League";
+        match.status = "live";
+        match.minute = 54;
+        match.homeScore = 1;
+        match.awayScore = 0;
+        match.setGoal("home", 1, 54, "HEA", "", false);
+        if ("red".equals(kind)) match.addMarker("red", 54, "KOT");
+        return match;
+    }
+
+    static String sampleLine(String kind) {
+        if ("red".equals(kind)) return "Test red card · background alerts work";
+        if ("var".equals(kind)) return "Test VAR check · background alerts work";
+        if ("penalty".equals(kind)) return "Test penalty · background alerts work";
+        return "Test goal · background alerts work";
     }
 
     /** A data-only style goal card: crests, score, and the chosen sound. The same id replaces, it does not stack. */

@@ -308,6 +308,49 @@ export function stripQualifiers(name) {
     .trim();
 }
 
+/** "Birmingham U21" -> u21. Feeds write U21, U-21, U 21, Under 21 and Sub-20. */
+const AGE_GROUP = /\b(?:u|under|sub)\s*-?\s*(1[5-9]|2[0-3])\b/;
+const RESERVE_WORDS = /\b(reserves|reserve|youth|juvenil|juniors|academy|castilla|promesas|atletic)\b/;
+const SECOND_TEAM = /\s+(ii|iii|b)$/;
+
+/**
+ * A youth, reserve, or women's side and the senior club it belongs to.
+ * Youth and reserve sides always wear the senior crest when we have one.
+ * A women's side keeps its own badge and only borrows the senior one when it has none.
+ * Returns null for a senior side.
+ */
+export function juniorSide(name) {
+  const folded = fold(name);
+  if (!folded) return null;
+  let kind = '';
+  let senior = folded;
+  if (AGE_GROUP.test(senior)) {
+    kind = 'youth';
+    senior = senior.replace(new RegExp(AGE_GROUP.source, 'g'), ' ');
+  }
+  if (RESERVE_WORDS.test(senior)) {
+    kind = kind || 'reserve';
+    senior = senior.replace(new RegExp(RESERVE_WORDS.source, 'g'), ' ');
+  }
+  if (/^jong\s+\S/.test(senior)) {
+    kind = kind || 'reserve';
+    senior = senior.replace(/^jong\s+/, ' ');
+  }
+  if (SECOND_TEAM.test(senior)) {
+    kind = kind || 'reserve';
+    senior = senior.replace(SECOND_TEAM, ' ');
+  }
+  if (WOMENS.test(senior) || /\s+w$/.test(senior)) {
+    kind = kind || 'women';
+    senior = senior.replace(new RegExp(WOMENS.source, 'g'), ' ').replace(/\s+w$/, ' ');
+  }
+  senior = senior.replace(/\s+/g, ' ').trim();
+  if (!kind || !senior || senior === folded) return null;
+  // One letter left over ("FC B") is not a club.
+  if (senior.replace(/\b(fc|sc|cf|afc)\b/g, '').trim().length < 2) return null;
+  return { senior, kind };
+}
+
 export function coreName(name) {
   const aliased = ALIASES[fold(name)] || ALIASES[stripQualifiers(name)] || stripQualifiers(name);
   const folded = stripQualifiers(aliased);

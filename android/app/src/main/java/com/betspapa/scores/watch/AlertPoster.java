@@ -301,6 +301,11 @@ public final class AlertPoster {
      * @param replaceId when non-zero, updates that notification instead of hashing the note id
      */
     static boolean post(Context context, WatchNote note, String goalSound, int replaceId, boolean onlyOnce) {
+        return post(context, note, goalSound, replaceId, onlyOnce, null);
+    }
+
+    /** @param shown a match to draw when the phone does not track one, such as the settings test card */
+    static boolean post(Context context, WatchNote note, String goalSound, int replaceId, boolean onlyOnce, WatchMatch shown) {
         ensure(context);
         if (note == null) return false;
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false;
@@ -330,10 +335,11 @@ public final class AlertPoster {
         if ("var".equals(note.kind) && !note.disallowed && replaceId == 0) {
             VarSlots.remember(context, note.matchId, id, note.player, note.minute == null ? 0 : note.minute, note.id);
         }
-        WatchMatch match = findMatch(context, note.matchId);
+        WatchMatch match = shown != null ? shown : findMatch(context, note.matchId);
         boolean dark = NotifTheme.dark(context, styleOf(context));
         NotificationCompat.Builder builder = base(context, channel, note.title, note.body)
-            .setPriority(soundOn ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
+            // High keeps a match event at the top of the shade, where Android draws the big card open.
+            .setPriority(soundOn || matchEvent(note.kind) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(!note.disallowed)
             .setCategory(Notification.CATEGORY_EVENT)
             .setOnlyAlertOnce(!soundOn || onlyOnce)
@@ -374,7 +380,8 @@ public final class AlertPoster {
             .setOnlyAlertOnce(onlyAlertOnce)
             .setGroup("betspapa-live-" + match.id)
             .setCategory(Notification.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            // Low sank the live card below everything else, where Android always shows it closed.
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(OpenMatch.forNote(context, note));
         try {
             ScoreCards.attach(context, builder, note, match, dark);
@@ -463,6 +470,11 @@ public final class AlertPoster {
     private static String styleOf(Context context) {
         WatchState state = WatchState.load(WatchFiles.file(context));
         return state.notificationStyle == null ? "auto" : state.notificationStyle;
+    }
+
+    static boolean matchEvent(String kind) {
+        return "goal".equals(kind) || "var".equals(kind) || "red".equals(kind) || "penalty".equals(kind)
+            || "kickoff".equals(kind) || "ht".equals(kind) || "ft".equals(kind);
     }
 
     private static String liveTitle(WatchMatch match) {

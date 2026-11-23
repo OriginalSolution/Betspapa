@@ -72,6 +72,13 @@ test('a server without the built UI sends pages to betspapa.com and leaves API, 
     const icon = await ask(port, { path: '/admin/icons/icon-192.png' });
     assert.equal(icon.status, 200);
     assert.equal(locked.status, 401);
+    const codes = await ask(port, { path: '/api/codes' });
+    assert.equal(codes.status, 200);
+    assert.equal(Array.isArray(JSON.parse(codes.body).strategies), true);
+    // Read back posts. It must reach the codes route, not the GET-only guard.
+    const readBack = await ask(port, { method: 'POST', path: '/api/codes' });
+    assert.notEqual(readBack.status, 405);
+    assert.equal(Array.isArray(JSON.parse(readBack.body).strategies), true);
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
