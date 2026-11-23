@@ -105,6 +105,10 @@ export type EngineLeg = {
   agreement?: string | null;
   /** Why the research step kept this pick. */
   reasons?: string[];
+  homeId?: string | null;
+  awayId?: string | null;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
 };
 
 export type EnginePart = {

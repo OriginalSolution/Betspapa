@@ -254,8 +254,8 @@ function HitRing({ rate }: { rate: number }) {
 function sidesOf(tip: PickTip, catalog: CrestCatalog, matches: ReturnType<typeof useStore>['matches']) {
   const live = matches.find((match) => match.id === tip.chip.eventId);
   return {
-    home: teamOf(tip.home, tip.homeId, live?.home.abbr || '', live?.home.color || '#e11d2e', catalog, live?.home.crest),
-    away: teamOf(tip.away, tip.awayId, live?.away.abbr || '', live?.away.color || '#3d7eff', catalog, live?.away.crest),
+    home: teamOf(tip.home, tip.homeId, live?.home.abbr || '', live?.home.color || '#e11d2e', catalog, live?.home.crest || tip.homeCrest),
+    away: teamOf(tip.away, tip.awayId, live?.away.abbr || '', live?.away.color || '#3d7eff', catalog, live?.away.crest || tip.awayCrest),
   };
 }
 

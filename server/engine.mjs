@@ -134,6 +134,29 @@ export function restartSnapshot(full, now = new Date()) {
 }
 
 /** The phone board. Tier slips keep their codes and drop the duplicated leg lists. */
+/** Attach the crest the board would paint, looked up from the fixture the leg belongs to. */
+export function paintEngineCrests(view, events, crestFor = () => '') {
+  const byId = new Map((events || []).map((event) => [String(event.eventId), event]));
+  const paintLeg = (leg) => {
+    const event = byId.get(String(leg?.eventId || ''));
+    if (!event) return leg;
+    return {
+      ...leg,
+      homeId: event.homeId || null,
+      awayId: event.awayId || null,
+      homeCrest: crestFor(event.homeId, event.home) || null,
+      awayCrest: crestFor(event.awayId, event.away) || null,
+    };
+  };
+  const paintSlip = (slip) => (slip ? { ...slip, legs: (slip.legs || []).map(paintLeg) } : slip);
+  if (!view) return view;
+  return {
+    ...view,
+    master: paintSlip(view.master),
+    trends: (view.trends || []).map(paintSlip),
+  };
+}
+
 export function appEngineState(full) {
   const state = full || {};
   return {

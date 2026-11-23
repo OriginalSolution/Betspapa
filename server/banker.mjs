@@ -116,14 +116,14 @@ function dailyEmpty(day, now) {
   return `No ${today} code · ${next} books ${today} 21:00 GMT`;
 }
 
-function publicLeg(leg) {
+function publicLeg(leg, crestFor) {
   const status = leg.gradeStatus || leg.bookResult || 'open';
   return {
     eventId: leg.eventId,
     home: leg.home,
     away: leg.away,
-    homeCrest: leg.homeCrest || '',
-    awayCrest: leg.awayCrest || '',
+    homeCrest: crestFor ? crestFor(leg.homeId, leg.home) || '' : leg.homeCrest || '',
+    awayCrest: crestFor ? crestFor(leg.awayId, leg.away) || '' : leg.awayCrest || '',
     label: leg.label,
     odds: leg.odds,
     kickoff: leg.kickMs ? new Date(leg.kickMs).toISOString() : '',
@@ -295,7 +295,7 @@ export function createBanker(options = {}) {
     return {
       code: row.code,
       cap: row.cap,
-      legs: legs.map(publicLeg),
+      legs: legs.map((leg) => publicLeg(leg, options.crestFor)),
       legCount: legs.length,
       totalOdds: row.totalOdds,
       highRisk: reasons.length > 0,

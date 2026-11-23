@@ -43,6 +43,8 @@ export type MatchPickCard = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -163,8 +165,10 @@ export function cardsFromEngine(state: EngineState | null, matches: Match[], sor
       eventId,
       home: match?.home.shortName || homeName,
       away: match?.away.shortName || awayName,
-      homeId: match?.home.id || slug(homeName),
-      awayId: match?.away.id || slug(awayName),
+      homeId: match?.home.id || legs[0]?.homeId || slug(homeName),
+      awayId: match?.away.id || legs[0]?.awayId || slug(awayName),
+      homeCrest: match?.home.crest || legs[0]?.homeCrest || null,
+      awayCrest: match?.away.crest || legs[0]?.awayCrest || null,
       league: match?.competition.name || 'Fixture',
       competitionId: match?.competition.id || '',
       kickoff,
@@ -196,6 +200,8 @@ export type PickTip = {
   away: string;
   homeId: string;
   awayId: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   league: string;
   competitionId: string;
   kickoff: string;
@@ -265,6 +271,8 @@ export function tipsFromEngine(state: EngineState | null, matches: Match[]): Pic
         away: card.away,
         homeId: card.homeId,
         awayId: card.awayId,
+        homeCrest: card.homeCrest || null,
+        awayCrest: card.awayCrest || null,
         league: card.league,
         competitionId: card.competitionId,
         kickoff: card.kickoff,

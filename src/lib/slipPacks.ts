@@ -87,8 +87,8 @@ export function trendPacks(tips: PickTip[], matches: Match[], now = Date.now()):
       kickoff: new Date(kick).toISOString(),
       home: tip.home,
       away: tip.away,
-      homeCrest: match?.home.crest || null,
-      awayCrest: match?.away.crest || null,
+      homeCrest: match?.home.crest || tip.homeCrest || null,
+      awayCrest: match?.away.crest || tip.awayCrest || null,
       sample: tip.chip.sample,
     };
     groups.set(leg.market, [...(groups.get(leg.market) || []), leg]);

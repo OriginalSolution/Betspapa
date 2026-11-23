@@ -305,8 +305,14 @@ export function evaluateChecks(input = {}) {
     const all = crests.tiers?.all || {};
     const topOk = !top.teams || top.pct >= CREST_TOP_TARGET;
     const allOk = !all.teams || all.pct >= CREST_ALL_TARGET;
-    const text = `Crests for the next 48 h: top leagues ${top.withCrest ?? 0}/${top.teams ?? 0}${top.teams ? ` (${top.pct}%)` : ''}, all teams ${all.withCrest ?? 0}/${all.teams ?? 0}${all.teams ? ` (${all.pct}%)` : ''}.`;
-    checks.push(check('crests', topOk && allOk, 'warn', topOk && allOk ? text : `${text} Below the ${CREST_TOP_TARGET}% / ${CREST_ALL_TARGET}% target. Retrying the misses.`, ['crests']));
+    const surfaces = Array.isArray(crests.surfaces) ? crests.surfaces : [];
+    const surfaceText = surfaces.length
+      ? ` App surfaces: ${surfaces.map((row) => `${row.name} ${row.real}/${row.total}${row.pct == null ? '' : ` (${row.pct}%)`}${row.broken ? `, ${row.broken} broken` : ''}${row.shield ? `, ${row.shield} shield` : ''}`).join('; ')}.`
+      : '';
+    const surfaceOk = surfaces.every((row) => !row.broken && (row.pct == null || row.pct >= CREST_ALL_TARGET));
+    const text = `Crests for the next 48 h: top leagues ${top.withCrest ?? 0}/${top.teams ?? 0}${top.teams ? ` (${top.pct}%)` : ''}, all teams ${all.withCrest ?? 0}/${all.teams ?? 0}${all.teams ? ` (${all.pct}%)` : ''}.${surfaceText}`;
+    const ok = topOk && allOk && surfaceOk;
+    checks.push(check('crests', ok, 'warn', ok ? text : `${text} Below the ${CREST_TOP_TARGET}% / ${CREST_ALL_TARGET}% target. Retrying the misses.`, ['crests']));
   }
 
   const attention = checks.filter((row) => !row.ok && row.level === 'attention');
