@@ -92,3 +92,20 @@ describe('next booking line', () => {
     expect(bookingLine(MON_10, '2026-11-26')).toBe('Thu codes book Wed 21:00 GMT');
   });
 });
+
+describe('codes on the board', () => {
+  it('lists every SportyBet and Football.com code once, for spotting new ones after Read back', async () => {
+    const { codesIn } = await import('./codes');
+    const withFootball: CodePart = { ...part('9B4CVQ'), football: true, footballCode: 'FB0001', footballLink: 'https://www.football.com/gh/?shareCode=FB0001', link: 'https://www.sportybet.com/gh/?shareCode=9B4CVQ' };
+    const data = view(
+      { '2026-11-23': { ladder: { parts: [withFootball], empty: '' }, gold: slot('GOLD01') } },
+      [strategy('ladder', empty, { parts: [withFootball], empty: '' }), strategy('gold')],
+    );
+    expect(codesIn(data)).toEqual([
+      { code: '9B4CVQ', desk: 'sportybet', link: 'https://www.sportybet.com/gh/?shareCode=9B4CVQ' },
+      { code: 'FB0001', desk: 'footballcom', link: 'https://www.football.com/gh/?shareCode=FB0001' },
+      { code: 'GOLD01', desk: 'sportybet', link: undefined },
+    ]);
+    expect(codesIn(null)).toEqual([]);
+  });
+});

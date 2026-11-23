@@ -6,6 +6,7 @@ import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore
 import { cx } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import { legsForPacks, PART_SIZE, partsOf, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
+import { goToBookedCodes } from '../lib/useFreshCodes';
 import { useEngineBoard } from '../state/engine';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
@@ -65,7 +66,8 @@ export function SlipBuilder() {
           alerted: false,
         },
       });
-      navigate('/slips/booked');
+      // Land on the booked codes with an arrival animation and the new codes glowing.
+      goToBookedCodes(navigate, '/slips/booked', parts.map((part) => ({ code: part.code, desk: part.desk })));
     } catch (error) {
       setProblem(error instanceof Error ? error.message : 'Booking failed.');
     } finally {

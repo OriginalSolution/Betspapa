@@ -7,6 +7,7 @@ import { readBuilder } from '../lib/builderStore';
 import { DESKS, marketLabel } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
 import type { BuilderLeg } from '../lib/slipPacks';
+import { useFreshCodes } from '../lib/useFreshCodes';
 import type { Team } from '../types';
 
 const SHOW_PARTS = 2;
@@ -37,6 +38,7 @@ export function BookedPage() {
   const tracked = useMemo(() => readBuilder().tracked, []);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [toast, setToast] = useState<string | null>(null);
+  useFreshCodes(tracked);
   const desks = tracked?.desks || [];
   const total = tracked?.legs.length || 0;
   const codes = desks.reduce((sum, desk) => sum + desk.parts.length, 0);

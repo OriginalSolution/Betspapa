@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Crest } from '../components/Crest';
 import {
   bookingLine,
+  codesIn,
   dailyCards,
   dayChip,
   fetchCodes,
@@ -24,6 +25,8 @@ import {
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
 import { useStore } from '../state/store';
+import { markFresh, newCodes } from '../lib/freshCode';
+import { goToBookedCodes, useFreshCodes } from '../lib/useFreshCodes';
 
 const SEEN = 'betspapa.codeNotices';
 
@@ -81,7 +84,7 @@ function CopyButton({ value }: { value: string }) {
 function CodeCopy({ code }: { code: string }) {
   return (
     <div className="code-actions">
-      <b className="code-booking-code" data-code={code}>{code}</b>
+      <b className="code-booking-code" data-code={code} data-booking-code={code}>{code}</b>
       <CopyButton value={code} />
     </div>
   );
@@ -112,14 +115,14 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
       <header>
         <div>
           <p>Part {index + 1} of {total}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
-          <strong>{part.code}</strong>
+          <strong data-booking-code={part.code}>{part.code}</strong>
         </div>
         <CodeCopy code={part.code} />
       </header>
       <Logos part={part} />
       <p className="code-odds">{part.legCount} legs · {oddsText(part.totalOdds)} odds{part.firstKick ? ` · ${gmtDay(part.firstKick.slice(0, 10))} ${gmtClock(part.firstKick)} – ${gmtClock(part.lastKick)} GMT` : ''}</p>
       {part.football && part.footballCode && part.footballCode !== part.code && (
-        <p className="code-foot">Football.com {part.footballCode} <CopyButton value={part.footballCode} /></p>
+        <p className="code-foot">Football.com <b data-booking-code={part.footballCode}>{part.footballCode}</b> <CopyButton value={part.footballCode} /></p>
       )}
       <Risk part={part} warning={warning} />
       <p className="code-read">{readbackLine(part)}{part.readAt ? ` · price at ${gmtClock(part.readAt)} GMT` : ''}</p>
@@ -197,8 +200,11 @@ export function CodesPage() {
     if (!next || typeof Notification === 'undefined' || Notification.permission !== 'granted' || posted.current.has(next.id)) return;
     posted.current.add(next.id);
     const card = new Notification(next.title, { body: next.body, icon: next.homeCrest || '/icon-192.png' });
-    card.onclick = () => navigate(`/codes/${next.strategy}`);
+    card.onclick = () => goToBookedCodes(navigate, `/codes/${next.strategy}`, next.code ? [{ code: next.code, desk: 'sportybet' }] : []);
   }, [data, settings.bankerCodes, navigate]);
+
+  // Just-booked or newly read-back codes glow and open SportyBet on tap.
+  useFreshCodes(data ? `${strategyId}|${segment}|${day}|${data.readAt}|${codesIn(data).length}` : null);
 
   const strategy = data?.strategies.find((item) => item.id === strategyId) || null;
   const recordRow = data?.record.strategies.find((item) => item.id === strategyId);
@@ -206,7 +212,12 @@ export function CodesPage() {
   async function readBack() {
     setBusy(true);
     try {
-      await load(true);
+      const before = codesIn(data).map((item) => item.code);
+      const view = await refreshCodes();
+      markFresh(newCodes(before, codesIn(view)));
+      setData(view);
+      setDay((current) => current || view.today);
+      setError('');
     } catch (reason) {
       setError(friendlyError(reason, 'Read back did not finish. Try again in a moment.'));
     } finally {
@@ -283,7 +294,7 @@ export function CodesPage() {
           onOpen={() => {
             remember(notice.id);
             setNotice(null);
-            navigate(`/codes/${notice.strategy}`);
+            goToBookedCodes(navigate, `/codes/${notice.strategy}`, notice.code ? [{ code: notice.code, desk: 'sportybet' }] : []);
           }}
         />
       )}

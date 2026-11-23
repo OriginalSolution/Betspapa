@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CodeStrip } from '../components/CodeStrip';
 import { bookGroups, legsForTier, tierFallback, type BookedGroup, type BookLeg } from '../lib/bookFollow';
 import { groupFollowMatches, type FollowRow } from '../lib/followCards';
@@ -9,7 +9,9 @@ import { Crest } from '../components/Crest';
 import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard';
 import { followIsStale } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
-import { DESK_NAMES, marketLabel, showOdds, type DeskId } from '../lib/engineSlips';
+import { DESKS, DESK_NAMES, marketLabel, showOdds, type DeskId } from '../lib/engineSlips';
+import { markFresh, newCodes, type FreshCode } from '../lib/freshCode';
+import { useFreshCodes } from '../lib/useFreshCodes';
 import { cx, kickoffWhen, scoreDash, statusLine } from '../lib/format';
 import { isFollowed } from '../lib/group';
 import { useEngineBoard } from '../state/engine';
@@ -146,6 +148,8 @@ export function FollowedTrends() {
   const [tier, setTier] = useState<CodeTier>('80');
   const [focusMarket, setFocusMarket] = useState<string | null>(null);
   const [booked, setBooked] = useState<BookedGroup[]>([]);
+  const seenCodes = useRef<Set<string> | null>(null);
+  useFreshCodes(booked, { scroll: false });
   const sourceLegs = useMemo(() => {
     const legs: BookLeg[] = [];
     for (const face of faces) {
@@ -208,7 +212,14 @@ export function FollowedTrends() {
     const timer = window.setTimeout(() => {
       void bookGroups(payload)
         .then((rows) => {
-          if (!stop) setBooked(rows);
+          if (stop) return;
+          // A rebook that returns new codes makes them glow; the first board on open does not.
+          const all: FreshCode[] = rows.flatMap((group) =>
+            DESKS.flatMap((id) => (group.books?.[id]?.parts || []).map((part) => ({ code: part.code, desk: id, link: part.link }))),
+          );
+          if (seenCodes.current) markFresh(newCodes(seenCodes.current, all));
+          seenCodes.current = new Set(all.map((item) => item.code));
+          setBooked(rows);
         })
         .catch(() => {
           if (!stop) setBooked([]);
