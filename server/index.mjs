@@ -8,7 +8,8 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { forceLiveMode, getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, paintEngineCrests, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { crestSurfaces } from './crestSurfaces.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
 import { readIncidents } from './guardianOps.mjs';
@@ -40,7 +41,7 @@ onEngineBoard((state) => results.ingest(state));
 async function tinySelfTest() {
   let parsed = false;
   try {
-    const view = JSON.parse(JSON.stringify(appEngineState(getEngineState())));
+    const view = JSON.parse(JSON.stringify(engineView()));
     parsed = Boolean(view && typeof view === 'object' && ('master' in view || Array.isArray(view.tiers)));
   } catch {
     parsed = false;
@@ -62,9 +63,28 @@ scheduleNightly(async () => {
     console.error(`[crests] Nightly pre-warm failed: ${error instanceof Error ? error.message : error}`);
   }
 });
+function engineView() {
+  const full = getEngineState();
+  return paintEngineCrests(appEngineState(full), full?.events || getCachedEvents(), (id, name) => crests.crestFor(id, name) || '');
+}
+
 onEngineCycle(() => {
   try {
-    crests.prewarm(getCachedEvents(), { days: 2 });
+    const extra = [];
+    for (const row of Object.values(banker?.state?.codes || {})) {
+      for (const leg of row.legs || []) {
+        extra.push({
+          home: leg.home,
+          away: leg.away,
+          homeId: leg.homeId,
+          awayId: leg.awayId,
+          kickoff: leg.kickMs ? new Date(leg.kickMs).toISOString() : new Date().toISOString(),
+          country: '',
+          tournament: '',
+        });
+      }
+    }
+    crests.prewarm([...getCachedEvents(), ...extra], { days: 2 });
   } catch {
     /* the nightly pass still runs */
   }
@@ -99,9 +119,23 @@ const guardian = createGuardian({
   selfTest: tinySelfTest,
   deviceCount: () => pushWatch.book.list().length,
   push: () => ({ ...pushWatch.stats(), pruned: prunedTokens }),
-  crests: () => crests.coverage({ hours: 48 }),
+  crests: () => {
+    const cover = crests.coverage({ hours: 48 });
+    const look = (id, name) => crests.crestFor(id, name) || '';
+    try {
+      cover.surfaces = crestSurfaces({
+        events: getCachedEvents(),
+        engine: getEngineState(),
+        codes: banker?.view?.() || null,
+        crestFor: look,
+      });
+    } catch {
+      cover.surfaces = [];
+    }
+    return cover;
+  },
   healCrests: () => crests.healMisses({ hours: 48 }),
-  payloadBytes: () => gzippedBytes(appEngineState(getEngineState())),
+  payloadBytes: () => gzippedBytes(engineView()),
   pruneDevices: async () => {
     prunedTokens = pruneStaleDevices(pushWatch.book);
     return prunedTokens;
@@ -152,6 +186,7 @@ const banker = createBanker({
   fetchImpl: fetch,
   results,
   coverage: () => getCachedEvents(),
+  crestFor: (id, name) => crests.crestFor(id, name) || '',
 });
 async function publishCodes(forceRead = false) {
   try {
@@ -484,7 +519,7 @@ async function handleApi(req, res, url) {
       return;
     }
     const full = getEngineState();
-    send(req, res, 200, url.searchParams.get('view') === 'app' ? appEngineState(full) : full);
+    send(req, res, 200, url.searchParams.get('view') === 'app' ? engineView() : full);
     return;
   }
   if (url.pathname === '/api/config') {
@@ -662,7 +697,7 @@ function serveCrest(req, res, pathname) {
   if (!match) return false;
   const file = crests.imagePath(match[1]);
   if (!file) {
-    res.writeHead(404, { 'Cache-Control': 'public, max-age=300', 'Content-Length': 9, 'Access-Control-Allow-Origin': '*' });
+    res.writeHead(404, { 'Cache-Control': 'no-store', 'Content-Length': 9, 'Access-Control-Allow-Origin': '*' });
     res.end('Not found');
     return true;
   }

@@ -71,6 +71,16 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
+/** The share code stays beside Copy. A banner or a refresh must not drop it. */
+function CodeCopy({ code }: { code: string }) {
+  return (
+    <div className="code-actions">
+      <b className="code-booking-code" data-code={code}>{code}</b>
+      <CopyButton value={code} />
+    </div>
+  );
+}
+
 function Risk({ part, warning }: { part: CodePart; warning: string }) {
   if (!part.highRisk) return null;
   return (
@@ -98,7 +108,7 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
           <p>Part {index + 1} of {total}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
           <strong>{part.code}</strong>
         </div>
-        <CopyButton value={part.code} />
+        <CodeCopy code={part.code} />
       </header>
       <Logos part={part} />
       <p className="code-odds">{part.legCount} legs · {oddsText(part.totalOdds)} odds{part.firstKick ? ` · ${gmtDay(part.firstKick.slice(0, 10))} ${gmtClock(part.firstKick)} – ${gmtClock(part.lastKick)} GMT` : ''}</p>
@@ -118,10 +128,9 @@ function SlotLine({ slot }: { slot: CodeSlot }) {
   return (
     <div className="code-slotline">
       <div>
-        <strong>{part.code}</strong>
         <span>{part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · Lost · ${part.settled} of ${part.legCount} settled` : ''}</span>
       </div>
-      <CopyButton value={part.code} />
+      <CodeCopy code={part.code} />
     </div>
   );
 }
@@ -286,7 +295,7 @@ export function CodesPage() {
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </Link>
-                {part && <CopyButton value={part.code} />}
+                {part && <CodeCopy code={part.code} />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
                 <div className="code-today">
                   <span>Today</span>
@@ -325,7 +334,7 @@ export function CodesPage() {
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </div>
-                {part && <CopyButton value={part.code} />}
+                {part && <CodeCopy code={part.code} />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{part.highRiskWhy}. {data.warning}</span></p>}
               </article>
             );
@@ -340,7 +349,7 @@ export function CodesPage() {
                   {part ? <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}</span> : <span>{row.slot?.empty}</span>}
                   {part?.highRisk && <em>HIGH RISK</em>}
                 </div>
-                {part && <CopyButton value={part.code} />}
+                {part && <CodeCopy code={part.code} />}
               </article>
             );
           })}
