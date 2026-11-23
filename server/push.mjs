@@ -13,6 +13,7 @@
 import { spawn } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { priceInRange } from './oddsRange.mjs';
+import { gradePick } from './results.mjs';
 import { cleanCountry } from './geo.mjs';
 import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -43,6 +44,7 @@ export function ttlFor(kind) {
   if (kind === 'goal' || kind === 'var' || kind === 'red' || kind === 'penalty') return '900s';
   if (kind === 'kickoff' || kind === 'ht') return '900s';
   if (kind === 'ft') return '1800s';
+  if (kind === 'slip') return PUSH_TTL;
   return PUSH_TTL;
 }
 
@@ -85,6 +87,7 @@ export function serviceAccount(env = process.env) {
 }
 
 export function channelFor(kind, settings = {}) {
+  if (kind === 'slip') return 'betspapa.goal.off.v4';
   if (kind === 'red') return settings.redSound === false ? 'betspapa.goal.off.v4' : 'betspapa.redcard.v1';
   if (kind === 'var') return settings.varSound === false ? 'betspapa.goal.off.v4' : 'betspapa.var.v1';
   if (kind === 'penalty') return settings.penaltySound === false ? 'betspapa.goal.off.v4' : 'betspapa.penalty.v1';
@@ -599,6 +602,86 @@ export function trendNotes(previous, next, device) {
   return notes;
 }
 
+/** A booked builder slip. Omitted means "leave the stored slip alone". Null clears it. */
+export function builderSlipFrom(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'builderSlip')) return undefined;
+  const slip = body.builderSlip;
+  if (!slip || typeof slip !== 'object') return null;
+  const id = String(slip.id || '').slice(0, 80);
+  const legs = (Array.isArray(slip.legs) ? slip.legs : []).slice(0, 200).map((leg) => {
+    const eventId = String(leg?.eventId || '');
+    const market = String(leg?.market || '');
+    const odds = Number(leg?.odds);
+    if (!/^sr:match:\d+$/.test(eventId) || !market || !priceInRange(market, odds, leg)) return null;
+    return {
+      key: `${eventId}|${market}`,
+      eventId,
+      market,
+      home: String(leg.home || '').slice(0, 80),
+      away: String(leg.away || '').slice(0, 80),
+      odds,
+      label: String(leg.label || market).slice(0, 80),
+    };
+  }).filter(Boolean);
+  if (!id || !legs.length) return null;
+  return { id, legs };
+}
+
+function slipCopy(legs, progress) {
+  const rows = legs.map((leg) => ({ ...leg, ...(progress[leg.key] || {}) }));
+  if (rows.some((row) => !row.status)) return null;
+  const played = rows.filter((row) => row.status === 'won' || row.status === 'lost');
+  if (!played.length) return null;
+  const won = played.filter((row) => row.status === 'won');
+  const lost = played.filter((row) => row.status === 'lost');
+  const names = won.map((row) => String(row.home || '').replace(/\s+(FC|AFC|CF)$/i, '').trim()).filter(Boolean);
+  const landed = names.length <= 1 ? names[0] || '' : names.length === 2 ? `${names[0]} and ${names[1]}` : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const missed = lost[0];
+  const title = lost.length ? `Slip lost · ${won.length} of ${played.length} legs won` : `Slip won · ${won.length} of ${played.length} legs`;
+  const landedLine = names.length === 1 ? `${names[0]} landed.` : names.length ? `${landed} legs all landed.` : '';
+  const body = missed
+    ? `${missed.home} ${missed.ft || ''} ${missed.away} missed ${missed.label}.${landedLine ? ` ${landedLine}` : ''}`.replace(/\s+/g, ' ').trim()
+    : landedLine;
+  return { title, body, kind: lost.length ? 'bust' : 'win' };
+}
+
+/**
+ * One alert for a tracked slip, and only after every leg has a final score.
+ * Progress is kept on the device so a match that has left the live list is not asked again.
+ */
+export function slipNote(device, matches) {
+  const slip = device?.builderSlip;
+  if (!slip?.id || !Array.isArray(slip.legs) || !slip.legs.length) return null;
+  const progress = { ...(device.slipProgress || {}) };
+  let changed = false;
+  for (const leg of slip.legs) {
+    if (progress[leg.key]?.status) continue;
+    const match = (matches || []).find((item) => item.id === leg.eventId);
+    if (!match || match.status !== 'finished' || match.homeScore == null || match.awayScore == null) continue;
+    const ht = Number.isFinite(match.htHome) && Number.isFinite(match.htAway) ? { home: match.htHome, away: match.htAway } : null;
+    const status = gradePick(leg.market, { home: match.homeScore, away: match.awayScore }, ht);
+    if (status === 'open') continue;
+    progress[leg.key] = { status, ft: `${match.homeScore}-${match.awayScore}`, home: match.home || leg.home, away: match.away || leg.away, label: leg.label };
+    changed = true;
+  }
+  if (changed) device.slipProgress = progress;
+  const copy = slipCopy(slip.legs, progress);
+  if (!copy) return { note: null, changed };
+  return {
+    changed,
+    note: {
+      id: `slip:${slip.id}`,
+      matchId: '',
+      kind: 'slip',
+      title: copy.title,
+      body: copy.body,
+      route: 'slip',
+      marketLabel: copy.title,
+      fixture: copy.body,
+    },
+  };
+}
+
 function cleanVersion(value) {
   if (typeof value !== 'string') return '';
   const version = value.trim();
@@ -649,6 +732,7 @@ export function acceptDevice(body) {
         promos: settings.promos !== false,
       },
       appVersion: cleanVersion(body?.appVersion),
+      builderSlip: builderSlipFrom(body) || null,
       sent: [],
       updatedAt: new Date().toISOString(),
     },
@@ -684,6 +768,8 @@ export function createDeviceBook(dir) {
         ...accepted.device,
         follows: body?.follows == null && existing?.follows ? existing.follows : accepted.device.follows,
         trends: body?.trends == null && existing?.trends ? existing.trends : accepted.device.trends,
+        builderSlip: builderSlipFrom(body) === undefined ? existing?.builderSlip || null : accepted.device.builderSlip,
+        slipProgress: builderSlipFrom(body) === undefined || existing?.builderSlip?.id === accepted.device.builderSlip?.id ? existing?.slipProgress || {} : {},
         sent: existing?.sent || [],
         appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),
         country: cleanCountry(meta?.country) || cleanCountry(existing?.country) || null,
@@ -713,6 +799,9 @@ export function createDeviceBook(dir) {
       const device = devices.find((item) => item.token === token);
       if (!device || device.sent.includes(id)) return;
       device.sent = [id, ...device.sent].slice(0, 400);
+      save();
+    },
+    persist() {
       save();
     },
     drop(token) {
@@ -1042,6 +1131,7 @@ export function watchedMatchIds(devices, matches) {
       const cut = String(trend).lastIndexOf(':');
       if (cut > 0) ids.add(String(trend).slice(0, cut));
     }
+    for (const leg of device?.builderSlip?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
     for (const match of matches || []) {
       if ((device?.follows?.teams || []).some((team) => teamFollows(team, match))) ids.add(match.id);
     }
@@ -1193,7 +1283,9 @@ export function startPushWatch(options = {}) {
     }
     pending = [];
     for (const device of book.list()) {
-      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device)];
+      const slip = slipNote(device, matches);
+      if (slip?.changed) book.persist();
+      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device), ...(slip?.note ? [slip.note] : [])];
       if (mine.length) matched += 1;
       for (const item of mine) queue.push({ device, item: { ...item, sentAt: now }, attempts: 0, at: now });
     }

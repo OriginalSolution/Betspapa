@@ -13,6 +13,10 @@ export type DeviceRegistration = {
   follows: Follows;
   trends: string[];
   bookings: Array<{ id: string; odds: number }>;
+  builderSlip?: {
+    id: string;
+    legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
+  } | null;
   settings: Pick<
     Settings,
     'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound' | 'promos'

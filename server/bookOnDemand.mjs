@@ -6,7 +6,7 @@ import { bookAll } from './bookers.mjs';
 import { selectionKey } from './selection.mjs';
 import { legOpen, priceInRange } from './oddsRange.mjs';
 
-const MAX_LEGS = 40;
+const MAX_LEGS = 50;
 const MAX_GROUPS = 12;
 const CACHE_MS = 6 * 60 * 60 * 1000;
 const WINDOW_MS = 60 * 1000;

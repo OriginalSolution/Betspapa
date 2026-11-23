@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { acceptDevice, BASELINE_MAX_AGE_MS, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, startPushWatch, teamFollows, trendNotes } from './push.mjs';
+import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, startPushWatch, teamFollows, trendNotes } from './push.mjs';
 
 test('FCM stays off until a service account is configured', () => {
   assert.equal(fcmConfigured({}), false);
@@ -374,4 +374,30 @@ test('after a long feed outage the next poll does not replay old goals', async (
   state.events = [EVENT('4:0')];
   await watch.tick();
   assert.deepEqual(sent.map((data) => data.id), ['sr:match:1:goal:home:4']);
+});
+
+test('a tracked slip alerts once, only after every leg has a final score', () => {
+  const device = {
+    builderSlip: builderSlipFrom({
+      builderSlip: {
+        id: 'abc',
+        legs: [
+          { eventId: 'sr:match:1', market: 'over15', odds: 1.25, home: 'Chelsea', away: 'Leeds', label: 'Over 1.5 goals' },
+          { eventId: 'sr:match:2', market: 'over15', odds: 1.22, home: 'Aston Villa', away: 'Sunderland', label: 'Over 1.5 goals' },
+        ],
+      },
+    }),
+  };
+  const playing = slipNote(device, [{ id: 'sr:match:1', status: 'live', homeScore: 1, awayScore: 0, home: 'Chelsea', away: 'Leeds' }]);
+  assert.equal(playing.note, null);
+  const one = slipNote(device, [{ id: 'sr:match:1', status: 'finished', homeScore: 2, awayScore: 1, home: 'Chelsea', away: 'Leeds' }]);
+  assert.equal(one.note, null);
+  const done = slipNote(device, [{ id: 'sr:match:2', status: 'finished', homeScore: 0, awayScore: 0, home: 'Aston Villa', away: 'Sunderland' }]);
+  assert.equal(done.note.id, 'slip:abc');
+  assert.equal(done.note.kind, 'slip');
+  assert.equal(done.note.route, 'slip');
+  assert.match(done.note.title, /Slip lost · 1 of 2 legs won/);
+  assert.match(done.note.body, /Aston Villa 0-0 Sunderland missed Over 1.5 goals/);
+  assert.match(done.note.body, /Chelsea landed/);
+  assert.equal(channelFor('slip', {}), 'betspapa.goal.off.v4');
 });

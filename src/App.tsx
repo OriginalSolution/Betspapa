@@ -19,6 +19,7 @@ import { isNativeApp } from './lib/nativeHttp';
 import { longDay } from './lib/format';
 import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
+import { useSlipAlert } from './components/SlipTrack';
 import { RecordPage } from './pages/RecordPage';
 
 const titles: Record<string, string> = {
@@ -55,6 +56,7 @@ export function App() {
     ? matches.find((item) => location.pathname === `/match/${item.id}`)
     : undefined;
   const title = match ? `${match.home.shortName} vs ${match.away.shortName}` : screenTitle(location.pathname, location.search);
+  useSlipAlert();
   const kept = ['/', '/picks', '/trends', '/slips', '/following'];
   const [seen, setSeen] = useState<string[]>(() => [location.pathname]);
   useEffect(() => {
