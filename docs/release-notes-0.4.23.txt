@@ -1,0 +1,1 @@
+After you book a code, the app now jumps to it with a smooth animation and makes the new code glow. Tap the glowing code to open SportyBet, Football.com, MSport, Betika or betPawa with the slip loaded (the code is copied too). The Codes tab hides strategies with no code for the day and shows when the next codes book. Includes the 0.4.22 home-screen widget.
