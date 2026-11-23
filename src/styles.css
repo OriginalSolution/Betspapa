@@ -2220,6 +2220,8 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .pack-bar p { margin: 0; color: var(--faint); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 750; }
 .pack-bar strong { font-family: var(--sans); font-size: 16px; line-height: 1.2; font-weight: 750; }
 .pack-bar > div span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; font-weight: 650; }
+.pack-bar.has-problem { border-color: rgba(225, 29, 46, 0.45); }
+.pack-bar-error { color: #f3c1c4 !important; }
 .pack-edit { background: #1c222e; color: var(--text); padding: 10px 14px; }
 .pack-book {
   position: relative;

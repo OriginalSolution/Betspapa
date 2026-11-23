@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { tierFallback, type BookLeg } from './bookFollow';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { bookingFailureMessage, bookGroups, tierFallback, type BookLeg } from './bookFollow';
 
 const now = Date.parse('2026-11-14T08:00:00.000Z');
 const later = '2026-11-14T18:00:00.000Z';
@@ -23,3 +23,26 @@ describe('followed tier fallback', () => {
     expect(result.note).toMatch(/kicked off or settled/);
   });
 });
+
+describe('booking failures', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('turns a hung request into a clear timeout message', async () => {
+    expect(bookingFailureMessage({ name: 'TimeoutError', message: 'The operation was aborted due to timeout' })).toMatch(/took too long/i);
+    vi.stubGlobal('fetch', vi.fn((_url: string, opts: { signal?: AbortSignal }) => new Promise((_resolve, reject) => {
+      opts.signal?.addEventListener('abort', () => {
+        const error = new Error('The operation was aborted due to timeout');
+        error.name = 'TimeoutError';
+        reject(error);
+      });
+    })));
+    await expect(bookGroups(
+      [{ id: 'slip-1', legs: [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, kickoff: later }] }],
+      { timeoutMs: 20 },
+    )).rejects.toThrow(/took too long/i);
+  });
+});
+

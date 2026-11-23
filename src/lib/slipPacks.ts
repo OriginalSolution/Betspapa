@@ -135,6 +135,19 @@ export function combinedOdds(legs: Array<{ odds: number }>): number {
   return Math.round(product * 100) / 100;
 }
 
+export function formatTotalOdds(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return value.toFixed(2);
+}
+
+/** One total, or one figure per part when the slip is split. */
+export function totalOddsLine(legs: Array<{ odds: number }>, size = PART_SIZE): string {
+  if (!legs.length) return '';
+  const parts = partsOf(legs, size).map((part) => combinedOdds(part));
+  if (parts.length === 1) return `Total odds ${formatTotalOdds(parts[0])}`;
+  return `Total odds ${parts.map((odds, index) => `part ${index + 1} ${formatTotalOdds(odds)}`).join(' · ')}`;
+}
+
 export function partsOf<T>(legs: T[], size = PART_SIZE): T[][] {
   const parts: T[][] = [];
   for (let index = 0; index < legs.length; index += size) parts.push(legs.slice(index, index + size));

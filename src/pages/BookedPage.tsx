@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
 import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
-import { coverageLine, partSummary, type BookedDeskView, type BookedPartView } from '../lib/bookedSlip';
+import { coverageLine, failedDeskLine, partSummary, type BookedDeskView, type BookedPartView } from '../lib/bookedSlip';
 import { copyText } from '../lib/bookmakerLink';
 import { readBuilder } from '../lib/builderStore';
 import { DESKS, marketLabel, type DeskId } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
-import type { BuilderLeg } from '../lib/slipPacks';
+import { combinedOdds, formatTotalOdds, type BuilderLeg } from '../lib/slipPacks';
 import { shareTrackedSlip } from '../lib/shareSlip';
 import { useFreshCodes } from '../lib/useFreshCodes';
 import type { Team } from '../types';
@@ -31,6 +31,8 @@ export function BookedPage() {
   const settled = 0;
   const first = [...(tracked?.legs || [])].sort((a, b) => a.kickoff.localeCompare(b.kickoff))[0];
   const when = tracked?.bookedAt ? kickoffClock(tracked.bookedAt) : '';
+  const slipOdds = tracked?.legs.length ? formatTotalOdds(combinedOdds(tracked.legs)) : '';
+  const failed = failedDeskLine(desks);
 
   const copyAll = () => {
     const lines = desks.flatMap((desk) => desk.parts.map((part) => `${desk.name} ${part.code}`));
@@ -64,9 +66,11 @@ export function BookedPage() {
         </header>
         <p>
           {first ? `First kick-off ${kickoffClock(first.kickoff)} GMT (${first.home} v ${first.away}). ` : ''}
+          {slipOdds ? `Total odds ${slipOdds}. ` : ''}
           One alert when the slip settles.{when ? ` Codes booked ${when} GMT.` : ''}
         </p>
       </section>
+      {failed && <p className="lede booked-fail" role="status">{failed}</p>}
       <div className="booked-actions">
         <button type="button" className="btn booked-copyall" onClick={copyAll}>Copy all {codes} codes</button>
         <button type="button" className="btn btn-quiet" onClick={share} aria-label="Share on WhatsApp" disabled={sharing} aria-busy={sharing}>{sharing ? 'Sharing…' : 'WhatsApp'}</button>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PickTip } from './matchPicks';
-import { combinedOdds, gradeScore, partsOf, priceAllowed, slipAlert, trendPacks, type GradedLeg } from './slipPacks';
+import { combinedOdds, gradeScore, partsOf, priceAllowed, slipAlert, totalOddsLine, trendPacks, type GradedLeg } from './slipPacks';
 
 function tip(market: string, odds: number, event = 'sr:match:1'): PickTip {
   return {
@@ -70,6 +70,9 @@ describe('slip packs', () => {
     expect(combinedOdds([{ odds: 1.23 }, { odds: 1.22 }, { odds: 1.25 }, { odds: 1.2 }, { odds: 1.19 }])).toBe(2.68);
     const legs = Array.from({ length: 51 }, (_, index) => index);
     expect(partsOf(legs).map((part) => part.length)).toEqual([50, 1]);
+    expect(totalOddsLine([{ odds: 1.2 }, { odds: 1.25 }, { odds: 1.3 }])).toBe('Total odds 1.95');
+    const long = Array.from({ length: 51 }, () => ({ odds: 1.2 }));
+    expect(totalOddsLine(long)).toMatch(/^Total odds part 1 .+ · part 2 1\.20$/);
   });
 
   it('writes one alert when the last leg ends, and none while a leg is open', () => {

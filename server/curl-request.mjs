@@ -17,10 +17,14 @@ export function requestJson(method, url, { body, headers = {}, timeout = 25 } = 
   return new Promise((resolve) => {
     const child = spawn('curl', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
+    let done = false;
     child.stdout.on('data', (buf) => {
       out += buf;
     });
     const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(killTimer);
       const text = out.trim();
       if (!text || !/^[{\[]/.test(text)) {
         resolve({});
@@ -32,7 +36,11 @@ export function requestJson(method, url, { body, headers = {}, timeout = 25 } = 
         resolve({});
       }
     };
+    const killTimer = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish();
+    }, (Number(timeout) + 2) * 1000);
     child.on('close', finish);
-    child.on('error', () => resolve({}));
+    child.on('error', finish);
   });
 }

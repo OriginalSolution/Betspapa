@@ -1,4 +1,5 @@
 import { CapacitorHttp } from '@capacitor/core';
+import { apiUrl } from './apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 import type { DeskId, EngineBook } from './engineSlips';
 import { MIN_PUBLISHED_ODDS } from './oddsFloor';
@@ -23,7 +24,6 @@ export type BookedGroup = {
   reason?: string;
 };
 
-const BOOK_URL = 'https://api.betspapa.com/api/book';
 const TIER_ORDER: CodeTier[] = ['100', '90', '80'];
 
 /** Use the chosen tier when it still has open legs. Otherwise say why and step down. */
@@ -57,7 +57,26 @@ export function legsForTier(legs: BookLeg[], tier: CodeTier, market: string | nu
   });
 }
 
-export async function bookGroups(groups: Array<{ id: string; legs: BookLeg[] }>): Promise<BookedGroup[]> {
+/** Client stops waiting if the API has not answered by then. The server also caps an on-demand book at 40s. */
+export const BOOK_TIMEOUT_MS = 45_000;
+export const BOOK_CONNECT_MS = 15_000;
+
+export function bookingFailureMessage(reason: unknown): string {
+  if (reason && typeof reason === 'object') {
+    const name = 'name' in reason ? String(reason.name) : '';
+    const message = 'message' in reason ? String(reason.message) : '';
+    if (name === 'TimeoutError' || name === 'AbortError' || /timeout/i.test(message)) {
+      return 'Booking took too long. Check your connection and try again.';
+    }
+    if (message) return message;
+  }
+  return 'Booking could not finish. Check your connection and try again.';
+}
+
+export async function bookGroups(
+  groups: Array<{ id: string; legs: BookLeg[] }>,
+  opts: { timeoutMs?: number } = {},
+): Promise<BookedGroup[]> {
   const body = {
     groups: groups.map((group) => ({
       id: group.id,
@@ -71,25 +90,39 @@ export async function bookGroups(groups: Array<{ id: string; legs: BookLeg[] }>)
     })),
   };
   const read = (data: unknown): BookedGroup[] => {
-    const row = data && typeof data === 'object' ? (data as { groups?: BookedGroup[] }) : {};
+    const row = data && typeof data === 'object' ? (data as { groups?: BookedGroup[]; error?: string }) : {};
+    if (typeof row.error === 'string' && row.error.trim()) throw new Error(row.error.trim());
     return Array.isArray(row.groups) ? row.groups : [];
   };
+  const timeoutMs = opts.timeoutMs ?? BOOK_TIMEOUT_MS;
+  const url = apiUrl('/api/book');
   if (isNativeApp()) {
-    const response = await CapacitorHttp.request(nativeRequestOptions('POST', BOOK_URL, { body }));
-    if (response.status < 200 || response.status >= 300) throw new Error(`Booking returned ${response.status}`);
+    let response;
+    try {
+      response = await CapacitorHttp.request(
+        nativeRequestOptions('POST', url, { body, connectMs: BOOK_CONNECT_MS, readMs: timeoutMs }),
+      );
+    } catch (error) {
+      throw new Error(bookingFailureMessage(error));
+    }
+    if (response.status === 429) throw new Error('Too many booking requests. Try again in a minute.');
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Booking is not available right now (error ${response.status}). Try again in a moment.`);
+    }
     return read(readJsonBody(response.data));
   }
-  const local = await fetch('/api/book', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).catch(() => null);
-  if (local?.ok) return read(await local.json());
-  const remote = await fetch(BOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!remote.ok) throw new Error(`Booking returned ${remote.status}`);
-  return read(await remote.json());
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    throw new Error(bookingFailureMessage(error));
+  }
+  if (response.status === 429) throw new Error('Too many booking requests. Try again in a minute.');
+  if (!response.ok) throw new Error(`Booking is not available right now (error ${response.status}). Try again in a moment.`);
+  return read(await response.json());
 }
