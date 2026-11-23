@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
@@ -14,21 +15,6 @@ import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 
 const emptyCatalog: CrestCatalog = { byKey: {}, byId: {} };
-
-async function copyText(value: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-  } catch {
-    const area = document.createElement('textarea');
-    area.value = value;
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    document.body.appendChild(area);
-    area.select();
-    document.execCommand('copy');
-    area.remove();
-  }
-}
 
 function confidenceBand(rate: number | null): CodeTier {
   const value = rate ?? 0;
@@ -54,7 +40,6 @@ export function PicksPage() {
   const [catalog, setCatalog] = useState<CrestCatalog>(emptyCatalog);
   const [openId, setOpenId] = useState<string | null>(null);
   const [folded, setFolded] = useState<Record<string, boolean>>({});
-  const [copied, setCopied] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string[]>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem('betspapa.pickChips.v1') || '[]') as unknown;
@@ -133,19 +118,10 @@ export function PicksPage() {
         {booked.parts.length === 0 && <p>{state?.showingCached ? 'Showing the last booked board' : 'No code yet'}</p>}
         <div>
           {booked.parts.map((part) => (
-            <button
-              key={part.code}
-              type="button"
-              className="master-part"
-              onClick={() => {
-                void copyText(part.code);
-                setCopied(part.code);
-              }}
-            >
+            <div key={part.code} className="master-part">
               <span>P{part.index}·{part.legs}</span>
-              <b data-booking-code={part.code}>{part.code}</b>
-              <em>{copied === part.code ? 'Copied' : 'Copy'}</em>
-            </button>
+              <CodeActions code={part.code} desk={desk} link={part.link} />
+            </div>
           ))}
         </div>
       </section>
@@ -175,7 +151,7 @@ export function PicksPage() {
         .map((id) => {
           const rows = shown.filter((tip) => confidenceBand(tip.chip.rate) === id);
           if (!rows.length) return null;
-          const code = slipParts(tierSlip(state, id, market === 'all' ? null : market), desk).parts[0]?.code || '';
+          const part = slipParts(tierSlip(state, id, market === 'all' ? null : market), desk).parts[0];
           const shut = Boolean(folded[id]);
           return (
             <section key={id} className="pick-group">
@@ -184,11 +160,8 @@ export function PicksPage() {
                   {shut ? '▸' : '▾'} {TIER_LABEL[id]}
                   <small>{rows.length} {rows.length === 1 ? 'pick' : 'picks'}</small>
                 </button>
-                {code && (
-                  <button type="button" className="pick-group-code" onClick={() => { void copyText(code); setCopied(code); }}>
-                    <b data-booking-code={code}>{code}</b>
-                    <span>{copied === code ? 'Copied' : 'Copy'}</span>
-                  </button>
+                {part?.code && (
+                  <CodeActions className="pick-group-code" code={part.code} desk={desk} link={part.link} />
                 )}
               </header>
               {!shut && rows.map((tip) => (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/apiJson';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import {
   bookingLine,
@@ -47,47 +48,27 @@ function remember(id: string) {
 
 export function CodeAlertCard({ notice, onOpen }: { notice: CodeNotice; onOpen: () => void }) {
   return (
-    <button type="button" className="code-alert" onClick={onOpen}>
-      <span className="code-alert-kicker">Betspapa · Codes</span>
-      <strong>{notice.title}</strong>
-      <span className="code-alert-body">{notice.body}</span>
-      {(notice.home || notice.away) && (
-        <span className="code-alert-teams">
-          <Crest team={{ id: notice.home, name: notice.home, shortName: notice.home, abbr: '', color: '', crest: notice.homeCrest }} size={28} />
-          <Crest team={{ id: notice.away, name: notice.away, shortName: notice.away, abbr: '', color: '', crest: notice.awayCrest }} size={28} />
-        </span>
-      )}
-      <em>Tap to open the code</em>
-    </button>
-  );
-}
-
-function CopyButton({ value }: { value: string }) {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      type="button"
-      className="btn code-copy"
-      onClick={() => {
-        void navigator.clipboard.writeText(value).then(() => {
-          setDone(true);
-          window.setTimeout(() => setDone(false), 1200);
-        });
-      }}
-    >
-      {done ? 'Copied' : 'Copy'}
-    </button>
-  );
-}
-
-/** The share code stays beside Copy. A banner or a refresh must not drop it. */
-function CodeCopy({ code }: { code: string }) {
-  return (
-    <div className="code-actions">
-      <b className="code-booking-code" data-code={code} data-booking-code={code}>{code}</b>
-      <CopyButton value={code} />
+    <div className="code-alert">
+      <button type="button" className="code-alert-open" onClick={onOpen}>
+        <span className="code-alert-kicker">Betspapa · Codes</span>
+        <strong>{notice.title}</strong>
+        <span className="code-alert-body">{notice.body}</span>
+        {(notice.home || notice.away) && (
+          <span className="code-alert-teams">
+            <Crest team={{ id: notice.home, name: notice.home, shortName: notice.home, abbr: '', color: '', crest: notice.homeCrest }} size={28} />
+            <Crest team={{ id: notice.away, name: notice.away, shortName: notice.away, abbr: '', color: '', crest: notice.awayCrest }} size={28} />
+          </span>
+        )}
+        <em>Tap to open the code</em>
+      </button>
+      {notice.code && <CodeCopy code={notice.code} />}
     </div>
   );
+}
+
+/** The share code stays beside Copy and Load. A banner or a refresh must not drop it. */
+function CodeCopy({ code, desk, link }: { code: string; desk?: string; link?: string }) {
+  return <CodeActions code={code} desk={desk} link={link} className="code-actions" codeClassName="code-booking-code" />;
 }
 
 function Risk({ part, warning }: { part: CodePart; warning: string }) {
@@ -115,14 +96,13 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
       <header>
         <div>
           <p>Part {index + 1} of {total}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
-          <strong data-booking-code={part.code}>{part.code}</strong>
         </div>
-        <CodeCopy code={part.code} />
+        <CodeCopy code={part.code} link={part.link} />
       </header>
       <Logos part={part} />
       <p className="code-odds">{part.legCount} legs · {oddsText(part.totalOdds)} odds{part.firstKick ? ` · ${gmtDay(part.firstKick.slice(0, 10))} ${gmtClock(part.firstKick)} – ${gmtClock(part.lastKick)} GMT` : ''}</p>
       {part.football && part.footballCode && part.footballCode !== part.code && (
-        <p className="code-foot">Football.com <b data-booking-code={part.footballCode}>{part.footballCode}</b> <CopyButton value={part.footballCode} /></p>
+        <p className="code-foot">Football.com <CodeCopy code={part.footballCode} desk="footballcom" link={part.footballLink} /></p>
       )}
       <Risk part={part} warning={warning} />
       <p className="code-read">{readbackLine(part)}{part.readAt ? ` · price at ${gmtClock(part.readAt)} GMT` : ''}</p>
@@ -152,7 +132,7 @@ function SlotLine({ slot }: { slot: CodeSlot }) {
       <div>
         <span>{part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · Lost · ${part.settled} of ${part.legCount} settled` : ''}</span>
       </div>
-      <CodeCopy code={part.code} />
+      <CodeCopy code={part.code} link={part.link} />
     </div>
   );
 }
@@ -330,7 +310,7 @@ export function CodesPage() {
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </Link>
-                {part && <CodeCopy code={part.code} />}
+                {part && <CodeCopy code={part.code} link={part.link} />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
                 {hasCode(item.today) && (
                   <div className="code-today">
@@ -373,7 +353,7 @@ export function CodesPage() {
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </div>
-                {part && <CodeCopy code={part.code} />}
+                {part && <CodeCopy code={part.code} link={part.link} />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{part.highRiskWhy}. {data.warning}</span></p>}
               </article>
             );
@@ -388,7 +368,7 @@ export function CodesPage() {
                   {part && <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}</span>}
                   {part?.highRisk && <em>HIGH RISK</em>}
                 </div>
-                {part && <CodeCopy code={part.code} />}
+                {part && <CodeCopy code={part.code} link={part.link} />}
               </article>
             );
           })}

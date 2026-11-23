@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
+import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { coverageLine, partSummary, type BookedDeskView, type BookedPartView } from '../lib/bookedSlip';
-import { copyText, deskName, openBookmaker } from '../lib/bookmakerLink';
+import { copyText } from '../lib/bookmakerLink';
 import { readBuilder } from '../lib/builderStore';
 import { DESKS, marketLabel, type DeskId } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
@@ -81,11 +82,6 @@ export function BookedPage() {
             setToast(`Copied ${code}`);
             window.setTimeout(() => setToast(null), 1800);
           }}
-          onLoad={(code, link) => {
-            void openBookmaker(desk.desk, code, link);
-            setToast(`Opening ${desk.name} with ${code}`);
-            window.setTimeout(() => setToast(null), 1800);
-          }}
         />
       ))}
       <section className="booked-legs">
@@ -114,14 +110,12 @@ function DeskCard({
   expanded,
   onToggle,
   onCopy,
-  onLoad,
 }: {
   desk: BookedDeskView;
   total: number;
   expanded: boolean;
   onToggle: () => void;
   onCopy: (code: string) => void;
-  onLoad: (code: string, link?: string) => void;
 }) {
   const visible = expanded ? desk.parts : desk.parts.slice(0, SHOW_PARTS);
   const hidden = desk.parts.length - visible.length;
@@ -142,14 +136,7 @@ function DeskCard({
       {desk.error && !desk.parts.length && <p className="lede">{desk.error}</p>}
       <ul>
         {visible.map((part, index) => (
-          <PartRow
-            key={`${part.code}-${index}`}
-            desk={desk.desk}
-            part={part}
-            index={index}
-            onCopy={() => onCopy(part.code)}
-            onLoad={() => onLoad(part.code, part.link)}
-          />
+          <PartRow key={`${part.code}-${index}`} desk={desk.desk} part={part} index={index} />
         ))}
       </ul>
       {hidden > 0 && (
@@ -161,38 +148,14 @@ function DeskCard({
   );
 }
 
-function PartRow({
-  desk,
-  part,
-  index,
-  onCopy,
-  onLoad,
-}: {
-  desk: DeskId;
-  part: BookedPartView;
-  index: number;
-  onCopy: () => void;
-  onLoad: () => void;
-}) {
+function PartRow({ desk, part, index }: { desk: DeskId; part: BookedPartView; index: number }) {
   return (
     <li>
       <div>
         <span>Part {index + 1}</span>
-        <button
-          type="button"
-          className="booked-code"
-          data-booking-code={part.code}
-          onClick={onLoad}
-          aria-label={`Load ${part.code} in ${deskName(desk)}`}
-        >
-          {part.code}
-        </button>
         <small>{partSummary(part)}</small>
       </div>
-      <div className="booked-part-actions">
-        <button type="button" className="btn btn-quiet btn-tiny" onClick={onCopy}>Copy</button>
-        <button type="button" className="btn btn-tiny" onClick={onLoad}>Load</button>
-      </div>
+      <CodeActions code={part.code} desk={desk} link={part.link} codeClassName="booked-code" />
     </li>
   );
 }

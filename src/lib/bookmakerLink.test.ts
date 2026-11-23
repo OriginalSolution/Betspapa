@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bookmakerUrl, deskForLink, openBookmaker, SHARE_LINKS } from './bookmakerLink';
+import { bookmakerUrl, deskForLink, deskOrSporty, openBookmaker, SHARE_LINKS } from './bookmakerLink';
 import { DESKS } from './engineSlips';
 
 describe('bookmaker share links', () => {
@@ -35,6 +35,14 @@ describe('bookmaker share links', () => {
     const url = await openBookmaker('sportybet', '9B4CVQ', null, { copy, open });
     expect(url).toBe('https://www.sportybet.com/gh/?shareCode=9B4CVQ');
     expect(order).toEqual(['copy:9B4CVQ', 'open:https://www.sportybet.com/gh/?shareCode=9B4CVQ']);
+  });
+
+  it('defaults a missing or unknown desk to SportyBet', () => {
+    expect(deskOrSporty('betika')).toBe('betika');
+    expect(deskOrSporty('sportybet')).toBe('sportybet');
+    expect(deskOrSporty(null)).toBe('sportybet');
+    expect(deskOrSporty('')).toBe('sportybet');
+    expect(deskOrSporty('unknown')).toBe('sportybet');
   });
 
   it('still opens the bookmaker when the clipboard refuses', async () => {
