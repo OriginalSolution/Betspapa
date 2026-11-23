@@ -129,4 +129,34 @@ describe('shareTrackedSlip', () => {
     expect(openUrl.mock.calls[0][0]).toMatch(/^https:\/\/wa\.me\/\?text=/);
     expect(decodeURIComponent(openUrl.mock.calls[0][0])).toContain('BetPawa L0PKMON');
   });
+
+  it('does not open WhatsApp when the share sheet is closed', async () => {
+    const openUrl = vi.fn();
+    const channel = await shareTrackedSlip(sample, {
+      render: async () => png,
+      isNative: () => true,
+      shareNative: async () => {
+        throw new Error('Share canceled');
+      },
+      openUrl,
+    });
+    expect(channel).toBeNull();
+    expect(openUrl).not.toHaveBeenCalled();
+  });
+
+  it('treats a web AbortError as a cancel', async () => {
+    const openUrl = vi.fn();
+    const abort = Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' });
+    const channel = await shareTrackedSlip(sample, {
+      render: async () => png,
+      isNative: () => false,
+      canShareFiles: () => true,
+      shareWeb: async () => {
+        throw abort;
+      },
+      openUrl,
+    });
+    expect(channel).toBeNull();
+    expect(openUrl).not.toHaveBeenCalled();
+  });
 });

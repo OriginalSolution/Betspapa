@@ -24,6 +24,7 @@ import org.json.JSONObject;
 /** Bundled crest store first, then a remote badge. A miss is a plain shield, never initials. */
 final class CrestCache {
     private static Map<String, String> crestIndex;
+    static final long MISS_MS = 60L * 60L * 1000L;
 
     private CrestCache() {}
 
@@ -35,14 +36,22 @@ final class CrestCache {
         if (bundled != null) return bundled;
         Bitmap photo = load(context, name, remote, size);
         if (photo != null) return photo;
+        // Offline or a bad URL: the APK still ships crests for the bigger clubs.
+        String path = remote.isEmpty() ? "" : storedPath(context, name);
+        Bitmap stored = path.isEmpty() ? null : decodeAsset(context, path);
+        if (stored != null) return circle(stored, size);
         return initials(abbr, color, name, size);
     }
 
     /** The same file the board uses from public/crests. */
     private static Bitmap bundled(Context context, String name, String url, int size) {
-        String path = url.contains("/crests/") ? url : storedPath(context, name);
-        if (path.isEmpty()) return null;
-        Bitmap raw = decodeAsset(context, path);
+        // A server URL (/crests/id/123.png?v=...) is not inside the APK. Fall back to the bundled file for the name
+        // only when there is no remote URL to download.
+        Bitmap raw = url.contains("/crests/") ? decodeAsset(context, url) : null;
+        if (raw == null && url.isEmpty()) {
+            String path = storedPath(context, name);
+            if (!path.isEmpty()) raw = decodeAsset(context, path);
+        }
         if (raw == null) return null;
         return circle(raw, size);
     }
@@ -95,7 +104,10 @@ final class CrestCache {
         int cut = url.indexOf("/crests/");
         if (cut < 0) return null;
         try {
-            InputStream stream = context.getAssets().open("public" + url.substring(cut));
+            String asset = url.substring(cut);
+            int query = asset.indexOf('?');
+            if (query >= 0) asset = asset.substring(0, query);
+            InputStream stream = context.getAssets().open("public" + asset);
             try {
                 return BitmapFactory.decodeStream(stream);
             } finally {
@@ -133,7 +145,8 @@ final class CrestCache {
             if (cached != null) return circle(cached, size);
         }
         File miss = new File(cacheDir(context), key + ".miss");
-        if (miss.isFile() && System.currentTimeMillis() - miss.lastModified() < 12L * 60L * 60L * 1000L) return null;
+        // A real miss (404 or not an image) is remembered for a while. A network blip is not: the next alert retries.
+        if (miss.isFile() && System.currentTimeMillis() - miss.lastModified() < MISS_MS) return null;
         if (!allowNetwork()) return null;
         // The server sends our own crest URL with each alert; no per-phone lookups.
         String resolved = url == null ? "" : url.trim();
@@ -141,9 +154,10 @@ final class CrestCache {
             touch(miss);
             return null;
         }
-        Bitmap fetched = download(resolved);
+        boolean[] definite = new boolean[1];
+        Bitmap fetched = download(resolved, definite);
         if (fetched == null) {
-            touch(miss);
+            if (definite[0]) touch(miss);
             return null;
         }
         try {
@@ -164,16 +178,24 @@ final class CrestCache {
         return !finger.contains("robolectric");
     }
 
-    private static Bitmap download(String address) {
+    private static Bitmap download(String address, boolean[] definite) {
         HttpURLConnection connection = null;
         try {
             connection = (HttpURLConnection) new URL(address).openConnection();
-            connection.setConnectTimeout(2500);
-            connection.setReadTimeout(4000);
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(6000);
             connection.setRequestProperty("User-Agent", MatchFeeds.USER_AGENT);
+            int status = connection.getResponseCode();
+            if (status == 404 || status == 410) {
+                definite[0] = true;
+                return null;
+            }
+            if (status < 200 || status >= 300) return null;
             InputStream stream = connection.getInputStream();
             try {
-                return BitmapFactory.decodeStream(stream);
+                Bitmap bitmap = BitmapFactory.decodeStream(stream);
+                if (bitmap == null) definite[0] = true;
+                return bitmap;
             } finally {
                 stream.close();
             }

@@ -56,6 +56,9 @@ export const BETPAWA_PRICE_TTL_MS = 2 * 60 * 1000;
 const eventCache = new Map();
 const priceCache = new Map();
 let offerCache = null;
+let offerLoading = null;
+/** Book + track waits at most this long for the price scan, then books with the last scan (or none). */
+export const INDEX_WAIT_MS = 6_000;
 
 function cacheGet(cache, key, now = Date.now()) {
   const row = cache.get(key);
@@ -123,6 +126,7 @@ export function resetBookerCache() {
   eventCache.clear();
   priceCache.clear();
   offerCache = null;
+  offerLoading = null;
   deskLanes.clear();
   interactiveLanes.clear();
 }
@@ -598,14 +602,38 @@ export function publicError(value) {
   return text || 'Booking failed';
 }
 
-async function cachedIndex(request) {
+/**
+ * The SportyBet price scan (up to 20 pages). One load at a time is shared by every caller.
+ * An expired scan is still returned to an interactive caller while the fresh one loads.
+ */
+function loadIndexShared(request) {
+  if (!offerLoading) {
+    offerLoading = loadOfferIndex(request)
+      .then((value) => {
+        offerCache = { value, expires: Date.now() + 3 * 60 * 1000 };
+        return value;
+      })
+      .catch(() => null)
+      .finally(() => {
+        offerLoading = null;
+      });
+  }
+  return offerLoading;
+}
+
+async function cachedIndex(request, opts = {}) {
   if (offerCache && offerCache.expires > Date.now()) return offerCache.value;
+  const loading = loadIndexShared(request);
+  if (!opts.interactive) return loading;
+  const stale = offerCache ? offerCache.value : null;
+  if (stale) return stale;
+  // During a long engine booking cycle the scan can take 20s+; Book + track must not wait for it.
+  const waitMs = Number(opts.waitMs) >= 0 ? Number(opts.waitMs) : INDEX_WAIT_MS;
+  let timer;
   try {
-    const value = await loadOfferIndex(request);
-    offerCache = { value, expires: Date.now() + 3 * 60 * 1000 };
-    return value;
-  } catch {
-    return null;
+    return await Promise.race([loading, new Promise((resolve) => { timer = setTimeout(() => resolve(null), waitMs); })]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -639,7 +667,7 @@ export async function bookAll(legs, request, onBook, only, opts = {}) {
   const deskNames = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'].filter((name) => !allowed || allowed.has(name));
   let index = null;
   try {
-    index = mapped.length ? await withDeadline(cachedIndex(request), deadline, timeoutMessage) : null;
+    index = mapped.length ? await withDeadline(cachedIndex(request, { interactive, waitMs: opts.indexWaitMs }), deadline, timeoutMessage) : null;
   } catch (error) {
     const failed = { parts: [], error: publicError(error?.message || error), dropped: [] };
     const books = {};

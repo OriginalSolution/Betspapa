@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAlertSetup } from '../components/AlertSetup';
 import { playEventSound, playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
-import { openNotificationSound, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest } from '../lib/deviceWatch';
+import { openNotificationSound, readPushToken, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest, type PushState } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
 import type { GoalSound, NotificationStyle } from '../types';
 import { useLineupList } from '../components/Lineups';
@@ -321,6 +321,16 @@ function AndroidWatchStatus() {
   const { settings } = useStore();
   const { status, applyStatus, refresh, startAgain } = useAlertSetup();
   const [testNote, setTestNote] = useState(false);
+  const [push, setPush] = useState<PushState | null>(null);
+  useEffect(() => {
+    let stop = false;
+    void readPushToken().then((state) => {
+      if (!stop) setPush(state);
+    });
+    return () => {
+      stop = true;
+    };
+  }, []);
   if (!status) return <p className="lede">Checking notification access.</p>;
   const allowed = status.notifications === 'granted';
   const unrestricted = status.batteryUnrestricted;
@@ -341,6 +351,17 @@ function AndroidWatchStatus() {
         >
           Allow notifications
         </button>
+      )}
+      {push && (
+        <div className="stat">
+          <span>Server push</span>
+          <strong className={push.token ? 'is-good' : 'is-bad'}>{pushLabel(push)}</strong>
+        </div>
+      )}
+      {push && push.playServices === false && (
+        <p className="lede">
+          This phone has no Google Play services, so Betspapa cannot receive server push. Alerts come only from the watcher on this phone while it is allowed to run. Allow background activity and App launch for Betspapa below.
+        </p>
       )}
       <div className="stat">
         <span>Battery optimization</span>
@@ -422,6 +443,13 @@ function AndroidWatchStatus() {
       </button>
     </div>
   );
+}
+
+export function pushLabel(push: PushState): string {
+  if (push.token) return 'Connected';
+  if (push.playServices === false) return 'No Google Play services';
+  if (!push.enabled) return 'Not in this build';
+  return push.error ? 'Not connected yet' : 'Connecting';
 }
 
 function pollLabel(at: number): string {

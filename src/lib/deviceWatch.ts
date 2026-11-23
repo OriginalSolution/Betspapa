@@ -83,7 +83,7 @@ type WatchPlugin = {
   openAutostart(): Promise<WatchDeviceStatus & { opened?: string }>;
   markSetup(options: { version: number; finished: boolean }): Promise<WatchDeviceStatus>;
   scheduleTest(options?: { kind?: string; goalSound?: string }): Promise<void>;
-  pushToken(): Promise<{ token: string; enabled: boolean }>;
+  pushToken(): Promise<PushState>;
   openNotificationSound(): Promise<WatchDeviceStatus>;
   present(options: { payload: string }): Promise<void>;
   addListener(eventName: 'resume', listenerFunc: (status: WatchDeviceStatus) => void): Promise<PluginListenerHandle>;
@@ -313,7 +313,10 @@ export async function scheduleBackgroundTest(options?: { kind?: string; goalSoun
   }
 }
 
-export async function readPushToken(): Promise<{ token: string; enabled: boolean }> {
+/** enabled is false when the build has no FCM or the phone has no Google Play services (Huawei without GMS). */
+export type PushState = { token: string; enabled: boolean; playServices?: boolean; error?: string };
+
+export async function readPushToken(): Promise<PushState> {
   if (!isNativeApp()) return { token: '', enabled: false };
   try {
     return await Watch.pushToken();
