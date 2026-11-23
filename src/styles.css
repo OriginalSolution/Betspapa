@@ -2361,6 +2361,9 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .code-label { margin: 0; color: var(--gold); font-size: 12px; font-weight: 750; }
 .code-when, .code-empty, .code-mix, .code-read, .code-record-line { margin: 0; color: var(--muted); font-size: 13px; }
 .code-refresh { justify-self: start; }
+.code-next { font-size: 12px; opacity: 0.85; }
+.code-none { display: grid; gap: 4px; justify-items: center; padding: 28px 16px; border: 1px dashed var(--line, rgba(255, 255, 255, 0.12)); border-radius: 14px; text-align: center; }
+.code-none strong { font-size: 15px; }
 .code-list, .code-daily { display: grid; gap: 10px; }
 .code-card, .code-part, .code-rules, .code-legs { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; min-width: 0; }
 .code-rules li, .code-odds, .code-read { overflow-wrap: anywhere; }
