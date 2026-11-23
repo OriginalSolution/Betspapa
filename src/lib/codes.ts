@@ -187,3 +187,26 @@ export function ladderDays(view: CodesView): Array<{ iso: string; slot: CodeSlot
     .map((iso) => ({ iso, slot: view.dailies[iso]?.ladder }))
     .filter((row): row is { iso: string; slot: CodeSlot } => hasCode(row.slot));
 }
+
+/** Every share code on the board, as SportyBet codes (Football.com codes ride along), for spotting new ones after Read back. */
+export function codesIn(view: CodesView | null | undefined): Array<{ code: string; desk: 'sportybet' | 'footballcom'; link?: string }> {
+  if (!view) return [];
+  const slots: CodeSlot[] = [];
+  for (const item of view.strategies || []) slots.push(item.week, item.today);
+  for (const day of Object.values(view.dailies || {})) slots.push(...Object.values(day || {}));
+  const out: Array<{ code: string; desk: 'sportybet' | 'footballcom'; link?: string }> = [];
+  const seen = new Set<string>();
+  for (const slot of slots) {
+    for (const part of slot?.parts || []) {
+      if (part?.code && !seen.has(part.code)) {
+        seen.add(part.code);
+        out.push({ code: part.code, desk: 'sportybet', link: part.link || undefined });
+      }
+      if (part?.football && part.footballCode && !seen.has(part.footballCode)) {
+        seen.add(part.footballCode);
+        out.push({ code: part.footballCode, desk: 'footballcom', link: part.footballLink || undefined });
+      }
+    }
+  }
+  return out;
+}
