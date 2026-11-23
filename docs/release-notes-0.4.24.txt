@@ -1,0 +1,1 @@
+The Book + track button now shows a spinner and a progress bar while codes are booking, so the app no longer looks frozen. On Booked & tracking, a red Load button sits beside Copy on every code. Load, or a tap on the code itself, copies it and opens SportyBet, Football.com, MSport, Betika or betPawa with the slip loaded.
