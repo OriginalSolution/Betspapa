@@ -1,0 +1,1 @@
+New home-screen widget: add "Betspapa scores" from your widgets to see the teams you follow at a glance. Live matches come first with crests, score and minute, then upcoming kick-offs in your local time. It resizes from a single match card (works on the Fold cover screen) to a full list, refreshes on its own and faster during live games, and a tap opens the match.
