@@ -2490,6 +2490,59 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .code-actions { display: flex; align-items: center; gap: 8px; flex: none; justify-self: end; }
 .code-booking-code { font-family: var(--score); font-size: 22px; letter-spacing: 0.04em; line-height: 1; white-space: nowrap; }
 .code-copy { border-radius: 999px; padding: 8px 14px; flex: none; }
+.code-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+}
+.code-pair-code {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--score);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
+  cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.code-pair .btn-tiny, .code-pair .btn { white-space: nowrap; flex: none; }
+.code-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.booking-chip { flex-wrap: wrap; }
+.booking-chip .code-pair { margin-left: auto; }
+.rec-code { display: flex; flex-wrap: wrap; }
+.rec-code .code-pair { margin-left: auto; }
+.code-alert { cursor: default; }
+.code-alert-open {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.code-alert .code-pair { margin-top: 8px; justify-content: flex-start; }
+@media (max-width: 380px) {
+  .code-card { grid-template-columns: 1fr; }
+  .code-card .code-pair, .code-actions, .code-pair { justify-content: flex-end; }
+  .code-pair { flex: 1 0 100%; }
+  .code-pair-code, .code-booking-code { font-size: 17px; white-space: normal; }
+  .rec-code .code-pair, .booking-chip .code-pair { flex: 1 0 100%; margin-left: 0; }
+}
 .code-part header, .code-slotline { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .code-part header p { margin: 0; color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 .code-part header strong { font-family: var(--score); font-size: 32px; letter-spacing: 0.04em; }

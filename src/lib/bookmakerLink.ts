@@ -25,6 +25,11 @@ export function isDesk(value: unknown): value is DeskId {
   return typeof value === 'string' && value in SHARE_LINKS;
 }
 
+/** SportyBet when the desk is missing or unknown. */
+export function deskOrSporty(value: unknown): DeskId {
+  return isDesk(value) ? value : 'sportybet';
+}
+
 /** Which bookmaker a share link belongs to, or null for anything else. */
 export function deskForLink(link: string | null | undefined): DeskId | null {
   if (!link) return null;
