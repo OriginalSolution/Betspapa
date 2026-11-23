@@ -71,13 +71,19 @@ public class WatchPlugin extends Plugin {
             return;
         }
         try {
+            boolean followsChanged;
             synchronized (WatchState.FILE_LOCK) {
                 WatchState state = WatchState.load(WatchFiles.file(getContext()));
+                String before = state.teamIds + "|" + state.matchIds;
                 state.merge(new JSONObject(patch == null || patch.isEmpty() ? "{}" : patch));
                 state.save(WatchFiles.file(getContext()));
+                followsChanged = !before.equals(state.teamIds + "|" + state.matchIds);
             }
             WatchScheduler.ensureWatching(getContext());
             WatchScheduler.arm(getContext());
+            // The home-screen widget lists followed teams, so it refetches when they change.
+            if (followsChanged) ScoreWidget.followsChanged(getContext());
+            else ScoreWidget.nudge(getContext());
             call.resolve();
         } catch (Exception error) {
             call.reject("Could not store the watch list", error);

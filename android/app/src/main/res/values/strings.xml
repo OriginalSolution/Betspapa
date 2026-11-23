@@ -36,4 +36,9 @@
     <string name="notif_action_primary">Open</string>
     <string name="notif_action_secondary">Mute</string>
     <string name="notif_action_tertiary">Share</string>
+    <string name="widget_name">Betspapa scores</string>
+    <string name="widget_description">Live scores and next kick-offs for the teams you follow.</string>
+    <string name="widget_empty">Follow teams in Betspapa to see them here</string>
+    <string name="widget_no_matches">No matches for your teams in the next 7 days</string>
+    <string name="widget_refresh">Refresh scores</string>
 </resources>

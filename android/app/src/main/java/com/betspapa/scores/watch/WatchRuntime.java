@@ -130,6 +130,7 @@ final class WatchRuntime {
             try {
                 AlertPoster.settleDisallowed(app);
                 AlertPoster.refreshLive(app);
+                ScoreWidget.nudge(app);
             } catch (RuntimeException ignored) {
                 /* a card failure must not stop the next poll */
             }

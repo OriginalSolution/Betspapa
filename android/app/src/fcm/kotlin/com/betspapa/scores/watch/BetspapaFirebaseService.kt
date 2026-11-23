@@ -83,6 +83,8 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
         } finally {
             AlertGate.finish(this, id, posted)
         }
+        // A goal or score push updates the home-screen widget too.
+        ScoreWidget.nudge(this)
         if (posted) AlertSound.await(8_000L)
         val channel = AlertPoster.channelFor(if (kind == "promo") "goal" else kind, sound)
         Log.i(TAG, "posted=$posted id=$id kind=$kind channel=$channel sound=$sound match=${note.matchId} priority=${message.priority}/${message.originalPriority} ageMs=$ageMs")
