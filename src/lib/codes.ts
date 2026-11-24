@@ -8,6 +8,8 @@ export type CodeLeg = {
   homeCrest: string;
   awayCrest: string;
   label: string;
+  /** Grade key such as over25 or ah-1-away. Older servers leave it out. */
+  market?: string;
   odds: number;
   kickoff: string;
   score: string;

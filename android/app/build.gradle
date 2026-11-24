@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 54
-        versionName "0.4.31" // Slip bell, new slip card, every screen QA-checked on Xiaomi large text
+        versionCode 55
+        versionName "0.4.32" // Track several slips at once: collapsible cards, Track from Trends, Picks and Codes, alerts name the slip
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

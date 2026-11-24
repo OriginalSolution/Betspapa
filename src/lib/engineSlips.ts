@@ -116,6 +116,8 @@ export type EnginePart = {
   link: string;
   totalOdds: number | null;
   legs: number;
+  /** Event ids booked in this code, when the feed lists them. */
+  matches?: string[];
 };
 
 export type EngineDrop = {
@@ -181,11 +183,13 @@ function parsePart(value: unknown, desk: DeskId): EnginePart | null {
   if (!code || !CODE.test(code) || !link || !link.startsWith(HOSTS[desk])) return null;
   const total = Number(row.totalOdds);
   const legs = Number(row.legs);
+  const matches = Array.isArray(row.matches) ? row.matches.filter((id): id is string => typeof id === 'string') : [];
   return {
     code,
     link,
     totalOdds: Number.isFinite(total) ? total : null,
     legs: Number.isFinite(legs) ? legs : 0,
+    ...(matches.length ? { matches } : {}),
   };
 }
 
@@ -431,4 +435,14 @@ export function splitMatch(match: string): [string, string] {
   const parts = match.split(/\s+vs\s+/i);
   if (parts.length >= 2) return [parts[0].trim(), parts.slice(1).join(' vs ').trim()];
   return [match.trim(), ''];
+}
+
+/**
+ * One slip with every leg. The board feed trims the master to 18 legs and sends tier
+ * slips without legs, so tracking one of those reads the whole slip first.
+ */
+export async function fetchEngineSlip(id: string): Promise<EngineSlip | null> {
+  const { apiJson } = await import('./apiJson');
+  const body = await apiJson<unknown>(`/api/engine/slip?id=${encodeURIComponent(id)}`, 'Slip');
+  return parseSlip(body);
 }

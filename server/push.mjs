@@ -34,6 +34,8 @@ import {
   legList,
   trendCopy,
   varReviewCopy,
+  bellLegCopy,
+  slipVerdictTitle,
 } from '../src/lib/noteCopy.mjs';
 
 export const MIN_ODDS = 1.2;
@@ -588,6 +590,16 @@ export function settleTrend(market, match) {
     if (home > away) return 'bust';
     return 'open';
   }
+  // Codes (Banker) markets on a tracked Codes slip.
+  if (market === 'home-over15') return home >= 2 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'away-over15') return away >= 2 ? 'won' : finished ? 'bust' : 'open';
+  if (market === 'ah-1-home' || market === 'ah-1-away') {
+    if (!finished) return 'open';
+    const margin = market === 'ah-1-home' ? home - away : away - home;
+    return margin >= 2 ? 'won' : margin === 1 ? 'open' : 'bust';
+  }
+  // Leads during the match (2 up, 1 up) need the goal timeline; the Codes page grades them.
+  if (/^[12]up-/.test(market)) return 'open';
   return scored > 0 && finished ? 'won' : 'open';
 }
 
@@ -651,10 +663,10 @@ export function builderSlipFrom(body) {
     };
   }).filter(Boolean);
   if (!id || !legs.length) return null;
-  return { id, legs };
+  return { id, label: String(slip.label || '').slice(0, 80), legs };
 }
 
-function slipCopy(legs, progress) {
+function slipCopy(legs, progress, name = '') {
   const rows = legs.map((leg) => ({ ...leg, ...(progress[leg.key] || {}) }));
   if (rows.some((row) => !row.status)) return null;
   const played = rows.filter((row) => row.status === 'won' || row.status === 'lost');
@@ -662,7 +674,7 @@ function slipCopy(legs, progress) {
   const won = played.filter((row) => row.status === 'won');
   const lost = played.filter((row) => row.status === 'lost');
   const missed = lost[0];
-  const title = lost.length ? `Slip lost · ${won.length} of ${played.length} legs won` : `Slip won · ${won.length} of ${played.length} legs`;
+  const title = slipVerdictTitle(name, won.length, played.length, lost.length);
   const landed = legList(won, (row) => legScore(row), 3);
   const landedLine = landed ? `${landed} landed.` : '';
   const body = missed
@@ -691,7 +703,7 @@ export function slipNote(device, matches) {
     changed = true;
   }
   if (changed) device.slipProgress = progress;
-  const copy = slipCopy(slip.legs, progress);
+  const copy = slipCopy(slip.legs, progress, slip.label);
   if (!copy) return { note: null, changed };
   return {
     changed,
@@ -712,10 +724,11 @@ export function slipNote(device, matches) {
 export function slipBellsFrom(body) {
   if (!body || !Object.prototype.hasOwnProperty.call(body, 'slipBells')) return undefined;
   const rows = Array.isArray(body.slipBells) ? body.slipBells : [];
+  let budget = 400;
   return rows.slice(0, 12).map((slip) => {
     const id = String(slip?.id || '').slice(0, 120);
     const seen = new Set();
-    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, 60).map((leg) => {
+    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, Math.min(100, Math.max(0, budget))).map((leg) => {
       const eventId = String(leg?.eventId || '');
       const market = String(leg?.market || '');
       if (!/^sr:match:\d+$/.test(eventId) || !/^[a-z0-9-]{2,24}$/.test(market)) return null;
@@ -733,6 +746,7 @@ export function slipBellsFrom(body) {
         label: String(leg.label || market).slice(0, 80),
       };
     }).filter(Boolean);
+    budget -= legs.length;
     if (!id || !legs.length) return null;
     return { id, label: String(slip?.label || '').slice(0, 80), legs };
   }).filter(Boolean);
@@ -774,8 +788,15 @@ export function bellNotes(device, matches) {
         id: `slipleg:${bell.id}:${leg.key}`,
         matchId: leg.eventId,
         kind: status === 'won' ? 'win' : 'bust',
-        title: `${status === 'won' ? 'Leg won' : 'Leg lost'} · ${leg.label}`,
-        body: `${legScore(row)}${leg.odds ? ` · ${Number(leg.odds).toFixed(2)}` : ''} · ${settled} of ${bell.legs.length} settled`,
+        ...bellLegCopy({
+          won: status === 'won',
+          slip: bell.label,
+          label: leg.label,
+          score: legScore(row),
+          odds: leg.odds ? Number(leg.odds).toFixed(2) : '',
+          settled,
+          total: bell.legs.length,
+        }),
         marketLabel: leg.label,
         market: leg.market,
         fixture: legFixture(row),
@@ -787,7 +808,7 @@ export function bellNotes(device, matches) {
     progress[bell.id] = done;
     // The tracked builder slip already sends its own one-off slip card under the same id.
     if (device?.builderSlip?.id === bell.id) continue;
-    const copy = slipCopy(bell.legs || [], done);
+    const copy = slipCopy(bell.legs || [], done, bell.label);
     if (copy) {
       notes.push({
         id: `slip:${bell.id}`,

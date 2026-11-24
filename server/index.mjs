@@ -8,7 +8,7 @@ import { hasSession } from './adminAuth.mjs';
 import { handleAdminApi, handleAdminPage } from './adminHttp.mjs';
 import { latestBooking, submitBooking } from './booking.mjs';
 import { forceLiveMode, getConfig } from './config.mjs';
-import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, paintEngineCrests, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
+import { appEngineState, engineNeedsRepair, engineSlipView, enginePersistence, getCachedEvents, getEngineRaw, getEngineSchedule, getEngineState, getEventOccurrence, onEngineBoard, onEngineCycle, paintEngineCrests, restartEngineIfHung, restoreEngine, runEngineCycle, startEngine } from './engine.mjs';
 import { crestSurfaces } from './crestSurfaces.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
@@ -517,6 +517,21 @@ async function handleApi(req, res, url) {
       return;
     }
     send(req, res, 200, results.view(url.searchParams.get('day') || ''), 'public, max-age=15');
+    return;
+  }
+  if (url.pathname === '/api/engine/slip') {
+    if (req.method !== 'GET') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    const full = getEngineState();
+    const slip = engineSlipView(full, String(url.searchParams.get('id') || '').slice(0, 120));
+    if (!slip) {
+      send(req, res, 404, { error: 'No such slip on the current board' });
+      return;
+    }
+    const painted = paintEngineCrests({ master: slip, trends: [] }, full?.events || getCachedEvents(), (id, name) => crests.crestFor(id, name) || '');
+    send(req, res, 200, painted.master, 'public, max-age=30');
     return;
   }
   if (url.pathname === '/api/engine') {

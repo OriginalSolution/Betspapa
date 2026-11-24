@@ -30,8 +30,8 @@ test('a belled slip alerts each leg with full names, then the whole slip once', 
   const early = bellNotes(device, [{ id: 'sr:match:1', status: 'live', homeScore: 2, awayScore: 0, home: 'Lions', away: 'Kotoko' }]);
   assert.deepEqual(early.notes.map((note) => note.id), ['slipleg:trend:80:over15:2026-11-24:sr:match:1|over15']);
   assert.equal(early.notes[0].kind, 'win');
-  assert.equal(early.notes[0].title, 'Leg won · Over 1.5 goals');
-  assert.match(early.notes[0].body, /^Heart of Lions 2-0 Asante Kotoko · 1.26 · 1 of 2 settled$/);
+  assert.equal(early.notes[0].title, 'Leg won · 80%+ Over 1.5 goals');
+  assert.match(early.notes[0].body, /^Over 1.5 goals · Heart of Lions 2-0 Asante Kotoko · 1.26 · 1 of 2 settled$/);
   assert.equal(early.notes[0].match.home, 'Heart of Lions');
   assert.equal(early.changed, true);
   // Same leg is not raised again on the next poll.
@@ -39,9 +39,9 @@ test('a belled slip alerts each leg with full names, then the whole slip once', 
   const done = bellNotes(device, [{ id: 'sr:match:2', status: 'finished', homeScore: 1, awayScore: 1, home: 'Hearts', away: 'Medeama' }]);
   assert.deepEqual(done.notes.map((note) => note.id), ['slipleg:trend:80:over15:2026-11-24:sr:match:2|dc-12', 'slip:trend:80:over15:2026-11-24']);
   assert.equal(done.notes[0].kind, 'bust');
-  assert.equal(done.notes[0].title, 'Leg lost · Double chance 12');
+  assert.equal(done.notes[0].title, 'Leg lost · 80%+ Over 1.5 goals');
   assert.equal(done.notes[1].kind, 'slip');
-  assert.match(done.notes[1].title, /Slip lost · 1 of 2 legs won/);
+  assert.equal(done.notes[1].title, '80%+ Over 1.5 goals lost · 1 of 2 legs won');
 });
 
 test('the tracked builder slip keeps its own slip card, the bell adds only the legs', () => {
@@ -96,8 +96,78 @@ test('end to end: a bell turned on in the app pushes kick-off, the goal and the 
   assert.equal(leg.kind, 'win');
   assert.equal(leg.home, 'Heart of Lions');
   assert.equal(leg.away, 'Asante Kotoko');
-  assert.equal(leg.title, 'Leg won · Over 1.5 goals');
+  assert.equal(leg.title, 'Leg won · 80%+ Over 1.5 goals');
   now += 25_000;
   await watch.tick();
   assert.equal(sent.filter((data) => data.id === leg.id).length, 1);
+});
+
+const SLIP_TWO = {
+  id: 'slip-two',
+  label: 'Slip 2 · SportyBet ABC123',
+  legs: [
+    { eventId: 'sr:match:1', market: 'over15', odds: 1.26, home: 'Heart of Lions', away: 'Asante Kotoko', label: 'Over 1.5 goals' },
+    { eventId: 'sr:match:3', market: 'btts', odds: 1.7, home: 'Dreams FC', away: 'Aduana', label: 'Both teams score' },
+  ],
+};
+const SLIP_THREE = {
+  id: 'slip-three',
+  label: 'Slip 3 · MSport XY9',
+  legs: [{ eventId: 'sr:match:1', market: 'over15', odds: 1.3, home: 'Heart of Lions', away: 'Asante Kotoko', label: 'Over 1.5 goals' }],
+};
+
+test('several tracked slips: each names itself, a shared match settles a leg on every slip', () => {
+  const device = { slipBells: slipBellsFrom({ slipBells: [SLIP_TWO, SLIP_THREE] }) };
+  const { notes } = bellNotes(device, [{ id: 'sr:match:1', status: 'live', homeScore: 2, awayScore: 0, home: 'Lions', away: 'Kotoko' }]);
+  assert.deepEqual(notes.map((note) => note.id), ['slipleg:slip-two:sr:match:1|over15', 'slipleg:slip-three:sr:match:1|over15', 'slip:slip-three']);
+  assert.equal(notes[0].title, 'Leg won · Slip 2 · SportyBet ABC123');
+  assert.equal(notes[0].body, 'Over 1.5 goals · Heart of Lions 2-0 Asante Kotoko · 1.26 · 1 of 2 settled');
+  assert.equal(notes[1].title, 'Leg won · Slip 3 · MSport XY9');
+  assert.equal(notes[2].title, 'Slip 3 · MSport XY9 won · 1 of 1 legs');
+  assert.deepEqual([...watchedMatchIds([device], [])].sort(), ['sr:match:1', 'sr:match:3']);
+});
+
+test('end to end: a goal in a match on two slips is pushed once, the leg result once per slip', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'betspapa-bell-'));
+  const book = createDeviceBook(dir);
+  book.register({ token: 'fcm-token-value-that-is-long-enough', follows: { matches: ['sr:match:1', 'sr:match:3'], teams: [] }, slipBells: [SLIP_TWO, SLIP_THREE] });
+  const row = (score) => ({ data: [{ events: [{ eventId: 'sr:match:1', homeTeamName: 'Heart of Lions', awayTeamName: 'Asante Kotoko', matchStatus: 'H1', status: 1, setScore: score }] }] });
+  let payload = row('0:0');
+  const sent = [];
+  const env = { FCM_SERVICE_ACCOUNT_JSON: '{"project_id":"betspapa-app","client_email":"push@betspapa-app.iam.gserviceaccount.com","private_key":"test-key"}' };
+  const send = async (_account, message) => {
+    sent.push(message.message.data);
+    return { dropped: false, ok: true, status: 200, body: { name: 'projects/betspapa-app/messages/1' } };
+  };
+  let now = Date.parse('2026-11-24T19:00:00Z');
+  const watch = startPushWatch({ dir, book, env, fetchImpl: async () => ({ ok: true, json: async () => payload }), send, log() {}, now: () => now });
+  await watch.tick();
+  for (const score of ['1:0', '2:0']) {
+    now += 25_000;
+    payload = row(score);
+    await watch.tick();
+  }
+  now += 25_000;
+  await watch.tick();
+  const ids = sent.map((data) => data.id);
+  assert.equal(ids.filter((id) => id === 'sr:match:1:goal:home:2').length, 1, ids.join(','));
+  assert.equal(ids.filter((id) => id === 'slipleg:slip-two:sr:match:1|over15').length, 1, ids.join(','));
+  assert.equal(ids.filter((id) => id === 'slipleg:slip-three:sr:match:1|over15').length, 1, ids.join(','));
+});
+
+test('Codes markets settle on their own rules, never on the "scored" fallback', async () => {
+  const { settleTrend } = await import('./push.mjs');
+  const done = (homeScore, awayScore) => ({ status: 'finished', homeScore, awayScore });
+  assert.equal(settleTrend('ah-1-away', done(1, 0)), 'bust');
+  assert.equal(settleTrend('ah-1-away', done(0, 2)), 'won');
+  assert.equal(settleTrend('ah-1-home', done(2, 1)), 'open');
+  assert.equal(settleTrend('home-over15', { status: 'live', homeScore: 2, awayScore: 0 }), 'won');
+  assert.equal(settleTrend('away-over15', done(3, 1)), 'bust');
+  assert.equal(settleTrend('2up-home', done(3, 0)), 'open');
+});
+
+test('bells share a leg budget so twelve big slips stay under the body limit', () => {
+  const legs = Array.from({ length: 150 }, (_, i) => ({ eventId: `sr:match:${i}`, market: 'over15', label: 'Over 1.5 goals' }));
+  const rows = slipBellsFrom({ slipBells: Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, label: `Slip ${i}`, legs })) });
+  assert.deepEqual(rows.map((row) => row.legs.length), [100, 100, 100, 100]);
 });

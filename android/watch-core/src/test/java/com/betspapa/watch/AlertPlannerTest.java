@@ -675,6 +675,44 @@ public class AlertPlannerTest {
         assertEquals("won", reloaded.slipResult("bell1", "sr:match:1|over15").optString("status"));
     }
 
+    @Test
+    public void namedSlipsSayWhichSlipAndShareAMatch() {
+        WatchState state = new WatchState();
+        state.browser = true;
+        JSONObject patch = new JSONObject("{\"follows\":{\"matches\":[\"sr:match:1\"],\"teams\":[]},\"slips\":["
+                + "{\"id\":\"s2\",\"label\":\"Slip 2 · SportyBet ABC123\",\"legs\":[{\"key\":\"sr:match:1|over15\",\"eventId\":\"sr:match:1\",\"market\":\"over15\",\"label\":\"Over 1.5 goals\",\"home\":\"Ghana\",\"away\":\"Somalia\"},"
+                + "{\"key\":\"sr:match:9|btts\",\"eventId\":\"sr:match:9\",\"market\":\"btts\",\"label\":\"Both teams score\",\"home\":\"A\",\"away\":\"B\"}]},"
+                + "{\"id\":\"s3\",\"label\":\"Slip 3 · MSport XY9\",\"legs\":[{\"key\":\"sr:match:1|over15\",\"eventId\":\"sr:match:1\",\"market\":\"over15\",\"label\":\"Over 1.5 goals\",\"home\":\"Ghana\",\"away\":\"Somalia\"}]}]}");
+        state.merge(patch);
+        WatchMatch one = match();
+        one.status = "live";
+        one.homeScore = 2;
+        one.awayScore = 0;
+        List<WatchMatch> board = new java.util.ArrayList<WatchMatch>();
+        board.add(one);
+        List<WatchNote> notes = AlertPlanner.slipNotes(board, state, KICK + 30L * 60_000L);
+        assertEquals(3, notes.size());
+        assertEquals("slipleg:s2:sr:match:1|over15", notes.get(0).id);
+        assertEquals("Leg won · Slip 2 · SportyBet ABC123", notes.get(0).title);
+        assertEquals("Over 1.5 goals · Ghana 2-0 Somalia · 1 of 2 settled", notes.get(0).body);
+        assertEquals("slipleg:s3:sr:match:1|over15", notes.get(1).id);
+        assertEquals("Leg won · Slip 3 · MSport XY9", notes.get(1).title);
+        assertEquals("slip:s3", notes.get(2).id);
+        assertEquals("Slip 3 · MSport XY9 won · 1 of 1 legs", notes.get(2).title);
+    }
+
+    @Test
+    public void codesMarketsDoNotFallBackToScored() {
+        WatchMatch done = match();
+        done.status = "finished";
+        done.homeScore = 1;
+        done.awayScore = 0;
+        assertEquals("bust", AlertPlanner.settle("ah-1-away", done));
+        assertEquals("open", AlertPlanner.settle("ah-1-home", done));
+        assertEquals("open", AlertPlanner.settle("2up-home", done));
+        assertEquals("bust", AlertPlanner.settle("home-over15", done));
+    }
+
     private static WatchState followed() {
         WatchState state = new WatchState();
         state.browser = true;

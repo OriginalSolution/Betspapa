@@ -101,4 +101,13 @@ describe('slip bells', () => {
     expect(legNoteId('s1', 'sr:match:1|over15')).toBe('slipleg:s1:sr:match:1|over15');
     expect(slipNoteId('s1')).toBe('slip:s1');
   });
+
+  it('keeps all ringing slips under one shared leg budget, newest first', () => {
+    const many = Array.from({ length: 150 }, (_, i) => leg(i));
+    for (let i = 0; i < 6; i++) setBell(`b${i}`, true, { label: `Slip ${i}`, legs: many }, NOW + i);
+    const rows = bellRegistration(readBells(), NOW + 10);
+    expect(rows.map((row) => row.legs.length)).toEqual([100, 100, 100, 100]);
+    expect(rows[0].id).toBe('b5');
+    expect(bellWatchRows(readBells(), NOW + 10).reduce((sum, row) => sum + row.legs.length, 0)).toBe(400);
+  });
 });

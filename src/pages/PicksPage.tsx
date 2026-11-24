@@ -4,6 +4,8 @@ import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
+import { TrackButton } from '../components/TrackButton';
+import { engineTrack } from '../lib/trackFrom';
 import { showsInTier, slipParts, tierSlip, CODE_TIERS, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
 import { plainReasons } from '../lib/plainReason';
 import { BookMark } from '../components/BookMark';
@@ -124,6 +126,9 @@ export function PicksPage() {
             </div>
           ))}
         </div>
+        {booked.parts.length > 0 && (
+          <TrackButton {...engineTrack(tierSlip(state, tier, market === 'all' ? null : market), desk, 'picks', `${TIER_LABEL[tier]} · ${DESK_NAMES[desk]}`)} className="track-btn-row" />
+        )}
       </section>
       <div className="market-filters pick-markets" role="tablist" aria-label="Filter by market">
         <button type="button" role="tab" aria-selected={market === 'all'} className={cx('market-filter', market === 'all' && 'is-on')} onClick={() => setMarket('all')}>

@@ -33,7 +33,9 @@ const EVENT = 'betspapa-slip-bells';
 /** A bell whose last leg kicked off more than two days ago has nothing left to say. */
 export const BELL_KEEP_MS = 2 * 24 * 60 * 60 * 1000;
 export const MAX_BELLS = 12;
-export const MAX_BELL_LEGS = 60;
+export const MAX_BELL_LEGS = 100;
+/** All ringing slips together. Keeps the device registration well under the server's body limit. */
+export const MAX_BELL_TOTAL = 400;
 
 function storage(): Storage | null {
   try {
@@ -147,13 +149,16 @@ export function setBell(id: string, on: boolean, slip: { label: string; legs: Be
 }
 
 /** Keep a ringing bell's legs current when the slip it belongs to changes (a rebook drops a leg). */
-export function refreshBellLegs(id: string, legs: BellLeg[]) {
+export function refreshBellLegs(id: string, legs: BellLeg[], label?: string) {
   const bells = readBells();
   const bell = bells[id];
   if (!bell?.on) return;
   const next = legs.slice(0, MAX_BELL_LEGS).map(toBellLeg);
-  if (next.map((leg) => leg.key).join('|') === bell.legs.map((leg) => leg.key).join('|')) return;
-  bells[id] = { ...bell, legs: next };
+  const sameLegs = next.map((leg) => leg.key).join('|') === bell.legs.map((leg) => leg.key).join('|');
+  // A slip tracked before slips had names gets its name, so its alerts say which slip.
+  const nextLabel = label && label !== bell.label ? label : bell.label;
+  if (sameLegs && nextLabel === bell.label) return;
+  bells[id] = { ...bell, label: nextLabel, legs: next };
   writeBells(bells);
 }
 
@@ -187,8 +192,20 @@ export function withBellFollows(follows: Follows, bells = readBells(), now = Dat
 }
 
 /** What the server stores for push. Same shape as the tracked builder slip, plus the label. */
+/** Newest bells first; legs past the shared budget are left off the newest-last slips. */
+function budgeted(bells: SlipBell[]): SlipBell[] {
+  let left = MAX_BELL_TOTAL;
+  return bells
+    .map((bell) => {
+      const legs = bell.legs.slice(0, Math.max(0, left));
+      left -= legs.length;
+      return { ...bell, legs };
+    })
+    .filter((bell) => bell.legs.length);
+}
+
 export function bellRegistration(bells = readBells(), now = Date.now()) {
-  return ringingBells(bells, now).map((bell) => ({
+  return budgeted(ringingBells(bells, now)).map((bell) => ({
     id: bell.id,
     label: bell.label.slice(0, 80),
     legs: bell.legs.map((leg) => ({ eventId: leg.eventId, market: leg.market, home: leg.home, away: leg.away, odds: leg.odds, label: leg.label })),
@@ -197,7 +214,7 @@ export function bellRegistration(bells = readBells(), now = Date.now()) {
 
 /** Watcher rows: the phone settles each leg itself when there is no Play Services push. */
 export function bellWatchRows(bells = readBells(), now = Date.now()) {
-  return ringingBells(bells, now).map((bell) => ({
+  return budgeted(ringingBells(bells, now)).map((bell) => ({
     id: bell.id,
     label: bell.label,
     legs: bell.legs.map((leg) => ({ key: leg.key, eventId: leg.eventId, market: leg.market, label: leg.label, home: leg.home, away: leg.away })),
