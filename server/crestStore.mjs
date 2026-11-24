@@ -14,7 +14,7 @@ import { coreName, flagUrl, isNationalSide, juniorSide, looseKey, teamSlug } fro
 import { loadCatalog, loadOverrides, pacer, sportsDb, wikidata } from './crestResolve.mjs';
 import { prepareCrest } from './crestImage.mjs';
 
-const USER_AGENT = 'Betspapa/0.4.31 (crest list; https://betspapa.com)';
+const USER_AGENT = 'Betspapa/0.4.32 (crest list; https://betspapa.com)';
 export const SPORTRADAR = 'https://img.sportradar.com/ls/crest/big/';
 const DAY = 86_400_000;
 /** Bump when the image checks change so earlier misses are tried again at once. */
