@@ -3238,3 +3238,5 @@ button.banner.banner-alert { min-height: 44px; }
 .name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.25; }
 /* Logo in the top bar is a 44px target. */
 .mobile-brand { min-width: 44px; min-height: 44px; justify-content: center; }
+/* The code chip itself is a tap target (Load): 24px box + 10px hit slop each side = 44px. */
+.code-pair-code { min-height: 24px; }
