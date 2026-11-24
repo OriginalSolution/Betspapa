@@ -1,0 +1,5 @@
+- Slip bell: tap it to get alerts for every match on the slip, with an animated won or lost result
+- Redesigned slip card
+- SportyBet master slip code and Copy/Load buttons are clear and readable
+- Codes and Picks line up on every phone, including large text and display size
+- Full team names everywhere, nothing cut off; bigger tap targets
