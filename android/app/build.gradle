@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 53
-        versionName "0.4.30" // Fits every phone, the open Fold and tablets
+        versionCode 54
+        versionName "0.4.31" // Slip bell, new slip card, every screen QA-checked on Xiaomi large text
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
