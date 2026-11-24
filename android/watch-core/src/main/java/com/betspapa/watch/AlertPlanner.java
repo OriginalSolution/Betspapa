@@ -107,7 +107,92 @@ public final class AlertPlanner {
             }
             notes.add(note);
         }
+        notes.addAll(slipNotes(matches, state, now));
         return notes;
+    }
+
+    /**
+     * Belled slips: one card per leg when it is won or lost, then one for the whole slip.
+     * Ids match the server push and the WebView, so each shows once on the phone.
+     */
+    static List<WatchNote> slipNotes(List<WatchMatch> matches, WatchState state, long now) {
+        List<WatchNote> notes = new ArrayList<WatchNote>();
+        for (org.json.JSONObject slip : state.slips) {
+            String slipId = slip.optString("id", "");
+            org.json.JSONArray legs = slip.optJSONArray("legs");
+            if (slipId.isEmpty() || legs == null || legs.length() == 0) continue;
+            int total = legs.length();
+            for (int i = 0; i < total; i++) {
+                org.json.JSONObject leg = legs.optJSONObject(i);
+                if (leg == null) continue;
+                String eventId = leg.optString("eventId", "");
+                String market = leg.optString("market", "");
+                String key = leg.optString("key", eventId + "|" + market);
+                if (eventId.isEmpty() || market.isEmpty() || state.slipResult(slipId, key) != null) continue;
+                WatchMatch match = find(matches, eventId);
+                if (match == null || (!inWindow(match, state, now) && !justFinished(match, state, now))) continue;
+                String verdict = settle(market, viewOf(match, now));
+                if ("open".equals(verdict)) continue;
+                boolean won = "won".equals(verdict);
+                String home = leg.optString("home", "");
+                String away = leg.optString("away", "");
+                if (home.isEmpty()) home = NoteCopy.fixture(match);
+                String score = match.homeScore != null && match.awayScore != null ? match.homeScore + "-" + match.awayScore : "";
+                String label = leg.optString("label", market);
+                org.json.JSONObject result = new org.json.JSONObject();
+                result.put("status", won ? "won" : "lost");
+                result.put("score", score);
+                result.put("home", home);
+                result.put("away", away);
+                result.put("label", label);
+                state.putSlipResult(slipId, key, result);
+                String id = "slipleg:" + slipId + ":" + key;
+                if (state.seen(id)) continue;
+                int settled = settledCount(state, slipId, legs);
+                WatchNote note = new WatchNote(id, match.id, won ? "win" : "bust", (won ? "Leg won · " : "Leg lost · ") + label,
+                        legScore(home, away, score) + " · " + settled + " of " + total + " settled");
+                note.marketLabel = label;
+                note.fixture = away.isEmpty() ? home : home + " v " + away;
+                notes.add(note);
+            }
+            String finalId = "slip:" + slipId;
+            if (state.seen(finalId) || settledCount(state, slipId, legs) < total) continue;
+            int wins = 0;
+            org.json.JSONObject missed = null;
+            for (int i = 0; i < total; i++) {
+                org.json.JSONObject leg = legs.optJSONObject(i);
+                if (leg == null) continue;
+                org.json.JSONObject result = state.slipResult(slipId, leg.optString("key", leg.optString("eventId", "") + "|" + leg.optString("market", "")));
+                if (result == null) continue;
+                if ("won".equals(result.optString("status"))) wins++;
+                else if (missed == null) missed = result;
+            }
+            String title = missed != null ? "Slip lost · " + wins + " of " + total + " legs won" : "Slip won · " + wins + " of " + total + " legs";
+            String body = missed != null
+                    ? legScore(missed.optString("home"), missed.optString("away"), missed.optString("score")) + " missed " + missed.optString("label") + "."
+                    : "Every leg landed.";
+            WatchNote note = new WatchNote(finalId, "", "slip", title, body);
+            note.marketLabel = title;
+            note.fixture = body;
+            notes.add(note);
+        }
+        return notes;
+    }
+
+    private static int settledCount(WatchState state, String slipId, org.json.JSONArray legs) {
+        int count = 0;
+        for (int i = 0; i < legs.length(); i++) {
+            org.json.JSONObject leg = legs.optJSONObject(i);
+            if (leg == null) continue;
+            String key = leg.optString("key", leg.optString("eventId", "") + "|" + leg.optString("market", ""));
+            if (state.slipResult(slipId, key) != null) count++;
+        }
+        return count;
+    }
+
+    static String legScore(String home, String away, String score) {
+        if (away == null || away.isEmpty()) return score == null || score.isEmpty() ? home : home + " " + score;
+        return score == null || score.isEmpty() ? home + " v " + away : home + " " + score + " " + away;
     }
 
     public static String settle(String market, WatchMatch match) {

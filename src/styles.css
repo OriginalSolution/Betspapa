@@ -2844,3 +2844,327 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .booked-foot .btn { flex: 1 1 140px; white-space: nowrap; }
 .code-card-main > * { min-width: 0; }
 .code-card-main strong, .code-card-main span { overflow-wrap: anywhere; }
+
+/* ===== Slip card (tracked slip), slip bell, leg rows, master hero contrast ===== */
+.slip-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 20px;
+  padding: 14px 14px 12px;
+  background:
+    radial-gradient(420px 160px at 100% 0%, rgba(225, 29, 46, 0.18), transparent 70%),
+    linear-gradient(180deg, #161a23, #10131a);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+.slip-card.is-won { border-color: rgba(61, 220, 151, 0.55); background: radial-gradient(420px 180px at 100% 0%, rgba(61, 220, 151, 0.2), transparent 70%), linear-gradient(180deg, #13201b, #0f1512); }
+.slip-card.is-lost { border-color: rgba(225, 29, 46, 0.6); }
+.slip-card-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.slip-card-title { flex: 1 1 auto; min-width: 0; }
+.slip-card-kicker { margin: 0; color: var(--muted); font-size: 11.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; overflow-wrap: anywhere; }
+.slip-card-title h2 {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 21px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  text-transform: none;
+  color: var(--text);
+}
+.slip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d6dae3;
+}
+.slip-chip.is-won { background: rgba(61, 220, 151, 0.16); color: #5ff0b0; }
+.slip-chip.is-lost { background: rgba(225, 29, 46, 0.2); color: #ff8a93; }
+.slip-chip.is-live { background: rgba(255, 77, 90, 0.18); color: #ff6b76; }
+.slip-chip.is-void { background: rgba(240, 201, 74, 0.14); color: var(--gold); }
+.slip-card-state { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Bell */
+.slip-bell {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dfe3ec;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.slip-bell svg { width: 22px; height: 22px; flex: none; overflow: visible; }
+.slip-bell-body { fill: none; stroke: currentColor; transition: fill 0.2s ease; }
+.slip-bell.is-on {
+  background: linear-gradient(180deg, #ff3445, #c8101f);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(225, 29, 46, 0.45);
+}
+.slip-bell.is-on .slip-bell-body { fill: #fff; }
+.slip-bell.is-on .slip-bell-clapper { stroke: #fff; }
+.slip-bell.is-ringing svg { transform-origin: 50% 12%; animation: slip-bell-ring 1.1s ease-in-out; }
+.slip-bell.is-ringing { animation: slip-bell-glow 1.1s ease-out; }
+@keyframes slip-bell-ring {
+  0% { transform: rotate(0); }
+  12% { transform: rotate(22deg); }
+  26% { transform: rotate(-18deg); }
+  40% { transform: rotate(14deg); }
+  54% { transform: rotate(-10deg); }
+  68% { transform: rotate(6deg); }
+  82% { transform: rotate(-3deg); }
+  100% { transform: rotate(0); }
+}
+@keyframes slip-bell-glow {
+  0% { box-shadow: 0 0 0 0 rgba(255, 52, 69, 0.7); }
+  100% { box-shadow: 0 0 0 14px rgba(255, 52, 69, 0); }
+}
+.slip-bell-small { padding: 0 10px 0 8px; }
+.slip-bell-note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(225, 29, 46, 0.12);
+  border: 1px solid rgba(225, 29, 46, 0.3);
+  color: #ffd5d9;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+/* Progress and summary */
+.slip-progress {
+  display: flex;
+  height: 8px;
+  margin-top: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+.slip-progress i { display: block; height: 100%; transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slip-progress .is-won { background: linear-gradient(90deg, #22b877, #3ddc97); }
+.slip-progress .is-lost { background: linear-gradient(90deg, #c8101f, #ff4d5a); }
+.slip-progress .is-void { background: var(--gold); }
+.slip-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+@media (min-width: 600px) { .slip-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.slip-summary > div { min-width: 0; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); }
+.slip-summary dt { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; overflow-wrap: anywhere; }
+.slip-summary dd { margin: 2px 0 0; font-family: var(--score); font-size: 22px; font-weight: 700; line-height: 1.05; overflow-wrap: anywhere; }
+.slip-summary dd .is-won { color: #5ff0b0; }
+.slip-summary dd .is-lost { color: #ff8a93; }
+.slip-missed { margin: 10px 0 0; color: #ffb3b9; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+
+/* Leg rows */
+.slip-legs2 { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.slip-leg2 {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  min-width: 0;
+  transform-origin: 50% 50%;
+}
+.slip-leg2.is-won { background: linear-gradient(90deg, rgba(61, 220, 151, 0.14), rgba(61, 220, 151, 0.03)); border-color: rgba(61, 220, 151, 0.35); }
+.slip-leg2.is-lost { background: linear-gradient(90deg, rgba(225, 29, 46, 0.18), rgba(225, 29, 46, 0.04)); border-color: rgba(225, 29, 46, 0.4); }
+.slip-leg2.is-live { border-color: rgba(255, 77, 90, 0.45); }
+.slip-leg2-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line-strong);
+}
+.slip-leg2-mark i { width: 8px; height: 8px; border-radius: 50%; background: #5b6273; }
+.slip-leg2-mark svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.slip-leg2.is-won .slip-leg2-mark { background: #22b877; border-color: #3ddc97; }
+.slip-leg2.is-lost .slip-leg2-mark { background: #d01525; border-color: #ff4d5a; }
+.slip-leg2-mark .slip-leg2-pulse { background: #ff4d5a; animation: slip-live 1.4s ease-in-out infinite; }
+@keyframes slip-live { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+.slip-leg2-main { min-width: 0; display: grid; gap: 3px; }
+.slip-leg2-side { margin: 0; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.slip-leg2-side .crest { flex: none; }
+.slip-leg2-side span { min-width: 0; overflow-wrap: anywhere; }
+.slip-leg2-meta { margin: 3px 0 0; display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
+.slip-pill {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 8px;
+  padding: 2px 8px;
+  background: rgba(225, 29, 46, 0.14);
+  border: 1px solid rgba(225, 29, 46, 0.3);
+  color: #ffc9ce;
+  font-size: 11.5px;
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.slip-leg2-side-col { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; min-width: 0; text-align: right; }
+.slip-leg2-odds { font-family: var(--score); font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: 0.01em; }
+.slip-leg2-side-col .slip-chip { white-space: nowrap; }
+.slip-leg2.is-fresh.is-won { animation: slip-flip-won 1.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slip-leg2.is-fresh.is-lost { animation: slip-flip-lost 1.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slip-leg2.is-fresh .slip-leg2-mark { animation: slip-mark-pop 0.9s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes slip-flip-won {
+  0% { transform: perspective(600px) rotateX(-90deg); box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); }
+  45% { transform: perspective(600px) rotateX(12deg); }
+  70% { transform: perspective(600px) rotateX(0); box-shadow: 0 0 0 6px rgba(61, 220, 151, 0.35); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 220, 151, 0); }
+}
+@keyframes slip-flip-lost {
+  0% { transform: perspective(600px) rotateX(-90deg); }
+  45% { transform: perspective(600px) rotateX(12deg); }
+  60% { transform: translateX(-6px); }
+  72% { transform: translateX(5px); }
+  84% { transform: translateX(-3px); box-shadow: 0 0 0 6px rgba(225, 29, 46, 0.35); }
+  100% { transform: none; box-shadow: 0 0 0 0 rgba(225, 29, 46, 0); }
+}
+@keyframes slip-mark-pop { 0% { transform: scale(0.2); } 100% { transform: scale(1); } }
+.slip-alert.is-won { border-color: rgba(61, 220, 151, 0.5); }
+.slip-alert.is-lost { border-color: rgba(225, 29, 46, 0.5); }
+.slip-card.is-party .slip-card-title h2 { animation: slip-cheer 0.9s 0.2s ease-out 2; }
+@keyframes slip-cheer { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.08); color: #5ff0b0; } }
+.slip-confetti { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; }
+.slip-confetti i {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: slip-confetti;
+  animation-timing-function: cubic-bezier(0.25, 0.6, 0.4, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes slip-confetti {
+  0% { opacity: 1; translate: 0 0; rotate: 0deg; }
+  100% { opacity: 0; translate: 0 420px; rotate: 540deg; }
+}
+.slip-trend-legs .slip-leg2 { padding: 8px; }
+.slip-trend.is-belled { border-color: rgba(225, 29, 46, 0.45); }
+.slip-trend-top .slip-bell { order: 2; }
+.slip-trend-top .slip-trend-main { min-width: 0; }
+
+/* Wide screens: legs in two columns on the open Fold and tablets. */
+@media (min-width: 720px) {
+  .slip-card .slip-legs2 { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+}
+/* Narrow phones or large text: the bell drops its word and keeps the 44px target. */
+@media (max-width: 359px) {
+  .slip-bell-text { display: none; }
+  .slip-bell { padding: 0; width: 44px; }
+  .slip-leg2 { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; padding: 9px 8px; }
+  .slip-leg2-mark { width: 22px; height: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slip-bell.is-ringing, .slip-bell.is-ringing svg,
+  .slip-leg2.is-fresh, .slip-leg2.is-fresh .slip-leg2-mark,
+  .slip-card.is-party .slip-card-title h2, .slip-leg2-mark .slip-leg2-pulse { animation: none !important; }
+  .slip-confetti { display: none; }
+  .slip-progress i { transition: none; }
+}
+
+/* Bookmaker chips wrap instead of hiding the third chip off the edge. */
+.slips-page .book-switch { flex-wrap: wrap; overflow: visible; padding: 4px 2px 6px; gap: 8px; }
+.slips-page .book-chip { min-height: 44px; flex: 0 1 auto; }
+
+/* Master slip: a high-contrast code panel and solid 44px buttons on any bookmaker colour. */
+.master-hero .master-part {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  min-width: 0;
+}
+.master-hero .master-part + .master-part { margin-top: 4px; }
+.master-hero .master-part-top { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.master-hero .master-part span.master-part-tag {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.master-hero .master-part span.master-meta { color: inherit; font-size: 14px; font-weight: 750; overflow-wrap: anywhere; min-width: 0; }
+.master-hero .master-part .code-pair.master-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  color: inherit;
+  font-size: inherit;
+  width: 100%;
+  flex: none;
+}
+.master-hero .master-actions .master-code {
+  grid-column: 1 / -1;
+  justify-self: stretch;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #fff;
+  color: #11131a;
+  font-family: var(--score);
+  font-size: clamp(30px, 11vw, 44px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.08em;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.master-hero .master-actions .btn {
+  min-height: 46px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  border: 0;
+  background: #11131a;
+  color: #fff;
+}
+.master-hero .master-actions .btn:not(.btn-quiet) { background: #fff; color: #c00d1c; }
+.master-hero.book-betika .master-actions .btn:not(.btn-quiet) { color: #203080; }
+.master-hero.book-msport .master-actions .btn:not(.btn-quiet),
+.master-hero.book-betpawa .master-actions .btn:not(.btn-quiet),
+.master-hero.book-footballcom .master-actions .btn:not(.btn-quiet) { color: #11131a; }
+.master-hero .master-actions .btn-quiet { background: rgba(0, 0, 0, 0.45); color: #fff; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45); }
+.master-hero .master-code-empty { color: inherit; font-size: 28px; }
+.master-hero .master-when { font-size: 13px; opacity: 0.95; }
+.slips-page .slip-trend .code-pair .btn-tiny { min-height: 40px; padding: 8px 14px; }

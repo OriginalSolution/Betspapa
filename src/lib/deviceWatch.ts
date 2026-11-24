@@ -46,7 +46,15 @@ export type WatchBooking = {
   code?: string;
 };
 
+/** A belled slip for the on-phone watcher: each leg posts its own won or lost card. */
+export type WatchSlip = {
+  id: string;
+  label: string;
+  legs: Array<{ key: string; eventId: string; market: string; label: string; home: string; away: string }>;
+};
+
 export type WatchPatch = {
+  slips?: WatchSlip[];
   browser?: boolean;
   settings?: WatchSettings;
   follows?: Follows;
@@ -93,6 +101,7 @@ type WatchPlugin = {
 const Watch = registerPlugin<WatchPlugin>('Watch');
 
 const draft: {
+  slips?: WatchSlip[];
   browser?: boolean;
   settings?: WatchSettings;
   follows?: Follows;
@@ -151,6 +160,7 @@ export function scheduleRows(matches: Match[], follows: Follows, trends: string[
 }
 
 export function stageWatch(partial: {
+  slips?: WatchSlip[];
   browser?: boolean;
   settings?: WatchSettings;
   follows?: Follows;
@@ -162,6 +172,7 @@ export function stageWatch(partial: {
   matches?: Match[];
   bookings?: WatchBooking[];
 }) {
+  if (partial.slips) draft.slips = partial.slips;
   if (partial.browser !== undefined) draft.browser = partial.browser;
   if (partial.settings) draft.settings = partial.settings;
   if (partial.follows) draft.follows = partial.follows;
@@ -180,6 +191,7 @@ let running: Promise<void> = Promise.resolve();
 
 function buildPatch(): WatchPatch {
   const patch: WatchPatch = {};
+  if (draft.slips) patch.slips = draft.slips;
   if (draft.browser !== undefined) patch.browser = draft.browser;
   if (draft.settings) patch.settings = draft.settings;
   if (draft.follows) patch.follows = draft.follows;

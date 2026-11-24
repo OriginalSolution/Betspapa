@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { fetchConfig, fetchInPlay, fetchSportyBoard } from '../data/remote';
 import { FeedPause, shouldPoll, shouldPollLive } from '../lib/backoff';
 import { followedNotices, staleAlertIds } from '../lib/alerts';
@@ -11,6 +11,7 @@ import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate, onBoardDate } from '../lib/dates';
 import { isNativeApp } from '../lib/nativeHttp';
+import { bellWatchRows, subscribeBells, withBellFollows } from '../lib/slipBells';
 import { playGoalSound, shouldPlayInAppCheer } from '../lib/cheer';
 import { pushBrowserNotification, readNativePermission, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
 import { diffAlerts, type AlertSignal } from '../lib/signals';
@@ -110,7 +111,7 @@ function applySnapshot(state: State, incoming: Match[], now: number, usingDemo =
   const deleted = loadDeletedAlerts();
   const alerts = diffAlerts(state.baseline, matches, {
     generation: state.t0,
-    followedMatchIds: new Set(state.follows.matches),
+    followedMatchIds: new Set(withBellFollows(state.follows).matches),
     followedTeamIds: new Set(state.follows.teams.map((team) => team.id)),
     settings: state.settings,
   });
@@ -443,6 +444,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const boardKey = state.matches.map((match) => `${match.id}:${match.status}:${match.homeScore}:${match.awayScore}:${match.minute}:${match.htHome}`).join('|');
   const followKey = `${state.follows.matches.join(',')}|${state.follows.teams.map((team) => team.id).join(',')}`;
+  // A slip bell follows its matches without touching the user's own follow list.
+  const [bellTick, setBellTick] = useState(0);
+  useEffect(() => subscribeBells(() => setBellTick((tick) => tick + 1)), []);
 
   useEffect(() => {
     upcomingRef.current = [];
@@ -453,9 +457,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const current = stateRef.current;
     const seen = loadAlerted();
     for (const item of current.inbox) seen.add(item.id);
-    const notes = followedNotices(current.matches, current.follows, current.settings, seen, Date.now());
+    const notes = followedNotices(current.matches, withBellFollows(current.follows), current.settings, seen, Date.now());
     if (notes.length) dispatch({ type: 'notices', items: notes });
-  }, [state.ready, state.watchReady, boardKey, followKey, state.settings]);
+  }, [state.ready, state.watchReady, boardKey, followKey, state.settings, bellTick]);
 
   useEffect(() => {
     if (!state.ready) return;
@@ -520,7 +524,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         varSound: state.settings.varSound,
         penaltySound: state.settings.penaltySound,
       },
-      follows: state.follows,
+      follows: withBellFollows(state.follows),
+      slips: bellWatchRows(),
       matches: state.matches,
       inbox: state.inbox,
       seen: [...loadAlerted()],
@@ -528,7 +533,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       replaceInbox: replaceInbox.current,
     });
     replaceInbox.current = false;
-  }, [state.settings, state.follows, state.matches, state.inbox]);
+  }, [state.settings, state.follows, state.matches, state.inbox, bellTick]);
 
   useEffect(() => {
     if (!state.flash.length) return;
