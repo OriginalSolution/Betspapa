@@ -26,3 +26,6 @@ export function trendCopy(match: CopyMatch, label: string): Copy;
 export function legFixture(leg: CopyLeg): string;
 export function legScore(leg: CopyLeg, score?: string): string;
 export function legList<T>(legs: T[], text?: (leg: T) => string, limit?: number): string;
+export function slipCallName(label: string | null | undefined): string;
+export function bellLegCopy(input: { won: boolean; slip: string; label: string; score: string; odds: string; settled: number; total: number }): Copy;
+export function slipVerdictTitle(slip: string, won: number, played: number, lost: number): string;

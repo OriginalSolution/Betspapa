@@ -125,3 +125,29 @@ export function legList(legs, text = legFixture, limit = 2) {
   const more = rows.length - limit;
   return `${rows.slice(0, limit).join(', ')} and ${more} more`;
 }
+
+/** A slip's own name, or "" for the generic labels older builds sent ("Slip", "Tracked slip"). */
+export function slipCallName(label) {
+  const name = String(label || '').trim();
+  if (!name || name === 'Slip' || name === 'Tracked slip') return '';
+  return name;
+}
+
+/**
+ * One leg of a belled slip settled. With a slip name the title says which slip:
+ * "Leg won · Slip 2 · SportyBet ABC123", and the market moves to the body.
+ */
+export function bellLegCopy({ won, slip, label, score, odds, settled, total }) {
+  const word = won ? 'Leg won' : 'Leg lost';
+  const name = slipCallName(slip);
+  const price = odds ? ` · ${odds}` : '';
+  const count = ` · ${settled} of ${total} settled`;
+  if (!name) return { title: `${word} · ${label}`, body: `${score}${price}${count}` };
+  return { title: `${word} · ${name}`, body: `${label} · ${score}${price}${count}` };
+}
+
+/** "Slip 2 · SportyBet ABC123 won · 5 of 5 legs", or the plain "Slip won · …" without a name. */
+export function slipVerdictTitle(slip, won, played, lost) {
+  const name = slipCallName(slip) || 'Slip';
+  return lost ? `${name} lost · ${won} of ${played} legs won` : `${name} won · ${won} of ${played} legs`;
+}

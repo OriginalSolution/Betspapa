@@ -126,6 +126,8 @@ function publicLeg(leg, crestFor) {
     homeCrest: crestFor ? crestFor(leg.homeId, leg.home) || '' : leg.homeCrest || '',
     awayCrest: crestFor ? crestFor(leg.awayId, leg.away) || '' : leg.awayCrest || '',
     label: leg.label,
+    /** Grade key (over25, home-over15, ah-1-away, 2up-home …) so a tracked Codes slip can settle each leg. */
+    market: leg.grade || '',
     odds: leg.odds,
     kickoff: leg.kickMs ? new Date(leg.kickMs).toISOString() : '',
     score: leg.score || leg.ft || '',
