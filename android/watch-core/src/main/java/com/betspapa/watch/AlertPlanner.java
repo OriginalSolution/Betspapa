@@ -119,6 +119,7 @@ public final class AlertPlanner {
         List<WatchNote> notes = new ArrayList<WatchNote>();
         for (org.json.JSONObject slip : state.slips) {
             String slipId = slip.optString("id", "");
+            String slipName = slipCallName(slip.optString("label", ""));
             org.json.JSONArray legs = slip.optJSONArray("legs");
             if (slipId.isEmpty() || legs == null || legs.length() == 0) continue;
             int total = legs.length();
@@ -149,8 +150,12 @@ public final class AlertPlanner {
                 String id = "slipleg:" + slipId + ":" + key;
                 if (state.seen(id)) continue;
                 int settled = settledCount(state, slipId, legs);
-                WatchNote note = new WatchNote(id, match.id, won ? "win" : "bust", (won ? "Leg won · " : "Leg lost · ") + label,
-                        legScore(home, away, score) + " · " + settled + " of " + total + " settled");
+                String word = won ? "Leg won · " : "Leg lost · ";
+                String count = legScore(home, away, score) + " · " + settled + " of " + total + " settled";
+                // A named slip says which slip in the title; the market moves to the body.
+                WatchNote note = slipName.isEmpty()
+                        ? new WatchNote(id, match.id, won ? "win" : "bust", word + label, count)
+                        : new WatchNote(id, match.id, won ? "win" : "bust", word + slipName, label + " · " + count);
                 note.marketLabel = label;
                 note.fixture = away.isEmpty() ? home : home + " v " + away;
                 notes.add(note);
@@ -167,7 +172,8 @@ public final class AlertPlanner {
                 if ("won".equals(result.optString("status"))) wins++;
                 else if (missed == null) missed = result;
             }
-            String title = missed != null ? "Slip lost · " + wins + " of " + total + " legs won" : "Slip won · " + wins + " of " + total + " legs";
+            String head = slipName.isEmpty() ? "Slip" : slipName;
+            String title = missed != null ? head + " lost · " + wins + " of " + total + " legs won" : head + " won · " + wins + " of " + total + " legs";
             String body = missed != null
                     ? legScore(missed.optString("home"), missed.optString("away"), missed.optString("score")) + " missed " + missed.optString("label") + "."
                     : "Every leg landed.";
@@ -188,6 +194,13 @@ public final class AlertPlanner {
             if (state.slipResult(slipId, key) != null) count++;
         }
         return count;
+    }
+
+    /** The slip's own name, or "" for the generic labels older builds sent. */
+    static String slipCallName(String label) {
+        String name = label == null ? "" : label.trim();
+        if (name.isEmpty() || "Slip".equals(name) || "Tracked slip".equals(name)) return "";
+        return name;
     }
 
     static String legScore(String home, String away, String score) {
@@ -248,6 +261,15 @@ public final class AlertPlanner {
             if (home > away) return "bust";
             return "open";
         }
+        // Codes (Banker) markets on a tracked Codes slip.
+        if ("home-over15".equals(market)) return home >= 2 ? "won" : finished ? "bust" : "open";
+        if ("away-over15".equals(market)) return away >= 2 ? "won" : finished ? "bust" : "open";
+        if ("ah-1-home".equals(market) || "ah-1-away".equals(market)) {
+            if (!finished) return "open";
+            int margin = "ah-1-home".equals(market) ? home - away : away - home;
+            return margin >= 2 ? "won" : margin == 1 ? "open" : "bust";
+        }
+        if (market.startsWith("2up-") || market.startsWith("1up-")) return "open";
         return scored > 0 && finished ? "won" : "open";
     }
 
