@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { friendlyError } from '../lib/apiJson';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CodeActions } from '../components/CodeActions';
+import { TrackButton } from '../components/TrackButton';
+import { draftFromCodes } from '../lib/trackFrom';
 import { Crest } from '../components/Crest';
 import {
   bookingLine,
@@ -90,7 +92,7 @@ function Logos({ part }: { part: CodePart }) {
   );
 }
 
-function PartBlock({ part, warning, index, total }: { part: CodePart; warning: string; index: number; total: number }) {
+function PartBlock({ part, warning, index, total, name }: { part: CodePart; warning: string; index: number; total: number; name: string }) {
   return (
     <article className="code-part">
       <header>
@@ -107,6 +109,7 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
       <Risk part={part} warning={warning} />
       <p className="code-read">{readbackLine(part)}{part.readAt ? ` · price at ${gmtClock(part.readAt)} GMT` : ''}</p>
       {mixText(part.mix) && <p className="code-mix">{mixText(part.mix)}</p>}
+      {part.status !== 'won' && part.status !== 'lost' && <TrackButton draft={draftFromCodes(name, [part])} className="track-btn-row" />}
     </article>
   );
 }
@@ -224,7 +227,7 @@ export function CodesPage() {
         </section>
         {week.parts.length === 0 && <p className="code-empty">{week.empty}</p>}
         {week.parts.map((part, index) => (
-          <PartBlock key={part.code} part={part} warning={data.warning} index={index} total={week.parts.length} />
+          <PartBlock key={part.code} part={part} warning={data.warning} index={index} total={week.parts.length} name={strategy.name} />
         ))}
         {week.parts[0] && (
           <section className="code-legs">
@@ -311,6 +314,7 @@ export function CodesPage() {
                   </div>
                 </Link>
                 {part && <CodeCopy code={part.code} link={part.link} />}
+                {part && part.status !== 'won' && part.status !== 'lost' && <TrackButton draft={draftFromCodes(item.name, [part])} className="track-btn-row" />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
                 {hasCode(item.today) && (
                   <div className="code-today">
@@ -354,6 +358,7 @@ export function CodesPage() {
                   </div>
                 </div>
                 {part && <CodeCopy code={part.code} link={part.link} />}
+                {part && part.status !== 'won' && part.status !== 'lost' && <TrackButton draft={draftFromCodes(item.name, [part])} className="track-btn-row" />}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{part.highRiskWhy}. {data.warning}</span></p>}
               </article>
             );

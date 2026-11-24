@@ -3240,3 +3240,108 @@ button.banner.banner-alert { min-height: 44px; }
 .mobile-brand { min-width: 44px; min-height: 44px; justify-content: center; }
 /* The code chip itself is a tap target (Load): 24px box + 10px hit slop each side = 44px. */
 .code-pair-code { min-height: 24px; }
+
+/* ---------- Several tracked slips (0.4.32) ---------- */
+.tracked-slips { display: grid; gap: 10px; min-width: 0; }
+.tracked-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.tracked-bar h2 { margin: 0; font-size: 17px; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.tracked-bar h2 small { color: var(--muted); font-size: 13px; font-weight: 800; }
+.tracked-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.tracked-all svg, .slip-card-chevron, .track-btn svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.slip-card-head { align-items: center; }
+.slip-card-toggle {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  gap: 3px;
+  padding: 2px 26px 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.slip-card-toggle:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.slip-card-toggle .slip-card-kicker { display: block; }
+.slip-card-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.slip-card-name strong { min-width: 0; font-size: 17px; line-height: 1.2; letter-spacing: -0.02em; color: var(--text); overflow-wrap: anywhere; }
+.slip-card-stats { color: #c9ced8; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.slip-card-stats .is-won { color: #5ff0b0; }
+.slip-card-stats .is-lost { color: #ff8a93; }
+.slip-card-chevron { position: absolute; right: 2px; top: 50%; margin-top: -8px; color: var(--muted); transition: transform 0.28s ease; }
+.slip-card.is-expanded .slip-card-chevron { transform: rotate(180deg); }
+.slip-card-settled { margin: 4px 0 0; color: var(--muted); font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; }
+.slip-card-origin { margin: 10px 0 0; color: var(--muted); font-size: 12.5px; font-weight: 650; overflow-wrap: anywhere; }
+.slip-card.is-collapsed { padding-bottom: 10px; }
+
+.slip-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.28s ease, opacity 0.22s ease; }
+.slip-collapse.is-open { grid-template-rows: 1fr; opacity: 1; }
+.slip-collapse-inner { min-height: 0; overflow: hidden; }
+.slip-collapse[hidden] { display: none; }
+
+.slip-remove { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.slip-remove p { margin: 0 0 8px; color: #ffd5d9; font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+.slip-remove-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.slip-remove-actions .btn { min-height: 44px; }
+.slip-remove-yes { background: linear-gradient(180deg, #ff3445, #c8101f); color: #fff; border-color: transparent; }
+.slip-remove-ask {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(225, 29, 46, 0.45);
+  background: transparent;
+  color: #ff9aa2;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.track-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.track-btn.is-on { background: rgba(61, 220, 151, 0.14); border-color: rgba(61, 220, 151, 0.45); color: #7ff5c2; }
+.track-btn-row { align-self: flex-start; }
+.master-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.master-hero .track-btn { background: rgba(0, 0, 0, 0.28); border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+.master-hero .track-btn.is-on { background: rgba(0, 0, 0, 0.35); color: #b9ffde; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slip-collapse, .slip-card-chevron { transition: none; }
+}

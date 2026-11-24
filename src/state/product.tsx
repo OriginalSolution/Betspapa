@@ -19,7 +19,7 @@ import { staleTrendIds, trendHitNotices } from '../lib/alerts';
 import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
-import { builderLegKeys, readBuilder } from '../lib/builderStore';
+import { builderLegKeys, readBuilder, readTrackedSlips, slipName } from '../lib/builderStore';
 import { bellRegistration, withBellFollows } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
@@ -210,7 +210,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
     const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
-    const tracked = readBuilder().tracked;
+    // The newest tracked slip keeps the one-off slip card; every slip with its bell on is in slipBells.
+    const tracked = readTrackedSlips()[0] || readBuilder().tracked;
     void syncPushDevice({
       follows: withBellFollows(follows),
       slipBells: bellRegistration(),
@@ -219,6 +220,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       builderSlip: tracked
         ? {
             id: tracked.id,
+            label: slipName(tracked),
             legs: tracked.legs.slice(0, 200).map((leg) => ({
               eventId: leg.eventId,
               market: leg.market,

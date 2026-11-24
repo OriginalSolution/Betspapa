@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { fetchResults, type RecordPick } from '../lib/results';
-import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
+import {
+  readBuilder,
+  readOpenSlips,
+  readTrackedSlips,
+  removeTrackedSlip,
+  slipName,
+  subscribeBuilder,
+  updateTrackedSlip,
+  writeOpenSlips,
+} from '../lib/builderStore';
+import { codesLegGrades } from '../lib/trackFrom';
 import { cx, kickoffClock, longDay } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import {
@@ -30,7 +40,7 @@ import {
 } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { loadAlerted } from '../lib/storage';
-import { legScore } from '../lib/noteCopy.mjs';
+import { bellLegCopy, legScore, slipCallName } from '../lib/noteCopy.mjs';
 import { useEngineBoard } from '../state/engine';
 import type { InboxItem, Match } from '../types';
 import { useStore } from '../state/store';
@@ -81,30 +91,24 @@ export async function gradesFor(legs: Array<{ key: string; eventId: string; mark
   return grades;
 }
 
-/** One inbox card when a booked slip settles. Later polls do not send another. */
+/** One inbox card per tracked slip when it settles. Later polls do not send another. */
 export function useSlipAlert() {
   const { matches, pushNotices } = useStore();
   useEffect(() => {
     let stop = false;
     const look = async () => {
-      const { tracked, packIds } = readBuilder();
-      if (!tracked || tracked.alerted || !tracked.legs.length) return;
-      const grades = await gradesFor(tracked.legs, matches);
+      const waiting = readTrackedSlips().filter((slip) => !slip.alerted && slip.legs.length);
+      if (!waiting.length) return;
+      const grades = await gradesFor(waiting.flatMap((slip) => slip.legs), matches);
       if (stop) return;
-      const legs = applyGrades(tracked.legs, grades);
-      const alert = slipAlert(legs);
-      if (!alert) return;
-      writeBuilder({ packIds, tracked: { ...tracked, alerted: true } });
-      const note: InboxItem = {
-        id: `slip:${tracked.id}`,
-        matchId: '',
-        kind: alert.kind,
-        title: alert.title,
-        body: alert.body,
-        createdAt: Date.now(),
-        read: false,
-      };
-      pushNotices([note]);
+      const notes: InboxItem[] = [];
+      for (const slip of waiting) {
+        const alert = slipAlert(applyGrades(slip.legs, grades), slipName(slip));
+        if (!alert) continue;
+        updateTrackedSlip(slip.id, { alerted: true });
+        notes.push({ id: `slip:${slip.id}`, matchId: '', kind: alert.kind, title: alert.title, body: alert.body, createdAt: Date.now(), read: false });
+      }
+      if (notes.length) pushNotices(notes);
     };
     void look();
     const timer = window.setInterval(() => void look(), 60_000);
@@ -115,7 +119,7 @@ export function useSlipAlert() {
   }, [matches, pushNotices]);
 }
 
-type SlipState = 'open' | 'live' | 'won' | 'lost';
+export type SlipState = 'open' | 'live' | 'won' | 'lost';
 
 function legLive(match: Match | undefined): { live: boolean; text: string } {
   if (!match) return { live: false, text: '' };
@@ -185,7 +189,7 @@ export function SlipLegRow({
   );
 }
 
-function slipStateOf(legs: GradedLeg[], byId: Map<string, Match>): SlipState {
+export function slipStateOf(legs: GradedLeg[], byId: Map<string, Match>): SlipState {
   if (legs.some((leg) => leg.status === 'lost')) return 'lost';
   if (legs.length && legs.every((leg) => leg.status !== 'open')) return 'won';
   if (legs.some((leg) => leg.status === 'open' && legLive(byId.get(leg.eventId)).live)) return 'live';
@@ -220,48 +224,91 @@ function useFreshResults(slipId: string, legs: GradedLeg[], graded: boolean, sta
   return { fresh, party };
 }
 
-export function SlipTimeline() {
-  const { matches, settings, permission, requestPermission } = useStore();
-  const { state } = useEngineBoard();
-  const [builder, setBuilder] = useState(readBuilder);
-  const [legs, setLegs] = useState<GradedLeg[]>([]);
-  const [graded, setGraded] = useState(false);
-  const bells = useSlipBells();
-  useEffect(() => subscribeBuilder(() => setBuilder(readBuilder())), []);
-  const packs = useMemo(() => trendPacks(tipsFromEngine(state, matches), matches), [state, matches]);
-  const source = builder.tracked?.legs?.length ? builder.tracked.legs : legsForPacks(packs, builder.packIds);
-  const sourceKey = source.map((leg) => leg.key).join('|');
-  const first = source[0]?.kickoff || '';
-  const slipId = builder.tracked?.id || (source.length ? `draft:${dayOf(first)}:${builder.packIds.join('+')}` : '');
+/** "28 matches · 29 legs, as 1 match has 2 picks". The bell follows matches; the slip counts legs. */
+export function bellCoverLine(legs: Array<{ eventId: string }>): string {
+  const perMatch = new Map<string, number>();
+  for (const leg of legs) perMatch.set(leg.eventId, (perMatch.get(leg.eventId) || 0) + 1);
+  const matches = perMatch.size;
+  const head = `Alerts on for ${matches} ${matches === 1 ? 'match' : 'matches'}`;
+  if (matches === legs.length) return `${head}: kick-off, goals and every result.`;
+  const shared = [...perMatch.values()].filter((count) => count > 1);
+  const pairs = shared.every((count) => count === 2);
+  const why = shared.length === 1
+    ? `1 match has ${shared[0]} picks`
+    : `${shared.length} matches have ${pairs ? '2 picks each' : 'more than one pick'}`;
+  return `${head} · ${legs.length} legs, as ${why}. Kick-off and goals once per match, a result for every leg.`;
+}
 
+/** Height-and-fade open/close. The legs only mount while open or closing. CSS turns it off for reduced motion. */
+function Collapse({ open, id, children }: { open: boolean; id: string; children: ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  const [expanded, setExpanded] = useState(open);
   useEffect(() => {
-    let stop = false;
-    if (!source.length) {
-      setLegs([]);
-      return;
+    if (open) {
+      setMounted(true);
+      let second = 0;
+      const first = window.requestAnimationFrame(() => {
+        second = window.requestAnimationFrame(() => setExpanded(true));
+      });
+      return () => {
+        window.cancelAnimationFrame(first);
+        window.cancelAnimationFrame(second);
+      };
     }
-    void gradesFor(source, matches).then((grades) => {
-      if (stop) return;
-      setLegs(applyGrades(source, grades));
-      setGraded(true);
-    });
-    return () => {
-      stop = true;
-    };
-  }, [matches, sourceKey]);
+    setExpanded(false);
+    const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(() => setMounted(false), reduce ? 0 : 300);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+  return (
+    <div id={id} className={cx('slip-collapse', expanded && 'is-open')} hidden={!mounted}>
+      <div className="slip-collapse-inner">{mounted && children}</div>
+    </div>
+  );
+}
 
+type CardSlip = {
+  id: string;
+  name: string;
+  kicker: string;
+  origin: string;
+  source: BuilderLeg[];
+  legs: GradedLeg[];
+  state: SlipState;
+  tracked: boolean;
+  number: number;
+};
+
+function SlipCard({
+  slip,
+  graded,
+  byId,
+  open,
+  onToggle,
+  onRemove,
+}: {
+  slip: CardSlip;
+  graded: boolean;
+  byId: Map<string, Match>;
+  open: boolean;
+  onToggle: () => void;
+  onRemove?: () => void;
+}) {
+  const { settings, permission, requestPermission } = useStore();
+  const bells = useSlipBells();
+  const [confirm, setConfirm] = useState(false);
+  const { legs: shown, source, state: slipState } = slip;
+  const sourceKey = source.map((leg) => leg.key).join('|');
+  const { fresh, party } = useFreshResults(slip.id, shown, graded, slipState);
   useEffect(() => {
-    if (slipId && source.length) refreshBellLegs(slipId, source.map(toBellLeg));
-  }, [slipId, sourceKey]);
+    if (source.length) refreshBellLegs(slip.id, source.map(toBellLeg), slip.tracked ? slip.name : undefined);
+  }, [slip.id, sourceKey, slip.name]);
+  useEffect(() => {
+    if (!open) setConfirm(false);
+  }, [open]);
 
-  const shown = legs.length ? legs : applyGrades(source, new Map());
-  const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
-  const slipState = slipStateOf(shown, byId);
-  const { fresh, party } = useFreshResults(slipId, shown, graded, slipState);
-  if (!source.length) return null;
-
-  const bellOn = Boolean(bells[slipId]?.on);
-  const alert = slipAlert(shown);
+  const bellOn = Boolean(bells[slip.id]?.on);
+  const alert = slipAlert(shown, slip.tracked ? slip.name : '');
   const won = shown.filter((leg) => leg.status === 'won').length;
   const lost = shown.filter((leg) => leg.status === 'lost').length;
   const voided = shown.filter((leg) => leg.status === 'void').length;
@@ -272,82 +319,271 @@ export function SlipTimeline() {
   const missed = shown.find((leg) => leg.status === 'lost');
   const pct = (value: number) => `${shown.length ? (value / shown.length) * 100 : 0}%`;
   const matchCount = new Set(source.map((leg) => leg.eventId)).size;
+  const bodyId = `slip-body-${slip.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
   const toggleBell = () => {
     const next = !bellOn;
-    setBell(slipId, next, { label: builder.tracked ? 'Tracked slip' : 'Slip', legs: source.map(toBellLeg) });
+    setBell(slip.id, next, { label: slip.tracked ? slip.name : 'Slip', legs: source.map(toBellLeg) });
     if (next && (!settings.browser || permission !== 'granted')) void requestPermission();
   };
 
   return (
-    <section className={cx('slip-card', `is-${slipState}`, party && 'is-party')} aria-label="Tracked slip">
+    <section
+      id={`tracked-${slip.id}`}
+      className={cx('slip-card', `is-${slipState}`, party && 'is-party', open ? 'is-expanded' : 'is-collapsed')}
+      aria-label={slip.name}
+    >
       {party && <SlipConfetti />}
       <header className="slip-card-head">
-        <div className="slip-card-title">
-          <p className="slip-card-kicker">
-            {first ? longDay(dayOf(first)) : 'Tracked slip'} · {source.length} {source.length === 1 ? 'leg' : 'legs'}
-          </p>
-          <h2>
-            {builder.tracked ? 'Your tracked slip' : 'Your slip'}
+        <button type="button" className="slip-card-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
+          <span className="slip-card-kicker">{slip.kicker}</span>
+          <span className="slip-card-name">
+            <strong>{slip.name}</strong>
             <span className={cx('slip-chip', 'slip-card-state', `is-${slipState}`)}>{STATE_WORD[slipState]}</span>
-          </h2>
-        </div>
+          </span>
+          <span className="slip-card-stats">
+            <span className="is-won">{won} won</span>
+            <span aria-hidden="true"> · </span>
+            <span className="is-lost">{lost} lost</span>
+            {totalText && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <span>odds {totalText}</span>
+              </>
+            )}
+          </span>
+          <svg className="slip-card-chevron" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+        </button>
         <SlipBell on={bellOn} count={matchCount} onToggle={toggleBell} />
       </header>
-      {bellOn && (
-        <p className="slip-bell-note" role="status">
-          Alerts on for {matchCount} {matchCount === 1 ? 'match' : 'matches'}: kick-off, goals and every result.
-        </p>
-      )}
       <div className="slip-progress" role="img" aria-label={`${settled} of ${shown.length} legs settled: ${won} won, ${lost} lost`}>
         <i className="is-won" style={{ width: pct(won) }} />
         <i className="is-lost" style={{ width: pct(lost) }} />
         <i className="is-void" style={{ width: pct(voided) }} />
       </div>
-      <dl className="slip-summary">
-        <div>
-          <dt>Settled</dt>
-          <dd>
-            {settled}/{shown.length}
-          </dd>
-        </div>
-        <div>
-          <dt>Won · lost</dt>
-          <dd>
-            <span className="is-won">{won}</span> · <span className="is-lost">{lost}</span>
-          </dd>
-        </div>
-        {totalText && (
+      <p className="slip-card-settled">
+        {settled}/{shown.length} settled
+      </p>
+      <Collapse open={open} id={bodyId}>
+        {bellOn && (
+          <p className="slip-bell-note" role="status">
+            {bellCoverLine(source)}
+          </p>
+        )}
+        {slip.origin && <p className="slip-card-origin">{slip.origin}</p>}
+        <dl className="slip-summary">
           <div>
-            <dt>Total odds</dt>
-            <dd>{totalText}</dd>
+            <dt>Settled</dt>
+            <dd>
+              {settled}/{shown.length}
+            </dd>
+          </div>
+          <div>
+            <dt>Won · lost</dt>
+            <dd>
+              <span className="is-won">{won}</span> · <span className="is-lost">{lost}</span>
+            </dd>
+          </div>
+          {totalText && (
+            <div>
+              <dt>Total odds</dt>
+              <dd>{totalText}</dd>
+            </div>
+          )}
+          {pays && (
+            <div>
+              <dt>GH₵10 pays</dt>
+              <dd>{pays}</dd>
+            </div>
+          )}
+        </dl>
+        {missed && <p className="slip-missed">Missed by {legScore(missed, missed.ft || '')} · {missed.label}</p>}
+        <ol className="slip-legs2">
+          {shown.map((leg) => (
+            <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} fresh={fresh.has(leg.key)} />
+          ))}
+        </ol>
+        {alert && (
+          <article className={cx('slip-alert', alert.kind === 'win' ? 'is-won' : 'is-lost')}>
+            <p>Betspapa · Slips</p>
+            <strong>{alert.title}</strong>
+            <span>{alert.body}</span>
+          </article>
+        )}
+        {!slip.tracked && (
+          <Link to="/trends" className="rec-codes-link">
+            Book and track this slip
+          </Link>
+        )}
+        {slip.tracked && onRemove && (
+          <div className={cx('slip-remove', confirm && 'is-confirm')}>
+            {confirm ? (
+              <>
+                <p role="alert">Stop tracking {slip.name}? Its alerts stop too.</p>
+                <div className="slip-remove-actions">
+                  <button type="button" className="btn btn-quiet" onClick={() => setConfirm(false)}>
+                    Keep
+                  </button>
+                  <button type="button" className="btn slip-remove-yes" onClick={onRemove}>
+                    Stop tracking
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="slip-remove-ask" onClick={() => setConfirm(true)}>
+                Stop tracking
+              </button>
+            )}
           </div>
         )}
-        {pays && (
-          <div>
-            <dt>GH₵10 pays</dt>
-            <dd>{pays}</dd>
-          </div>
-        )}
-      </dl>
-      {missed && <p className="slip-missed">Missed by {legScore(missed, missed.ft || '')} · {missed.label}</p>}
-      <ol className="slip-legs2">
-        {shown.map((leg) => (
-          <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} fresh={fresh.has(leg.key)} />
-        ))}
-      </ol>
-      {alert && (
-        <article className={cx('slip-alert', alert.kind === 'win' ? 'is-won' : 'is-lost')}>
-          <p>Betspapa · Slips</p>
-          <strong>{alert.title}</strong>
-          <span>{alert.body}</span>
-        </article>
+      </Collapse>
+    </section>
+  );
+}
+
+const ORIGIN: Record<string, string> = { book: 'Booked from trends', trend: 'Trend code', master: 'Master code', picks: 'Picks master code', codes: 'Codes' };
+
+/**
+ * Every tracked slip as its own card: newest open slips first, finished ones below.
+ * One slip opens by default; with more, all start collapsed. Open state is remembered.
+ */
+export function TrackedSlips() {
+  const { matches } = useStore();
+  const { state } = useEngineBoard();
+  const [params] = useSearchParams();
+  const focus = params.get('slip');
+  const [builder, setBuilder] = useState(readBuilder);
+  const [slips, setSlips] = useState(readTrackedSlips);
+  const [grades, setGrades] = useState<Map<string, { status: LegStatus; ft: string | null; ht: string | null }>>(new Map());
+  const [graded, setGraded] = useState(false);
+  const [openMap, setOpenMap] = useState(readOpenSlips);
+  useEffect(
+    () =>
+      subscribeBuilder(() => {
+        setBuilder(readBuilder());
+        setSlips(readTrackedSlips());
+      }),
+    [],
+  );
+  const packs = useMemo(() => trendPacks(tipsFromEngine(state, matches), matches), [state, matches]);
+  const draftLegs = !builder.tracked && builder.packIds.length ? legsForPacks(packs, builder.packIds) : [];
+  const allLegs = useMemo(() => {
+    const seen = new Map<string, BuilderLeg>();
+    for (const leg of [...draftLegs, ...slips.flatMap((slip) => slip.legs)]) if (!seen.has(leg.key)) seen.set(leg.key, leg);
+    return [...seen.values()];
+  }, [draftLegs.map((leg) => leg.key).join('|'), slips]);
+  const allKey = allLegs.map((leg) => leg.key).join('|');
+  const hasCodes = slips.some((slip) => slip.source === 'codes');
+
+  useEffect(() => {
+    let stop = false;
+    if (!allLegs.length) return;
+    void Promise.all([gradesFor(allLegs, matches), hasCodes ? codesLegGrades() : Promise.resolve(new Map())]).then(([found, coded]) => {
+      if (stop) return;
+      for (const [key, grade] of coded) if (!found.has(key)) found.set(key, grade);
+      setGrades(found);
+      setGraded(true);
+    });
+    return () => {
+      stop = true;
+    };
+  }, [matches, allKey, hasCodes]);
+
+  const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
+  const cards: CardSlip[] = [];
+  if (draftLegs.length) {
+    const first = draftLegs[0]?.kickoff || '';
+    const legs = applyGrades(draftLegs, grades);
+    cards.push({
+      id: `draft:${dayOf(first)}:${builder.packIds.join('+')}`,
+      name: 'Your slip · not booked',
+      kicker: `${first ? longDay(dayOf(first)) : 'Slip'} · ${draftLegs.length} ${draftLegs.length === 1 ? 'leg' : 'legs'}`,
+      origin: '',
+      source: draftLegs,
+      legs,
+      state: slipStateOf(legs, byId),
+      tracked: false,
+      number: Number.MAX_SAFE_INTEGER,
+    });
+  }
+  const tracked = slips.map((slip): CardSlip => {
+    const first = [...slip.legs].sort((a, b) => a.kickoff.localeCompare(b.kickoff))[0]?.kickoff || slip.bookedAt;
+    const legs = applyGrades(slip.legs, grades);
+    return {
+      id: slip.id,
+      name: slipName(slip),
+      kicker: `${first ? longDay(dayOf(first)) : 'Tracked'} · ${slip.legs.length} ${slip.legs.length === 1 ? 'leg' : 'legs'}`,
+      origin: [ORIGIN[slip.source || 'book'], slip.origin].filter(Boolean).join(' · '),
+      source: slip.legs,
+      legs,
+      state: slipStateOf(legs, byId),
+      tracked: true,
+      number: slip.number || 0,
+    };
+  });
+  const finished = (card: CardSlip) => card.state === 'won' || card.state === 'lost';
+  tracked.sort((a, b) => Number(finished(a)) - Number(finished(b)) || b.number - a.number);
+  cards.push(...tracked);
+
+  const many = cards.length > 1;
+  const isOpen = (id: string) => openMap[id] ?? (focus ? focus === id : !many);
+  const save = (next: Record<string, boolean>) => {
+    const live = new Set(cards.map((card) => card.id));
+    const kept = Object.fromEntries(Object.entries(next).filter(([id]) => live.has(id)));
+    setOpenMap(kept);
+    writeOpenSlips(kept);
+  };
+  const allOpen = cards.length > 0 && cards.every((card) => isOpen(card.id));
+
+  useEffect(() => {
+    if (!focus) return;
+    if (!isOpen(focus)) save({ ...openMap, [focus]: true });
+    document.getElementById(`tracked-${focus}`)?.scrollIntoView({ block: 'start' });
+  }, [focus]);
+
+  if (!cards.length) return null;
+
+  const remove = (card: CardSlip) => {
+    setBell(card.id, false, { label: card.name, legs: [] });
+    removeTrackedSlip(card.id);
+    const next = { ...openMap };
+    delete next[card.id];
+    save(next);
+  };
+
+  return (
+    <section className="tracked-slips" aria-label="Tracked slips">
+      {many && (
+        <div className="tracked-bar">
+          <h2>
+            Tracked slips <small>{tracked.length}</small>
+          </h2>
+          <button
+            type="button"
+            className="tracked-all"
+            aria-pressed={allOpen}
+            onClick={() => save(Object.fromEntries(cards.map((card) => [card.id, !allOpen])))}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d={allOpen ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4'} />
+            </svg>
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        </div>
       )}
-      {!builder.tracked && (
-        <Link to="/trends" className="rec-codes-link">
-          Book and track this slip
-        </Link>
-      )}
+      {cards.map((card) => (
+        <SlipCard
+          key={card.id}
+          slip={card}
+          graded={graded}
+          byId={byId}
+          open={isOpen(card.id)}
+          onToggle={() => save({ ...openMap, [card.id]: !isOpen(card.id) })}
+          onRemove={card.tracked ? () => remove(card) : undefined}
+        />
+      ))}
     </section>
   );
 }
@@ -382,9 +618,9 @@ export function useSlipBellAlerts() {
           if (leg.status !== 'won' && leg.status !== 'lost') continue;
           const id = legNoteId(bell.id, leg.key);
           if (alerted.has(id)) continue;
-          notes.push(legNotice(id, leg, done, graded.length));
+          notes.push(legNotice(id, leg, done, graded.length, bell.label));
         }
-        const final = slipAlert(graded);
+        const final = slipAlert(graded, slipCallName(bell.label));
         const finalId = slipNoteId(bell.id);
         if (final && !alerted.has(finalId)) {
           notes.push({ id: finalId, matchId: '', kind: final.kind, title: final.title, body: final.body, createdAt: Date.now(), read: false });
@@ -408,14 +644,15 @@ export function useSlipBellAlerts() {
   }, [bells, boardKey, pushNotices]);
 }
 
-export function legNotice(id: string, leg: GradedLeg, done: number, total: number): InboxItem {
+export function legNotice(id: string, leg: GradedLeg, done: number, total: number, slip = ''): InboxItem {
   const won = leg.status === 'won';
+  const copy = bellLegCopy({ won, slip, label: leg.label, score: legScore(leg, leg.ft || ''), odds: leg.odds.toFixed(2), settled: done, total });
   return {
     id,
     matchId: leg.eventId,
     kind: won ? 'win' : 'bust',
-    title: `${won ? 'Leg won' : 'Leg lost'} · ${leg.label}`,
-    body: `${legScore(leg, leg.ft || '')} · ${leg.odds.toFixed(2)} · ${done} of ${total} settled`,
+    title: copy.title,
+    body: copy.body,
     createdAt: Date.now(),
     read: false,
   };

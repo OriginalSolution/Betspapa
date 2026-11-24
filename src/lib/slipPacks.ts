@@ -1,7 +1,7 @@
 import type { PickTip } from './matchPicks';
 import { marketLabel } from './engineSlips';
 import type { Match } from '../types';
-import { legList, legScore } from './noteCopy.mjs';
+import { legList, legScore, slipVerdictTitle } from './noteCopy.mjs';
 
 /** Same bands as the server. A price outside this table is not a suggestion. */
 const RANGES: Record<string, { min: number; max: number; exclusive?: boolean }> = {
@@ -186,6 +186,11 @@ export function gradeScore(market: string, ft: { home: number; away: number } | 
     case 'fh-over05': return hasHt ? yes(fh >= 1) : 'open';
     case 'fh-over15': return hasHt ? yes(fh >= 2) : 'open';
     case 'sh-over05': return hasHt ? yes(g - fh >= 1) : 'open';
+    // Codes (Banker) grade keys on a tracked Codes slip.
+    case 'home-over15': return yes(h >= 2);
+    case 'away-over15': return yes(a >= 2);
+    case 'ah-1-home': return h - a === 1 ? 'void' : yes(h - a >= 2);
+    case 'ah-1-away': return a - h === 1 ? 'void' : yes(a - h >= 2);
     default: return 'open';
   }
 }
@@ -201,14 +206,14 @@ export function applyGrades(
 }
 
 /** The one sentence this slip sends, once every leg has a result. */
-export function slipAlert(legs: GradedLeg[]): { title: string; body: string; kind: 'win' | 'bust' } | null {
+export function slipAlert(legs: GradedLeg[], name = ''): { title: string; body: string; kind: 'win' | 'bust' } | null {
   if (!legs.length || legs.some((leg) => leg.status === 'open')) return null;
   const played = legs.filter((leg) => leg.status === 'won' || leg.status === 'lost');
   if (!played.length) return null;
   const won = played.filter((leg) => leg.status === 'won');
   const lost = played.filter((leg) => leg.status === 'lost');
   const kind = lost.length ? 'bust' : 'win';
-  const title = lost.length ? `Slip lost · ${won.length} of ${played.length} legs won` : `Slip won · ${won.length} of ${played.length} legs`;
+  const title = slipVerdictTitle(name, won.length, played.length, lost.length);
   const missed = lost[0];
   const landedList = legList(won, (leg) => legScore(leg, leg.ft || ''), 3);
   const landedLine = landedList ? `${landedList} landed.` : '';

@@ -147,13 +147,16 @@ export function setBell(id: string, on: boolean, slip: { label: string; legs: Be
 }
 
 /** Keep a ringing bell's legs current when the slip it belongs to changes (a rebook drops a leg). */
-export function refreshBellLegs(id: string, legs: BellLeg[]) {
+export function refreshBellLegs(id: string, legs: BellLeg[], label?: string) {
   const bells = readBells();
   const bell = bells[id];
   if (!bell?.on) return;
   const next = legs.slice(0, MAX_BELL_LEGS).map(toBellLeg);
-  if (next.map((leg) => leg.key).join('|') === bell.legs.map((leg) => leg.key).join('|')) return;
-  bells[id] = { ...bell, legs: next };
+  const sameLegs = next.map((leg) => leg.key).join('|') === bell.legs.map((leg) => leg.key).join('|');
+  // A slip tracked before slips had names gets its name, so its alerts say which slip.
+  const nextLabel = label && label !== bell.label ? label : bell.label;
+  if (sameLegs && nextLabel === bell.label) return;
+  bells[id] = { ...bell, label: nextLabel, legs: next };
   writeBells(bells);
 }
 

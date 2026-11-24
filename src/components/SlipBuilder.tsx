@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bookingFailureMessage, bookGroups, type BookLeg } from '../lib/bookFollow';
 import { desksFromBooking, failedDeskLine } from '../lib/bookedSlip';
-import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
+import { addTrackedSlip, readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
 import { cx } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import { legsForPacks, PART_SIZE, partsOf, totalOddsLine, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
@@ -89,17 +89,18 @@ export function SlipBuilder() {
         setProblem(failed || reasons[0] || 'No desk returned a code. Nothing was invented.');
         return;
       }
-      writeBuilder({
-        packIds: builder.packIds,
-        tracked: {
-          id: `slip-${Date.now().toString(36)}`,
-          legs: selected,
-          bookedAt: new Date().toISOString(),
-          parts,
-          desks,
-          alerted: false,
-        },
+      // A new booking joins the tracked slips; the ones already tracked stay.
+      const tracked = addTrackedSlip({
+        id: `slip-${Date.now().toString(36)}`,
+        legs: selected,
+        bookedAt: new Date().toISOString(),
+        parts,
+        desks,
+        alerted: false,
+        source: 'book',
+        origin: [...new Set(selected.map((leg) => leg.label))].slice(0, 3).join(' · '),
       });
+      writeBuilder({ packIds: builder.packIds, tracked });
       // Land on the booked codes with an arrival animation and the new codes glowing.
       goToBookedCodes(navigate, '/slips/booked', parts.map((part) => ({ code: part.code, desk: part.desk })));
     } catch (error) {
