@@ -12,7 +12,7 @@ import {
   writeOpenSlips,
 } from '../lib/builderStore';
 import { codesLegGrades } from '../lib/trackFrom';
-import { cx, kickoffClock, longDay } from '../lib/format';
+import { cx, kickoffClock } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import {
   applyGrades,
@@ -343,14 +343,8 @@ function SlipCard({
           </span>
           <span className="slip-card-stats">
             <span className="is-won">{won} won</span>
-            <span aria-hidden="true"> · </span>
             <span className="is-lost">{lost} lost</span>
-            {totalText && (
-              <>
-                <span aria-hidden="true"> · </span>
-                <span>odds {totalText}</span>
-              </>
-            )}
+            {totalText && <span>odds {totalText}</span>}
           </span>
           <svg className="slip-card-chevron" viewBox="0 0 16 16" aria-hidden="true">
             <path d="M4 6l4 4 4-4" />
@@ -443,6 +437,13 @@ function SlipCard({
   );
 }
 
+/** "Tue 24 Nov" in the phone's own zone. */
+function shortDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(date).replace(',', '');
+}
+
 const ORIGIN: Record<string, string> = { book: 'Booked from trends', trend: 'Trend code', master: 'Master code', picks: 'Picks master code', codes: 'Codes' };
 
 /**
@@ -499,7 +500,7 @@ export function TrackedSlips() {
     cards.push({
       id: `draft:${dayOf(first)}:${builder.packIds.join('+')}`,
       name: 'Your slip · not booked',
-      kicker: `${first ? longDay(dayOf(first)) : 'Slip'} · ${draftLegs.length} ${draftLegs.length === 1 ? 'leg' : 'legs'}`,
+      kicker: `${first ? shortDay(first) : 'Slip'} · ${draftLegs.length} ${draftLegs.length === 1 ? 'leg' : 'legs'}`,
       origin: '',
       source: draftLegs,
       legs,
@@ -514,7 +515,7 @@ export function TrackedSlips() {
     return {
       id: slip.id,
       name: slipName(slip),
-      kicker: `${first ? longDay(dayOf(first)) : 'Tracked'} · ${slip.legs.length} ${slip.legs.length === 1 ? 'leg' : 'legs'}`,
+      kicker: `${first ? shortDay(first) : 'Tracked'} · ${slip.legs.length} ${slip.legs.length === 1 ? 'leg' : 'legs'}`,
       origin: [ORIGIN[slip.source || 'book'], slip.origin].filter(Boolean).join(' · '),
       source: slip.legs,
       legs,
