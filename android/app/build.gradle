@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 52
-        versionName "0.4.29" // Alerts name both clubs in full
+        versionCode 53
+        versionName "0.4.30" // Fits every phone, the open Fold and tablets
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

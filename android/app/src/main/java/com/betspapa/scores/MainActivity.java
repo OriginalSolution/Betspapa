@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.os.SystemClock;
 import android.content.Intent;
 import android.view.View;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.splashscreen.SplashScreenViewProvider;
@@ -57,6 +58,11 @@ public class MainActivity extends BridgeActivity {
         deliverOpen(getIntent());
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().setBackgroundColor(0xFF07080C);
+            // Android scales WebView text by the system font size. Xiaomi and Samsung phones
+            // often ship at 110-130%, which broke rows sized for 100%. Honour a small boost,
+            // cap the rest so every screen still fits.
+            WebSettings web = getBridge().getWebView().getSettings();
+            web.setTextZoom(textZoomFor(getResources().getConfiguration().fontScale));
             getBridge().addWebViewListener(new WebViewListener() {
                 @Override
                 public void onPageLoaded(WebView webView) {
@@ -65,6 +71,13 @@ public class MainActivity extends BridgeActivity {
                 }
             });
         }
+    }
+
+    /** WebView text zoom for a system font scale: follows it between 85% and 115%. */
+    public static int textZoomFor(float fontScale) {
+        if (Float.isNaN(fontScale) || fontScale <= 0f) return 100;
+        float clamped = Math.max(0.85f, Math.min(1.15f, fontScale));
+        return Math.round(clamped * 100f);
     }
 
     private boolean pageReady() {

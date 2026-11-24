@@ -2374,7 +2374,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .pick-markets .market-filter { display: flex; flex-direction: column; align-items: flex-start; min-width: 92px; white-space: normal; }
 .pick-markets .market-filter b { font-weight: 650; opacity: 0.7; }
 .pick-group header { justify-content: space-between; padding: 8px 2px 4px; }
-.pick-group header button { background: transparent; border: 0; color: inherit; font-weight: 800; display: inline-flex; gap: 6px; align-items: center; }
+.pick-group header > button { background: transparent; border: 0; color: inherit; font-weight: 800; display: inline-flex; gap: 6px; align-items: center; }
 .pick-group header small { color: var(--faint); font-weight: 700; }
 .pick-group-code { margin-left: auto; }
 .ring-card { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
@@ -2620,3 +2620,227 @@ main.main.fresh-arrive { animation: fresh-arrive 520ms cubic-bezier(0.2, 0.8, 0.
   main.main.fresh-arrive, [data-booking-code].is-fresh.fresh-pulse, .fresh-hint { animation: none; }
   .fresh-hint { transform: translateX(-50%); }
 }
+
+/* ------------------------------------------------------------------
+   Responsive pass (0.4.30): every phone from a 344px Fold cover to the
+   1366px tablet. Lists become card grids wherever two cards fit, so the
+   open Fold and tablets use the whole screen. Phones keep one column.
+   ------------------------------------------------------------------ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.main, .main > div, .stack > *, .settings > *, .codes > *, .today-board > section > * { min-width: 0; }
+:root { --card-min: 340px; }
+
+/* Sticky league headers sat under the top bar by the notch height. */
+.comp-head { top: calc(var(--topbar) + var(--safe-area-inset-top)); }
+
+/* Card grids: one column on phones, two or more once two cards fit. */
+.today-board > section,
+.pick-group,
+.slip-builder,
+.booked-page,
+.code-list,
+.code-daily,
+.follow-cards,
+.stack-block:has(> .slip-trend) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--card-min)), 1fr));
+  align-items: start;
+}
+.today-board > section { padding: 0 14px; column-gap: 12px; }
+.today-board > section > .board-section { grid-column: 1 / -1; padding-inline: 2px; }
+.today-board .fixture-card { margin: 0 0 12px; }
+.pick-group { column-gap: 10px; }
+.pick-group > header { grid-column: 1 / -1; }
+.slip-builder { column-gap: 12px; }
+.slip-builder > :not(.pack-row) { grid-column: 1 / -1; }
+.booked-page { column-gap: 12px; }
+.booked-page > :not(.booked-desk) { grid-column: 1 / -1; }
+.code-list, .code-daily { column-gap: 10px; }
+.code-list > :not(.code-card), .code-daily > :not(.code-card) { grid-column: 1 / -1; }
+.follow-cards { column-gap: 10px; }
+.stack-block:has(> .slip-trend) { column-gap: 10px; }
+.stack-block:has(> .slip-trend) > :not(.slip-trend) { grid-column: 1 / -1; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); column-gap: 12px; align-items: start; }
+.settings { display: block; column-width: 380px; column-gap: 14px; }
+.settings > * { break-inside: avoid; margin: 0 0 12px; }
+
+/* Picks master code: parts wrap as chips instead of running off the card. */
+.master-strip { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; display: grid; gap: 8px; min-width: 0; }
+.master-strip header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.master-strip header span { color: var(--faint); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; min-width: 0; }
+.master-strip label { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; min-height: 44px; }
+.master-strip label img, .master-strip label .book-mark { width: 18px; height: 18px; }
+.master-strip select { background: transparent; color: inherit; border: 0; font: inherit; font-size: 13px; font-weight: 750; max-width: 128px; min-height: 44px; }
+.master-strip > p { margin: 0; color: var(--muted); font-size: 13px; }
+.master-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
+.master-strip .master-part { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; }
+.master-strip .master-part > span:first-child { flex: none; }
+.master-strip .master-part .code-pair { flex: 1 1 auto; flex-wrap: nowrap; justify-content: flex-end; }
+
+/* Match detail scoreboard: the time and status never collide with the crests. */
+.scoreline { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+.result { min-width: 0; }
+.kickoff-time { display: block; font-size: clamp(30px, 9.5vw, 42px); white-space: nowrap; line-height: 1; }
+.big-score { font-size: clamp(48px, 16vw, 68px); white-space: nowrap; }
+.result .status-pill { display: flex; justify-content: center; }
+.side-name { max-width: 100%; overflow-wrap: anywhere; }
+.fixture-kick { font-size: clamp(26px, 8vw, 32px); white-space: nowrap; }
+.fixture-score { font-size: clamp(30px, 9vw, 36px); white-space: nowrap; }
+.fixture-mid { min-width: 0; }
+
+/* Booked & tracking: every part reads the same, code and buttons on one row. */
+.booked-desk { container: desk / inline-size; }
+.booked-desk li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 10px; }
+.booked-desk li > div { min-width: 0; }
+.booked-desk li .code-pair { flex: none; flex-wrap: nowrap; justify-content: flex-end; }
+@container desk (max-width: 460px) {
+  .booked-desk li { grid-template-columns: minmax(0, 1fr); }
+  .booked-desk li .code-pair { justify-content: flex-start; flex-wrap: wrap; }
+  .booked-desk li .code-pair .code-pair-code { margin-right: auto; }
+}
+.booked-desk header .btn-tiny { flex: none; }
+.booked-status header { flex-wrap: wrap; }
+.booked-actions { flex-wrap: wrap; }
+.booked-actions .btn { min-width: 0; }
+.booked-legs li { min-width: 0; }
+.booked-legs li span { overflow-wrap: anywhere; }
+
+/* Code rows: the code shrinks before the buttons do. */
+.code-pair-code, .booked-code { min-width: 0; }
+.code-card > * { min-width: 0; }
+.code-booking-code { white-space: normal; overflow-wrap: anywhere; }
+
+/* Slip bar: text can wrap, buttons keep their label, nothing spills. */
+.pack-bar > div { min-width: 0; }
+.pack-bar strong { display: block; overflow-wrap: anywhere; }
+.pack-bar-progress { max-width: 100%; }
+.pack-book, .pack-edit { flex: none; white-space: nowrap; }
+.pack-book { min-width: 0; }
+.pack-book-label { white-space: nowrap; }
+.pack-row strong { overflow-wrap: anywhere; }
+
+/* Tap targets: 44px for controls you hit often; small pills get an invisible hit area. */
+.icon-btn { width: 44px; height: 44px; }
+.btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+.btn-tiny { min-height: 34px; }
+.pack-add, .pack-edit, .pack-book { min-height: 44px; }
+.code-seg button { min-height: 44px; }
+.step { min-width: 44px; min-height: 44px; }
+.btn-tiny, .chip, .code-pair-code, .market-filter, .pack-remove, .sort-toggle button { position: relative; }
+.btn-tiny::before, .chip::before, .code-pair-code::before, .pack-remove::before, .sort-toggle button::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+.code-pair-code::before { inset: -10px 0; }
+.chip::before { inset: -7px 0; }
+.tab { min-height: 44px; }
+
+/* Long names and big text (Android font size, Xiaomi defaults) wrap instead of overflowing. */
+.top-title h1, .top-title p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ring-body span, .pick-title, .follow-card header strong, .inbox-item strong, .rec-sides, .slip-leg-teams { overflow-wrap: anywhere; }
+.inbox-item > :first-child { min-width: 0; }
+.setting > :first-child, .stat > :first-child { min-width: 0; }
+.setting-controls { flex-wrap: wrap; justify-content: flex-end; }
+.stat strong { text-align: right; }
+.market-filter { min-height: 44px; }
+.pick-markets .market-filter { white-space: normal; }
+
+/* Fold open, tablets in portrait, phones on their side: centred slip bar, wider padding. */
+@media (min-width: 600px) and (max-width: 959px) {
+  .pack-bar {
+    left: 50%;
+    right: auto;
+    width: min(720px, calc(100% - 24px - var(--safe-area-inset-left) - var(--safe-area-inset-right)));
+    transform: translateX(-50%);
+  }
+  .stack, .codes, .settings { padding-left: 18px; padding-right: 18px; }
+  .today-board > section { padding: 0 18px; }
+  .tab { font-size: 11px; }
+}
+
+/* Short landscape screens: free the height for content. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --tab: 52px; --topbar: 50px; }
+  .topbar { position: relative; }
+  .comp-head { top: 0; }
+  .tab { flex-direction: row; gap: 6px; }
+}
+
+/* Desktop and big tablets: the centre column grows with the screen; the right rail
+   only shows once there is room for it. */
+@media (min-width: 960px) {
+  .shell { grid-template-columns: 220px minmax(0, 1fr); max-width: 1480px; }
+  .rail { display: none; }
+  .codes { max-width: none; }
+}
+@media (min-width: 1280px) {
+  .shell { grid-template-columns: 220px minmax(0, 1fr) minmax(260px, 300px); }
+  .rail { display: flex; }
+}
+
+/* Trends "In your slip": crest pair, both clubs, the pick, the price on one fluid row. */
+.crest-initials {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  background: #232a37;
+  color: #d5d9e2;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.pack-legs li.slip-leg {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.pack-legs li.slip-leg:first-child { border-top: 0; }
+.pack-legs li.slip-leg.is-editing { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.pack-legs .slip-leg-crests { flex: none; display: inline-flex; align-items: center; }
+.pack-legs .slip-leg-crests .crest + .crest { margin-left: -6px; box-shadow: 0 0 0 2px var(--surface); }
+.pack-legs .slip-leg-main { flex: initial; min-width: 0; display: grid; gap: 1px; }
+.pack-legs .slip-leg-teams { font-size: 13px; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
+.pack-legs .slip-leg-teams i { font-style: normal; color: var(--faint); font-weight: 600; padding: 0 1px; }
+.pack-legs .slip-leg-main small { color: var(--muted); font-size: 11.5px; font-weight: 650; overflow-wrap: anywhere; }
+.pack-legs .slip-leg-odds { font-family: var(--score); font-size: 18px; font-weight: 700; justify-self: end; }
+.pack-slip .pack-legs { margin-top: 10px; gap: 0; }
+.pack-slip .tip-head { flex-wrap: wrap; row-gap: 2px; }
+.pack-slip .tip-head span { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 600px) {
+  .pack-slip .pack-legs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); column-gap: 18px; }
+  .pack-legs li.slip-leg:nth-child(2) { border-top: 0; }
+}
+.slip-builder { padding-bottom: calc(140px + var(--safe-area-inset-bottom)); }
+@media (min-width: 960px) { .slip-builder { padding-bottom: 12px; } }
+
+/* Slips master hero: the big code, Copy and Load wrap above the pick count on narrow phones. */
+.master-hero .master-part { flex-wrap: wrap; row-gap: 4px; min-width: 0; }
+.master-hero .master-part .code-pair { flex: 1 1 auto; justify-content: flex-start; flex-wrap: wrap; }
+.master-hero .master-code { font-size: clamp(30px, 10vw, 42px); }
+.master-hero .master-meta { flex: 1 1 100%; min-width: 0; }
+
+/* Code + Copy + Load never push past the screen: the row wraps instead (Picks groups, Codes daily). */
+@media (max-width: 380px) {
+  .code-pair { flex: 1 1 auto; }
+}
+.pick-group header, .code-slotline, .code-today, .code-foot { flex-wrap: wrap; row-gap: 6px; }
+.pick-group header .code-pair { margin-left: auto; flex: 0 1 auto; flex-wrap: nowrap; }
+.code-slotline > :first-child { min-width: 0; }
+.pack-bar { overflow: clip; }
+.pack-bar-progress { overflow: hidden; }
+.fixture-side strong, .side-name { overflow-wrap: anywhere; hyphens: auto; }
+.pick-group header > button { white-space: nowrap; min-height: 44px; }
+.ring-meta { flex-wrap: wrap; row-gap: 2px; }
+.ring-meta > * { white-space: nowrap; }
+.ring-meta em { white-space: normal; }
+.sig-held, .sig-exc { white-space: nowrap; flex: none; }
+.ring-body { min-width: 0; }
+.booked-foot { flex-wrap: wrap; }
+.booked-foot .btn { flex: 1 1 140px; white-space: nowrap; }
+.code-card-main > * { min-width: 0; }
+.code-card-main strong, .code-card-main span { overflow-wrap: anywhere; }
