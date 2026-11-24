@@ -21,7 +21,7 @@ import { cx } from '../lib/format';
 import type { Team } from '../types';
 import { SlipLegRow, TrackedSlips } from '../components/SlipTrack';
 import { TrackButton } from '../components/TrackButton';
-import { draftFromEngine } from '../lib/trackFrom';
+import { engineTrack } from '../lib/trackFrom';
 import { SlipBell } from '../components/SlipBell';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
@@ -223,7 +223,7 @@ function MasterHero({
       {book.parts.length > 0 && (
         <div className="master-foot">
           {booked && <p className="master-when">Booked {booked}</p>}
-          <TrackButton draft={draftFromEngine(master, desk, 'master', `${DESK_NAMES[desk]} master slip`)} />
+          <TrackButton {...engineTrack(master, desk, 'master', `${DESK_NAMES[desk]} master slip`)} />
         </div>
       )}
     </article>
@@ -281,7 +281,7 @@ function TrendSlip({
         {book.parts.map((part) => (
           <CodeActions key={part.code} code={part.code} desk={desk} link={part.link} showCode={book.parts.length > 1} />
         ))}
-        {book.parts.length > 0 && <TrackButton draft={draftFromEngine(trend, desk, 'trend', trend.label)} className="track-btn-row" />}
+        {book.parts.length > 0 && <TrackButton {...engineTrack(trend, desk, 'trend', trend.label)} className="track-btn-row" />}
       </div>
       {open && (
         <ol className="slip-legs2 slip-trend-legs">

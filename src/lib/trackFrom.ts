@@ -1,6 +1,6 @@
 import type { TrackSource, TrackedSlip } from './builderStore';
 import { fetchCodes, type CodePart } from './codes';
-import { deskBook, splitMatch, visibleLegs, type DeskId, type EngineSlip } from './engineSlips';
+import { deskBook, fetchEngineSlip, splitMatch, visibleLegs, type DeskId, type EngineSlip } from './engineSlips';
 import { packLabel, type BuilderLeg } from './slipPacks';
 
 /** A slip ready to be tracked. The list gives it its number and name. */
@@ -22,9 +22,11 @@ export function draftFromEngine(slip: EngineSlip | null | undefined, desk: DeskI
   const parts = book.parts.filter((part) => part.code).map((part) => ({ desk, code: part.code, legs: part.legs }));
   if (!parts.length) return null;
   const dropped = new Set(book.dropped.map((drop) => `${drop.eventId}|${drop.market}`));
+  const listed = new Set(book.parts.flatMap((part) => part.matches || []));
   const legs = uniqueLegs(
     visibleLegs(slip)
       .filter((leg) => !dropped.has(`${leg.eventId}|${leg.market}`))
+      .filter((leg) => !listed.size || listed.has(leg.eventId))
       .map((leg) => {
         const [home, away] = splitMatch(leg.match);
         return {
@@ -42,7 +44,6 @@ export function draftFromEngine(slip: EngineSlip | null | undefined, desk: DeskI
         };
       }),
   );
-  if (!legs.length) return null;
   return {
     id: `${source}:${slip.id}:${desk}:${parts[0].code}`,
     legs,
@@ -114,4 +115,13 @@ export async function codesLegGrades(): Promise<Map<string, { status: 'won' | 'l
     /* the board still grades full-time markets */
   }
   return found;
+}
+
+/** The draft to show now, plus a loader for the full leg list when the board feed trimmed it. */
+export function engineTrack(slip: EngineSlip | null | undefined, desk: DeskId, source: TrackSource, origin: string): { draft: TrackDraft | null; load?: () => Promise<TrackDraft | null> } {
+  const draft = draftFromEngine(slip, desk, source, origin);
+  if (!slip || !draft) return { draft };
+  const trimmed = slip.legs.length < slip.legCount;
+  if (!trimmed) return { draft };
+  return { draft, load: async () => draftFromEngine(await fetchEngineSlip(slip.id), desk, source, origin) };
 }

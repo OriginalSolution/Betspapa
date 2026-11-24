@@ -20,3 +20,19 @@ test('the app view drops duplicated tier legs and keeps the codes', () => {
   assert.equal(state.tiers[0].books.sportybet.parts[0].code, 'DC12100');
   assert.equal(JSON.stringify(state).includes('drop me'), false);
 });
+
+test('one slip view carries every leg and the dropped picks, for tracking on the phone', async () => {
+  const { engineSlipView, appEngineState } = await import('./engine.mjs');
+  const legs = Array.from({ length: 30 }, (_, i) => ({ eventId: `sr:match:${i}`, market: 'over15', match: `A${i} vs B${i}`, kickoff: '2026-11-24T19:00:00Z', odds: 1.3 }));
+  const full = {
+    master: { id: 'master', legCount: 30, legs, books: { sportybet: { parts: [{ code: 'ABC123', link: 'x', legs: 29, matches: [] }], dropped: [{ eventId: 'sr:match:0', market: 'over15', match: 'A0 vs B0', reason: 'not offered' }] } } },
+    trends: [],
+    tiers: [{ id: 'tier:90', legCount: 30, legs, books: {} }],
+  };
+  assert.equal(appEngineState(full).master.legs.length, 18);
+  const view = engineSlipView(full, 'master');
+  assert.equal(view.legs.length, 30);
+  assert.equal(view.books.sportybet.dropped.length, 1);
+  assert.equal(engineSlipView(full, 'tier:90').legs.length, 30);
+  assert.equal(engineSlipView(full, 'nope'), null);
+});

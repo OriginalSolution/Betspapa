@@ -724,10 +724,11 @@ export function slipNote(device, matches) {
 export function slipBellsFrom(body) {
   if (!body || !Object.prototype.hasOwnProperty.call(body, 'slipBells')) return undefined;
   const rows = Array.isArray(body.slipBells) ? body.slipBells : [];
+  let budget = 400;
   return rows.slice(0, 12).map((slip) => {
     const id = String(slip?.id || '').slice(0, 120);
     const seen = new Set();
-    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, 60).map((leg) => {
+    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, Math.min(100, Math.max(0, budget))).map((leg) => {
       const eventId = String(leg?.eventId || '');
       const market = String(leg?.market || '');
       if (!/^sr:match:\d+$/.test(eventId) || !/^[a-z0-9-]{2,24}$/.test(market)) return null;
@@ -745,6 +746,7 @@ export function slipBellsFrom(body) {
         label: String(leg.label || market).slice(0, 80),
       };
     }).filter(Boolean);
+    budget -= legs.length;
     if (!id || !legs.length) return null;
     return { id, label: String(slip?.label || '').slice(0, 80), legs };
   }).filter(Boolean);

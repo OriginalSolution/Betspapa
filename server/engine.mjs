@@ -185,6 +185,19 @@ export function appEngineState(full) {
   };
 }
 
+/** One slip with every leg and each bookmaker's dropped picks, for tracking it on the phone. */
+export function engineSlipView(full, id) {
+  const state = full || {};
+  const slip = [state.master, ...(state.trends || []), ...(state.tiers || [])].find((row) => row && row.id === id);
+  if (!slip) return null;
+  const slim = slimSlip(slip);
+  const books = {};
+  for (const [desk, book] of Object.entries(slim.books || {})) {
+    books[desk] = { ...book, dropped: (slip.books?.[desk]?.dropped || []).slice(0, 200) };
+  }
+  return { ...slim, books };
+}
+
 function slipHasCode(slip) {
   const books = slip?.books || {};
   return Object.values(books).some((book) => (book?.parts || []).some((part) => part?.code));

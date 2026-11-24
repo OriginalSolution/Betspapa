@@ -165,3 +165,9 @@ test('Codes markets settle on their own rules, never on the "scored" fallback', 
   assert.equal(settleTrend('away-over15', done(3, 1)), 'bust');
   assert.equal(settleTrend('2up-home', done(3, 0)), 'open');
 });
+
+test('bells share a leg budget so twelve big slips stay under the body limit', () => {
+  const legs = Array.from({ length: 150 }, (_, i) => ({ eventId: `sr:match:${i}`, market: 'over15', label: 'Over 1.5 goals' }));
+  const rows = slipBellsFrom({ slipBells: Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, label: `Slip ${i}`, legs })) });
+  assert.deepEqual(rows.map((row) => row.legs.length), [100, 100, 100, 100]);
+});
