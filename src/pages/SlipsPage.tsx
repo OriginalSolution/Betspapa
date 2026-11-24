@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
 import { CodeActions } from '../components/CodeActions';
-import { Crest } from '../components/Crest';
 import { PickCard } from '../components/PickCard';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import {
@@ -20,7 +19,11 @@ import {
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 import type { Team } from '../types';
-import { SlipTimeline } from '../components/SlipTrack';
+import { SlipLegRow, SlipTimeline } from '../components/SlipTrack';
+import { SlipBell } from '../components/SlipBell';
+import { setBell, toBellLeg } from '../lib/slipBells';
+import { useSlipBells } from '../lib/useSlipBells';
+import { packLabel } from '../lib/slipPacks';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
@@ -197,20 +200,23 @@ function MasterHero({
         </div>
       </header>
       {book.parts.length ? (
-        book.parts.map((part) => {
+        book.parts.map((part, index) => {
           const odds = showOdds(part.totalOdds);
           return (
             <div className="master-part" key={part.code}>
-              <CodeActions code={part.code} desk={desk} link={part.link} codeClassName="master-code" compact={false} />
-              <p className="master-meta">
-                {picksLabel(part.legs)}
-                {odds ? ` · ${odds}` : ''}
+              <p className="master-part-top">
+                {book.parts.length > 1 && <span className="master-part-tag">Part {index + 1} of {book.parts.length}</span>}
+                <span className="master-meta">
+                  {picksLabel(part.legs)}
+                  {odds ? ` · odds ${odds}` : ''}
+                </span>
               </p>
+              <CodeActions code={part.code} desk={desk} link={part.link} className="master-actions" codeClassName="master-code" compact={false} />
             </div>
           );
         })
       ) : (
-        <p className="master-code">No code yet</p>
+        <p className="master-code master-code-empty">No code yet</p>
       )}
       {book.parts.length > 0 && booked && <p className="master-when">Booked {booked}</p>}
     </article>
@@ -239,13 +245,28 @@ function TrendSlip({
   const odds = book.parts.map((part) => showOdds(part.totalOdds)).filter((value): value is string => Boolean(value));
   const count = book.parts.length ? book.parts.reduce((sum, part) => sum + part.legs, 0) : visibleLegs(trend).length;
   const legs = visibleLegs(trend);
+  const { settings, permission, requestPermission } = useStore();
+  const bells = useSlipBells();
+  const bellId = `trend:${trend.id}:${(trend.bookedAt || '').slice(0, 10)}`;
+  const bellOn = Boolean(bells[bellId]?.on);
+  const bellLegs = legs.map((leg) => {
+    const [home, away] = splitMatch(leg.match);
+    return toBellLeg({ eventId: leg.eventId, market: leg.market, label: packLabel(leg.market), odds: Number(leg.odds) || 0, kickoff: leg.kickoff || '', home, away: away || '' });
+  });
+  const matchCount = new Set(bellLegs.map((leg) => leg.eventId)).size;
+  const toggleBell = () => {
+    const next = !bellOn;
+    setBell(bellId, next, { label: trend.label, legs: bellLegs });
+    if (next && (!settings.browser || permission !== 'granted')) void requestPermission();
+  };
   return (
-    <article id={`slip-${trend.id}`} className={cx('slip-trend', open && 'is-open', focused && 'trend-focus')}>
+    <article id={`slip-${trend.id}`} className={cx('slip-trend', open && 'is-open', focused && 'trend-focus', bellOn && 'is-belled')}>
       <div className="slip-trend-top">
         <button type="button" className="slip-trend-main" aria-expanded={open} onClick={onToggle}>
           <strong>{trend.label}</strong>
           <span className="slip-code">{codes.length ? codes.join(' · ') : 'No code yet'}</span>
         </button>
+        {legs.length > 0 && <SlipBell on={bellOn} count={matchCount} onToggle={toggleBell} className="slip-bell-small" />}
         <p className="slip-meta">
           {picksLabel(count)}
           {odds.length ? ` · ${odds.join(' · ')}` : ''}
@@ -255,37 +276,32 @@ function TrendSlip({
         ))}
       </div>
       {open && (
-        <ul className="slip-legs">
+        <ol className="slip-legs2 slip-trend-legs">
           {legs.map((leg) => {
             const [homeName, awayName] = splitMatch(leg.match);
             const board = matches.find((match) => match.id === leg.eventId);
             const home = board?.home ?? namedTeam(homeName, catalog);
             const away = awayName ? (board?.away ?? namedTeam(awayName, catalog)) : null;
-            const price = showOdds(leg.odds);
-            const kick = when(leg.kickoff);
             return (
-              <li key={`${leg.eventId}:${leg.market}`}>
-                <span className="slip-leg-teams">
-                  <Crest team={home} size={22} />
-                  <span>{home.shortName}</span>
-                  {away && (
-                    <>
-                      <span className="muted">vs</span>
-                      <Crest team={away} size={22} />
-                      <span>{away.shortName}</span>
-                    </>
-                  )}
-                </span>
-                <span className="slip-leg-meta">
-                  {marketLabel(leg.market)}
-                  {leg.sample ? ` · ${leg.occurrence}% · ${leg.sample}` : ''}
-                  {price ? ` · ${price}` : ''}
-                  {kick ? ` · ${kick}` : ''}
-                </span>
-              </li>
+              <SlipLegRow
+                key={`${leg.eventId}:${leg.market}`}
+                match={board}
+                leg={{
+                  key: `${leg.eventId}|${leg.market}`,
+                  home: homeName,
+                  away: awayName || '',
+                  homeCrest: home.crest || null,
+                  awayCrest: away?.crest || null,
+                  label: `${marketLabel(leg.market)}${leg.sample ? ` · ${leg.sample}` : ''}`,
+                  odds: Number(leg.odds) || 0,
+                  kickoff: leg.kickoff || '',
+                  status: 'open',
+                  ft: null,
+                }}
+              />
             );
           })}
-        </ul>
+        </ol>
       )}
     </article>
   );

@@ -20,6 +20,8 @@ import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
 import { builderLegKeys, readBuilder } from '../lib/builderStore';
+import { bellRegistration, withBellFollows } from '../lib/slipBells';
+import { useSlipBells } from '../lib/useSlipBells';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
 import { loadAlerted } from '../lib/storage';
 import type { InboxItem, Match } from '../types';
@@ -183,6 +185,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     if (notes.length) pushNotices(notes);
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
+  const bells = useSlipBells();
   const syncDeviceRef = useRef<() => void>(() => {});
   syncDeviceRef.current = () => {
     const byMatch = new Map(matches.map((match) => [match.id, match]));
@@ -209,7 +212,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
     const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
     const tracked = readBuilder().tracked;
     void syncPushDevice({
-      follows,
+      follows: withBellFollows(follows),
+      slipBells: bellRegistration(),
       trends: trendFollows,
       bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
       builderSlip: tracked
@@ -248,7 +252,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     syncDeviceRef.current();
-  }, [trendFollows, matches, picks, engineTick, follows, settings]);
+  }, [trendFollows, matches, picks, engineTick, follows, settings, bells]);
 
   useEffect(() => {
     const send = () => syncDeviceRef.current();

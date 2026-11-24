@@ -628,6 +628,53 @@ public class AlertPlannerTest {
         return match;
     }
 
+    @Test
+    public void belledSlipPostsEachLegThenTheSlipOnce() {
+        WatchState state = new WatchState();
+        state.browser = true;
+        JSONObject patch = new JSONObject("{\"follows\":{\"matches\":[\"sr:match:1\",\"sr:match:2\"],\"teams\":[]},\"slips\":[{\"id\":\"bell1\",\"label\":\"Slip\",\"legs\":["
+                + "{\"key\":\"sr:match:1|over15\",\"eventId\":\"sr:match:1\",\"market\":\"over15\",\"label\":\"Over 1.5 goals\",\"home\":\"Al Astiklal FC\",\"away\":\"Nashama Al-Mustaqbal\"},"
+                + "{\"key\":\"sr:match:2|dc-12\",\"eventId\":\"sr:match:2\",\"market\":\"dc-12\",\"label\":\"Double chance 12\",\"home\":\"Hearts of Oak\",\"away\":\"Medeama SC\"}]}]}");
+        state.merge(patch);
+        assertTrue(state.hasInterest());
+        WatchMatch one = match();
+        one.status = "live";
+        one.homeScore = 1;
+        one.awayScore = 1;
+        WatchMatch two = match();
+        two.id = "sr:match:2";
+        two.homeId = "hearts";
+        two.awayId = "medeama";
+        two.status = "live";
+        two.homeScore = 0;
+        two.awayScore = 0;
+        List<WatchMatch> board = new java.util.ArrayList<WatchMatch>();
+        board.add(one);
+        board.add(two);
+        List<WatchNote> first = AlertPlanner.slipNotes(board, state, KICK + 30L * 60_000L);
+        assertEquals(1, first.size());
+        assertEquals("slipleg:bell1:sr:match:1|over15", first.get(0).id);
+        assertEquals("win", first.get(0).kind);
+        assertEquals("Leg won · Over 1.5 goals", first.get(0).title);
+        assertEquals("Al Astiklal FC 1-1 Nashama Al-Mustaqbal · 1 of 2 settled", first.get(0).body);
+        state.record(first.get(0), KICK);
+        assertEquals(0, AlertPlanner.slipNotes(board, state, KICK + 31L * 60_000L).size());
+        two.status = "finished";
+        two.homeScore = 1;
+        two.awayScore = 1;
+        List<WatchNote> done = AlertPlanner.slipNotes(board, state, KICK + 100L * 60_000L);
+        assertEquals(2, done.size());
+        assertEquals("bust", done.get(0).kind);
+        assertEquals("Leg lost · Double chance 12", done.get(0).title);
+        assertEquals("slip:bell1", done.get(1).id);
+        assertEquals("slip", done.get(1).kind);
+        assertEquals("Slip lost · 1 of 2 legs won", done.get(1).title);
+        assertEquals("Hearts of Oak 1-1 Medeama SC missed Double chance 12.", done.get(1).body);
+        // Results survive a save and reload.
+        WatchState reloaded = WatchState.fromJson(state.toJson());
+        assertEquals("won", reloaded.slipResult("bell1", "sr:match:1|over15").optString("status"));
+    }
+
     private static WatchState followed() {
         WatchState state = new WatchState();
         state.browser = true;

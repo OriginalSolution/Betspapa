@@ -708,6 +708,103 @@ export function slipNote(device, matches) {
   };
 }
 
+/** Slips with the bell on. Omitted means "leave the stored bells alone". An empty list clears them. */
+export function slipBellsFrom(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'slipBells')) return undefined;
+  const rows = Array.isArray(body.slipBells) ? body.slipBells : [];
+  return rows.slice(0, 12).map((slip) => {
+    const id = String(slip?.id || '').slice(0, 120);
+    const seen = new Set();
+    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, 60).map((leg) => {
+      const eventId = String(leg?.eventId || '');
+      const market = String(leg?.market || '');
+      if (!/^sr:match:\d+$/.test(eventId) || !/^[a-z0-9-]{2,24}$/.test(market)) return null;
+      const key = `${eventId}|${market}`;
+      if (seen.has(key)) return null;
+      seen.add(key);
+      const odds = Number(leg?.odds);
+      return {
+        key,
+        eventId,
+        market,
+        home: String(leg.home || '').slice(0, 80),
+        away: String(leg.away || '').slice(0, 80),
+        odds: Number.isFinite(odds) ? odds : null,
+        label: String(leg.label || market).slice(0, 80),
+      };
+    }).filter(Boolean);
+    if (!id || !legs.length) return null;
+    return { id, label: String(slip?.label || '').slice(0, 80), legs };
+  }).filter(Boolean);
+}
+
+/** Keep the settled results of bells the phone still has, drop the rest. */
+export function keepBellProgress(progress, bells) {
+  const keep = {};
+  for (const bell of bells || []) if (progress?.[bell.id]) keep[bell.id] = progress[bell.id];
+  return keep;
+}
+
+/**
+ * Belled slips: one push per leg as soon as it is won or lost, full team names,
+ * then one for the whole slip once every leg has a result.
+ * A leg can be won before full time (over 1.5 at the second goal); a loss waits for the market to be dead.
+ */
+export function bellNotes(device, matches) {
+  const bells = Array.isArray(device?.slipBells) ? device.slipBells : [];
+  if (!bells.length) return { notes: [], changed: false };
+  const progress = { ...(device.bellProgress || {}) };
+  const notes = [];
+  let changed = false;
+  for (const bell of bells) {
+    const done = { ...(progress[bell.id] || {}) };
+    for (const leg of bell.legs || []) {
+      if (done[leg.key]?.status) continue;
+      const match = (matches || []).find((item) => item.id === leg.eventId);
+      if (!match) continue;
+      const verdict = settleTrend(leg.market, match);
+      if (verdict === 'open') continue;
+      const status = verdict === 'won' ? 'won' : 'lost';
+      const ft = match.homeScore != null && match.awayScore != null ? `${match.homeScore}-${match.awayScore}` : '';
+      done[leg.key] = { status, ft, home: leg.home || match.home, away: leg.away || match.away, label: leg.label };
+      changed = true;
+      const settled = (bell.legs || []).filter((row) => done[row.key]?.status).length;
+      const row = { home: leg.home || match.home, away: leg.away || match.away, ft };
+      notes.push({
+        id: `slipleg:${bell.id}:${leg.key}`,
+        matchId: leg.eventId,
+        kind: status === 'won' ? 'win' : 'bust',
+        title: `${status === 'won' ? 'Leg won' : 'Leg lost'} · ${leg.label}`,
+        body: `${legScore(row)}${leg.odds ? ` · ${Number(leg.odds).toFixed(2)}` : ''} · ${settled} of ${bell.legs.length} settled`,
+        marketLabel: leg.label,
+        market: leg.market,
+        fixture: legFixture(row),
+        odds: leg.odds ? Number(leg.odds).toFixed(2) : '',
+        route: 'slip',
+        match: { ...match, home: row.home, away: row.away },
+      });
+    }
+    progress[bell.id] = done;
+    // The tracked builder slip already sends its own one-off slip card under the same id.
+    if (device?.builderSlip?.id === bell.id) continue;
+    const copy = slipCopy(bell.legs || [], done);
+    if (copy) {
+      notes.push({
+        id: `slip:${bell.id}`,
+        matchId: '',
+        kind: 'slip',
+        title: copy.title,
+        body: copy.body,
+        route: 'slip',
+        marketLabel: copy.title,
+        fixture: copy.body,
+      });
+    }
+  }
+  if (changed) device.bellProgress = progress;
+  return { notes, changed };
+}
+
 function cleanVersion(value) {
   if (typeof value !== 'string') return '';
   const version = value.trim();
@@ -762,6 +859,7 @@ export function acceptDevice(body) {
       },
       appVersion: cleanVersion(body?.appVersion),
       builderSlip: builderSlipFrom(body) || null,
+      slipBells: slipBellsFrom(body) || [],
       lineupOff: Array.isArray(body?.lineupOff) ? body.lineupOff.filter((id) => typeof id === 'string').slice(0, 200) : [],
       sent: [],
       updatedAt: new Date().toISOString(),
@@ -801,6 +899,8 @@ export function createDeviceBook(dir) {
         builderSlip: builderSlipFrom(body) === undefined ? existing?.builderSlip || null : accepted.device.builderSlip,
         lineupOff: Array.isArray(body?.lineupOff) ? accepted.device.lineupOff : existing?.lineupOff || [],
         slipProgress: builderSlipFrom(body) === undefined || existing?.builderSlip?.id === accepted.device.builderSlip?.id ? existing?.slipProgress || {} : {},
+        slipBells: slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells,
+        bellProgress: keepBellProgress(existing?.bellProgress, slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells),
         sent: existing?.sent || [],
         appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),
         country: cleanCountry(meta?.country) || cleanCountry(existing?.country) || null,
@@ -1167,6 +1267,7 @@ export function watchedMatchIds(devices, matches) {
       if (cut > 0) ids.add(String(trend).slice(0, cut));
     }
     for (const leg of device?.builderSlip?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
+    for (const bell of device?.slipBells || []) for (const leg of bell?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
     for (const match of matches || []) {
       if ((device?.follows?.teams || []).some((team) => teamFollows(team, match))) ids.add(match.id);
     }
@@ -1319,8 +1420,9 @@ export function startPushWatch(options = {}) {
     pending = [];
     for (const device of book.list()) {
       const slip = slipNote(device, matches);
-      if (slip?.changed) book.persist();
-      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device), ...(slip?.note ? [slip.note] : [])];
+      const bell = bellNotes(device, matches);
+      if (slip?.changed || bell.changed) book.persist();
+      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device), ...(slip?.note ? [slip.note] : []), ...bell.notes];
       if (mine.length) matched += 1;
       for (const item of mine) queue.push({ device, item: { ...item, sentAt: now }, attempts: 0, at: now });
     }

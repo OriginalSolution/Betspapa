@@ -39,6 +39,10 @@ public final class WatchState {
     public final List<WatchMatch> matches = new ArrayList<WatchMatch>();
     public final List<String> muted = new ArrayList<String>();
     public final List<JSONObject> bookings = new ArrayList<JSONObject>();
+    /** Slips with the bell on: id, label, legs (key, eventId, market, label, home, away). */
+    public final List<JSONObject> slips = new ArrayList<JSONObject>();
+    /** Settled bell legs per slip: slipId -> legKey -> {status, score, home, away, label}. */
+    public JSONObject slipResults = new JSONObject();
     public long fixturesAt;
     /** Wall clock of the last poll that reached the feeds. Watchdog and Settings read this. */
     public long lastPollAt;
@@ -64,7 +68,7 @@ public final class WatchState {
     }
 
     public boolean hasInterest() {
-        return !matchIds.isEmpty() || !teamIds.isEmpty() || !trends.isEmpty();
+        return !matchIds.isEmpty() || !teamIds.isEmpty() || !trends.isEmpty() || !slips.isEmpty();
     }
 
     public boolean follows(WatchMatch match) {
@@ -73,6 +77,14 @@ public final class WatchState {
 
     public boolean relevant(WatchMatch match) {
         if (follows(match)) return true;
+        for (JSONObject slip : slips) {
+            JSONArray legs = slip.optJSONArray("legs");
+            if (legs == null) continue;
+            for (int i = 0; i < legs.length(); i++) {
+                JSONObject leg = legs.optJSONObject(i);
+                if (leg != null && match.id.equals(leg.optString("eventId", ""))) return true;
+            }
+        }
         for (String trend : trends) {
             int cut = trend.lastIndexOf(':');
             if (cut > 0 && trend.substring(0, cut).equals(match.id)) return true;
@@ -219,6 +231,38 @@ public final class WatchState {
             addStrings(muted, patch.optJSONArray("muted"));
         }
         if (patch.has("bookings")) replaceBookings(patch.optJSONArray("bookings"));
+        if (patch.has("slips")) replaceSlips(patch.optJSONArray("slips"));
+        JSONObject results = patch.optJSONObject("slipResults");
+        if (results != null) slipResults = results;
+    }
+
+    private void replaceSlips(JSONArray incoming) {
+        slips.clear();
+        JSONObject kept = new JSONObject();
+        if (incoming != null) {
+            for (int i = 0; i < incoming.length() && slips.size() < 12; i++) {
+                JSONObject row = incoming.optJSONObject(i);
+                if (row == null || row.optString("id", "").isEmpty() || row.optJSONArray("legs") == null) continue;
+                slips.add(row);
+                JSONObject prior = slipResults.optJSONObject(row.optString("id", ""));
+                if (prior != null) kept.put(row.optString("id", ""), prior);
+            }
+        }
+        slipResults = kept;
+    }
+
+    public JSONObject slipResult(String slipId, String legKey) {
+        JSONObject slip = slipResults.optJSONObject(slipId);
+        return slip == null ? null : slip.optJSONObject(legKey);
+    }
+
+    public void putSlipResult(String slipId, String legKey, JSONObject result) {
+        JSONObject slip = slipResults.optJSONObject(slipId);
+        if (slip == null) {
+            slip = new JSONObject();
+            slipResults.put(slipId, slip);
+        }
+        slip.put(legKey, result);
     }
 
     public void replaceFromFeed(List<WatchMatch> upcoming, long now) {
@@ -359,6 +403,8 @@ public final class WatchState {
         json.put("matches", listed);
         json.put("muted", new JSONArray(muted));
         json.put("bookings", new JSONArray(bookings));
+        json.put("slips", new JSONArray(slips));
+        json.put("slipResults", slipResults);
         json.put("fixturesAt", fixturesAt);
         json.put("lastPollAt", lastPollAt);
         json.put("source", MatchFeeds.SOURCE_LABEL);

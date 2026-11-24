@@ -18,6 +18,12 @@ export type DeviceRegistration = {
     id: string;
     legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
   } | null;
+  /** Slips with the bell on. Each leg gets its own won or lost push, then one for the slip. */
+  slipBells?: Array<{
+    id: string;
+    label: string;
+    legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
+  }>;
   settings: Pick<
     Settings,
     'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'goalSound' | 'redSound' | 'varSound' | 'penaltySound' | 'promos' | 'lineups' | 'lineupBig' | 'bankerCodes'

@@ -194,6 +194,9 @@ final class ScoreCards {
 
     private static String strip(WatchNote note, WatchMatch match) {
         if (note != null && note.disallowed) return "NO GOAL";
+        boolean leg = note != null && note.id != null && note.id.startsWith("slipleg:");
+        if (leg && "win".equals(note.kind)) return "LEG WON";
+        if (leg && "bust".equals(note.kind)) return "LEG LOST";
         if (note != null && "win".equals(note.kind)) return "TREND HIT";
         if (note != null && "bust".equals(note.kind)) return "BUST";
         if (note != null && "slip".equals(note.kind)) return "SLIP";
