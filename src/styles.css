@@ -1824,7 +1824,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   scrollbar-width: none;
 }
 .promo-carousel::-webkit-scrollbar { display: none; }
-.promo-carousel a { flex: 0 0 100%; scroll-snap-align: start; }
+.promo-carousel a { flex: 0 0 100%; }
 .promo-carousel img { width: 100%; aspect-ratio: 16 / 9; height: auto; object-fit: cover; object-position: center top; border-radius: 16px; background: #07080c; display: block; }
 .trends-option-c { gap: 10px; }
 .trend-seg {
@@ -3168,3 +3168,73 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .master-hero .master-code-empty { color: inherit; font-size: 28px; }
 .master-hero .master-when { font-size: 13px; opacity: 0.95; }
 .slips-page .slip-trend .code-pair .btn-tiny { min-height: 40px; padding: 8px 14px; }
+/* ---- 0.4.31 QA: rows that hold a code + Copy + Load wrap by content, not by screen width.
+   Bases are in em so they grow with the phone's text size (Xiaomi large font / display size). ---- */
+.code-pair { flex-wrap: wrap; }
+.code-pair > * { flex: none; }
+.code-pair-code { white-space: nowrap; overflow-wrap: normal; font-size: clamp(17px, 1.15em + 0.6vw, 22px); }
+.code-booking-code { white-space: nowrap; overflow-wrap: normal; }
+
+/* Codes cards: text first; the code row sits beside it only when the text still has ~15em. */
+.code-card { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 8px 10px; }
+.code-card > * { flex: 1 1 100%; min-width: 0; }
+.code-card > :first-child { flex: 999 1 15em; }
+.code-card > .code-pair { flex: 1 0 auto; justify-content: flex-end; }
+.code-card > .code-pair > .code-pair-code { margin-right: auto; }
+.code-card-main > div { flex: 1 1 auto; }
+.code-card-main span, .code-card > div > span { overflow-wrap: break-word; }
+.code-today { display: grid; grid-template-columns: minmax(0, 1fr); }
+.code-slotline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.code-slotline > :first-child { flex: 999 1 12em; min-width: 0; }
+.code-slotline > .code-pair { flex: 1 0 auto; justify-content: flex-end; }
+.code-slotline > .code-pair > .code-pair-code { margin-right: auto; }
+
+/* Picks master code: label, code and buttons wrap inside each part; columns follow the text size. */
+.master-parts { grid-template-columns: repeat(auto-fill, minmax(min(100%, 19em), 1fr)); }
+.master-strip .master-part { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.master-strip .master-part > span:first-child { flex: 0 0 auto; white-space: nowrap; }
+.master-strip .master-part .code-pair { flex: 1 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+.master-strip .master-part .code-pair-code { margin-right: auto; }
+.master-strip header label { flex: 0 0 auto; }
+
+/* Picks group header: tier toggle left, code row right; the code row drops under when tight. */
+.pick-group header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.pick-group header > button { flex: 1 0 auto; justify-content: flex-start; }
+.pick-group header .code-pair { flex: 0 0 auto; flex-wrap: nowrap; margin-left: auto; }
+
+/* Picks market tabs: one line each, the row scrolls sideways instead of squashing. */
+.pick-markets { flex-wrap: nowrap; overflow-x: auto; }
+.pick-markets .market-filter { flex: none; min-width: 0; white-space: nowrap; }
+
+/* Pick cards: the market keeps one line when it can; chips go under it, team names wrap, never cut. */
+.ring-meta { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
+.ring-meta em { flex: 0 1 auto; min-width: 0; }
+.ring-body > span:not(.ring-meta) { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; align-items: flex-start; }
+.code-card-main { min-height: 44px; }
+/* .code-pair is a <span>: never let a "card span { display:block }" rule turn it back into a block. */
+.code-pair.code-pair { display: flex; }
+.code-card .code-pair, .code-slotline .code-pair { color: inherit; font-size: inherit; }
+
+/* ---- 0.4.31 QA round 2 ---- */
+/* Codes detail legs: names wrap instead of pushing the page sideways. */
+.code-leg { grid-template-columns: auto minmax(0, 1fr) minmax(0, max-content); }
+.code-leg > div { min-width: 0; }
+.code-leg p span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+.code-leg-pick { max-width: 11em; overflow-wrap: anywhere; }
+.code-part header { flex-wrap: wrap; row-gap: 6px; }
+
+/* Match cards: full team names on up to three lines, never cut mid-letter. */
+.fixture-side strong { display: block; -webkit-line-clamp: unset; overflow: visible; max-width: 100%; }
+
+/* Tap targets: 40px+ everywhere. */
+.pick-markets .market-filter { min-width: 44px; }
+.add-grid button { min-height: 40px; }
+.switch { position: relative; }
+.switch::before { content: ''; position: absolute; inset: -8px -2px; }
+.today-search input, .settings input { min-height: 40px; }
+button.banner.banner-alert { min-height: 44px; }
+.rec-codes-link { display: inline-flex; align-items: center; min-height: 44px; }
+/* Live rows: full team names wrap rather than trail off. */
+.name { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; line-height: 1.25; }
+/* Logo in the top bar is a 44px target. */
+.mobile-brand { min-width: 44px; min-height: 44px; justify-content: center; }
