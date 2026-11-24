@@ -103,7 +103,7 @@ export function PicksPage() {
           </button>
         ))}
       </div>
-      <section className="master-code">
+      <section className="master-strip">
         <header>
           <span>Master code · {TIER_LABEL[tier]} all {band.length}</span>
           <label>
@@ -116,7 +116,7 @@ export function PicksPage() {
           </label>
         </header>
         {booked.parts.length === 0 && <p>{state?.showingCached ? 'Showing the last booked board' : 'No code yet'}</p>}
-        <div>
+        <div className="master-parts">
           {booked.parts.map((part) => (
             <div key={part.code} className="master-part">
               <span>P{part.index}·{part.legs}</span>

@@ -14,6 +14,28 @@ function EmptyCrest({ size, followed }: { size: number; followed: boolean }) {
   );
 }
 
+const FILLER = new Set(['fc', 'sc', 'afc', 'cf', 'ac', 'cd', 'sk', 'fk', 'if', 'bk', 'club', 'de', 'la', 'el', 'al', 'the', 'u17', 'u19', 'u20', 'u21', 'u23', 'ii', 'b']);
+
+/** Up to two letters for a side with no badge anywhere: "Orlando Pirates FC" is OP. */
+export function teamInitials(name: string): string {
+  const words = (name || '').replace(/[^\p{L}\p{N}\s-]/gu, ' ').split(/[\s-]+/).filter(Boolean);
+  const kept = words.filter((word) => !FILLER.has(word.toLowerCase()));
+  const pick = (kept.length ? kept : words).slice(0, 2);
+  return pick.map((word) => word[0]).join('').toUpperCase() || '?';
+}
+
+function InitialsCrest({ name, size, followed }: { name: string; size: number; followed: boolean }) {
+  return (
+    <span
+      className={cx('crest', 'crest-initials', followed && 'team-on')}
+      style={{ width: size, height: size, fontSize: Math.max(8, Math.round(size * 0.42)) }}
+      aria-hidden="true"
+    >
+      {teamInitials(name)}
+    </span>
+  );
+}
+
 /** A phone WebView can drop the first fetch. Two retries, then the plain shield. */
 const CREST_RETRIES = 2;
 
@@ -23,7 +45,18 @@ export function crestSrc(url: string, attempt: number): string {
   return `${url}${join}try=${attempt}`;
 }
 
-export function Crest({ team, size = 22, followed = false }: { team: Team; size?: number; followed?: boolean }) {
+export function Crest({
+  team,
+  size = 22,
+  followed = false,
+  fallback = 'shield',
+}: {
+  team: Team;
+  size?: number;
+  followed?: boolean;
+  /** What to draw when no badge loads: the plain shield, or the side's initials. */
+  fallback?: 'shield' | 'initials';
+}) {
   const [url, setUrl] = useState(team.crest || '');
   const [attempt, setAttempt] = useState(0);
   const [broken, setBroken] = useState(false);
@@ -60,5 +93,6 @@ export function Crest({ team, size = 22, followed = false }: { team: Team; size?
       />
     );
   }
+  if (fallback === 'initials') return <InitialsCrest name={team.name} size={size} followed={followed} />;
   return <EmptyCrest size={size} followed={followed} />;
 }

@@ -10,10 +10,22 @@ import { goToBookedCodes } from '../lib/useFreshCodes';
 import { useEngineBoard } from '../state/engine';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
+import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
+import { crestKey } from '../lib/crests';
+import { marketLabel } from '../lib/engineSlips';
+import { kickoffClock } from '../lib/format';
 import type { Team } from '../types';
 
 function teamOf(name: string, crest: string | null): Team {
   return { id: name || 'side', name, shortName: name, abbr: '', color: '#2a303c', crest };
+}
+
+/** Badge for a slip side: the leg's own, then today's board, then the bundled catalogue. */
+function sideCrest(name: string, own: string | null, board: Map<string, string>, catalog: CrestCatalog | null): string | null {
+  if (own) return own;
+  const fromBoard = board.get(crestKey(name));
+  if (fromBoard) return fromBoard;
+  return catalog ? catalogCrest(catalog, { id: '', name }) : null;
 }
 
 export function SlipBuilder() {
@@ -26,6 +38,27 @@ export function SlipBuilder() {
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => subscribeBuilder(() => setBuilder(readBuilder())), []);
+  const [catalog, setCatalog] = useState<CrestCatalog | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadCrestCatalog().then((loaded) => {
+      if (alive) setCatalog(loaded);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const boardCrests = useMemo(() => {
+    const found = new Map<string, string>();
+    for (const match of matches) {
+      for (const team of [match.home, match.away]) {
+        if (!team.crest) continue;
+        found.set(crestKey(team.name), team.crest);
+        if (team.shortName) found.set(crestKey(team.shortName), team.crest);
+      }
+    }
+    return found;
+  }, [matches]);
 
   const packs = useMemo(() => trendPacks(tipsFromEngine(state, matches), matches), [state, matches]);
   const selected = builder.tracked?.legs?.length ? builder.tracked.legs : legsForPacks(packs, builder.packIds);
@@ -108,10 +141,21 @@ export function SlipBuilder() {
         ) : (
           <ul className="pack-legs">
             {selected.map((leg) => (
-              <li key={leg.key}>
-                <Crest team={teamOf(leg.home, leg.homeCrest)} size={22} />
-                <span>{leg.home}</span>
-                <b>{leg.odds.toFixed(2)}</b>
+              <li key={leg.key} className={cx('slip-leg', editing && 'is-editing')}>
+                <span className="slip-leg-crests" aria-hidden="true">
+                  <Crest team={teamOf(leg.home, sideCrest(leg.home, leg.homeCrest, boardCrests, catalog))} size={22} fallback="initials" />
+                  <Crest team={teamOf(leg.away, sideCrest(leg.away, leg.awayCrest, boardCrests, catalog))} size={22} fallback="initials" />
+                </span>
+                <span className="slip-leg-main">
+                  <span className="slip-leg-teams">
+                    {leg.home} <i>v</i> {leg.away}
+                  </span>
+                  <small>
+                    {marketLabel(leg.market)}
+                    {leg.kickoff ? ` · ${kickoffClock(leg.kickoff)}` : ''}
+                  </small>
+                </span>
+                <b className="slip-leg-odds">{leg.odds.toFixed(2)}</b>
                 {editing && (
                   <button type="button" className="pack-remove" onClick={() => removeLeg(builder.packIds, packs, leg)} aria-label={`Remove the ${leg.label} trend`}>
                     Remove trend
