@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { profile } from '../data/board';
 import type { Match } from '../types';
 import { cx, minuteLabel } from '../lib/format';
+import { canUseLineupAlerts } from '../lib/proAccess';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
 import { IconStar } from './Icons';
@@ -39,7 +40,7 @@ export function MatchRow({ match }: { match: Match }) {
       >
         <IconStar filled={followed} />
       </button>
-      {settings.lineupCard && lineup && <LineupStrip lineup={lineup} />}
+      {settings.lineupCard && canUseLineupAlerts() && lineup && <LineupStrip lineup={lineup} />}
     </article>
   );
 }

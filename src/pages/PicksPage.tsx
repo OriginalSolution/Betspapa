@@ -5,6 +5,7 @@ import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
 import { showsInTier, slipParts, tierSlip, CODE_TIERS, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
+import { canSeeTier } from '../lib/proAccess';
 import { plainReasons } from '../lib/plainReason';
 import { BookMark } from '../components/BookMark';
 import { cx, kickoffClock } from '../lib/format';
@@ -103,6 +104,12 @@ export function PicksPage() {
           </button>
         ))}
       </div>
+      {!canSeeTier(tier) ? (
+        <p className="pro-lock">
+          {TIER_LABEL[tier]} picks are part of Pro. <Link to="/pro">See Pro</Link>
+        </p>
+      ) : (
+      <>
       <section className="master-strip">
         <header>
           <span>Master code · {TIER_LABEL[tier]} all {band.length}</span>
@@ -202,6 +209,8 @@ export function PicksPage() {
           onClose={() => setOpenId(null)}
           onAdd={() => toggleChip(openTip.chip)}
         />
+      )}
+      </>
       )}
     </div>
   );

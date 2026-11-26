@@ -16,6 +16,7 @@ import {
   type TrendView,
 } from '../data/board';
 import { staleTrendIds, trendHitNotices } from '../lib/alerts';
+import { canUseLineupAlerts } from '../lib/proAccess';
 import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
@@ -243,7 +244,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         varSound: settings.varSound,
         penaltySound: settings.penaltySound,
         promos: settings.promos,
-        lineups: settings.lineups,
+        lineups: settings.lineups && canUseLineupAlerts(),
         lineupBig: settings.lineupBig,
         bankerCodes: settings.bankerCodes,
       },

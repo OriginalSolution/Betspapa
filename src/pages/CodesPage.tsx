@@ -25,6 +25,7 @@ import {
 } from '../lib/codes';
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
+import { canSeeCode } from '../lib/proAccess';
 import { useStore } from '../state/store';
 import { markFresh, newCodes } from '../lib/freshCode';
 import { goToBookedCodes, useFreshCodes } from '../lib/useFreshCodes';
@@ -90,18 +91,33 @@ function Logos({ part }: { part: CodePart }) {
   );
 }
 
+function codeText(part: CodePart, extra = ''): string {
+  if (!canSeeCode(part.code, part.firstKick)) return 'Early code · Pro';
+  return `${part.code} · ${part.legCount} legs · ${oddsText(part.totalOdds)}${extra}`;
+}
+
+function EarlyCode({ code, firstKick }: { code: string; firstKick?: string }) {
+  if (canSeeCode(code, firstKick)) return <CodeCopy code={code} />;
+  return (
+    <Link to="/pro" className="pro-lock">
+      Early code · Pro
+    </Link>
+  );
+}
+
 function PartBlock({ part, warning, index, total }: { part: CodePart; warning: string; index: number; total: number }) {
+  const open = canSeeCode(part.code, part.firstKick);
   return (
     <article className="code-part">
       <header>
         <div>
           <p>Part {index + 1} of {total}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
         </div>
-        <CodeCopy code={part.code} link={part.link} />
+        {open ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />}
       </header>
       <Logos part={part} />
       <p className="code-odds">{part.legCount} legs · {oddsText(part.totalOdds)} odds{part.firstKick ? ` · ${gmtDay(part.firstKick.slice(0, 10))} ${gmtClock(part.firstKick)} – ${gmtClock(part.lastKick)} GMT` : ''}</p>
-      {part.football && part.footballCode && part.footballCode !== part.code && (
+      {open && part.football && part.footballCode && part.footballCode !== part.code && (
         <p className="code-foot">Football.com <CodeCopy code={part.footballCode} desk="footballcom" link={part.footballLink} /></p>
       )}
       <Risk part={part} warning={warning} />
@@ -127,12 +143,13 @@ function NextBooking({ line, none, title }: { line: string; none: boolean; title
 function SlotLine({ slot }: { slot: CodeSlot }) {
   const part = slot.parts[0];
   if (!part) return <p className="code-empty">{slot.empty}</p>;
+  const open = canSeeCode(part.code, part.firstKick);
   return (
     <div className="code-slotline">
       <div>
         <span>{part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · Lost · ${part.settled} of ${part.legCount} settled` : ''}</span>
       </div>
-      <CodeCopy code={part.code} link={part.link} />
+      {open ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />}
     </div>
   );
 }
@@ -305,12 +322,12 @@ export function CodesPage() {
                   <div>
                     <strong>{item.name}</strong>
                     {part && (
-                      <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}{item.week.parts.length > 1 ? ` · +${item.week.parts.length - 1} more code` : ''}</span>
+                      <span>{codeText(part, item.week.parts.length > 1 ? ` · +${item.week.parts.length - 1} more code` : '')}</span>
                     )}
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </Link>
-                {part && <CodeCopy code={part.code} link={part.link} />}
+                {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
                 {hasCode(item.today) && (
                   <div className="code-today">
@@ -349,11 +366,11 @@ export function CodesPage() {
                   <i>{item.code}</i>
                   <div>
                     <strong>{item.name}</strong>
-                    {part && <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}{part.status === 'lost' ? ` · lost (${part.settled} of ${part.legCount} settled)` : part.status === 'won' ? ' · won' : ''}</span>}
+                    {part && <span>{codeText(part, part.status === 'lost' ? ` · lost (${part.settled} of ${part.legCount} settled)` : part.status === 'won' ? ' · won' : '')}</span>}
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
                 </div>
-                {part && <CodeCopy code={part.code} link={part.link} />}
+                {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{part.highRiskWhy}. {data.warning}</span></p>}
               </article>
             );
@@ -365,10 +382,10 @@ export function CodesPage() {
               <article className="code-card code-card-slim" key={row.iso}>
                 <div>
                   <strong>{dayChip(row.iso).weekday}</strong>
-                  {part && <span>{part.code} · {part.legCount} legs · {oddsText(part.totalOdds)}</span>}
+                  {part && <span>{codeText(part)}</span>}
                   {part?.highRisk && <em>HIGH RISK</em>}
                 </div>
-                {part && <CodeCopy code={part.code} link={part.link} />}
+                {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
               </article>
             );
           })}

@@ -13,6 +13,7 @@ import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/forma
 import type { EventType, Match, MatchEvent } from '../types';
 import { LineupXI, useLineup } from '../components/Lineups';
 import { MatchFacts } from '../components/MatchFacts';
+import { canAddFollow } from '../lib/proAccess';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
 
@@ -58,6 +59,8 @@ export function MatchPage() {
     );
   }
 
+  const followCount = follows.matches.length + follows.teams.length;
+  const followRoom = canAddFollow(followCount);
   const followed = follows.matches.includes(match.id);
   const homeOn = follows.teams.some((team) => team.id === match.home.id);
   const awayOn = follows.teams.some((team) => team.id === match.away.id);
@@ -110,11 +113,11 @@ export function MatchPage() {
           <button type="button" className={cx('btn', followed && 'btn-quiet')} onClick={() => toggleMatch(match.id)}>
             {followed ? 'Following match' : 'Follow match'}
           </button>
-          <button type="button" className={cx('btn', 'btn-quiet', homeOn && 'is-on')} onClick={() => toggleTeam(teamFollow(match.home))}>
-            {homeOn ? `Following ${match.home.shortName}` : `Follow ${match.home.shortName}`}
+          <button type="button" className={cx('btn', 'btn-quiet', homeOn && 'is-on')} onClick={() => { if (!homeOn && !followRoom) return; toggleTeam(teamFollow(match.home)); }}>
+            {homeOn ? `Following ${match.home.shortName}` : followRoom ? `Follow ${match.home.shortName}` : 'Pro for more follows'}
           </button>
-          <button type="button" className={cx('btn', 'btn-quiet', awayOn && 'is-on')} onClick={() => toggleTeam(teamFollow(match.away))}>
-            {awayOn ? `Following ${match.away.shortName}` : `Follow ${match.away.shortName}`}
+          <button type="button" className={cx('btn', 'btn-quiet', awayOn && 'is-on')} onClick={() => { if (!awayOn && !followRoom) return; toggleTeam(teamFollow(match.away)); }}>
+            {awayOn ? `Following ${match.away.shortName}` : followRoom ? `Follow ${match.away.shortName}` : 'Pro for more follows'}
           </button>
         </div>
       </section>

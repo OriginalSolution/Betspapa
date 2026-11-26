@@ -24,7 +24,7 @@ export function MorePage() {
         {PRO_UI_ENABLED && (
           <Link to="/pro">
             <strong>Betspapa Pro</strong>
-            <span>Placeholder prices. Nothing is charged.</span>
+            <span>Subscribe in the Android app. No purchase on the website.</span>
           </Link>
         )}
         <a href="https://betspapa.com/privacy/" target="_blank" rel="noopener noreferrer">

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAlertSetup } from '../components/AlertSetup';
 import { playEventSound, playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
 import { openNotificationSound, readPushToken, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest, type PushState } from '../lib/deviceWatch';
 import { isNativeApp } from '../lib/nativeHttp';
+import { canUseLineupAlerts } from '../lib/proAccess';
 import type { GoalSound, NotificationStyle } from '../types';
 import { useLineupList } from '../components/Lineups';
 import { useStore } from '../state/store';
@@ -488,6 +490,12 @@ function LineupSettings() {
   return (
     <section className="panel" aria-label="Lineup alerts">
       <h2>Lineup alerts</h2>
+      {!canUseLineupAlerts() ? (
+        <p className="pro-lock">
+          Lineup alerts are part of Pro. <Link to="/pro">See Pro</Link>
+        </p>
+      ) : (
+      <>
       <p className="lede">For picks and teams you follow. One alert when the starting XI is named, compared with that team’s previous match.</p>
       <div className="setting">
         <div>
@@ -525,6 +533,8 @@ function LineupSettings() {
           <strong>{sample.home} v {sample.away}</strong>
           <span>{sample.homeChanges == null ? 'Lineup in' : `${sample.home} make ${sample.homeChanges} changes`}. {(sample.homeIn || []).slice(0, 3).join(', ')}{(sample.homeIn || []).length ? ' start.' : ''}</span>
         </article>
+      )}
+      </>
       )}
     </section>
   );

@@ -11,6 +11,7 @@ import { applyCrests } from '../lib/liveScores';
 import { mergeBoard } from '../lib/liveBoard';
 import { isoFromDate, onBoardDate } from '../lib/dates';
 import { isNativeApp } from '../lib/nativeHttp';
+import { canAddFollow } from '../lib/proAccess';
 import { bellWatchRows, subscribeBells, withBellFollows } from '../lib/slipBells';
 import { playGoalSound, shouldPlayInAppCheer } from '../lib/cheer';
 import { pushBrowserNotification, readNativePermission, readPermission, requestBrowserPermission, vibrateAlert, type BrowserPermission } from '../lib/notify';
@@ -182,11 +183,15 @@ function reducer(state: State, action: Action): State {
       };
     case 'toggle-match': {
       const has = state.follows.matches.includes(action.id);
+      const count = state.follows.matches.length + state.follows.teams.length;
+      if (!has && !canAddFollow(count)) return state;
       const matches = has ? state.follows.matches.filter((id) => id !== action.id) : [...state.follows.matches, action.id];
       return { ...state, follows: { ...state.follows, matches } };
     }
     case 'toggle-team': {
       const has = state.follows.teams.some((team) => team.id === action.team.id);
+      const count = state.follows.matches.length + state.follows.teams.length;
+      if (!has && !canAddFollow(count)) return state;
       const teams = has ? state.follows.teams.filter((team) => team.id !== action.team.id) : [...state.follows.teams, action.team];
       return { ...state, follows: { ...state.follows, teams } };
     }

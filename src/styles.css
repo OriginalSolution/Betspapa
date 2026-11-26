@@ -3315,6 +3315,10 @@ button.banner.banner-alert { min-height: 44px; }
 button.ad-slot { width: calc(100% - 28px); background: transparent; }
 .pro-screen { padding-bottom: 24px; }
 .pro-note { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.pro-lock { margin: 12px 14px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.pro-lock a { color: var(--text); font-weight: 750; }
+.pro-prices .btn { margin-top: 8px; }
+.ad-banner { min-height: 50px; }
 .pro-prices, .pro-limits section {
   margin-top: 12px;
   padding: 14px;

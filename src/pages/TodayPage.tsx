@@ -12,6 +12,7 @@ import { useEngineBoard } from '../state/engine';
 import { apiUrl } from '../lib/apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { applyFilter, type BoardFilter } from '../lib/group';
+import { canUseSavedFilters } from '../lib/proAccess';
 import { applySavedFilters, loadSavedFilters, writeSavedFilters, type SavedChip } from '../lib/savedFilters';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
@@ -100,7 +101,8 @@ export function TodayPage() {
     if (leagueId) return match.competition.id === leagueId;
     return true;
   });
-  const shown = applyFilter(applySavedFilters(scoped, saved), filter);
+  const filtersOn = canUseSavedFilters();
+  const shown = applyFilter(filtersOn ? applySavedFilters(scoped, saved) : scoped, filter);
   const keepSaved = (next: SavedChip[]) => {
     setSaved(next);
     writeSavedFilters(next);
@@ -124,7 +126,12 @@ export function TodayPage() {
       {searching ? null : (
         <>
           {!(teamId || leagueId) && <WeekStrip />}
-          {!(teamId || leagueId) && <SavedFilters matches={matches} saved={saved} onChange={keepSaved} />}
+          {!(teamId || leagueId) && filtersOn && <SavedFilters matches={matches} saved={saved} onChange={keepSaved} />}
+          {!(teamId || leagueId) && !filtersOn && (
+            <p className="pro-lock">
+              Saved filters are part of Pro. <Link to="/pro">See Pro</Link>
+            </p>
+          )}
           {!(teamId || leagueId) && <TodaySortBar value={sort} onChange={setSort} />}
           {!(teamId || leagueId) && <FilterChips value={filter} onChange={setFilter} />}
           {feedNote && (
