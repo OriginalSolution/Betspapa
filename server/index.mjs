@@ -30,6 +30,7 @@ import { flattenPrematch, loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 import { installDiskGuard } from './safeWrite.mjs';
 import { cachedMatchInsight } from './matchInsight.mjs';
+import { readEntitlements, rememberEntitlement, verifyPlayPurchase, writeEntitlements } from './proBilling.mjs';
 installDiskGuard();
 loadMarketRules();
 
@@ -575,6 +576,33 @@ async function handleApi(req, res, url) {
       pollMs: 120000,
       reason: null,
     });
+    return;
+  }
+  if (url.pathname === '/api/pro/verify') {
+    if (req.method !== 'POST') {
+      send(req, res, 405, { error: 'Method not allowed' });
+      return;
+    }
+    const limit = takeRequest(clientIp(req), url.pathname);
+    if (limit.limited) {
+      send(req, res, 429, { error: 'Slow down.' }, 'private, no-store', { 'Retry-After': String(limit.retryAfter) });
+      return;
+    }
+    try {
+      const body = await readJson(req);
+      const result = await verifyPlayPurchase({
+        productId: String(body?.productId || ''),
+        purchaseToken: String(body?.purchaseToken || ''),
+      });
+      if (result.store) {
+        const file = join(dataDir, 'pro-entitlements.json');
+        const book = rememberEntitlement(readEntitlements(file), result.store);
+        writeEntitlements(file, book);
+      }
+      send(req, res, result.status, result.body, 'private, no-store');
+    } catch (error) {
+      send(req, res, 400, { entitled: false, error: error instanceof Error ? error.message : 'Purchase could not be checked.' });
+    }
     return;
   }
   if (url.pathname === '/api/match-insight') {

@@ -51,6 +51,8 @@ public class MainActivity extends BridgeActivity {
             }
         });
         registerPlugin(WatchPlugin.class);
+        registerPlugin(PlayBillingPlugin.class);
+        registerPlugin(AdsPlugin.class);
         super.onCreate(savedInstanceState);
         paintBlack();
         AlertPoster.ensure(this);

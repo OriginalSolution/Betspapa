@@ -1,5 +1,5 @@
 /**
- * Pro prices and ads are not approved.
- * Keep this false. Do not turn it on to sell a plan, load an ad, or charge anyone.
+ * Keep this false on production. Play products and real AdMob units are not
+ * created yet. Turning it on shows billing, the free/Pro limits, and test ads.
  */
 export const PRO_UI_ENABLED = false;
