@@ -26,7 +26,7 @@ import { crestStore, scheduleNightly } from './crestStore.mjs';
 import { createResults } from './results.mjs';
 import { createLineups, lineupNote, lineupWanted } from './lineups.mjs';
 import { bankerNote, bankerWanted, createBanker } from './banker.mjs';
-import { loadUpcomingEvents } from './upcoming.mjs';
+import { flattenPrematch, loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 import { installDiskGuard } from './safeWrite.mjs';
 installDiskGuard();
@@ -282,6 +282,24 @@ async function cached(key, ttl, fn) {
   const value = await fn();
   cache.set(key, { value, expires: Date.now() + ttl });
   return value;
+}
+
+async function loadInPlay() {
+  return cached('inplay-football', 20_000, async () => {
+    const response = await fetch(
+      'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1',
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+          Referer: 'https://www.sportybet.com/gh/sport/football',
+        },
+        signal: AbortSignal.timeout(45_000),
+      },
+    );
+    if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
+    return response.json();
+  });
 }
 
 function withOccurrence(events) {
@@ -560,21 +578,7 @@ async function handleApi(req, res, url) {
   }
   if (url.pathname === '/api/live') {
     try {
-      const events = await cached('inplay-football', 20_000, async () => {
-        const response = await fetch(
-          'https://www.sportybet.com/api/gh/factsCenter/liveOrPrematchEvents?sportId=sr%3Asport%3A1',
-          {
-            headers: {
-              Accept: 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
-              Referer: 'https://www.sportybet.com/gh/sport/football',
-            },
-            signal: AbortSignal.timeout(45_000),
-          },
-        );
-        if (!response.ok) throw new Error(`In-play scores returned ${response.status}`);
-        return response.json();
-      });
+      const events = await loadInPlay();
       send(req, res, 200, slimLivePayload(events, (id, name) => crests.crestFor(id, name)), 'public, max-age=20');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'In-play scores failed' });
@@ -614,6 +618,18 @@ async function handleApi(req, res, url) {
         const kick = new Date(event.kickoff).getTime();
         return kick >= fromMs && kick <= toMs;
       });
+      const seen = new Set(filtered.map((event) => event.eventId));
+      try {
+        const live = flattenPrematch(await loadInPlay());
+        for (const event of live) {
+          const kick = new Date(event.kickoff).getTime();
+          if (!event.eventId || seen.has(event.eventId) || kick < fromMs || kick > toMs) continue;
+          filtered.push(event);
+          seen.add(event.eventId);
+        }
+      } catch (error) {
+        console.error(`[fixtures] In-play list was not merged: ${error instanceof Error ? error.message : error}`);
+      }
       send(req, res, 200, { source: 'betspapa', events: withCrests(withOccurrence(filtered)) }, 'public, max-age=60');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Fixture feed failed' });

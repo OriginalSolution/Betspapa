@@ -10,11 +10,12 @@ describe('feed backoff', () => {
     expect(backoffMs(0, null, 1)).toBe(1300);
   });
 
-  it('stops the board poll in the background or in demo, and live scores only while a match is on screen', () => {
+  it('stops the board poll in the background or in demo, and asks for in-play scores whenever the board is open', () => {
     expect(shouldPoll(true, 'sporty')).toBe(true);
     expect(shouldPoll(false, 'live')).toBe(false);
     expect(shouldPoll(true, 'demo')).toBe(false);
-    expect(shouldPollLive(true, ['scheduled'])).toBe(false);
+    expect(shouldPollLive(true, ['scheduled'])).toBe(true);
+    expect(shouldPollLive(true, [])).toBe(true);
     expect(shouldPollLive(true, ['live'])).toBe(true);
     expect(shouldPollLive(false, ['halftime'])).toBe(false);
   });
