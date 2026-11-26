@@ -45,6 +45,20 @@ describe('bookmaker share links', () => {
     expect(deskOrSporty('unknown')).toBe('sportybet');
   });
 
+  it('a Play build copies the code and does not open any bookmaker', async () => {
+    const open = vi.fn();
+    const toast = vi.fn();
+    const url = await openBookmaker('sportybet', '9B4CVQ', 'https://www.sportybet.com/gh/?shareCode=9B4CVQ', {
+      copy: async () => {},
+      open,
+      play: true,
+      toast,
+    });
+    expect(url).toBe('');
+    expect(open).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalled();
+  });
+
   it('still opens the bookmaker when the clipboard refuses', async () => {
     const open = vi.fn();
     await openBookmaker('betpawa', 'BP9900', undefined, { copy: async () => Promise.reject(new Error('denied')), open });

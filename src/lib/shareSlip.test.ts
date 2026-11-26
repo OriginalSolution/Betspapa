@@ -72,6 +72,7 @@ describe('slip share model', () => {
       ].join('\n'),
     );
     expect(whatsAppTextUrl(text)).toContain('https://wa.me/?text=Betspapa');
+    expect(shareCaption({ ...model, desks: [{ id: 'sportybet', name: 'SportyBet', codes: ['ABC123 https://www.sportybet.com/gh/?shareCode=ABC123'] }] }, true)).not.toMatch(/sportybet\.com|football\.com|msport|betika|betpawa/);
   });
 
   it('returns null when there are no codes', () => {

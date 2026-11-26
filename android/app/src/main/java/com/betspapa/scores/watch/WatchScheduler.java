@@ -1,5 +1,6 @@
 package com.betspapa.scores.watch;
 
+import com.betspapa.scores.BuildConfig;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -71,6 +72,11 @@ public final class WatchScheduler {
     }
 
     public static void ensurePeriodic(Context context) {
+        if (BuildConfig.PLAY_STORE) {
+            WorkManager.getInstance(context).cancelUniqueWork(PERIODIC);
+            WorkManager.getInstance(context).cancelUniqueWork(ONCE);
+            return;
+        }
         Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
         PeriodicWorkRequest work = new PeriodicWorkRequest.Builder(FixtureRefreshWorker.class, 15, TimeUnit.MINUTES)
             .setConstraints(constraints)
@@ -79,12 +85,14 @@ public final class WatchScheduler {
     }
 
     public static void enqueueRefresh(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
         OneTimeWorkRequest once = new OneTimeWorkRequest.Builder(FixtureRefreshWorker.class).setConstraints(constraints).build();
         WorkManager.getInstance(context).enqueueUniqueWork(ONCE, ExistingWorkPolicy.REPLACE, once);
     }
 
     public static void arm(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         ensurePeriodic(context);
         armWatchdog(context);
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
@@ -106,6 +114,7 @@ public final class WatchScheduler {
 
     /** Fires even in Doze. Starts the service again if HiOS has killed it, then polls. */
     public static void armWatchdog(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) return;
         WatchState state = WatchState.load(WatchFiles.file(context));
@@ -119,12 +128,14 @@ public final class WatchScheduler {
 
     /** Brought back a few seconds after a swipe. The process is usually already gone. */
     public static void scheduleRestart(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) return;
         schedule(alarms, restartIntent(context), System.currentTimeMillis() + 5_000L, 3_000L);
     }
 
     public static void onAlarm(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         ensureWatching(context);
         if (WatchRuntime.serviceRunning) nudge(context);
         else start(context);
@@ -132,6 +143,7 @@ public final class WatchScheduler {
     }
 
     public static void onWatchdog(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         WatchState state = WatchState.load(WatchFiles.file(context));
         if (!ready(context, state)) return;
         if (!WatchRuntime.serviceRunning) start(context);
@@ -141,6 +153,7 @@ public final class WatchScheduler {
 
     /** Ask the running watcher to poll now. A fresh start uses the foreground-service API. */
     public static void nudge(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         Intent intent = new Intent(context, ScoreWatchService.class);
         intent.setAction(ScoreWatchService.ACTION_POLL);
         try {
@@ -152,6 +165,7 @@ public final class WatchScheduler {
     }
 
     public static void ensureWatching(Context context) {
+        if (BuildConfig.PLAY_STORE) return;
         WatchState state = WatchState.load(WatchFiles.file(context));
         if (!ready(context, state)) return;
         long now = System.currentTimeMillis();
@@ -185,6 +199,16 @@ public final class WatchScheduler {
     }
 
     public static void requestBatteryExemption(Context context) {
+        if (BuildConfig.PLAY_STORE) {
+            Intent list = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            if (!(context instanceof android.app.Activity)) list.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                context.startActivity(list);
+            } catch (RuntimeException ignored) {
+                /* the settings guide still tells the user where to look */
+            }
+            return;
+        }
         String pkg = context.getPackageName();
         Intent request = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
         request.setData(Uri.parse("package:" + pkg));
@@ -249,6 +273,7 @@ public final class WatchScheduler {
     }
 
     private static boolean start(Context context) {
+        if (BuildConfig.PLAY_STORE) return false;
         try {
             ContextCompat.startForegroundService(context, new Intent(context, ScoreWatchService.class));
             return true;

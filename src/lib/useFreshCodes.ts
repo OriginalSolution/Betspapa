@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import { deskName, isDesk, openBookmaker } from './bookmakerLink';
+import { isPlayStoreBuild } from './storeBuild';
 import { clearFresh, freshCodes, markFresh, PULSE_MS, type FreshCode } from './freshCode';
 
 function reducedMotion(): boolean {
@@ -79,8 +80,9 @@ export function useFreshCodes(ready: unknown, options: { scroll?: boolean } = {}
           if (item.link) node.dataset.freshLink = item.link;
           node.setAttribute('role', 'link');
           node.setAttribute('tabindex', '0');
-          node.setAttribute('aria-label', `New code ${item.code}. Open in ${deskName(item.desk)}`);
-          node.title = `Open in ${deskName(item.desk)}`;
+          const play = isPlayStoreBuild();
+          node.setAttribute('aria-label', play ? `New code ${item.code}. Copy it` : `New code ${item.code}. Open in ${deskName(item.desk)}`);
+          node.title = play ? 'Copy code' : `Open in ${deskName(item.desk)}`;
           lit.push(node);
         });
       }
@@ -88,7 +90,7 @@ export function useFreshCodes(ready: unknown, options: { scroll?: boolean } = {}
       clearFresh();
       if (scroll) lit[0].scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'center' });
       const first = fresh.find((item) => isDesk(item.desk));
-      if (first) showHint(`New code ${first.code} · tap it to open ${deskName(first.desk)}`, lit[0]);
+      if (first) showHint(isPlayStoreBuild() ? `New code ${first.code} · tap it to copy` : `New code ${first.code} · tap it to open ${deskName(first.desk)}`, lit[0]);
       pulseTimer = window.setTimeout(() => lit.forEach((node) => node.classList.remove('fresh-pulse')), PULSE_MS);
     });
     return () => {

@@ -143,7 +143,7 @@ export const defaultSettings: Settings = {
   goalVolume: 60,
   notificationStyle: 'auto',
   dataSource: 'sporty',
-  promos: true,
+  promos: false,
   lineups: true,
   lineupBig: false,
   lineupCard: true,

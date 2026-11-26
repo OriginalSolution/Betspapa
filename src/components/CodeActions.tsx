@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { copyText, deskName, deskOrSporty, openBookmaker } from '../lib/bookmakerLink';
+import { copyText, deskName, deskOrSporty, openBookmaker, showCopiedToast } from '../lib/bookmakerLink';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import type { DeskId } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 
@@ -29,6 +30,7 @@ export function CodeActions({
 }: CodeActionsProps) {
   const [copied, setCopied] = useState(false);
   const resolved = deskOrSporty(desk);
+  const play = isPlayStoreBuild();
   if (!code) return null;
 
   const stop = (event?: { stopPropagation(): void }) => {
@@ -39,6 +41,7 @@ export function CodeActions({
     stop(event);
     void copyText(code).then(() => {
       setCopied(true);
+      if (play) showCopiedToast();
       window.setTimeout(() => setCopied(false), 1400);
     });
   };
@@ -59,8 +62,8 @@ export function CodeActions({
           className={cx('code-pair-code', codeClassName)}
           data-booking-code={code}
           data-code={code}
-          onClick={load}
-          aria-label={`Load ${code} in ${name}`}
+          onClick={play ? copy : load}
+          aria-label={play ? `Copy ${code}` : `Load ${code} in ${name}`}
         >
           {code}
         </button>
@@ -68,9 +71,11 @@ export function CodeActions({
       <button type="button" className={cx(btn, 'btn-quiet')} onClick={copy}>
         {copied ? 'Copied' : 'Copy'}
       </button>
-      <button type="button" className={btn} onClick={load} aria-label={`Load ${code} in ${name}`}>
-        Load
-      </button>
+      {!play && (
+        <button type="button" className={btn} onClick={load} aria-label={`Load ${code} in ${name}`}>
+          Load
+        </button>
+      )}
     </span>
   );
 }

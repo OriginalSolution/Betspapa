@@ -66,6 +66,9 @@ export function ProPage() {
 
   return (
     <div className="stack pro-screen">
+      <button type="button" className="btn btn-quiet pro-close" onClick={() => window.history.back()}>
+        Close
+      </button>
       {android ? (
         <p className="pro-note">Prices come from Google Play. {plans.some((plan) => plan.fromPlay) ? 'These are Play’s prices for this phone.' : 'Play’s price shows here when the store answers. Until then the approved Ghana prices are shown.'}</p>
       ) : (
@@ -87,6 +90,11 @@ export function ProPage() {
             Restore purchases
           </button>
         )}
+        <p className="pro-note">Each price is for that period. A year is not shown as a monthly price. A subscription renews automatically until cancelled.</p>
+        <p className="pro-note">Cancel in Google Play: open your profile photo, then Payments and subscriptions, then Subscriptions.</p>
+        <p className="pro-note">
+          <a href="https://play.google.com/store/account/subscriptions?package=com.betspapa.scores">Manage subscription</a>
+        </p>
       </section>
       <div className="pro-limits">
         <section>

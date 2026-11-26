@@ -1,4 +1,5 @@
 import { DESK_NAMES, type DeskId } from './engineSlips';
+import { isPlayStoreBuild } from './storeBuild';
 
 /**
  * Share-code URLs, the same ones the server books with (server/bookers.mjs).
@@ -78,6 +79,18 @@ function openUrl(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+/** A short "Copied" confirmation. Play builds use it instead of opening a bookmaker. */
+export function showCopiedToast() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.copy-toast').forEach((node) => node.remove());
+  const node = document.createElement('p');
+  node.className = 'copy-toast';
+  node.setAttribute('role', 'status');
+  node.textContent = 'Copied';
+  document.body.appendChild(node);
+  window.setTimeout(() => node.remove(), 1600);
+}
+
 /**
  * Copy the code first (so it can be pasted if the bookmaker drops the link),
  * then open the bookmaker with the code preloaded.
@@ -86,13 +99,20 @@ export async function openBookmaker(
   desk: DeskId,
   code: string,
   link?: string | null,
-  deps: { copy?: (value: string) => Promise<void>; open?: (url: string) => void } = {},
+  deps: { copy?: (value: string) => Promise<void>; open?: (url: string) => void; play?: boolean; toast?: () => void } = {},
 ): Promise<string> {
+  const play = deps.play ?? isPlayStoreBuild();
   const url = bookmakerUrl(desk, code, link);
+  let copied = false;
   try {
     await (deps.copy || copyText)(code);
+    copied = true;
   } catch {
-    /* opening still loads the code */
+    /* a website build still opens the bookmaker */
+  }
+  if (play) {
+    if (copied) (deps.toast || showCopiedToast)();
+    return '';
   }
   (deps.open || openUrl)(url);
   return url;

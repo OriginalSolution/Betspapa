@@ -3301,6 +3301,21 @@ button.banner.banner-alert { min-height: 44px; }
 .mobile-brand { min-width: 44px; min-height: 44px; justify-content: center; }
 /* The code chip itself is a tap target (Load): 24px box + 10px hit slop each side = 44px. */
 .code-pair-code { min-height: 24px; }
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-area-inset-bottom, 0px) + 88px);
+  transform: translateX(-50%);
+  z-index: 80;
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #12141a;
+  font-size: 14px;
+  font-weight: 750;
+  pointer-events: none;
+}
 .ad-slot {
   margin: 12px 14px;
   padding: 10px 12px;
@@ -3315,6 +3330,8 @@ button.banner.banner-alert { min-height: 44px; }
 button.ad-slot { width: calc(100% - 28px); background: transparent; }
 .pro-screen { padding-bottom: 24px; }
 .pro-note { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.pro-close { align-self: flex-start; margin-top: 8px; }
+.pro-note a { color: var(--text); font-weight: 750; }
 .pro-lock { margin: 12px 14px; color: var(--muted); font-size: 14px; line-height: 1.4; }
 .pro-lock a { color: var(--text); font-weight: 750; }
 .pro-prices .btn { margin-top: 8px; }

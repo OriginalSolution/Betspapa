@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, startPushWatch, teamFollows, trendNotes } from './push.mjs';
+import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, startPushWatch, stripBookmakerUrls, teamFollows, trendNotes } from './push.mjs';
 
 test('FCM stays off until a service account is configured', () => {
   assert.equal(fcmConfigured({}), false);
@@ -111,6 +111,19 @@ test('a device only hears followed matches and the message is high priority', ()
   assert.equal(message.message.data.home, 'Hearts');
   assert.equal(message.message.data.homeScore, '1');
   assert.equal(message.message.data.minute, '12');
+  const linked = messageFor({
+    id: 'note',
+    kind: 'goal',
+    title: 'Goal https://www.sportybet.com/gh/?shareCode=ABC',
+    body: 'Open https://betika.com/en-gh/share/BK1',
+    route: 'https://www.football.com/gh/?shareCode=X',
+    match: { id: 'sr:match:1', home: 'Hearts', away: 'Kotoko' },
+  }, accepted.device);
+  assert.equal(linked.message.data.title.includes('sportybet.com'), false);
+  assert.equal(linked.message.data.body.includes('betika.com'), false);
+  assert.equal(linked.message.data.route.includes('football.com'), false);
+  assert.equal(stripBookmakerUrls('code ABC123'), 'code ABC123');
+  assert.equal(accepted.device.settings.promos, false);
 });
 
 test('a match that appears in play is a kick-off, and a simulated row is ignored', () => {
