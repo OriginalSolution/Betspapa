@@ -6,6 +6,7 @@ import type { TrackedSlip } from './builderStore';
 import { DESKS } from './engineSlips';
 import { renderSlipPng, type ShareModel } from './shareCardCanvas';
 import type { BuilderLeg } from './slipPacks';
+import { isPlayStoreBuild, withoutBookmakerUrls } from './storeBuild';
 
 export type SlipShareSource = {
   desks?: BookedDeskView[];
@@ -50,9 +51,10 @@ export function slipShareModel(tracked: SlipShareSource | null | undefined): Sha
 }
 
 /** The text caption that travels with the image, and the wa.me fallback. */
-export function shareCaption(model: ShareModel): string {
+export function shareCaption(model: ShareModel, play = isPlayStoreBuild()): string {
   const lines = model.desks.flatMap((desk) => desk.codes.map((code) => `${desk.name} ${code}`));
-  return `Betspapa slip\n${lines.join('\n')}`;
+  const text = `Betspapa slip\n${lines.join('\n')}`;
+  return play ? withoutBookmakerUrls(text) : text;
 }
 
 export function whatsAppTextUrl(text: string): string {

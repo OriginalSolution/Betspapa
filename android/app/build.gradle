@@ -14,9 +14,10 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 54
-        versionName "0.4.31" // Slip bell, new slip card, every screen QA-checked on Xiaomi large text
+        versionCode 55
+        versionName "0.4.32" // Play build copies codes, uses FCM alerts, and does not open a bookmaker
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
+        buildConfigField "boolean", "PLAY_STORE", System.getenv("STORE_BUILD") == "play" ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -63,6 +64,15 @@ android {
     }
 }
 
+def playStore = System.getenv("STORE_BUILD") == "play"
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (playStore) {
+            variant.sources.manifests.addStaticManifestFile("src/play/AndroidManifest.xml")
+        }
+    }
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
@@ -82,7 +92,7 @@ dependencies {
     implementation project(':capacitor-android')
     implementation project(':watch-core')
     implementation 'androidx.work:work-runtime:2.9.1'
-    implementation 'com.android.billingclient:billing:6.2.1'
+    implementation 'com.android.billingclient:billing:8.0.0'
     implementation 'com.google.android.gms:play-services-ads:23.6.0'
     implementation 'com.google.guava:guava:33.3.1-android'
     if (fcmEnabled) {

@@ -144,6 +144,13 @@ function teamCrest(competitor, name) {
   return crestUrlFor(name);
 }
 
+const BOOKMAKER_URL = /https?:\/\/(?:www\.)?(?:sportybet\.com|football\.com|msport\.com|betika\.com|betpawa\.com(?:\.gh)?)(?:\/\S*)?/gi;
+
+/** A push must not carry a bookmaker link. The Play app cannot be switched back to opening one. */
+export function stripBookmakerUrls(value) {
+  return String(value || '').replace(BOOKMAKER_URL, '').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
 /**
  * Data-only FCM. A notification block makes Android draw a plain system card
  * and never calls onMessageReceived, so the Red Ticker would not run.
@@ -157,8 +164,8 @@ export function messageFor(note, device) {
     id: String(note.id || ''),
     matchId: String(note.matchId || match.id || ''),
     kind: String(note.kind || ''),
-    title: String(note.title || ''),
-    body: String(note.body || ''),
+    title: stripBookmakerUrls(note.title || ''),
+    body: stripBookmakerUrls(note.body || ''),
     channel,
     home,
     away,
@@ -177,7 +184,7 @@ export function messageFor(note, device) {
     fixture: String(note.fixture || ''),
     odds: String(note.odds || ''),
     image: String(note.image || ''),
-    route: String(note.route || ''),
+    route: stripBookmakerUrls(note.route || ''),
     code: String(note.code || ''),
     disallowed: note.disallowed ? '1' : '',
     replaces: String(note.replaces || ''),
@@ -853,7 +860,7 @@ export function acceptDevice(body) {
         redSound: settings.redSound !== false,
         varSound: settings.varSound !== false,
         penaltySound: settings.penaltySound !== false,
-        promos: settings.promos !== false,
+        promos: settings.promos === true,
         lineups: settings.lineups !== false,
         lineupBig: settings.lineupBig === true,
         bankerCodes: Array.isArray(settings.bankerCodes) ? settings.bankerCodes.filter((id) => typeof id === 'string').slice(0, 8) : [],
@@ -1047,7 +1054,7 @@ export async function sendPromoToToken(book, note, token) {
   const chosen = String(token || '').trim();
   if (chosen.length < 20 || /\s/.test(chosen)) return { ok: false, error: 'Paste a device token, or register the phone first.', sent: 0 };
   const known = (book?.list?.() || []).find((item) => item.token === chosen);
-  if (known?.settings?.promos === false) return { ok: false, error: 'That phone has Promos turned off.', sent: 0 };
+  if (known?.settings?.promos !== true) return { ok: false, error: 'That phone has Promos turned off.', sent: 0 };
   try {
     const result = await sendMessage(account, messageFor(note, known || { token: chosen, settings: { goalSound: 'crowd', promos: true } }));
     if (result.dropped && known) book.drop(chosen);
@@ -1063,7 +1070,7 @@ export async function broadcastPromo(book, note) {
   if (!fcmConfigured() || !account) return { ok: false, error: 'FCM is not configured.', sent: 0 };
   let sent = 0;
   for (const device of book?.list?.() || []) {
-    if (device?.settings?.promos === false) continue;
+    if (device?.settings?.promos !== true) continue;
     if (book.alreadySent(device.token, note.id)) continue;
     try {
       const result = await sendMessage(account, messageFor(note, device));

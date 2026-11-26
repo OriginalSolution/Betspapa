@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { hideTestBanner, placeTestBanner, adsOnAndroid } from '../lib/ads';
 import { PRO_UI_ENABLED } from '../lib/proFlag';
 
-/** A small banner under the live list. Android loads Google's test unit. Nothing pops up. */
+/** A small banner under the live list, never beside a Copy button. Android loads Google's test unit. Nothing pops up. */
 export function AdSlot() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {

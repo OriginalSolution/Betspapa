@@ -3,6 +3,7 @@ package com.betspapa.scores;
 import android.app.Activity;
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.PendingPurchasesParams;
 import com.android.billingclient.api.BillingClientStateListener;
 import com.android.billingclient.api.BillingFlowParams;
 import com.android.billingclient.api.BillingResult;
@@ -74,7 +75,10 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
             return;
         }
         if (client == null) {
-            client = BillingClient.newBuilder(activity).setListener(this).enablePendingPurchases().build();
+            client = BillingClient.newBuilder(activity)
+                .setListener(this)
+                .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+                .build();
         }
         if (client.isReady()) {
             next.run();
@@ -103,7 +107,8 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
                 .build());
         }
         QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder().setProductList(list).build();
-        client.queryProductDetailsAsync(params, (result, details) -> {
+        client.queryProductDetailsAsync(params, (billingResult, queryResult) -> {
+            List<ProductDetails> details = queryResult == null ? null : queryResult.getProductDetailsList();
             JSArray rows = new JSArray();
             if (details != null) {
                 for (ProductDetails item : details) {
@@ -188,6 +193,7 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
         if (offers == null || offers.isEmpty()) return "";
         List<ProductDetails.PricingPhase> phases = offers.get(0).getPricingPhases().getPricingPhaseList();
         if (phases == null || phases.isEmpty()) return "";
-        return phases.get(0).getFormattedPrice();
+        // The last phase is the renewing price for that period, not a monthly equivalent.
+        return phases.get(phases.size() - 1).getFormattedPrice();
     }
 }
