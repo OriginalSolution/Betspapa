@@ -39,7 +39,11 @@ export function shouldPoll(visible: boolean, mode: string): boolean {
   return mode !== 'demo';
 }
 
-export function shouldPollLive(visible: boolean, statuses: string[]): boolean {
-  if (!visible) return false;
-  return statuses.some((status) => status === 'live' || status === 'halftime');
+/**
+ * In-play scores are fetched whenever the board is on screen.
+ * The upcoming list drops a match when it kicks off, so a board that only
+ * shows scheduled games is exactly when the live list has to be asked.
+ */
+export function shouldPollLive(visible: boolean, _statuses: string[] = []): boolean {
+  return visible;
 }
