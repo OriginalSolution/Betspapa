@@ -19,13 +19,21 @@ export type FixtureResult = { status: number; body: FixtureBody; retryAfter?: st
 
 export type FixtureTransport = {
   native: boolean;
+  /** Page host. The dev server is localhost. betspapa.com must not use a relative /api path. */
+  host?: string;
   local: (url: string) => Promise<FixtureResult>;
   direct: (url: string) => Promise<FixtureResult>;
 };
 
-function devProxy(): boolean {
-  if (isNativeApp()) return false;
-  const host = typeof location !== 'undefined' ? location.hostname : '';
+function pageHost(transport?: Pick<FixtureTransport, 'host'>): string {
+  if (transport && typeof transport.host === 'string') return transport.host;
+  return typeof location !== 'undefined' ? location.hostname : '';
+}
+
+/** The Vite proxy exists only on a desktop localhost. GitHub Pages has no /api. */
+export function devProxy(transport?: Pick<FixtureTransport, 'native' | 'host'>): boolean {
+  if (transport?.native || isNativeApp()) return false;
+  const host = pageHost(transport);
   return host === 'localhost' || host === '127.0.0.1';
 }
 
@@ -102,7 +110,7 @@ export function dayFixtureUrl(from: string, to: string): string {
 export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   let lastError = 'Fixture feed failed';
-  if (devProxy()) {
+  if (devProxy(transport)) {
     try {
       const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
       if (local.status >= 200 && local.status < 300 && Array.isArray(local.body?.events)) {
@@ -167,7 +175,7 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
     if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
-  if (devProxy()) {
+  if (devProxy(transport)) {
     try {
       return read(await transport.local('/api/live'));
     } catch (error) {
