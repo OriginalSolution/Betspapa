@@ -3265,6 +3265,7 @@ button.ad-slot { width: calc(100% - 28px); background: transparent; }
 }
 .pro-prices p { margin: 0 0 6px; font-size: 20px; font-weight: 750; letter-spacing: -0.03em; }
 .pro-prices .btn { margin-top: 8px; width: 100%; }
+.pro-prices .btn:disabled, button.ad-slot:disabled { opacity: 0.55; }
 .pro-limits { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 720px) { .pro-limits { grid-template-columns: 1fr 1fr; } }
 .pro-limits h2 { margin: 0 0 4px; font-size: 13px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
