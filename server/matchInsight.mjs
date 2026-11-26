@@ -162,7 +162,8 @@ export function parseTable(payload, homeUid, awayUid) {
     if (!best || rank > best.rank) {
       const group = String(table.groupname || '').trim();
       const name = String(table.name || '').trim();
-      best = { rank, name: group && name ? `${name} · ${group}` : name || group, rows };
+      const titled = group && name && !name.toLowerCase().includes(group.toLowerCase()) ? `${name} · ${group}` : name || group;
+      best = { rank, name: titled, rows };
     }
   }
   if (!best) return null;
