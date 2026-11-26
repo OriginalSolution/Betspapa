@@ -12,6 +12,7 @@ import { FormPips } from '../components/PickCard';
 import { cx, minuteLabel, scoreDash, statusLine, teamFollow } from '../lib/format';
 import type { EventType, Match, MatchEvent } from '../types';
 import { LineupXI, useLineup } from '../components/Lineups';
+import { MatchFacts } from '../components/MatchFacts';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
 
@@ -117,6 +118,7 @@ export function MatchPage() {
           </button>
         </div>
       </section>
+      <MatchFacts id={match.id} home={match.home.shortName} away={match.away.shortName} />
       {lineup && (
         <>
           <LineupXI lineup={lineup} side="home" />
