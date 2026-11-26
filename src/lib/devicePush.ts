@@ -51,11 +51,56 @@ async function waitForPushToken(): Promise<PushState> {
   return tokenWait;
 }
 
+const DELETED_KEY = 'betspapa.pushDeleted.v1';
+
+export function pushDeletionHeld(token: string): boolean {
+  try {
+    return Boolean(token) && localStorage.getItem(DELETED_KEY) === token;
+  } catch {
+    return false;
+  }
+}
+
+export function clearPushDeletion() {
+  try {
+    localStorage.removeItem(DELETED_KEY);
+  } catch {
+    /* the next registration can still be sent */
+  }
+}
+
+/** Removes this phone's push registration. A later alert opt-in can register again. */
+export async function deletePushDevice(): Promise<'removed' | 'none' | 'failed'> {
+  if (!isNativeApp()) return 'none';
+  const push = await readPushToken();
+  if (!push.enabled || !push.token) return 'none';
+  try {
+    const response = await CapacitorHttp.request(
+      nativeRequestOptions('DELETE', DEVICES_URL, {
+        connectMs: 15_000,
+        readMs: 20_000,
+        headers: { 'Content-Type': 'application/json' },
+        body: { token: push.token },
+      }),
+    );
+    if (response.status < 200 || response.status >= 300) return 'failed';
+    try {
+      localStorage.setItem(DELETED_KEY, push.token);
+    } catch {
+      /* the server copy is already gone */
+    }
+    await stashForTokenRefresh('');
+    return 'removed';
+  } catch {
+    return 'failed';
+  }
+}
+
 /** Registers the FCM token. A build without google-services.json has no token and this is a no-op. */
 export async function syncPushDevice(body: Omit<DeviceRegistration, 'token' | 'appVersion'>): Promise<boolean> {
   if (!isNativeApp()) return false;
   const push = await waitForPushToken();
-  if (!push.enabled || !push.token) return false;
+  if (!push.enabled || !push.token || pushDeletionHeld(push.token)) return false;
   const payload: DeviceRegistration = { ...body, token: push.token, appVersion: APP_VERSION };
   const signature = JSON.stringify(payload);
   if (!shouldResend(signature, Date.now())) return true;
