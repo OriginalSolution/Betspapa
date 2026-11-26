@@ -68,7 +68,7 @@ def playStore = System.getenv("STORE_BUILD") == "play"
 androidComponents {
     onVariants(selector().all()) { variant ->
         if (playStore) {
-            variant.sources.manifest.addStaticManifestFile(project.layout.projectDirectory.file("src/play/AndroidManifest.xml"))
+            variant.sources.manifests.addStaticManifestFile(project.layout.projectDirectory.file("src/play/AndroidManifest.xml"))
         }
     }
 }
