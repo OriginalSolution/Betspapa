@@ -15,7 +15,8 @@ import { createSign } from 'node:crypto';
 import { priceInRange } from './oddsRange.mjs';
 import { gradePick } from './results.mjs';
 import { cleanCountry } from './geo.mjs';
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync } from 'node:fs';
+import { safeWriteFile } from './safeWrite.mjs';
 import { join } from 'node:path';
 import { expandAlias, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog } from './crestResolve.mjs';
@@ -867,22 +868,48 @@ export function acceptDevice(body) {
   };
 }
 
+function readDeviceFile(path) {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    if (!Array.isArray(parsed)) return { ok: false, devices: [] };
+    const devices = parsed.filter((item) => item && typeof item.token === 'string' && item.token);
+    return { ok: true, devices };
+  } catch {
+    return { ok: false, devices: [] };
+  }
+}
+
 export function createDeviceBook(dir) {
   const file = join(dir, 'devices.json');
   let devices = load();
 
   function load() {
-    try {
-      const parsed = JSON.parse(readFileSync(file, 'utf8'));
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+    const primary = readDeviceFile(file);
+    if (primary.ok) return primary.devices;
+    for (const extra of [`${file}.bak`, `${file}.tmp`]) {
+      const copy = readDeviceFile(extra);
+      if (!copy.ok || !copy.devices.length) continue;
+      console.error(`[push] Restored ${copy.devices.length} device registrations from ${extra.slice(file.length + 1) || 'backup'}.`);
+      try {
+        safeWriteFile(file, JSON.stringify(copy.devices));
+      } catch (error) {
+        console.error(`[push] Could not write the restored device list: ${error instanceof Error ? error.message : error}`);
+      }
+      return copy.devices;
     }
+    console.error('[push] Device list could not be read and no backup was found.');
+    return [];
   }
 
   function save() {
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(file, JSON.stringify(devices));
+    try {
+      mkdirSync(dir, { recursive: true });
+      const current = readDeviceFile(file);
+      if (current.ok && current.devices.length) safeWriteFile(`${file}.bak`, JSON.stringify(current.devices));
+      safeWriteFile(file, JSON.stringify(devices));
+    } catch (error) {
+      console.error(`[push] Could not store device registrations: ${error instanceof Error ? error.message : error}`);
+    }
   }
 
   return {
@@ -1133,8 +1160,12 @@ export function createAlertLog(dir) {
   }
 
   function save() {
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(file, JSON.stringify(rows));
+    try {
+      mkdirSync(dir, { recursive: true });
+      safeWriteFile(file, JSON.stringify(rows));
+    } catch (error) {
+      console.error(`[push] Could not store the alert log: ${error instanceof Error ? error.message : error}`);
+    }
   }
 
   return {
@@ -1203,7 +1234,11 @@ export function writeScoreBaseline(dir, matches) {
     revs: match.revs || undefined,
     missingSince: match.missingSince || undefined,
   }));
-  writeFileSync(baselinePath(dir), JSON.stringify(slim));
+  try {
+    safeWriteFile(baselinePath(dir), JSON.stringify(slim));
+  } catch (error) {
+    console.error(`[push] Could not store the score baseline: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 function readLiveCurl() {

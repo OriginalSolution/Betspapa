@@ -3,7 +3,8 @@
  * Seeded codes are read back and never rebooked. The refresh button
  * only reads back. Predict2u is not called.
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { safeWriteFile } from './safeWrite.mjs';
 import { join } from 'node:path';
 import {
   DAILY_ODDS_TARGET,
@@ -62,10 +63,7 @@ function readState(file, now) {
 }
 
 function writeState(file, state) {
-  mkdirSync(join(file, '..'), { recursive: true });
-  const temp = `${file}.tmp`;
-  writeFileSync(temp, JSON.stringify(state));
-  renameSync(temp, file);
+  safeWriteFile(file, JSON.stringify(state));
 }
 
 function sportyLink(code) {

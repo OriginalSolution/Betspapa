@@ -5,6 +5,7 @@ import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
 import { LIVE_FEED, parseLivePayload } from '../lib/liveBoard';
 import { FeedPause, headerValue } from '../lib/backoff';
+import { apiUrl } from '../lib/apiJson';
 import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
@@ -22,9 +23,15 @@ export type FixtureTransport = {
   direct: (url: string) => Promise<FixtureResult>;
 };
 
+function devProxy(): boolean {
+  if (isNativeApp()) return false;
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
 export async function fetchConfig(): Promise<AppConfig> {
   try {
-    const response = await fetch('/api/config');
+    const response = await fetch(devProxy() ? '/api/config' : apiUrl('/api/config'));
     if (!response.ok) throw new Error('config');
     const body = (await response.json()) as Partial<AppConfig>;
     if (body.mode !== 'live' && body.mode !== 'demo' && body.mode !== 'sporty') throw new Error('config');
@@ -95,7 +102,7 @@ export function dayFixtureUrl(from: string, to: string): string {
 export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   let lastError = 'Fixture feed failed';
-  if (!transport.native) {
+  if (devProxy()) {
     try {
       const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
       if (local.status >= 200 && local.status < 300 && Array.isArray(local.body?.events)) {
@@ -160,7 +167,7 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
     if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
-  if (!transport.native) {
+  if (devProxy()) {
     try {
       return read(await transport.local('/api/live'));
     } catch (error) {

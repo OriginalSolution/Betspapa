@@ -2,9 +2,10 @@
  * Decisions Papa Guardian can make without another process.
  * Nothing here invents a booking code or a fixture.
  */
-import { appendFileSync, mkdirSync, readFileSync, readdirSync, statfsSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, statfsSync, statSync, unlinkSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { totalmem } from 'node:os';
+import { safeWriteFile } from './safeWrite.mjs';
 
 export const LEG_KEEP_RATIO = 0.3;
 export const DISK_PRESSURE = 0.8;
@@ -193,7 +194,7 @@ export function compactDataDir(dir, now = Date.now()) {
     const stats = statSync(incidents);
     if (stats.size > 512 * 1024) {
       const lines = readFileSync(incidents, 'utf8').split('\n').filter(Boolean).slice(-200);
-      writeFileSync(incidents, `${lines.join('\n')}\n`);
+      safeWriteFile(incidents, `${lines.join('\n')}\n`);
       removed.push(incidents);
     }
   } catch {
@@ -212,6 +213,132 @@ export function compactDataDir(dir, now = Date.now()) {
     /* the directory can be missing in a test */
   }
   return removed;
+}
+
+/** Names and trees that must survive a disk cleanup. Crest images and the fixture catalogue can be fetched again. */
+const PROTECTED_FILES = new Set([
+  'devices.json',
+  'devices.json.bak',
+  'engine-state.json',
+  'engine-state.json.bak',
+  'push-baseline.json',
+  'push-baseline.json.bak',
+  'device-census.json',
+  'incidents.jsonl',
+  'league-risk.json',
+]);
+
+const PROTECTED_DIRS = ['results', 'banker', 'lineups'];
+
+export const DISK_FREE_TARGET = 200 * 1024 * 1024;
+
+function relPath(dir, file) {
+  return relative(dir, file).split(sep).join('/');
+}
+
+export function isProtectedData(dir, file) {
+  const rel = relPath(dir, file);
+  if (!rel || rel.startsWith('..')) return true;
+  if (PROTECTED_FILES.has(rel)) return true;
+  if (PROTECTED_DIRS.some((name) => rel === name || rel.startsWith(`${name}/`))) return true;
+  if (/(^|\/)(promos\/state\.json|crests\/index\.json)$/.test(rel)) return true;
+  if (/keystore|\.jks$|\.p12$|\.pem$|secret|credential|service-account/i.test(rel)) return true;
+  return false;
+}
+
+function walkFiles(dir, root = dir) {
+  const found = [];
+  let names = [];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return found;
+  }
+  for (const name of names) {
+    const file = join(dir, name);
+    let stats;
+    try {
+      stats = statSync(file);
+    } catch {
+      continue;
+    }
+    if (stats.isDirectory()) found.push(...walkFiles(file, root));
+    else if (stats.isFile()) found.push({ file, rel: relPath(root, file), size: stats.size, mtimeMs: stats.mtimeMs });
+  }
+  return found;
+}
+
+/** Bytes by top-level name, largest first. Used to see what filled the disk before anything is removed. */
+export function diskBreakdown(dir) {
+  const totals = new Map();
+  for (const row of walkFiles(dir)) {
+    const top = row.rel.split('/')[0] || row.rel;
+    totals.set(top, (totals.get(top) || 0) + row.size);
+  }
+  return [...totals.entries()].map(([name, bytes]) => ({ name, bytes })).sort((a, b) => b.bytes - a.bytes);
+}
+
+/**
+ * Free space on the data disk. Never removes device registrations, the results
+ * record, banker codes, lineups, the booked board, or keystores and secrets.
+ * Crest files and the fixture catalogue are caches and can be fetched again.
+ */
+export function relieveDisk(dir, { targetFreeBytes = DISK_FREE_TARGET, now = Date.now(), usage = null } = {}) {
+  const removed = [];
+  let freed = 0;
+  if (!dir) return { removed, freed, before: { total: 0, free: 0 }, after: { total: 0, free: 0 }, largest: [] };
+  const largest = diskBreakdown(dir);
+  const before = usage || readDiskUsage(dir);
+  const clock = now instanceof Date ? now.getTime() : Number(now);
+  const drop = (row) => {
+    if (!row || isProtectedData(dir, row.file)) return false;
+    try {
+      unlinkSync(row.file);
+      removed.push(row.rel);
+      freed += row.size || 0;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const files = walkFiles(dir);
+  for (const row of files) {
+    if (row.rel.endsWith('.tmp')) drop(row);
+  }
+  const freeNow = () => {
+    if (usage) return (Number(usage.free) || 0) + freed;
+    return Number(readDiskUsage(dir).free) || 0;
+  };
+  const tight = () => freeNow() < targetFreeBytes;
+  if (tight()) {
+    for (const row of files) {
+      if (row.rel === 'fixtures-catalogue.json' || row.rel.startsWith('health/')) {
+        if (row.rel.startsWith('health/') && clock - row.mtimeMs < 3 * 24 * 60 * 60 * 1000) continue;
+        drop(row);
+      }
+    }
+    compactDataDir(dir, clock);
+  }
+  if (tight()) {
+    const crests = walkFiles(dir)
+      .filter((row) => row.rel.startsWith('crests/id/') && row.rel.endsWith('.png'))
+      .sort((a, b) => a.mtimeMs - b.mtimeMs);
+    for (const row of crests) {
+      if (!tight()) break;
+      drop(row);
+    }
+  }
+  if (tight()) {
+    const promos = walkFiles(dir)
+      .filter((row) => row.rel.startsWith('promos/') && row.rel.endsWith('.png'))
+      .sort((a, b) => a.mtimeMs - b.mtimeMs);
+    for (const row of promos) {
+      if (!tight()) break;
+      drop(row);
+    }
+  }
+  const after = readDiskUsage(dir);
+  return { removed, freed, before, after, largest };
 }
 
 export async function dispatchAttention(incident, env = process.env, fetchImpl = fetch) {

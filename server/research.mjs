@@ -5,8 +5,8 @@
  * plus any settled picks this engine has recorded. No extra API key.
  * server/leagueRisk.json is an optional override, not the source of the score.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { safeWriteFile } from './safeWrite.mjs';
 import { ODDS_RANGES } from './oddsRange.mjs';
 import { WINDOW } from './occurrence.mjs';
 import { gradeWithTeams, SUPPORT_RATE, TREND_RATE } from './teamGrade.mjs';
@@ -354,8 +354,11 @@ export function loadSettled(file) {
 }
 
 export function saveSettled(file, rows) {
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(rows));
+  try {
+    safeWriteFile(file, JSON.stringify(rows));
+  } catch (error) {
+    console.error(`[research] Could not store settled rows: ${error instanceof Error ? error.message : error}`);
+  }
 }
 
 export function rememberSettled(existing, legs) {

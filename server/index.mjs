@@ -12,7 +12,7 @@ import { appEngineState, engineNeedsRepair, enginePersistence, getCachedEvents, 
 import { crestSurfaces } from './crestSurfaces.mjs';
 import { attachGuardian, createGuardian, noteRequest } from './guardian.mjs';
 import { gzippedBytes } from './guardianChecks.mjs';
-import { readIncidents } from './guardianOps.mjs';
+import { diskBreakdown, readDiskUsage, readIncidents, relieveDisk } from './guardianOps.mjs';
 import { bookAll } from './bookers.mjs';
 import { requestJson } from './curl-request.mjs';
 import { legOpen, priceInRange } from './oddsRange.mjs';
@@ -28,10 +28,30 @@ import { createLineups, lineupNote, lineupWanted } from './lineups.mjs';
 import { bankerNote, bankerWanted, createBanker } from './banker.mjs';
 import { loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
-
+import { installDiskGuard } from './safeWrite.mjs';
+installDiskGuard();
 loadMarketRules();
 
 const dataDir = process.env.ENGINE_DATA_DIR || join(process.cwd(), 'data', 'engine');
+const diskRelief = relieveDisk(dataDir);
+{
+  const beforePct = diskRelief.before.total ? Math.round((100 * (diskRelief.before.total - diskRelief.before.free)) / diskRelief.before.total) : 0;
+  const after = readDiskUsage(dataDir);
+  const afterPct = after.total ? Math.round((100 * (after.total - after.free)) / after.total) : beforePct;
+  const biggest = (diskRelief.largest.length ? diskRelief.largest : diskBreakdown(dataDir)).slice(0, 8).map((row) => `${row.name} ${Math.round(row.bytes / (1024 * 1024))}MB`).join(', ');
+  console.log(`[disk] ${beforePct}% full before cleanup (${biggest || 'no files'}). Removed ${diskRelief.removed.length} cache files, ${Math.round(diskRelief.freed / (1024 * 1024))}MB. Now ${afterPct}% full, ${Math.round((after.free || 0) / (1024 * 1024))}MB free.`);
+}
+
+function diskHealth() {
+  const usage = readDiskUsage(dataDir);
+  const total = Number(usage.total) || 0;
+  const free = Number(usage.free) || 0;
+  return {
+    usedPct: total ? Math.round((100 * (total - free)) / total) : null,
+    freeMb: Math.round(free / (1024 * 1024)),
+    totalMb: Math.round(total / (1024 * 1024)),
+  };
+}
 const results = createResults({
   dir: dataDir,
   crestFor: (id, name) => crests.crestFor(id, name) || null,
@@ -491,6 +511,7 @@ async function handleApi(req, res, url) {
       reason: watch.reason,
       devices: watch.devices,
       checks: watch.checks,
+      disk: diskHealth(),
     });
     return;
   }

@@ -9,6 +9,8 @@ import {
   catalogueShape,
   collapsedLegs,
   compactDataDir,
+  isProtectedData,
+  relieveDisk,
   cycleHung,
   diskPressure,
   dispatchAttention,
@@ -117,6 +119,32 @@ test('compacting the data dir keeps the board and the device list', () => {
   assert.equal(removed.some((file) => file.endsWith('2020-01-01.json')), true);
   assert.equal(removed.some((file) => file.endsWith('devices.json')), false);
   assert.equal(removed.some((file) => file.endsWith('engine-state.json')), false);
+});
+
+test('a full disk drops the crest cache and the fixture catalogue, and keeps devices and results', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'betspapa-relief-'));
+  writeFileSync(join(dir, 'devices.json'), '[{"token":"keep"}]');
+  writeFileSync(join(dir, 'engine-state.json'), '{"master":{}}');
+  writeFileSync(join(dir, 'fixtures-catalogue.json'), '{"events":[]}');
+  writeFileSync(join(dir, 'scratch.tmp'), 'temp');
+  mkdirSync(join(dir, 'results'), { recursive: true });
+  writeFileSync(join(dir, 'results', 'record.json'), '{"picks":{"a":1}}');
+  mkdirSync(join(dir, 'crests', 'id'), { recursive: true });
+  writeFileSync(join(dir, 'crests', 'id', '1.png'), 'png');
+  writeFileSync(join(dir, 'crests', 'index.json'), '{}');
+  assert.equal(isProtectedData(dir, join(dir, 'devices.json')), true);
+  assert.equal(isProtectedData(dir, join(dir, 'results', 'record.json')), true);
+  assert.equal(isProtectedData(dir, join(dir, 'crests', 'id', '1.png')), false);
+  const relief = relieveDisk(dir, { targetFreeBytes: 500, usage: { total: 1000, free: 10 } });
+  assert.equal(relief.removed.some((file) => file === 'devices.json'), false);
+  assert.equal(relief.removed.some((file) => file === 'engine-state.json'), false);
+  assert.equal(relief.removed.some((file) => file === 'results/record.json'), false);
+  assert.equal(relief.removed.some((file) => file === 'crests/index.json'), false);
+  assert.equal(relief.removed.includes('fixtures-catalogue.json'), true);
+  assert.equal(relief.removed.includes('scratch.tmp'), true);
+  assert.equal(relief.removed.includes('crests/id/1.png'), true);
+  assert.equal(readFileSync(join(dir, 'devices.json'), 'utf8'), '[{"token":"keep"}]');
+  assert.equal(readFileSync(join(dir, 'results', 'record.json'), 'utf8'), '{"picks":{"a":1}}');
 });
 
 test('incidents append and read back in newest-first order', () => {
