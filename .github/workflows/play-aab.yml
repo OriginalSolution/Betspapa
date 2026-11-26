@@ -71,7 +71,11 @@ jobs:
           TARGET=$(echo "$MANIFEST" | grep -o 'android:targetSdkVersion="[0-9]*"' | grep -o '[0-9]*')
           test "$TARGET" -ge 35
           if echo "$MANIFEST" | grep -q 'USE_EXACT_ALARM'; then echo "USE_EXACT_ALARM must not ship to Play"; exit 1; fi
-          if echo "$MANIFEST" | grep -q 'FOREGROUND_SERVICE'; then echo "Play build must not declare a foreground service"; exit 1; fi
+          for PERM in android.permission.FOREGROUND_SERVICE_DATA_SYNC android.permission.FOREGROUND_SERVICE_SPECIAL_USE android.permission.FOREGROUND_SERVICE; do
+            if echo "$MANIFEST" | grep -q "$PERM"; then echo "Play manifest still has $PERM"; exit 1; fi
+            echo "absent $PERM"
+          done
+          if echo "$MANIFEST" | grep -q 'SystemForegroundService\|ScoreWatchService'; then echo "Play manifest still has a foreground service component"; exit 1; fi
           if echo "$MANIFEST" | grep -q 'REQUEST_IGNORE_BATTERY_OPTIMIZATIONS'; then echo "Play build must not request a battery exemption"; exit 1; fi
           if echo "$MANIFEST" | grep -Eiq 'sportybet|football\.com|msport|betika|betpawa'; then echo "Play manifest must not name a bookmaker"; exit 1; fi
           echo "$MANIFEST" | grep -q 'BetspapaFirebaseService'

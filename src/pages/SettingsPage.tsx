@@ -4,6 +4,7 @@ import { useAlertSetup } from '../components/AlertSetup';
 import { playEventSound, playGoalSound } from '../lib/cheer';
 import { OEM_INSTRUCTION, pollIsStale } from '../lib/alertSetup';
 import { openNotificationSound, readPushToken, requestBatteryExemption, requestExactAlarm, requestWatchNotifications, scheduleBackgroundTest, type PushState } from '../lib/deviceWatch';
+import { clearPushDeletion, deletePushDevice } from '../lib/devicePush';
 import { isNativeApp } from '../lib/nativeHttp';
 import { canUseLineupAlerts } from '../lib/proAccess';
 import type { GoalSound, NotificationStyle } from '../types';
@@ -34,7 +35,8 @@ export function SettingsPage() {
     clearInbox,
     clearFollows,
   } = useStore();
-  const [confirm, setConfirm] = useState<'inbox' | 'follows' | null>(null);
+  const [confirm, setConfirm] = useState<'inbox' | 'follows' | 'data' | null>(null);
+  const [dataNote, setDataNote] = useState('');
 
   return (
     <div className="settings">
@@ -94,7 +96,10 @@ export function SettingsPage() {
               label={toggle.label}
               onChange={(value) => {
                 setSetting(toggle.key, value);
-                if (toggle.key === 'browser' && value && isNativeApp()) void requestWatchNotifications();
+                if (toggle.key === 'browser' && value) {
+                  clearPushDeletion();
+                  if (isNativeApp()) void requestWatchNotifications();
+                }
               }}
             />
           </div>
@@ -147,7 +152,34 @@ export function SettingsPage() {
           >
             {confirm === 'inbox' ? 'Confirm clear alerts' : 'Clear alerts'}
           </button>
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => {
+              if (confirm !== 'data') {
+                setConfirm('data');
+                setDataNote('');
+                return;
+              }
+              void deletePushDevice().then((result) => {
+                setConfirm(null);
+                setDataNote(
+                  result === 'removed'
+                    ? 'The push registration for this phone has been removed.'
+                    : result === 'none'
+                      ? 'This browser has no push registration. Use the deletion page to email a request.'
+                      : 'The registration could not be removed. Email meditusa2023@gmail.com.',
+                );
+              });
+            }}
+          >
+            {confirm === 'data' ? 'Confirm delete my data' : 'Delete my data'}
+          </button>
         </div>
+        {dataNote && <p className="lede">{dataNote}</p>}
+        <p className="lede">
+          <a href="https://betspapa.com/delete-data/">What is stored, and how to ask for the rest to be deleted</a>
+        </p>
       </section>
 
       <section className="panel about">

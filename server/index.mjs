@@ -417,10 +417,25 @@ async function handleApi(req, res, url) {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'POST, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       });
       res.end();
+      return;
+    }
+    if (req.method === 'DELETE') {
+      try {
+        const body = await readJson(req);
+        const token = typeof body?.token === 'string' ? body.token.trim() : '';
+        if (token.length < 20 || token.length > 4096) {
+          send(req, res, 400, { error: 'That registration could not be removed.' });
+          return;
+        }
+        pushBook.drop(token);
+        send(req, res, 200, { ok: true });
+      } catch (error) {
+        send(req, res, 400, { error: error.message || 'That registration could not be removed.' });
+      }
       return;
     }
     if (req.method !== 'POST') {

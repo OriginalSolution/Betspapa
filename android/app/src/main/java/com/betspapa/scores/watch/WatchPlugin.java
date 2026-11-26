@@ -48,7 +48,12 @@ public class WatchPlugin extends Plugin {
     @PluginMethod
     public void stashDevice(PluginCall call) {
         String payload = call.getString("payload", "");
-        if (getContext() == null || payload == null || payload.isEmpty() || payload.length() > 200_000) {
+        if (getContext() == null || payload == null || payload.length() > 200_000) {
+            call.resolve();
+            return;
+        }
+        if (payload.isEmpty()) {
+            getContext().getSharedPreferences(DeviceRegistrar.PREFS, Context.MODE_PRIVATE).edit().remove(DeviceRegistrar.KEY).apply();
             call.resolve();
             return;
         }

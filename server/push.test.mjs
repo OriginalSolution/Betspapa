@@ -427,3 +427,16 @@ test('a tracked slip alerts once, only after every leg has a final score', () =>
   assert.match(done.note.body, /Chelsea 2-1 Leeds landed/);
   assert.equal(channelFor('slip', {}), 'betspapa.goal.off.v4');
 });
+
+test('deleting a device removes that push token and leaves the others', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'devices-'));
+  const book = createDeviceBook(dir);
+  const token = 'fcm-token-value-that-is-long-enough';
+  const other = 'fcm-token-value-that-belongs-to-someone-else';
+  assert.equal(book.register({ token, settings: {} }).ok, true);
+  assert.equal(book.register({ token: other, settings: {} }).ok, true);
+  book.drop(token);
+  assert.deepEqual(book.list().map((item) => item.token), [other]);
+  book.drop(token);
+  assert.equal(book.list().length, 1);
+});
