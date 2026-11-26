@@ -1604,6 +1604,8 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   .picks-page.has-float { padding-bottom: 24px; }
 }
 
+.saved-filters { padding-top: 4px; padding-bottom: 0; }
+.saved-empty { color: var(--muted); font-size: 12px; font-weight: 650; align-self: center; }
 .week-wrap { padding-top: 4px; }
 .week-strip {
   display: flex;

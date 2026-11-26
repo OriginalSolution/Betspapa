@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState, MatchSkeleton } from '../components/MatchBoard';
 import { ErrorBanner, FilterChips } from '../components/Chrome';
+import { SavedFilters } from '../components/SavedFilters';
 import { TodayBoard, TodaySortBar, WeekStrip, type TodaySort } from '../components/TodayBoard';
 import { scopeLabel, TodaySearch } from '../components/TodaySearch';
 import { CapacitorHttp } from '@capacitor/core';
@@ -10,6 +11,7 @@ import { useEngineBoard } from '../state/engine';
 import { apiUrl } from '../lib/apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { applyFilter, type BoardFilter } from '../lib/group';
+import { applySavedFilters, loadSavedFilters, writeSavedFilters, type SavedChip } from '../lib/savedFilters';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
 
@@ -82,6 +84,7 @@ export function TodayPage() {
   const { matches, loading, ready, feedNote, refresh } = useStore();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<BoardFilter>('all');
+  const [saved, setSaved] = useState<SavedChip[]>(() => loadSavedFilters());
   const [visible, setVisible] = useState(30);
   const [sort, setSort] = useState<TodaySort>('kickoff');
   const engine = useEngine();
@@ -96,7 +99,11 @@ export function TodayPage() {
     if (leagueId) return match.competition.id === leagueId;
     return true;
   });
-  const shown = applyFilter(scoped, filter);
+  const shown = applyFilter(applySavedFilters(scoped, saved), filter);
+  const keepSaved = (next: SavedChip[]) => {
+    setSaved(next);
+    writeSavedFilters(next);
+  };
   const waiting = !ready || (loading && matches.length === 0);
   const searching = query.trim().length >= 2;
 
@@ -116,6 +123,7 @@ export function TodayPage() {
       {searching ? null : (
         <>
           {!(teamId || leagueId) && <WeekStrip />}
+          {!(teamId || leagueId) && <SavedFilters matches={matches} saved={saved} onChange={keepSaved} />}
           {!(teamId || leagueId) && <TodaySortBar value={sort} onChange={setSort} />}
           {!(teamId || leagueId) && <FilterChips value={filter} onChange={setFilter} />}
           {feedNote && (
