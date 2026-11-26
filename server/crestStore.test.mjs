@@ -174,6 +174,23 @@ test('misses saved by an older image check are due again after an upgrade', asyn
   assert.equal(store.index.misses['44'].nextAt, 0);
 });
 
+test('a crest listed in the index but missing on disk is not advertised and is fetched again', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'crests-'));
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({
+    version: 1,
+    overrides: {},
+    misses: {},
+    teams: { 38: { name: 'Chelsea', country: 'England', competition: 'Premier League', source: 'sportradar', remote: '', hash: 'deadbeef00', size: 100, at: '' } },
+  }));
+  const { store, calls } = makeStore([[/img\.sportradar\.com\/ls\/crest\/big\/38\.png/, () => response(200, png())]], { dir });
+  assert.equal(store.crestFor('sr:competitor:38', 'Chelsea'), '');
+  await store.idle();
+  assert.ok(calls.some((url) => url.endsWith('/38.png')));
+  assert.match(store.crestFor('sr:competitor:38', 'Chelsea'), /\/crests\/id\/38\.png\?v=/);
+  assert.equal(store.prewarm([{ home: 'Chelsea', homeId: 'sr:competitor:38', away: 'Leeds United', awayId: 'sr:competitor:2', kickoff: new Date(Date.parse('2026-11-21T12:00:00Z')).toISOString(), country: 'England', tournament: 'Premier League' }]), 1);
+});
+
 test('youth and reserve sides wear the senior club crest; a women side keeps its own', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'crests-'));
   const { writeFileSync } = await import('node:fs');
@@ -184,6 +201,9 @@ test('youth and reserve sides wear the senior club crest; a women side keeps its
     misses: {},
     teams: { 10: row('Birmingham City', 'senior'), 11: row('Birmingham City U21', 'youth'), 20: row('Arsenal', 'ars'), 21: row('Arsenal Women', 'arsw') },
   }));
+  const { mkdirSync } = await import('node:fs');
+  mkdirSync(join(dir, 'id'), { recursive: true });
+  for (const id of ['10', '11', '20', '21']) writeFileSync(join(dir, 'id', `${id}.png`), png());
   const store = createCrestStore({ dir, log: () => {}, origin: 'https://api.test', root: dir, fetchImpl: async () => response(404, '') });
   assert.equal(store.crestFor('sr:competitor:11', 'Birmingham City U21'), 'https://api.test/crests/id/10.png?v=senior');
   assert.equal(store.crestFor('', 'Birmingham City U23'), 'https://api.test/crests/id/10.png?v=senior');

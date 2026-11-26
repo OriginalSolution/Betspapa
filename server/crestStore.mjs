@@ -157,15 +157,35 @@ export function createCrestStore(options = {}) {
     return usage.free < 80 * 1024 * 1024 || (total - usage.free) / total > 0.8;
   }
 
+  function storedFile(cid) {
+    if (!cid) return false;
+    try {
+      return statSync(join(imgDir, `${cid}.png`)).isFile();
+    } catch {
+      return false;
+    }
+  }
+
   function urlFor(cid) {
     const row = index.teams[cid];
-    return row ? `${origin}/crests/id/${cid}.png?v=${row.hash}` : '';
+    if (!row || !storedFile(cid)) return '';
+    return `${origin}/crests/id/${cid}.png?v=${row.hash}`;
+  }
+
+  /** The index still names this team, but the png was removed. Queue one refetch, then back off. */
+  function scheduleRefetch(cid) {
+    const row = index.teams[cid];
+    if (!cid || !row || storedFile(cid) || !row.name) return false;
+    const miss = index.misses[cid];
+    if (miss && miss.nextAt > now()) return false;
+    return enqueue({ id: cid, name: row.name, country: row.country || '', competition: row.competition || '', force: true });
   }
 
   /** Crest URL for a team: our copy by id, else the bundled catalogue by name, else ''. */
   function ownCrest(rawId, name) {
     const cid = competitorId(rawId);
-    if (cid && index.teams[cid]) return urlFor(cid);
+    const own = cid ? urlFor(cid) : '';
+    if (own) return own;
     return fileUrl(name ? legacyPath(name) : '');
   }
 
@@ -198,7 +218,10 @@ export function createCrestStore(options = {}) {
     const ids = seniorIds();
     for (const key of [looseKey(senior), coreName(senior)]) {
       const cid = key ? ids.get(key) : '';
-      if (cid) return urlFor(cid);
+      if (!cid) continue;
+      const url = urlFor(cid);
+      if (url) return url;
+      scheduleRefetch(cid);
     }
     return fileUrl(legacyPath(senior));
   }
@@ -208,6 +231,8 @@ export function createCrestStore(options = {}) {
    * A women's side keeps its own badge and borrows the senior one only when it has none.
    */
   function crestFor(rawId, name) {
+    const asked = competitorId(rawId);
+    if (asked) scheduleRefetch(asked);
     const junior = name ? juniorSide(name) : null;
     if (junior && junior.kind !== 'women') {
       const senior = seniorCrest(junior.senior);
@@ -383,9 +408,10 @@ export function createCrestStore(options = {}) {
   }
 
   function due(cid) {
-    if (index.teams[cid]) return false;
+    if (index.teams[cid] && storedFile(cid)) return false;
     const miss = index.misses[cid];
-    return !miss || !(miss.nextAt > now());
+    if (miss && miss.nextAt > now()) return false;
+    return true;
   }
 
   function enqueue(team, { front = false } = {}) {
@@ -559,7 +585,10 @@ export function createCrestStore(options = {}) {
 
   function publicList() {
     const crests = {};
-    for (const cid of Object.keys(index.teams)) crests[cid] = urlFor(cid);
+    for (const cid of Object.keys(index.teams)) {
+      const url = urlFor(cid);
+      if (url) crests[cid] = url;
+    }
     return { generatedAt: new Date(now()).toISOString(), count: Object.keys(crests).length, crests };
   }
 
