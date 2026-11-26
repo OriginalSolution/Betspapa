@@ -5,6 +5,7 @@ import { isFollowed } from '../lib/group';
 import { dayRangeIso } from '../lib/dates';
 import { LIVE_FEED, parseLivePayload } from '../lib/liveBoard';
 import { FeedPause, headerValue } from '../lib/backoff';
+import { apiUrl } from '../lib/apiJson';
 import { FIXTURE_CONNECT_MS, FIXTURE_READ_MS, isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 
 export const FIXTURE_FEED = 'https://api.betspapa.com/api/sportybet/upcoming';
@@ -18,13 +19,27 @@ export type FixtureResult = { status: number; body: FixtureBody; retryAfter?: st
 
 export type FixtureTransport = {
   native: boolean;
+  /** Page host. The dev server is localhost. betspapa.com must not use a relative /api path. */
+  host?: string;
   local: (url: string) => Promise<FixtureResult>;
   direct: (url: string) => Promise<FixtureResult>;
 };
 
+function pageHost(transport?: Pick<FixtureTransport, 'host'>): string {
+  if (transport && typeof transport.host === 'string') return transport.host;
+  return typeof location !== 'undefined' ? location.hostname : '';
+}
+
+/** The Vite proxy exists only on a desktop localhost. GitHub Pages has no /api. */
+export function devProxy(transport?: Pick<FixtureTransport, 'native' | 'host'>): boolean {
+  if (transport?.native || isNativeApp()) return false;
+  const host = pageHost(transport);
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
 export async function fetchConfig(): Promise<AppConfig> {
   try {
-    const response = await fetch('/api/config');
+    const response = await fetch(devProxy() ? '/api/config' : apiUrl('/api/config'));
     if (!response.ok) throw new Error('config');
     const body = (await response.json()) as Partial<AppConfig>;
     if (body.mode !== 'live' && body.mode !== 'demo' && body.mode !== 'sporty') throw new Error('config');
@@ -95,7 +110,7 @@ export function dayFixtureUrl(from: string, to: string): string {
 export async function fetchSportyBoard(date: string, transport: FixtureTransport = defaultTransport()): Promise<Match[]> {
   const { from, to } = dayRangeIso(date);
   let lastError = 'Fixture feed failed';
-  if (!transport.native) {
+  if (devProxy(transport)) {
     try {
       const local = await transport.local(`/api/fixtures?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
       if (local.status >= 200 && local.status < 300 && Array.isArray(local.body?.events)) {
@@ -160,7 +175,7 @@ export async function fetchInPlay(transport: FixtureTransport = defaultTransport
     if (error instanceof FeedPause) throw error;
     lastError = error instanceof Error ? error.message : lastError;
   }
-  if (!transport.native) {
+  if (devProxy(transport)) {
     try {
       return read(await transport.local('/api/live'));
     } catch (error) {

@@ -356,18 +356,21 @@ export async function fetchEngine(): Promise<EngineState> {
     }
     return finish(parseEngine(readJsonBody(response.data)));
   }
-  try {
-    const local = await fetch('/api/engine?view=app');
-    if (local.status === 409 || local.status === 429 || local.status >= 500) {
-      throw new FeedPause(local.status, local.headers.get('retry-after'));
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  if (host === 'localhost' || host === '127.0.0.1') {
+    try {
+      const local = await fetch('/api/engine?view=app');
+      if (local.status === 409 || local.status === 429 || local.status >= 500) {
+        throw new FeedPause(local.status, local.headers.get('retry-after'));
+      }
+      if (local.ok) {
+        const state = parseEngine(await local.json());
+        if (engineHasRows(state)) return finish(state);
+      }
+    } catch (error) {
+      if (error instanceof FeedPause) throw error;
+      /* the dev server is not running */
     }
-    if (local.ok) {
-      const state = parseEngine(await local.json());
-      if (engineHasRows(state)) return finish(state);
-    }
-  } catch (error) {
-    if (error instanceof FeedPause) throw error;
-    /* GitHub Pages has no API process */
   }
   try {
     const response = await fetch(ENGINE_URL);

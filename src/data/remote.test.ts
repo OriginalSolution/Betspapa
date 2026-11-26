@@ -70,12 +70,13 @@ describe('fixture loading', () => {
     expect(matches).toEqual([]);
   });
 
-  it('uses the same-origin proxy in the browser and does not call the direct feed', async () => {
+  it('uses the same-origin proxy on localhost and does not call the direct feed', async () => {
     let directCalls = 0;
     const matches = await fetchSportyBoard(
       '2026-11-10',
       transport({
         native: false,
+        host: 'localhost',
         local: async () => ({ status: 200, body: { events: [event(kickoffOn('2026-11-10'))] } }),
         direct: async () => {
           directCalls += 1;
@@ -84,6 +85,29 @@ describe('fixture loading', () => {
       }),
     );
     expect(directCalls).toBe(0);
+    expect(matches).toHaveLength(1);
+  });
+
+  it('reads api.betspapa.com from the public site and does not call a relative /api path', async () => {
+    let localCalls = 0;
+    let directUrl = '';
+    const matches = await fetchSportyBoard(
+      '2026-11-10',
+      transport({
+        native: false,
+        host: 'betspapa.com',
+        local: async () => {
+          localCalls += 1;
+          return { status: 200, body: { events: [] } };
+        },
+        direct: async (url) => {
+          directUrl = url;
+          return { status: 200, body: { events: [event(kickoffOn('2026-11-10'))] } };
+        },
+      }),
+    );
+    expect(localCalls).toBe(0);
+    expect(directUrl.startsWith('https://api.betspapa.com/api/fixtures')).toBe(true);
     expect(matches).toHaveLength(1);
   });
 

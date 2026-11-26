@@ -7,6 +7,7 @@ import { TodayBoard, TodaySortBar, WeekStrip, type TodaySort } from '../componen
 import { scopeLabel, TodaySearch } from '../components/TodaySearch';
 import { CapacitorHttp } from '@capacitor/core';
 import { useEngineBoard } from '../state/engine';
+import { apiUrl } from '../lib/apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { applyFilter, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
@@ -22,7 +23,8 @@ async function loadPromos(): Promise<{ promos?: PromoCard[] }> {
     if (response.status < 200 || response.status >= 300) return { promos: [] };
     return readJsonBody(response.data) as { promos?: PromoCard[] };
   }
-  const response = await fetch('/api/promos');
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  const response = await fetch(host === 'localhost' || host === '127.0.0.1' ? '/api/promos' : apiUrl('/api/promos'));
   if (!response.ok) return { promos: [] };
   return response.json();
 }

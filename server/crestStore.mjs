@@ -8,11 +8,13 @@
  * booking cycle's top-up, and the Papa Guardian crest check.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { coreName, flagUrl, isNationalSide, juniorSide, looseKey, teamSlug } from '../src/lib/crestMatch.mjs';
 import { loadCatalog, loadOverrides, pacer, sportsDb, wikidata } from './crestResolve.mjs';
 import { prepareCrest } from './crestImage.mjs';
+import { readDiskUsage } from './guardianOps.mjs';
+import { safeWriteFile } from './safeWrite.mjs';
 
 const USER_AGENT = 'Betspapa/0.4.31 (crest list; https://betspapa.com)';
 export const SPORTRADAR = 'https://img.sportradar.com/ls/crest/big/';
@@ -141,9 +143,18 @@ export function createCrestStore(options = {}) {
   }
 
   function saveNow() {
-    const tmp = `${indexFile}.tmp`;
-    writeFileSync(tmp, JSON.stringify(index));
-    renameSync(tmp, indexFile);
+    try {
+      safeWriteFile(indexFile, JSON.stringify(index));
+    } catch (error) {
+      log(`Could not save the crest index: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  function diskTight() {
+    const usage = readDiskUsage(dir);
+    const total = Number(usage.total) || 0;
+    if (!total) return false;
+    return usage.free < 80 * 1024 * 1024 || (total - usage.free) / total > 0.8;
   }
 
   function urlFor(cid) {
@@ -244,12 +255,24 @@ export function createCrestStore(options = {}) {
     throw last;
   }
 
+  let diskWarned = false;
   function keep(cid, team, source, remote, prepared, extra = {}) {
+    if (diskTight()) {
+      if (!diskWarned) {
+        diskWarned = true;
+        log('Data disk is nearly full. Not storing another crest until space is free.');
+      }
+      return '';
+    }
+    diskWarned = false;
     const hash = createHash('sha1').update(prepared.png).digest('hex').slice(0, 10);
     const target = join(imgDir, `${cid}.png`);
-    const tmp = `${target}.tmp`;
-    writeFileSync(tmp, prepared.png);
-    renameSync(tmp, target);
+    try {
+      safeWriteFile(target, prepared.png);
+    } catch (error) {
+      log(`Could not store crest ${cid}: ${error instanceof Error ? error.message : error}`);
+      return '';
+    }
     index.teams[cid] = {
       name: team.name || index.teams[cid]?.name || '',
       country: team.country || '',

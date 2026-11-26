@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { appEngineState, boardHasCodes } from './engine.mjs';
 import { directoryPersistent, evaluateChecks, gzippedBytes, noteDeviceCount } from './guardianChecks.mjs';
-import { appendIncident, attentionStreak, compactDataDir, diskPressure, dispatchAttention, invalidDeskReports, memoryHot, noteSelfTest, readDiskUsage, readMemoryLimit, selfTestDue } from './guardianOps.mjs';
+import { appendIncident, attentionStreak, diskPressure, dispatchAttention, invalidDeskReports, memoryHot, noteSelfTest, readDiskUsage, readMemoryLimit, relieveDisk, selfTestDue } from './guardianOps.mjs';
 import { priceInRange, rangeReason } from './oddsRange.mjs';
 
 const DESKS = ['sportybet', 'footballcom', 'msport', 'betika', 'betpawa'];
@@ -314,8 +314,16 @@ export function createGuardian(options = {}) {
       }
       const disk = options.disk ? options.disk() : options.dataDir ? diskPressure(readDiskUsage(options.dataDir)) : { full: false, used: 0 };
       if (disk.full && options.dataDir) {
-        const removed = compactDataDir(options.dataDir, nowFn());
-        logIncident({ code: 'disk', level: 'attention', message: `Data disk is ${Math.round((disk.used || 0) * 100)}% full. Compacted ${removed.length} old files.`, fixed: removed.length > 0 });
+        const relief = relieveDisk(options.dataDir, { now: nowFn() });
+        const beforePct = relief.before.total ? Math.round((100 * (relief.before.total - relief.before.free)) / relief.before.total) : Math.round((disk.used || 0) * 100);
+        const afterPct = relief.after.total ? Math.round((100 * (relief.after.total - relief.after.free)) / relief.after.total) : beforePct;
+        const biggest = relief.largest.slice(0, 6).map((row) => `${row.name} ${Math.round(row.bytes / (1024 * 1024))}MB`).join(', ');
+        logIncident({
+          code: 'disk',
+          level: 'attention',
+          message: `Data disk was ${beforePct}% full (${biggest || 'empty'}). Freed ${Math.round(relief.freed / (1024 * 1024))}MB across ${relief.removed.length} cache files. Now ${afterPct}% full.`,
+          fixed: relief.removed.length > 0,
+        });
       }
       const invalid = invalidDeskReports(options.getRaw ? options.getRaw() : options.getState?.());
       let verdict = evaluate({ fresh: true });

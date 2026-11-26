@@ -1,5 +1,6 @@
 /** Unattended fixture, occurrence, book, and repair cycle. It does not call Predict2u. */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { safeWriteFile } from './safeWrite.mjs';
 import { join } from 'node:path';
 import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
@@ -309,22 +310,33 @@ export function createEngine(options = {}) {
     return ids;
   }
 
-  function load() {
+  function readBoardFile(path) {
     try {
-      const parsed = JSON.parse(readFileSync(file, 'utf8'));
-      return { ...emptyState(), ...parsed, events: Array.isArray(parsed.events) ? parsed.events : [], legs: Array.isArray(parsed.legs) ? parsed.legs : [] };
+      const parsed = JSON.parse(readFileSync(path, 'utf8'));
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+      return parsed;
     } catch {
-      return emptyState();
+      return null;
     }
+  }
+
+  function load() {
+    const parsed = readBoardFile(file) || readBoardFile(`${file}.bak`);
+    if (!parsed) return emptyState();
+    if (!readBoardFile(file) && boardHasCodes(parsed)) log('log', 'Restored the booked board from the last good copy.');
+    return { ...emptyState(), ...parsed, events: Array.isArray(parsed.events) ? parsed.events : [], legs: Array.isArray(parsed.legs) ? parsed.legs : [] };
   }
 
   function save(next, gen = activeGen, force = true) {
     if (gen !== activeGen) return;
     state = next;
     if (!force && Date.now() - lastDiskWrite < diskGapMs) return;
+    if (!boardHasCodes(next)) return;
     try {
       mkdirSync(dir, { recursive: true });
-      writeFileSync(file, JSON.stringify(next));
+      const body = JSON.stringify(next);
+      safeWriteFile(file, body);
+      safeWriteFile(`${file}.bak`, body);
       lastDiskWrite = Date.now();
       diskOk = true;
       diskError = '';

@@ -6,8 +6,9 @@
  * No reconstruction: a day only shows what this engine published while this
  * record was running.
  */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { safeWriteFile } from './safeWrite.mjs';
+import { join } from 'node:path';
 import { priceInRange } from './oddsRange.mjs';
 import { bankerNeedsTimeline, gradeBanker, mismatchNote, timelineEvents } from './bankerGrade.mjs';
 
@@ -22,7 +23,7 @@ const VOIDED = /postpon|cancel|abandon|walkover/i;
 const LOOK_AFTER_MS = 2 * 60 * 1000;
 const RECHECK_MS = 8 * 60 * 1000;
 const STILL_PLAYING_MS = 3 * 60 * 60 * 1000;
-const MAX_LOOKUPS = 40;
+const MAX_LOOKUPS = 160;
 const KEEP_DAYS = 120;
 
 export function matchNumber(eventId) {
@@ -154,10 +155,7 @@ function readRecord(file, now) {
 }
 
 function writeRecord(file, record) {
-  mkdirSync(dirname(file), { recursive: true });
-  const temp = `${file}.tmp`;
-  writeFileSync(temp, JSON.stringify(record));
-  renameSync(temp, file);
+  safeWriteFile(file, JSON.stringify(record));
 }
 
 /** Legs the app showed: the 80%+ tiers, every trend, and the master slip. */

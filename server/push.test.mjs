@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -140,6 +140,19 @@ test('a followed trend pushes when it lands, and a price under 1.20 does not', (
   assert.deepEqual(notes.map((note) => note.id), ['trend:sr:match:1:over15:hit']);
   assert.equal(notes[0].kind, 'win');
   assert.equal(notes[0].title.includes('Over 1.5'), true);
+});
+
+test('a corrupt device list is restored from the backup and not replaced by an empty file', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'betspapa-devices-'));
+  const book = createDeviceBook(dir);
+  const token = 'fcm-token-value-that-is-long-enough';
+  book.register({ token, follows: { matches: [], teams: [] } });
+  book.register({ token, follows: { matches: ['sr:match:1'], teams: [] } });
+  writeFileSync(join(dir, 'devices.json'), '{');
+  const restored = createDeviceBook(dir);
+  assert.equal(restored.list().length, 1);
+  assert.equal(restored.list()[0].token, token);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'devices.json'), 'utf8'))[0].token, token);
 });
 
 test('a restart sends the goal that landed while the process was down', async () => {
