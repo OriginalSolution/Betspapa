@@ -29,6 +29,7 @@ import { bankerNote, bankerWanted, createBanker } from './banker.mjs';
 import { flattenPrematch, loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 import { installDiskGuard } from './safeWrite.mjs';
+import { cachedMatchInsight } from './matchInsight.mjs';
 installDiskGuard();
 loadMarketRules();
 
@@ -574,6 +575,19 @@ async function handleApi(req, res, url) {
       pollMs: 120000,
       reason: null,
     });
+    return;
+  }
+  if (url.pathname === '/api/match-insight') {
+    const id = url.searchParams.get('id') || '';
+    if (!/^(sr:match:)?\d+$/.test(id)) {
+      send(req, res, 400, { error: 'id must be a match id.' });
+      return;
+    }
+    try {
+      send(req, res, 200, await cachedMatchInsight(id), 'public, max-age=30');
+    } catch (error) {
+      send(req, res, 502, { error: error.message || 'Match facts failed' });
+    }
     return;
   }
   if (url.pathname === '/api/live') {
