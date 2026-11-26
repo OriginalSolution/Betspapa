@@ -3301,3 +3301,31 @@ button.banner.banner-alert { min-height: 44px; }
 .mobile-brand { min-width: 44px; min-height: 44px; justify-content: center; }
 /* The code chip itself is a tap target (Load): 24px box + 10px hit slop each side = 44px. */
 .code-pair-code { min-height: 24px; }
+.ad-slot {
+  margin: 12px 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+button.ad-slot { width: calc(100% - 28px); background: transparent; }
+.pro-screen { padding-bottom: 24px; }
+.pro-note { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.pro-prices, .pro-limits section {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.pro-prices p { margin: 0 0 6px; font-size: 20px; font-weight: 750; letter-spacing: -0.03em; }
+.pro-prices .btn { margin-top: 8px; width: 100%; }
+.pro-prices .btn:disabled, button.ad-slot:disabled { opacity: 0.55; }
+.pro-limits { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 720px) { .pro-limits { grid-template-columns: 1fr 1fr; } }
+.pro-limits h2 { margin: 0 0 4px; font-size: 13px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.pro-limits p { margin: 0; }

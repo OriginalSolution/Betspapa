@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { AdSlot } from '../components/AdSlot';
 import { LiveAlertsBanner } from '../components/AlertSetup';
 import { EmptyState, MatchSkeleton } from '../components/MatchBoard';
 import { ErrorBanner, FilterChips } from '../components/Chrome';
@@ -161,6 +162,7 @@ export function TodayPage() {
               )}
             </>
           )}
+          <AdSlot />
         </>
       )}
     </>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PRO_UI_ENABLED } from '../lib/proFlag';
 
 const links = [
   { to: '/record', title: 'Record', detail: 'Every 80%+ pick, graded from the full-time score' },
@@ -20,6 +21,12 @@ export function MorePage() {
             <span>{link.detail}</span>
           </Link>
         ))}
+        {PRO_UI_ENABLED && (
+          <Link to="/pro">
+            <strong>Betspapa Pro</strong>
+            <span>Placeholder prices. Nothing is charged.</span>
+          </Link>
+        )}
         <a href="https://betspapa.com/privacy/" target="_blank" rel="noopener noreferrer">
           <strong>Privacy policy</strong>
           <span>What alerts send and how to delete it</span>
