@@ -14,6 +14,7 @@ import type { EventType, Match, MatchEvent } from '../types';
 import { LineupXI, useLineup } from '../components/Lineups';
 import { MatchFacts } from '../components/MatchFacts';
 import { canAddFollow } from '../lib/proAccess';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
 
@@ -184,8 +185,8 @@ function HitMarkets({ matchId, focus }: { matchId: string; focus: string | null 
       )}
       {booked.map((code) => (
         <div key={`${code.bookId}:${code.code}`} className="booking-chip">
-          <BookMark id={code.bookId} />
-          <span>{DESK_NAMES[code.bookId]}</span>
+          {!isPlayStoreBuild() && <BookMark id={code.bookId} />}
+          {!isPlayStoreBuild() && <span>{DESK_NAMES[code.bookId]}</span>}
           <CodeActions code={code.code} desk={code.bookId} />
         </div>
       ))}

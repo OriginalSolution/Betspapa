@@ -7,6 +7,7 @@ import { Crest } from '../components/Crest';
 import { DESK_NAMES, DESKS, type DeskId } from '../lib/engineSlips';
 import { cx, longDay, weekdayChip } from '../lib/format';
 import { playTierPhrase } from '../lib/pickCodes';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import {
   accraToday,
   bandLine,
@@ -388,9 +389,9 @@ function CodeRow({ code, part, parts }: { code: RecordCode; part: number; parts:
   const state = code.status === 'open' ? `${code.settled}/${code.legCount} settled` : code.status === 'won' ? 'Won' : code.status === 'lost' ? 'Lost' : 'Void';
   return (
     <li className="rec-code">
-      <BookMark id={code.desk} />
+      {!isPlayStoreBuild() && <BookMark id={code.desk} />}
       <div>
-        <strong>{name}{part ? ` · part ${part}/${parts}` : ''}</strong>
+        <strong>{isPlayStoreBuild() ? `Code${part ? ` ${part}` : ''}` : name}{!isPlayStoreBuild() && part ? ` · part ${part}/${parts}` : ''}</strong>
         <span className={cx('rec-code-state', `is-${code.status}`)}>{state}</span>
       </div>
       <CodeActions code={code.code} desk={code.desk} />

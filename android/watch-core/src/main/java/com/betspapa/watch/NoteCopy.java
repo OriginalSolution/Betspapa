@@ -145,13 +145,13 @@ public final class NoteCopy {
         return rest.isEmpty() || bareTrend(rest) ? "" : rest;
     }
 
-    /** "Arsenal 2-1 Chelsea FT". */
+    /** "Arsenal 2-1 Chelsea · FT". */
     public static String scoreWithClock(String score, String clock) {
         String line = clean(score);
         String mark = clean(clock);
         if (line.isEmpty()) return mark;
         if (mark.isEmpty() || line.contains(mark)) return line;
-        return line + " " + mark;
+        return line + " \u00b7 " + mark;
     }
 
     /**

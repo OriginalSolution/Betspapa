@@ -190,7 +190,7 @@ export function SettingsPage() {
       <section className="panel about">
         <h2>Betspapa</h2>
         <p>
-          A matchday board for scores, trends, picks, and slips. Club names identify fixtures. Fixtures and prices come from Betspapa. Share codes are issued only when a bookmaker accepts the slip.
+          A matchday board for scores, trends, picks, and slips. Club names identify fixtures. Fixtures and prices come from Betspapa. {isPlayStoreBuild() ? 'Share codes are the published ones.' : 'Share codes are issued only when a bookmaker accepts the slip.'}
         </p>
       </section>
     </div>

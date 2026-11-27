@@ -78,7 +78,7 @@ function topSubtitle(pathname: string, date: string): string {
   if (pathname === '/picks') return isPlayStoreBuild() ? 'Today · picks at 8/10+' : 'Today · picks at 80%+';
   if (pathname.startsWith('/codes')) return playCodeLabel('Banker rules - own odds limits');
   if (pathname === '/trends') return 'Add a whole trend to your slip';
-  if (pathname === '/slips/booked') return 'Codes for every bookmaker';
+  if (pathname === '/slips/booked') return isPlayStoreBuild() ? 'Your codes' : 'Codes for every bookmaker';
   if (pathname === '/record') return playTierPhrase('Every 80%+ pick, graded');
   if (pathname === '/record/picks') return 'Graded picks · top leagues';
   if (pathname === '/record/codes') return 'Booked codes settle with their legs';

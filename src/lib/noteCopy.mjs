@@ -146,13 +146,13 @@ export function afterMark(title) {
   return rest && !bareTrend(rest) ? rest : '';
 }
 
-/** "Arsenal 2-1 Chelsea FT". The clock is left off when the score already contains it. */
+/** "Arsenal 2-1 Chelsea · FT". The clock is left off when the score already contains it. */
 export function scoreWithClock(score, clock) {
   const line = String(score || '').replace(/\s+/g, ' ').trim();
   const mark = String(clock || '').replace(/\s+/g, ' ').trim();
   if (!line) return mark;
   if (!mark || line.includes(mark)) return line;
-  return `${line} ${mark}`;
+  return `${line} · ${mark}`;
 }
 
 /** One line of the detail a settle card must keep. Empty pieces are left out. "Trend hit" alone is never a piece. */
