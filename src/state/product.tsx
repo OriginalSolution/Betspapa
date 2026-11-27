@@ -20,7 +20,7 @@ import { canUseLineupAlerts } from '../lib/proAccess';
 import { stageWatch, watchNativeEvents } from '../lib/deviceWatch';
 import { syncPushDevice } from '../lib/devicePush';
 import { publishableOdds } from '../lib/oddsFloor';
-import { builderLegKeys, readBuilder } from '../lib/builderStore';
+import { builderLegKeys, readBuilder, subscribeBuilder } from '../lib/builderStore';
 import { bellRegistration, withBellFollows } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { bookingForPick, readEngineCache, subscribeEngine } from '../lib/engineSlips';
@@ -187,6 +187,8 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   }, [picks, codes, matches, slipPicks, t0, pushNotices]);
 
   const bells = useSlipBells();
+  const [builderTick, setBuilderTick] = useState(0);
+  useEffect(() => subscribeBuilder(() => setBuilderTick((value) => value + 1)), []);
   const syncDeviceRef = useRef<() => void>(() => {});
   syncDeviceRef.current = () => {
     const byMatch = new Map(matches.map((match) => [match.id, match]));
@@ -211,16 +213,14 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
     const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
-    const tracked = readBuilder().tracked;
-    void syncPushDevice({
-      follows: withBellFollows(follows),
-      slipBells: bellRegistration(),
-      trends: trendFollows,
-      bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
-      builderSlip: tracked
+    const trackedSlips = readBuilder().slips;
+    const tracked = trackedSlips[0] ?? null;
+    const slipPayload = (slip: typeof tracked) =>
+      slip
         ? {
-            id: tracked.id,
-            legs: tracked.legs.slice(0, 200).map((leg) => ({
+            id: slip.id,
+            label: slip.label,
+            legs: slip.legs.slice(0, 200).map((leg) => ({
               eventId: leg.eventId,
               market: leg.market,
               home: leg.home,
@@ -229,7 +229,14 @@ export function ProductProvider({ children }: { children: ReactNode }) {
               label: leg.label,
             })),
           }
-        : null,
+        : null;
+    void syncPushDevice({
+      follows: withBellFollows(follows),
+      slipBells: bellRegistration(),
+      trends: trendFollows,
+      bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
+      builderSlip: slipPayload(tracked),
+      builderSlips: trackedSlips.map((slip) => slipPayload(slip)).filter((slip): slip is NonNullable<typeof slip> => Boolean(slip)),
       lineupOff: settings.lineupOff,
       settings: {
         kickoff: settings.kickoff,
@@ -253,7 +260,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     syncDeviceRef.current();
-  }, [trendFollows, matches, picks, engineTick, follows, settings, bells]);
+  }, [trendFollows, matches, picks, engineTick, follows, settings, bells, builderTick]);
 
   useEffect(() => {
     const send = () => syncDeviceRef.current();

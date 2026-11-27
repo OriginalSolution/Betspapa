@@ -659,7 +659,20 @@ export function builderSlipFrom(body) {
     };
   }).filter(Boolean);
   if (!id || !legs.length) return null;
-  return { id, legs };
+  return { id, label: String(slip.label || '').slice(0, 80), legs };
+}
+
+/** Every tracked slip. Omitted means "leave the stored list alone". An empty list clears it. */
+export function builderSlipsFrom(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'builderSlips')) return undefined;
+  const rows = Array.isArray(body.builderSlips) ? body.builderSlips : [];
+  return rows.slice(0, 12).map((slip) => builderSlipFrom({ builderSlip: slip })).filter(Boolean);
+}
+
+export function trackedSlipsOf(device) {
+  if (Array.isArray(device?.builderSlips) && device.builderSlips.length) return device.builderSlips;
+  if (device?.builderSlip?.id && Array.isArray(device.builderSlip.legs) && device.builderSlip.legs.length) return [device.builderSlip];
+  return [];
 }
 
 function slipCopy(legs, progress) {
@@ -714,6 +727,51 @@ export function slipNote(device, matches) {
       fixture: copy.body,
     },
   };
+}
+
+/**
+ * One win or lose card per tracked slip, after every leg of that slip has a score.
+ * The kind is win or bust so the phone plays it on the goal-sound path.
+ */
+export function slipNotes(device, matches) {
+  const slips = trackedSlipsOf(device);
+  if (!slips.length) return { notes: [], changed: false };
+  const bag = { ...(device.slipProgressBySlip || {}) };
+  if (device.builderSlip?.id && device.slipProgress && !bag[device.builderSlip.id]) bag[device.builderSlip.id] = { ...device.slipProgress };
+  const notes = [];
+  let changed = false;
+  for (const slip of slips) {
+    const progress = { ...(bag[slip.id] || {}) };
+    let slipChanged = false;
+    for (const leg of slip.legs) {
+      if (progress[leg.key]?.status) continue;
+      const match = (matches || []).find((item) => item.id === leg.eventId);
+      if (!match || match.status !== 'finished' || match.homeScore == null || match.awayScore == null) continue;
+      const ht = Number.isFinite(match.htHome) && Number.isFinite(match.htAway) ? { home: match.htHome, away: match.htAway } : null;
+      const status = gradePick(leg.market, { home: match.homeScore, away: match.awayScore }, ht);
+      if (status === 'open') continue;
+      progress[leg.key] = { status, ft: `${match.homeScore}-${match.awayScore}`, home: match.home || leg.home, away: match.away || leg.away, label: leg.label };
+      slipChanged = true;
+    }
+    if (slipChanged) {
+      bag[slip.id] = progress;
+      changed = true;
+    }
+    const copy = slipCopy(slip.legs, progress);
+    if (!copy) continue;
+    notes.push({
+      id: `slip:${slip.id}`,
+      matchId: '',
+      kind: copy.kind,
+      title: copy.title,
+      body: copy.body,
+      route: 'slip',
+      marketLabel: copy.title,
+      fixture: copy.body,
+    });
+  }
+  if (changed) device.slipProgressBySlip = bag;
+  return { notes, changed };
 }
 
 /** Slips with the bell on. Omitted means "leave the stored bells alone". An empty list clears them. */
@@ -793,8 +851,10 @@ export function bellNotes(device, matches) {
       });
     }
     progress[bell.id] = done;
-    // The tracked builder slip already sends its own one-off slip card under the same id.
-    if (device?.builderSlip?.id === bell.id) continue;
+    // A tracked slip already sends its own one-off card under the same id.
+    const trackedIds = new Set(trackedSlipsOf(device).map((slip) => slip.id));
+    if (device?.builderSlip?.id) trackedIds.add(device.builderSlip.id);
+    if (trackedIds.has(bell.id)) continue;
     const copy = slipCopy(bell.legs || [], done);
     if (copy) {
       notes.push({
@@ -866,13 +926,32 @@ export function acceptDevice(body) {
         bankerCodes: Array.isArray(settings.bankerCodes) ? settings.bankerCodes.filter((id) => typeof id === 'string').slice(0, 8) : [],
       },
       appVersion: cleanVersion(body?.appVersion),
-      builderSlip: builderSlipFrom(body) || null,
+      builderSlip: null,
+      builderSlips: null,
       slipBells: slipBellsFrom(body) || [],
       lineupOff: Array.isArray(body?.lineupOff) ? body.lineupOff.filter((id) => typeof id === 'string').slice(0, 200) : [],
       sent: [],
       updatedAt: new Date().toISOString(),
     },
   };
+}
+
+function storedSlips(body, existing) {
+  const listed = builderSlipsFrom(body);
+  if (listed) return { slips: listed, slip: listed[0] || null };
+  const single = builderSlipFrom(body);
+  if (single) return { slips: [single], slip: single };
+  if (builderSlipsFrom(body) === undefined && builderSlipFrom(body) === undefined && body && !Object.prototype.hasOwnProperty.call(body, 'builderSlip') && !Object.prototype.hasOwnProperty.call(body, 'builderSlips')) {
+    const slips = Array.isArray(existing?.builderSlips) && existing.builderSlips.length ? existing.builderSlips : existing?.builderSlip ? [existing.builderSlip] : [];
+    return { slips, slip: slips[0] || null };
+  }
+  return { slips: [], slip: null };
+}
+
+function keepSlipProgress(progress, slips) {
+  const keep = {};
+  for (const slip of slips || []) if (progress?.[slip.id]) keep[slip.id] = progress[slip.id];
+  return keep;
 }
 
 function readDeviceFile(path) {
@@ -926,13 +1005,16 @@ export function createDeviceBook(dir) {
       if (accepted.error) return accepted;
       const existing = devices.find((item) => item.token === accepted.device.token);
       const now = new Date().toISOString();
+      const slips = storedSlips(body, existing);
       const device = {
         ...accepted.device,
         follows: body?.follows == null && existing?.follows ? existing.follows : accepted.device.follows,
         trends: body?.trends == null && existing?.trends ? existing.trends : accepted.device.trends,
-        builderSlip: builderSlipFrom(body) === undefined ? existing?.builderSlip || null : accepted.device.builderSlip,
+        builderSlip: slips.slip,
+        builderSlips: slips.slips,
         lineupOff: Array.isArray(body?.lineupOff) ? accepted.device.lineupOff : existing?.lineupOff || [],
-        slipProgress: builderSlipFrom(body) === undefined || existing?.builderSlip?.id === accepted.device.builderSlip?.id ? existing?.slipProgress || {} : {},
+        slipProgress: slips.slip?.id && existing?.builderSlip?.id === slips.slip.id ? existing?.slipProgress || {} : {},
+        slipProgressBySlip: keepSlipProgress(existing?.slipProgressBySlip, slips.slips),
         slipBells: slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells,
         bellProgress: keepBellProgress(existing?.bellProgress, slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells),
         sent: existing?.sent || [],
@@ -1308,7 +1390,7 @@ export function watchedMatchIds(devices, matches) {
       const cut = String(trend).lastIndexOf(':');
       if (cut > 0) ids.add(String(trend).slice(0, cut));
     }
-    for (const leg of device?.builderSlip?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
+    for (const slip of trackedSlipsOf(device)) for (const leg of slip?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
     for (const bell of device?.slipBells || []) for (const leg of bell?.legs || []) if (leg?.eventId) ids.add(String(leg.eventId));
     for (const match of matches || []) {
       if ((device?.follows?.teams || []).some((team) => teamFollows(team, match))) ids.add(match.id);
@@ -1461,10 +1543,10 @@ export function startPushWatch(options = {}) {
     }
     pending = [];
     for (const device of book.list()) {
-      const slip = slipNote(device, matches);
+      const slip = slipNotes(device, matches);
       const bell = bellNotes(device, matches);
       if (slip?.changed || bell.changed) book.persist();
-      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device), ...(slip?.note ? [slip.note] : []), ...bell.notes];
+      const mine = [...notesForDevice(notes, device), ...trendNotes(previous, matches, device), ...slip.notes, ...bell.notes];
       if (mine.length) matched += 1;
       for (const item of mine) queue.push({ device, item: { ...item, sentAt: now }, attempts: 0, at: now });
     }

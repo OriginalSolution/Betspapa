@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchResults, type RecordPick } from '../lib/results';
-import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
+import { readBuilder, subscribeBuilder, updateTrackedSlip } from '../lib/builderStore';
 import { cx, kickoffClock, longDay } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import {
@@ -87,24 +87,27 @@ export function useSlipAlert() {
   useEffect(() => {
     let stop = false;
     const look = async () => {
-      const { tracked, packIds } = readBuilder();
-      if (!tracked || tracked.alerted || !tracked.legs.length) return;
-      const grades = await gradesFor(tracked.legs, matches);
-      if (stop) return;
-      const legs = applyGrades(tracked.legs, grades);
-      const alert = slipAlert(legs);
-      if (!alert) return;
-      writeBuilder({ packIds, tracked: { ...tracked, alerted: true } });
-      const note: InboxItem = {
-        id: `slip:${tracked.id}`,
-        matchId: '',
-        kind: alert.kind,
-        title: alert.title,
-        body: alert.body,
-        createdAt: Date.now(),
-        read: false,
-      };
-      pushNotices([note]);
+      const { slips } = readBuilder();
+      const notes: InboxItem[] = [];
+      for (const tracked of slips) {
+        if (tracked.alerted || !tracked.legs.length) continue;
+        const grades = await gradesFor(tracked.legs, matches);
+        if (stop) return;
+        const legs = applyGrades(tracked.legs, grades);
+        const alert = slipAlert(legs);
+        if (!alert) continue;
+        updateTrackedSlip(tracked.id, { alerted: true });
+        notes.push({
+          id: `slip:${tracked.id}`,
+          matchId: '',
+          kind: alert.kind,
+          title: alert.title,
+          body: alert.body,
+          createdAt: Date.now(),
+          read: false,
+        });
+      }
+      if (notes.length) pushNotices(notes);
     };
     void look();
     const timer = window.setInterval(() => void look(), 60_000);

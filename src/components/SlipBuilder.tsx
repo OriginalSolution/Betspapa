@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { bookingFailureMessage, bookGroups, type BookLeg } from '../lib/bookFollow';
 import { desksFromBooking, failedDeskLine } from '../lib/bookedSlip';
-import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
+import { addTrackedSlip, readBuilder, replacePackIds, subscribeBuilder } from '../lib/builderStore';
 import { cx } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
 import { playTierPhrase } from '../lib/pickCodes';
@@ -70,7 +70,7 @@ export function SlipBuilder() {
 
   const toggle = (pack: TrendPack) => {
     const packIds = added.has(pack.id) ? builder.packIds.filter((id) => id !== pack.id) : [...builder.packIds, pack.id];
-    writeBuilder({ packIds, tracked: null });
+    replacePackIds(packIds);
     setProblem(null);
   };
 
@@ -90,16 +90,14 @@ export function SlipBuilder() {
         setProblem(failed || reasons[0] || 'No desk returned a code. Nothing was invented.');
         return;
       }
-      writeBuilder({
-        packIds: builder.packIds,
-        tracked: {
-          id: `slip-${Date.now().toString(36)}`,
-          legs: selected,
-          bookedAt: new Date().toISOString(),
-          parts,
-          desks,
-          alerted: false,
-        },
+      addTrackedSlip({
+        id: `slip-${Date.now().toString(36)}`,
+        label: packs.filter((pack) => added.has(pack.id)).map((pack) => pack.label).join(' · ') || 'Tracked slip',
+        legs: selected,
+        bookedAt: new Date().toISOString(),
+        parts,
+        desks,
+        alerted: false,
       });
       // Land on the booked codes with an arrival animation and the new codes glowing.
       goToBookedCodes(navigate, '/slips/booked', parts.map((part) => ({ code: part.code, desk: part.desk })));
@@ -220,5 +218,5 @@ function bookLeg(leg: BuilderLeg): BookLeg {
 function removeLeg(packIds: string[], packs: TrendPack[], leg: BuilderLeg) {
   const owner = packs.find((pack) => pack.legs.some((item) => item.key === leg.key));
   if (!owner) return;
-  writeBuilder({ packIds: packIds.filter((id) => id !== owner.id), tracked: null });
+  replacePackIds(packIds.filter((id) => id !== owner.id));
 }

@@ -116,6 +116,8 @@ export type EnginePart = {
   link: string;
   totalOdds: number | null;
   legs: number;
+  /** Match ids this part actually booked, when the engine sent them. */
+  matches?: string[];
 };
 
 export type EngineDrop = {
@@ -181,11 +183,13 @@ function parsePart(value: unknown, desk: DeskId): EnginePart | null {
   if (!code || !CODE.test(code) || !link || !link.startsWith(HOSTS[desk])) return null;
   const total = Number(row.totalOdds);
   const legs = Number(row.legs);
+  const matches = Array.isArray(row.matches) ? row.matches.filter((id): id is string => typeof id === 'string' && id.startsWith('sr:match:')) : [];
   return {
     code,
     link,
     totalOdds: Number.isFinite(total) ? total : null,
     legs: Number.isFinite(legs) ? legs : 0,
+    matches,
   };
 }
 
