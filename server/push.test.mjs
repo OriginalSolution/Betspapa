@@ -447,6 +447,17 @@ test('each tracked slip gets its own win or lose card', () => {
   assert.equal(done.notes[0].kind === 'slip', false);
 });
 
+test('every tracked slip is stored, past the old dozen', () => {
+  const slips = builderSlipsFrom({
+    builderSlips: Array.from({ length: 24 }, (_, index) => ({
+      id: `s${index}`,
+      legs: [{ eventId: `sr:match:${index + 1}`, market: 'over15', odds: 1.25, home: 'Home', away: 'Away', label: 'Over 1.5 goals' }],
+    })),
+  });
+  assert.equal(slips.length, 24);
+  assert.equal(slips[23].id, 's23');
+});
+
 test('deleting a device removes that push token and leaves the others', () => {
   const dir = mkdtempSync(join(tmpdir(), 'devices-'));
   const book = createDeviceBook(dir);

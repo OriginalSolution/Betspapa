@@ -220,7 +220,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         ? {
             id: slip.id,
             label: slip.label,
-            legs: slip.legs.slice(0, 200).map((leg) => ({
+            legs: slip.legs.map((leg) => ({
               eventId: leg.eventId,
               market: leg.market,
               home: leg.home,

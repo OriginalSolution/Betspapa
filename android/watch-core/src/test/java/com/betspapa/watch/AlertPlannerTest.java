@@ -629,6 +629,21 @@ public class AlertPlannerTest {
     }
 
     @Test
+    public void everyBelledSlipIsKept() {
+        WatchState state = new WatchState();
+        StringBuilder slips = new StringBuilder();
+        for (int i = 0; i < 24; i++) {
+            if (i > 0) slips.append(',');
+            slips.append("{\"id\":\"s").append(i).append("\",\"label\":\"Slip\",\"legs\":[{\"key\":\"sr:match:")
+                    .append(i).append("|over15\",\"eventId\":\"sr:match:").append(i)
+                    .append("\",\"market\":\"over15\",\"label\":\"Over 1.5 goals\",\"home\":\"Home\",\"away\":\"Away\"}]}");
+        }
+        state.merge(new JSONObject("{\"slips\":[" + slips + "]}"));
+        assertEquals(24, state.slips.size());
+        assertEquals(1, state.slips.get(23).getJSONArray("legs").length());
+    }
+
+    @Test
     public void belledSlipPostsEachLegThenTheSlipOnce() {
         WatchState state = new WatchState();
         state.browser = true;

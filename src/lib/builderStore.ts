@@ -3,7 +3,6 @@ import type { BuilderLeg } from './slipPacks';
 
 const KEY = 'betspapa.builder.v1';
 const EVENT = 'betspapa-builder';
-export const MAX_TRACKED_SLIPS = 12;
 
 export type BookedPart = { desk: string; code: string; legs: number };
 
@@ -39,7 +38,7 @@ export function readBuilder(): BuilderState {
 }
 
 export function writeBuilder(next: { packIds: string[]; slips: TrackedSlip[] }) {
-  const slips = next.slips.map(normaliseTracked).filter((slip) => slip.legs.length).slice(0, MAX_TRACKED_SLIPS);
+  const slips = next.slips.map(normaliseTracked).filter((slip) => slip.legs.length);
   const stored = { packIds: next.packIds, slips, tracked: slips[0] ?? null };
   try {
     localStorage.setItem(KEY, JSON.stringify(stored));
@@ -87,8 +86,7 @@ export function slipsFromStored(parsed: { slips?: unknown; tracked?: TrackedSlip
     ? parsed.slips.map((slip) => normaliseTracked(slip as TrackedSlip)).filter((slip) => slip.legs.length)
     : [];
   const legacy = parsed?.tracked && Array.isArray(parsed.tracked.legs) ? normaliseTracked(parsed.tracked) : null;
-  const withLegacy = legacy && legacy.legs.length && !listed.some((slip) => slip.id === legacy.id) ? [legacy, ...listed] : listed;
-  return withLegacy.slice(0, MAX_TRACKED_SLIPS);
+  return legacy && legacy.legs.length && !listed.some((slip) => slip.id === legacy.id) ? [legacy, ...listed] : listed;
 }
 
 function normaliseTracked(value: TrackedSlip): TrackedSlip {

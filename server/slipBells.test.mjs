@@ -14,13 +14,16 @@ const BELL = {
   ],
 };
 
-test('slip bells are cleaned, capped and keyed per leg', () => {
+test('slip bells are cleaned and keyed per leg, with no cap', () => {
   assert.equal(slipBellsFrom({}), undefined);
   assert.deepEqual(slipBellsFrom({ slipBells: [] }), []);
   const [bell] = slipBellsFrom({ slipBells: [{ ...BELL, legs: [...BELL.legs, BELL.legs[0], { eventId: 'bad', market: 'x' }] }] });
   assert.equal(bell.legs.length, 2);
   assert.equal(bell.legs[0].key, 'sr:match:1|over15');
-  assert.equal(slipBellsFrom({ slipBells: Array.from({ length: 30 }, (_, i) => ({ ...BELL, id: `s${i}` })) }).length, 12);
+  assert.equal(slipBellsFrom({ slipBells: Array.from({ length: 30 }, (_, i) => ({ ...BELL, id: `s${i}` })) }).length, 30);
+  const legs = Array.from({ length: 70 }, (_, i) => ({ eventId: `sr:match:${i + 1}`, market: 'over15', odds: 1.26, home: 'Home', away: 'Away', label: 'Over 1.5 goals' }));
+  const [long] = slipBellsFrom({ slipBells: [{ id: 'long', label: 'Long', legs }] });
+  assert.equal(long.legs.length, 70);
 });
 
 test('a belled slip alerts each leg with full names, then the whole slip once', () => {

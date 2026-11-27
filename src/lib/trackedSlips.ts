@@ -31,6 +31,27 @@ export function slipFromPublishedCode(state: EngineState | null, raw: string, no
   return null;
 }
 
+/** Fixture ids across every tracked slip, each id once. Live scores are read from that one set. */
+export function slipFixtureIds(slips: Array<{ legs: Array<{ eventId: string }> }>): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const slip of slips) {
+    for (const leg of slip.legs) {
+      if (!leg.eventId || seen.has(leg.eventId)) continue;
+      seen.add(leg.eventId);
+      ids.push(leg.eventId);
+    }
+  }
+  return ids;
+}
+
+/** The board rows those fixtures need. Other matches stay out of the slip poll. */
+export function matchesForSlips<T extends { id: string }>(matches: T[], ids: Iterable<string>): T[] {
+  const wanted = ids instanceof Set ? ids : new Set(ids);
+  if (!wanted.size) return [];
+  return matches.filter((match) => wanted.has(match.id));
+}
+
 export function slipCounts(legs: GradedLeg[]) {
   const won = legs.filter((leg) => leg.status === 'won').length;
   const lost = legs.filter((leg) => leg.status === 'lost').length;

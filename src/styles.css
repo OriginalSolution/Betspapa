@@ -2987,7 +2987,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .slip-monitor-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .slip-monitor-head h2 { margin: 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .slip-monitor-head span, .slip-monitor-won, .slip-monitor-bell span { color: var(--muted); font-size: 12px; }
-.slip-monitor-list { list-style: none; margin: 8px 0; padding: 0; }
+.slip-monitor-list { list-style: none; margin: 8px 0; padding: 0; overflow-anchor: none; }
+.slip-monitor-pad { list-style: none; }
 .slip-monitor-row {
   width: 100%;
   display: flex;

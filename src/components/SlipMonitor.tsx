@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CodeActions } from './CodeActions';
 import { SlipBell } from './SlipBell';
@@ -7,7 +7,8 @@ import { readBuilder, subscribeBuilder, addTrackedSlip, type TrackedSlip } from 
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { playTierPhrase } from '../lib/pickCodes';
 import { applyGrades, combinedOdds, formatTotalOdds, type GradedLeg } from '../lib/slipPacks';
-import { deskOf, slipCounts, slipFromPublishedCode, splitMonitorLegs } from '../lib/trackedSlips';
+import { deskOf, matchesForSlips, slipCounts, slipFixtureIds, slipFromPublishedCode, splitMonitorLegs } from '../lib/trackedSlips';
+import { slipWindow } from '../lib/slipWindow';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { cx } from '../lib/format';
@@ -19,8 +20,7 @@ type MonitorState = 'live' | 'pending' | 'won' | 'lost';
 
 const WORD: Record<MonitorState, string> = { live: 'Live', pending: 'Pending', won: 'Won', lost: 'Lost' };
 
-function monitorState(legs: GradedLeg[], matches: Match[]): MonitorState {
-  const byId = new Map(matches.map((match) => [match.id, match]));
+function monitorState(legs: GradedLeg[], byId: Map<string, Match>): MonitorState {
   if (legs.some((leg) => leg.status === 'lost')) return 'lost';
   if (legs.length && legs.every((leg) => leg.status !== 'open')) return 'won';
   if (legs.some((leg) => leg.status === 'open' && live(byId.get(leg.eventId)))) return 'live';
@@ -52,6 +52,9 @@ export function SlipMonitor() {
   useEffect(() => subscribeBuilder(() => setBuilder(readBuilder())), []);
 
   const key = builder.slips.map((slip) => `${slip.id}:${slip.legs.length}`).join('|');
+  const fixtureIds = useMemo(() => slipFixtureIds(builder.slips), [key]);
+  const watched = useMemo(() => matchesForSlips(matches, fixtureIds), [matches, fixtureIds]);
+  const scoreKey = watched.map((match) => `${match.id}:${match.status}:${match.homeScore ?? ''}:${match.awayScore ?? ''}`).join('|');
   useEffect(() => {
     let stop = false;
     const legs = builder.slips.flatMap((slip) => slip.legs);
@@ -59,23 +62,70 @@ export function SlipMonitor() {
       setGrades(new Map());
       return;
     }
-    void gradesFor(legs, matches).then((next) => {
+    void gradesFor(legs, watched).then((next) => {
       if (!stop) setGrades(next);
     });
     return () => {
       stop = true;
     };
-  }, [key, matches]);
+  }, [key, scoreKey]);
 
+  const byId = useMemo(() => new Map(watched.map((match) => [match.id, match])), [scoreKey]);
   const rows = useMemo(
     () =>
       builder.slips.map((slip) => {
         const legs = applyGrades(slip.legs, grades);
-        const status = monitorState(legs, matches);
+        const status = monitorState(legs, byId);
         return { slip, legs, status };
       }),
-    [builder.slips, grades, matches],
+    [builder.slips, grades, byId],
   );
+
+  const listRef = useRef<HTMLUListElement>(null);
+  const heights = useRef(new Map<string, number>());
+  const [layout, setLayout] = useState({ scrollTop: 0, viewHeight: 720, listOffset: 0 });
+  const [revision, setRevision] = useState(0);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list || !rows.length) return;
+    const scroller = scrollBox(list);
+    const read = () => {
+      const next = readLayout(list, scroller);
+      setLayout((current) => (sameLayout(current, next) ? current : next));
+    };
+    read();
+    const target: HTMLElement | Window = scroller ?? window;
+    target.addEventListener('scroll', read, { passive: true });
+    window.addEventListener('resize', read);
+    return () => {
+      target.removeEventListener('scroll', read);
+      window.removeEventListener('resize', read);
+    };
+  }, [rows.length]);
+  const frame = useMemo(() => {
+    const measured = rows.map((row) => heights.current.get(row.slip.id));
+    return slipWindow(rows.length, measured, layout.scrollTop - layout.listOffset, layout.viewHeight);
+  }, [rows, layout, revision, openId]);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      let changed = false;
+      list.querySelectorAll<HTMLLIElement>('[data-slip-id]').forEach((item) => {
+        const id = item.dataset.slipId || '';
+        const next = Math.ceil(item.getBoundingClientRect().height);
+        if (id && next > 0 && heights.current.get(id) !== next) {
+          heights.current.set(id, next);
+          changed = true;
+        }
+      });
+      if (changed) setRevision((value) => value + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [frame.start, frame.end, openId]);
 
   const addCode = () => {
     const slip = slipFromPublishedCode(state, code);
@@ -95,11 +145,13 @@ export function SlipMonitor() {
         <span>{rows.length} {rows.length === 1 ? 'slip' : 'slips'}</span>
       </header>
       {rows.length === 0 && <p className="lede">No tracked slips yet. Paste a code from today’s list, or build one on Trends. Booking another keeps the ones you already have.</p>}
-      <ul className="slip-monitor-list">
-        {rows.map((row) => {
+      <ul className="slip-monitor-list" ref={listRef}>
+        {frame.padTop > 0 && <li className="slip-monitor-pad" style={{ height: frame.padTop }} aria-hidden="true" />}
+        {rows.slice(frame.start, frame.end).map((row, offset) => {
           const open = openId === row.slip.id;
+          const index = frame.start + offset;
           return (
-            <li key={row.slip.id}>
+            <li key={row.slip.id} data-slip-id={row.slip.id} data-index={index}>
               <button
                 type="button"
                 className={cx('slip-monitor-row', open && 'is-on')}
@@ -117,13 +169,14 @@ export function SlipMonitor() {
                   row={row}
                   play={play}
                   bellOn={Boolean(bells[row.slip.id]?.on)}
-                  matches={matches}
+                  matches={watched}
                   onBell={(on) => toggleBell(row.slip, on, settings.browser, permission, requestPermission)}
                 />
               )}
             </li>
           );
         })}
+        {frame.padBottom > 0 && <li className="slip-monitor-pad" style={{ height: frame.padBottom }} aria-hidden="true" />}
       </ul>
       <form
         className="slip-monitor-add"
@@ -184,6 +237,30 @@ function OpenSlip({
       </ol>
     </article>
   );
+}
+
+function scrollBox(node: HTMLElement): HTMLElement | null {
+  const main = node.closest('.main');
+  if (!(main instanceof HTMLElement)) return null;
+  const overflow = getComputedStyle(main).overflowY;
+  return overflow === 'auto' || overflow === 'scroll' ? main : null;
+}
+
+function readLayout(list: HTMLElement, scroller: HTMLElement | null) {
+  if (!scroller) {
+    const rect = list.getBoundingClientRect();
+    return { scrollTop: window.scrollY, viewHeight: window.innerHeight, listOffset: rect.top + window.scrollY };
+  }
+  const listRect = list.getBoundingClientRect();
+  const box = scroller.getBoundingClientRect();
+  return { scrollTop: scroller.scrollTop, viewHeight: scroller.clientHeight, listOffset: listRect.top - box.top + scroller.scrollTop };
+}
+
+function sameLayout(
+  current: { scrollTop: number; viewHeight: number; listOffset: number },
+  next: { scrollTop: number; viewHeight: number; listOffset: number },
+) {
+  return current.scrollTop === next.scrollTop && current.viewHeight === next.viewHeight && current.listOffset === next.listOffset;
 }
 
 function toggleBell(

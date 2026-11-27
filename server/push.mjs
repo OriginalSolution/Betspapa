@@ -643,7 +643,7 @@ export function builderSlipFrom(body) {
   const slip = body.builderSlip;
   if (!slip || typeof slip !== 'object') return null;
   const id = String(slip.id || '').slice(0, 80);
-  const legs = (Array.isArray(slip.legs) ? slip.legs : []).slice(0, 200).map((leg) => {
+  const legs = (Array.isArray(slip.legs) ? slip.legs : []).map((leg) => {
     const eventId = String(leg?.eventId || '');
     const market = String(leg?.market || '');
     const odds = Number(leg?.odds);
@@ -666,7 +666,7 @@ export function builderSlipFrom(body) {
 export function builderSlipsFrom(body) {
   if (!body || !Object.prototype.hasOwnProperty.call(body, 'builderSlips')) return undefined;
   const rows = Array.isArray(body.builderSlips) ? body.builderSlips : [];
-  return rows.slice(0, 12).map((slip) => builderSlipFrom({ builderSlip: slip })).filter(Boolean);
+  return rows.map((slip) => builderSlipFrom({ builderSlip: slip })).filter(Boolean);
 }
 
 export function trackedSlipsOf(device) {
@@ -692,6 +692,14 @@ function slipCopy(legs, progress) {
   return { title, body, kind: lost.length ? 'bust' : 'win' };
 }
 
+function matchIndex(matches) {
+  const byId = new Map();
+  for (const match of matches || []) {
+    if (match?.id != null && !byId.has(match.id)) byId.set(match.id, match);
+  }
+  return byId;
+}
+
 /**
  * One alert for a tracked slip, and only after every leg has a final score.
  * Progress is kept on the device so a match that has left the live list is not asked again.
@@ -699,11 +707,12 @@ function slipCopy(legs, progress) {
 export function slipNote(device, matches) {
   const slip = device?.builderSlip;
   if (!slip?.id || !Array.isArray(slip.legs) || !slip.legs.length) return null;
+  const byId = matchIndex(matches);
   const progress = { ...(device.slipProgress || {}) };
   let changed = false;
   for (const leg of slip.legs) {
     if (progress[leg.key]?.status) continue;
-    const match = (matches || []).find((item) => item.id === leg.eventId);
+    const match = byId.get(leg.eventId);
     if (!match || match.status !== 'finished' || match.homeScore == null || match.awayScore == null) continue;
     const ht = Number.isFinite(match.htHome) && Number.isFinite(match.htAway) ? { home: match.htHome, away: match.htAway } : null;
     const status = gradePick(leg.market, { home: match.homeScore, away: match.awayScore }, ht);
@@ -740,12 +749,13 @@ export function slipNotes(device, matches) {
   if (device.builderSlip?.id && device.slipProgress && !bag[device.builderSlip.id]) bag[device.builderSlip.id] = { ...device.slipProgress };
   const notes = [];
   let changed = false;
+  const byId = matchIndex(matches);
   for (const slip of slips) {
     const progress = { ...(bag[slip.id] || {}) };
     let slipChanged = false;
     for (const leg of slip.legs) {
       if (progress[leg.key]?.status) continue;
-      const match = (matches || []).find((item) => item.id === leg.eventId);
+      const match = byId.get(leg.eventId);
       if (!match || match.status !== 'finished' || match.homeScore == null || match.awayScore == null) continue;
       const ht = Number.isFinite(match.htHome) && Number.isFinite(match.htAway) ? { home: match.htHome, away: match.htAway } : null;
       const status = gradePick(leg.market, { home: match.homeScore, away: match.awayScore }, ht);
@@ -778,10 +788,10 @@ export function slipNotes(device, matches) {
 export function slipBellsFrom(body) {
   if (!body || !Object.prototype.hasOwnProperty.call(body, 'slipBells')) return undefined;
   const rows = Array.isArray(body.slipBells) ? body.slipBells : [];
-  return rows.slice(0, 12).map((slip) => {
+  return rows.map((slip) => {
     const id = String(slip?.id || '').slice(0, 120);
     const seen = new Set();
-    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).slice(0, 60).map((leg) => {
+    const legs = (Array.isArray(slip?.legs) ? slip.legs : []).map((leg) => {
       const eventId = String(leg?.eventId || '');
       const market = String(leg?.market || '');
       if (!/^sr:match:\d+$/.test(eventId) || !/^[a-z0-9-]{2,24}$/.test(market)) return null;
@@ -822,11 +832,12 @@ export function bellNotes(device, matches) {
   const progress = { ...(device.bellProgress || {}) };
   const notes = [];
   let changed = false;
+  const byId = matchIndex(matches);
   for (const bell of bells) {
     const done = { ...(progress[bell.id] || {}) };
     for (const leg of bell.legs || []) {
       if (done[leg.key]?.status) continue;
-      const match = (matches || []).find((item) => item.id === leg.eventId);
+      const match = byId.get(leg.eventId);
       if (!match) continue;
       const verdict = settleTrend(leg.market, match);
       if (verdict === 'open') continue;

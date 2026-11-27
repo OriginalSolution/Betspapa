@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { slipsFromStored } from './builderStore';
 import type { EngineState } from './engineSlips';
-import { slipFromPublishedCode, splitMonitorLegs } from './trackedSlips';
+import { matchesForSlips, slipFixtureIds, slipFromPublishedCode, splitMonitorLegs } from './trackedSlips';
 import type { GradedLeg } from './slipPacks';
 import type { Match } from '../types';
 
@@ -99,6 +99,35 @@ describe('an existing tracked slip joins the list', () => {
       },
     });
     expect(slips.map((slip) => slip.id)).toEqual(['slip-thursday']);
+  });
+});
+
+describe('unlimited tracked slips', () => {
+  it('keeps every stored slip', () => {
+    const slips = Array.from({ length: 24 }, (_, index) => ({
+      id: `s${index}`,
+      label: `Slip ${index}`,
+      legs: [{ key: `sr:match:${index}|over15`, eventId: `sr:match:${index}`, market: 'over15', label: 'Over 1.5', odds: 1.2, kickoff: '', home: 'A', away: 'B', homeCrest: null, awayCrest: null, sample: null }],
+      bookedAt: '',
+      parts: [],
+      desks: [],
+      alerted: false,
+    }));
+    expect(slipsFromStored({ slips })).toHaveLength(24);
+  });
+
+  it('batches fixture ids across slips', () => {
+    const ids = slipFixtureIds([
+      { legs: [{ eventId: 'sr:match:1' }, { eventId: 'sr:match:2' }] },
+      { legs: [{ eventId: 'sr:match:2' }, { eventId: 'sr:match:3' }] },
+    ]);
+    expect(ids).toEqual(['sr:match:1', 'sr:match:2', 'sr:match:3']);
+    const matches = [
+      { id: 'sr:match:1', status: 'live' },
+      { id: 'sr:match:9', status: 'live' },
+      { id: 'sr:match:3', status: 'finished' },
+    ] as Match[];
+    expect(matchesForSlips(matches, ids).map((match) => match.id)).toEqual(['sr:match:1', 'sr:match:3']);
   });
 });
 

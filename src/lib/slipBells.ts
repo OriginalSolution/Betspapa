@@ -32,8 +32,6 @@ const SEEN_KEY = 'betspapa.slipBellSeen.v1';
 const EVENT = 'betspapa-slip-bells';
 /** A bell whose last leg kicked off more than two days ago has nothing left to say. */
 export const BELL_KEEP_MS = 2 * 24 * 60 * 60 * 1000;
-export const MAX_BELLS = 12;
-export const MAX_BELL_LEGS = 60;
 
 function storage(): Storage | null {
   try {
@@ -78,7 +76,7 @@ export function readBells(): Record<string, SlipBell> {
         label: typeof row.label === 'string' ? row.label : '',
         on: row.on === true,
         at: Number(row.at) || 0,
-        legs: legs.slice(0, MAX_BELL_LEGS),
+        legs,
       };
     }
     return out;
@@ -131,15 +129,14 @@ export function pruneBells(bells: Record<string, SlipBell>, now = Date.now()): R
       const last = lastKick(bell);
       return !last || now - last <= BELL_KEEP_MS;
     })
-    .sort((a, b) => b.at - a.at)
-    .slice(0, MAX_BELLS);
+    .sort((a, b) => b.at - a.at);
   return Object.fromEntries(kept.map((bell) => [bell.id, bell]));
 }
 
 /** Turn a slip's bell on or off. On stores the legs, so alerts survive the slip leaving the screen. */
 export function setBell(id: string, on: boolean, slip: { label: string; legs: BellLeg[] }, now = Date.now()): Record<string, SlipBell> {
   const bells = readBells();
-  if (on) bells[id] = { id, label: slip.label, on: true, at: now, legs: slip.legs.slice(0, MAX_BELL_LEGS).map(toBellLeg) };
+  if (on) bells[id] = { id, label: slip.label, on: true, at: now, legs: slip.legs.map(toBellLeg) };
   else delete bells[id];
   const next = pruneBells(bells, now);
   writeBells(next);
@@ -151,7 +148,7 @@ export function refreshBellLegs(id: string, legs: BellLeg[]) {
   const bells = readBells();
   const bell = bells[id];
   if (!bell?.on) return;
-  const next = legs.slice(0, MAX_BELL_LEGS).map(toBellLeg);
+  const next = legs.map(toBellLeg);
   if (next.map((leg) => leg.key).join('|') === bell.legs.map((leg) => leg.key).join('|')) return;
   bells[id] = { ...bell, legs: next };
   writeBells(bells);
@@ -183,7 +180,7 @@ export function bellMatchIds(bells = readBells(), now = Date.now()): string[] {
 export function withBellFollows(follows: Follows, bells = readBells(), now = Date.now()): Follows {
   const extra = bellMatchIds(bells, now).filter((id) => !follows.matches.includes(id));
   if (!extra.length) return follows;
-  return { ...follows, matches: [...follows.matches, ...extra].slice(0, 200) };
+  return { ...follows, matches: [...follows.matches, ...extra] };
 }
 
 /** What the server stores for push. Same shape as the tracked builder slip, plus the label. */

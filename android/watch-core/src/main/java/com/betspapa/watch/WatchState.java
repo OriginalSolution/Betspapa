@@ -240,7 +240,7 @@ public final class WatchState {
         slips.clear();
         JSONObject kept = new JSONObject();
         if (incoming != null) {
-            for (int i = 0; i < incoming.length() && slips.size() < 12; i++) {
+            for (int i = 0; i < incoming.length(); i++) {
                 JSONObject row = incoming.optJSONObject(i);
                 if (row == null || row.optString("id", "").isEmpty() || row.optJSONArray("legs") == null) continue;
                 slips.add(row);

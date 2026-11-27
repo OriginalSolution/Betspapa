@@ -71,6 +71,14 @@ describe('slip bells', () => {
     expect(bellWatchRows(readBells(), NOW)[0].legs[0].key).toBe('sr:match:1|over15');
   });
 
+  it('keeps every bell and every leg', () => {
+    for (let index = 0; index < 24; index += 1) setBell(`s${index}`, true, { label: `Slip ${index}`, legs: [leg(index + 1)] }, NOW);
+    expect(Object.keys(readBells())).toHaveLength(24);
+    const legs = Array.from({ length: 70 }, (_, index) => leg(index + 1));
+    setBell('long', true, { label: 'Long', legs }, NOW);
+    expect(readBells().long.legs).toHaveLength(70);
+  });
+
   it('drops a bell two days after its last kick-off', () => {
     setBell('old', true, { label: 'Old', legs: [leg(1, 'over15', '2026-11-20T19:00:00Z')] }, NOW);
     expect(bellRegistration(readBells(), NOW)).toEqual([]);
