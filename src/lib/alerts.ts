@@ -129,6 +129,7 @@ export function trendIdFromAlert(id: string): string {
 
 /** Where an Alerts row opens. A trend hit goes to the match that owns it. */
 export function alertTarget(item: Pick<InboxItem, 'id' | 'kind' | 'matchId'>): string {
+  if (item.id.startsWith('slipleg:') || item.id.startsWith('slip:')) return '/slips';
   const matchId = item.matchId || matchIdFromTrendAlert(item.id);
   if (matchId) {
     const trend = trendIdFromAlert(item.id);

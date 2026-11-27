@@ -270,9 +270,20 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
                 android:ellipsize="end"
-                android:maxLines="1"
+                android:maxLines="2"
                 android:textColor="#A7ACB8"
                 android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/trend_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="#A7ACB8"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/book_row"

@@ -251,6 +251,11 @@ public class WatchPlugin extends Plugin {
             note.bookId = json.optString("bookId", "");
             note.bookCode = json.optString("code", "");
             note.fixture = json.optString("fixture", "");
+            note.trendLabel = json.optString("trendLabel", "");
+            note.progress = json.optString("progress", "");
+            note.clock = json.optString("clock", "");
+            note.slipLabel = json.optString("slip", "");
+            note.slipId = json.optString("slipId", "");
             rememberMatch(json);
             String sound = json.optString("goalSound", "crowd");
             // FCM or the native poller may already have posted this id. The gate keeps the cheer to one.

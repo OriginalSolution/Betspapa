@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CodeActions } from './CodeActions';
 import { SlipBell } from './SlipBell';
 import { SlipLegRow, gradesFor } from './SlipTrack';
@@ -44,12 +44,17 @@ export function SlipMonitor() {
   const bells = useSlipBells();
   const play = isPlayStoreBuild();
   const [builder, setBuilder] = useState(readBuilder);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const wanted = params.get('slip');
+  const [openId, setOpenId] = useState<string | null>(wanted);
   const [grades, setGrades] = useState<Map<string, { status: GradedLeg['status']; ft: string | null; ht: string | null }>>(new Map());
   const [code, setCode] = useState('');
   const [problem, setProblem] = useState('');
 
   useEffect(() => subscribeBuilder(() => setBuilder(readBuilder())), []);
+  useEffect(() => {
+    if (wanted) setOpenId(wanted);
+  }, [wanted]);
 
   const key = builder.slips.map((slip) => `${slip.id}:${slip.legs.length}`).join('|');
   const fixtureIds = useMemo(() => slipFixtureIds(builder.slips), [key]);

@@ -38,6 +38,11 @@ public class TestAlertReceiver extends BroadcastReceiver {
             }, "promo-qc").start();
             return;
         }
+        if ("win".equals(kind) || "leg".equals(kind) || "bust".equals(kind)) {
+            postSettle(app, intent, kind, sound);
+            holdForSound();
+            return;
+        }
         if (intent != null && intent.getStringExtra("home") != null) {
             postScore(app, intent, kind, sound);
             holdForSound();
@@ -92,6 +97,55 @@ public class TestAlertReceiver extends BroadcastReceiver {
         if ("var".equals(kind)) return "Test VAR check · background alerts work";
         if ("penalty".equals(kind)) return "Test penalty · background alerts work";
         return "Test goal · background alerts work";
+    }
+
+    /** The settle card the server sends for a leg or a trend: teams, market, odds, slip and the running count. */
+    private static void postSettle(Context app, Intent intent, String kind, String sound) {
+        String home = text(intent, "home", "Arsenal");
+        String away = text(intent, "away", "Chelsea");
+        int homeScore = intExtra(intent, "homeScore", 2);
+        int awayScore = intExtra(intent, "awayScore", 1);
+        boolean lost = "bust".equals(kind);
+        WatchMatch match = new WatchMatch();
+        match.id = text(intent, "matchId", "sr:match:qc");
+        match.home = home;
+        match.away = away;
+        match.homeFull = home;
+        match.awayFull = away;
+        match.homeCrest = text(intent, "homeCrest", "");
+        match.awayCrest = text(intent, "awayCrest", "");
+        match.competition = text(intent, "competition", "Premier League");
+        match.status = "finished";
+        match.minute = intExtra(intent, "minute", 90);
+        match.homeScore = homeScore;
+        match.awayScore = awayScore;
+        try {
+            synchronized (WatchState.FILE_LOCK) {
+                WatchState state = WatchState.load(WatchFiles.file(app));
+                state.notificationStyle = "dark";
+                state.save(WatchFiles.file(app));
+            }
+        } catch (Exception ignored) {
+            /* the card still posts */
+        }
+        String market = text(intent, "market", "Over 1.5");
+        String trend = text(intent, "trend", "8/10+ Over 1.5");
+        String odds = text(intent, "odds", "1.26");
+        String slip = text(intent, "slip", "QC0003");
+        String progress = text(intent, "progress", "29 of 36 won");
+        String score = home + " " + homeScore + "-" + awayScore + " " + away;
+        String id = text(intent, "id", "slipleg:qc:" + match.id + "|over15");
+        WatchNote note = new WatchNote(id, match.id, lost ? "bust" : "win", (lost ? "Leg lost · " : "Leg won · ") + market, score + " · FT · " + market + " · " + trend + " · " + odds + " · " + slip + " · " + progress);
+        note.marketLabel = market;
+        note.trendLabel = trend;
+        note.oddsText = odds;
+        note.slipLabel = slip;
+        note.slipId = text(intent, "slipId", "qc");
+        note.progress = progress;
+        note.clock = "FT";
+        note.fixture = score;
+        note.minute = 90;
+        AlertPoster.post(app, note, sound, 0, false, match);
     }
 
     /** A data-only style goal card: crests, score, and the chosen sound. The same id replaces, it does not stack. */

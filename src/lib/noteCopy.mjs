@@ -100,6 +100,50 @@ export function trendCopy(match, label) {
   return { title: `Trend hit · ${label}`, body: `${scoreLine(match)} · ${label}` };
 }
 
+/** The short pick name on a card: "Over 1.5", "Home win". */
+export function pickName(label) {
+  const text = String(label || '').replace(/\s+/g, ' ').trim();
+  const named = {
+    'full-time home win': 'Home win',
+    'full-time away win': 'Away win',
+    'full-time draw': 'Draw',
+    'over 0.5 goals': 'Over 0.5',
+    'over 1.5 goals': 'Over 1.5',
+    'over 2.5 goals': 'Over 2.5',
+    'over 3.5 goals': 'Over 3.5',
+    'under 1.5 goals': 'Under 1.5',
+    'under 2.5 goals': 'Under 2.5',
+    'under 3.5 goals': 'Under 3.5',
+    'both teams to score': 'Both teams to score',
+    'both teams not to score': 'Both teams not to score',
+    'home team to score': 'Home to score',
+    'away team to score': 'Away to score',
+  };
+  if (named[text.toLowerCase()]) return named[text.toLowerCase()];
+  return text.replace(/ goals$/i, '') || 'Pick';
+}
+
+/** FT when the match is over, otherwise the minute. */
+export function settleClock(match) {
+  if (!match) return '';
+  if (match.status === 'finished') return 'FT';
+  if (match.status === 'halftime') return 'HT';
+  return minuteMark(match.minute);
+}
+
+/** One line of the detail a settle card must keep. Empty pieces are left out. "Trend hit" alone is never a piece. */
+export function settleText(parts) {
+  const seen = new Set();
+  const rows = [];
+  for (const part of parts) {
+    const text = String(part || '').replace(/\s+/g, ' ').trim();
+    if (!text || text.toLowerCase() === 'trend hit' || seen.has(text.toLowerCase())) continue;
+    seen.add(text.toLowerCase());
+    rows.push(text);
+  }
+  return rows.join(' · ');
+}
+
 /** "Arsenal v Chelsea" for a slip or code leg; one name alone when the other is missing. */
 export function legFixture(leg) {
   const home = teamName(leg?.home);

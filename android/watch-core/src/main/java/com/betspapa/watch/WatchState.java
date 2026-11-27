@@ -148,6 +148,11 @@ public final class WatchState {
         if (note.bookId != null) row.put("bookId", note.bookId);
         if (note.bookCode != null) row.put("bookCode", note.bookCode);
         if (note.fixture != null) row.put("fixture", note.fixture);
+        if (note.trendLabel != null) row.put("trendLabel", note.trendLabel);
+        if (note.progress != null) row.put("progress", note.progress);
+        if (note.clock != null) row.put("clock", note.clock);
+        if (note.slipId != null) row.put("slipId", note.slipId);
+        if (note.slipLabel != null) row.put("slipLabel", note.slipLabel);
         if (note.replaces != null && !note.replaces.isEmpty()) row.put("replaces", note.replaces);
         inbox.add(0, row);
         seen.add(note.id);
@@ -170,6 +175,11 @@ public final class WatchState {
             note.bookId = row.optString("bookId", "");
             note.bookCode = row.optString("bookCode", "");
             note.fixture = row.optString("fixture", "");
+            note.trendLabel = row.optString("trendLabel", "");
+            note.progress = row.optString("progress", "");
+            note.clock = row.optString("clock", "");
+            note.slipId = row.optString("slipId", "");
+            note.slipLabel = row.optString("slipLabel", "");
             note.replaces = row.optString("replaces", "");
             pending.add(note);
         }

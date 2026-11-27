@@ -16,6 +16,14 @@ public final class WatchNote {
     public String bookId;
     public String bookCode;
     public String fixture;
+    /** Tier or slip name, such as 80%+ Over 1.5. */
+    public String trendLabel;
+    /** Running slip tally, such as 29 of 36 won. */
+    public String progress;
+    /** FT, HT, or a minute mark. */
+    public String clock;
+    public String slipId;
+    public String slipLabel;
     /** For a goal VAR took back: the goal note this card replaces on the shade. */
     public String replaces;
 
