@@ -72,8 +72,10 @@ test('the push carries the scorer, side and minute so the phone card can show th
 test('a trend hit names the fixture and score in full', () => {
   const notes = trendNotes([row({ homeScore: 1, awayScore: 1 })], [row({ homeScore: 2, awayScore: 1, minute: 70 })], { trends: ['sr:match:9:over25'] });
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].body, 'Manchester United 2-1 Brighton & Hove Albion · Over 2.5 goals');
-  assert.equal(notes[0].fixture, 'Manchester United vs Brighton & Hove Albion');
+  assert.equal(notes[0].body, 'Manchester United 2-1 Brighton & Hove Albion · 70′ · Over 2.5');
+  assert.equal(notes[0].fixture, 'Manchester United 2-1 Brighton & Hove Albion');
+  assert.equal(notes[0].marketLabel, 'Over 2.5');
+  assert.notEqual(notes[0].body, 'Trend hit');
 });
 
 test('code alerts name the real fixtures', () => {

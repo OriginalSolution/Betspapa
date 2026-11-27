@@ -50,6 +50,11 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             data["fixture"]?.takeIf { it.isNotEmpty() }?.let { note.fixture = it }
             data["odds"]?.takeIf { it.isNotEmpty() }?.let { note.oddsText = it }
             data["code"]?.takeIf { it.isNotEmpty() }?.let { note.bookCode = it }
+            data["trendLabel"]?.takeIf { it.isNotEmpty() }?.let { note.trendLabel = it }
+            data["progress"]?.takeIf { it.isNotEmpty() }?.let { note.progress = it }
+            data["clock"]?.takeIf { it.isNotEmpty() }?.let { note.clock = it }
+            data["slip"]?.takeIf { it.isNotEmpty() }?.let { note.slipLabel = it }
+            data["slipId"]?.takeIf { it.isNotEmpty() }?.let { note.slipId = it }
             if (kind == "var") note.varCheck = true
             if (data["disallowed"] == "1") {
                 note.disallowed = true

@@ -110,7 +110,8 @@ public class MainActivity extends BridgeActivity {
         String route = intent.getStringExtra(OpenMatch.EXTRA_ROUTE);
         String matchId = intent.getStringExtra(OpenMatch.EXTRA_MATCH);
         String trendId = intent.getStringExtra(OpenMatch.EXTRA_TREND);
-        if ((matchId == null || matchId.isEmpty()) && (trendId == null || trendId.isEmpty())) return;
+        boolean slip = "slip".equals(route) || "codes".equals(route) || "picks".equals(route) || "today".equals(route);
+        if (!slip && (matchId == null || matchId.isEmpty()) && (trendId == null || trendId.isEmpty())) return;
         if (route == null || route.isEmpty() || "home".equals(route)) return;
         PluginHandle handle = getBridge().getPlugin("Watch");
         if (handle == null || !(handle.getInstance() instanceof WatchPlugin)) return;

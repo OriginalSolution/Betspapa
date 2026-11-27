@@ -14,13 +14,16 @@ const BELL = {
   ],
 };
 
-test('slip bells are cleaned, capped and keyed per leg', () => {
+test('slip bells are cleaned and keyed per leg, with no cap', () => {
   assert.equal(slipBellsFrom({}), undefined);
   assert.deepEqual(slipBellsFrom({ slipBells: [] }), []);
   const [bell] = slipBellsFrom({ slipBells: [{ ...BELL, legs: [...BELL.legs, BELL.legs[0], { eventId: 'bad', market: 'x' }] }] });
   assert.equal(bell.legs.length, 2);
   assert.equal(bell.legs[0].key, 'sr:match:1|over15');
-  assert.equal(slipBellsFrom({ slipBells: Array.from({ length: 30 }, (_, i) => ({ ...BELL, id: `s${i}` })) }).length, 12);
+  assert.equal(slipBellsFrom({ slipBells: Array.from({ length: 30 }, (_, i) => ({ ...BELL, id: `s${i}` })) }).length, 30);
+  const legs = Array.from({ length: 70 }, (_, i) => ({ eventId: `sr:match:${i + 1}`, market: 'over15', odds: 1.26, home: 'Home', away: 'Away', label: 'Over 1.5 goals' }));
+  const [long] = slipBellsFrom({ slipBells: [{ id: 'long', label: 'Long', legs }] });
+  assert.equal(long.legs.length, 70);
 });
 
 test('a belled slip alerts each leg with full names, then the whole slip once', () => {
@@ -30,8 +33,10 @@ test('a belled slip alerts each leg with full names, then the whole slip once', 
   const early = bellNotes(device, [{ id: 'sr:match:1', status: 'live', homeScore: 2, awayScore: 0, home: 'Lions', away: 'Kotoko' }]);
   assert.deepEqual(early.notes.map((note) => note.id), ['slipleg:trend:80:over15:2026-11-24:sr:match:1|over15']);
   assert.equal(early.notes[0].kind, 'win');
-  assert.equal(early.notes[0].title, 'Leg won · Over 1.5 goals');
-  assert.match(early.notes[0].body, /^Heart of Lions 2-0 Asante Kotoko · 1.26 · 1 of 2 settled$/);
+  assert.equal(early.notes[0].title, 'Leg won · Over 1.5');
+  assert.equal(early.notes[0].marketLabel, 'Over 1.5');
+  assert.equal(early.notes[0].body, 'Heart of Lions 2-0 Asante Kotoko · Over 1.5 · 80%+ Over 1.5 goals · 1.26 · 1 of 2 won');
+  assert.notEqual(early.notes[0].body, 'Trend hit');
   assert.equal(early.notes[0].match.home, 'Heart of Lions');
   assert.equal(early.changed, true);
   // Same leg is not raised again on the next poll.
@@ -96,7 +101,14 @@ test('end to end: a bell turned on in the app pushes kick-off, the goal and the 
   assert.equal(leg.kind, 'win');
   assert.equal(leg.home, 'Heart of Lions');
   assert.equal(leg.away, 'Asante Kotoko');
-  assert.equal(leg.title, 'Leg won · Over 1.5 goals');
+  assert.equal(leg.title, 'Leg won · Over 1.5');
+  assert.equal(leg.marketLabel, 'Over 1.5');
+  assert.match(leg.body, /Heart of Lions 2-0 Asante Kotoko/);
+  assert.match(leg.body, /1 of 2 won/);
+  assert.match(leg.fixture, /Heart of Lions 2-0 Asante Kotoko/);
+  assert.equal(leg.odds, '1.26');
+  assert.equal(leg.slip, '80%+ Over 1.5 goals');
+  assert.notEqual(leg.body, 'Trend hit');
   now += 25_000;
   await watch.tick();
   assert.equal(sent.filter((data) => data.id === leg.id).length, 1);

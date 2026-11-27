@@ -23,9 +23,10 @@ public final class OpenMatch {
             String key = "open:" + (note.id == null || note.id.isEmpty() ? matchId : note.id);
             return view(context, matchId, "match", "", key);
         }
-        if ("slip".equals(note.kind)) {
+        if (slipNote(note)) {
+            String slipId = note.slipId == null ? "" : note.slipId;
             String key = "open:" + (note.id == null || note.id.isEmpty() ? "slip" : note.id);
-            return view(context, "", "slip", "", key);
+            return view(context, "", "slip", slipId, key);
         }
         if ("code".equals(note.kind)) {
             String strategy = note.fixture == null ? "" : note.fixture;
@@ -73,6 +74,13 @@ public final class OpenMatch {
         int cut = trendId.lastIndexOf(':');
         if (cut <= 0) return "";
         return trendId.substring(0, cut);
+    }
+
+    static boolean slipNote(WatchNote note) {
+        if (note == null) return false;
+        if ("slip".equals(note.kind)) return true;
+        String id = note.id == null ? "" : note.id;
+        return id.startsWith("slip:") || id.startsWith("slipleg:");
     }
 
     static String trendId(WatchNote note) {

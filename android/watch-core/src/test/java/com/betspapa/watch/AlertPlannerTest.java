@@ -629,6 +629,21 @@ public class AlertPlannerTest {
     }
 
     @Test
+    public void everyBelledSlipIsKept() {
+        WatchState state = new WatchState();
+        StringBuilder slips = new StringBuilder();
+        for (int i = 0; i < 24; i++) {
+            if (i > 0) slips.append(',');
+            slips.append("{\"id\":\"s").append(i).append("\",\"label\":\"Slip\",\"legs\":[{\"key\":\"sr:match:")
+                    .append(i).append("|over15\",\"eventId\":\"sr:match:").append(i)
+                    .append("\",\"market\":\"over15\",\"label\":\"Over 1.5 goals\",\"home\":\"Home\",\"away\":\"Away\"}]}");
+        }
+        state.merge(new JSONObject("{\"slips\":[" + slips + "]}"));
+        assertEquals(24, state.slips.size());
+        assertEquals(1, state.slips.get(23).getJSONArray("legs").length());
+    }
+
+    @Test
     public void belledSlipPostsEachLegThenTheSlipOnce() {
         WatchState state = new WatchState();
         state.browser = true;
@@ -655,8 +670,9 @@ public class AlertPlannerTest {
         assertEquals(1, first.size());
         assertEquals("slipleg:bell1:sr:match:1|over15", first.get(0).id);
         assertEquals("win", first.get(0).kind);
-        assertEquals("Leg won · Over 1.5 goals", first.get(0).title);
-        assertEquals("Al Astiklal FC 1-1 Nashama Al-Mustaqbal · 1 of 2 settled", first.get(0).body);
+        assertEquals("Leg won · Over 1.5", first.get(0).title);
+        assertEquals("Al Astiklal FC 1-1 Nashama Al-Mustaqbal · Over 1.5 · Slip · 1 of 2 won", first.get(0).body);
+        assertEquals("bell1", first.get(0).slipId);
         state.record(first.get(0), KICK);
         assertEquals(0, AlertPlanner.slipNotes(board, state, KICK + 31L * 60_000L).size());
         two.status = "finished";

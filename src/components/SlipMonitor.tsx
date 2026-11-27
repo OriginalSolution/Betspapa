@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CodeActions } from './CodeActions';
 import { SlipBell } from './SlipBell';
 import { SlipLegRow, gradesFor } from './SlipTrack';
 import { readBuilder, subscribeBuilder, addTrackedSlip, type TrackedSlip } from '../lib/builderStore';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { playTierPhrase } from '../lib/pickCodes';
-import { applyGrades, type GradedLeg } from '../lib/slipPacks';
-import { deskOf, slipFromPublishedCode } from '../lib/trackedSlips';
+import { applyGrades, combinedOdds, formatTotalOdds, type GradedLeg } from '../lib/slipPacks';
+import { deskOf, matchesForSlips, slipCounts, slipFixtureIds, slipFromPublishedCode, splitMonitorLegs } from '../lib/trackedSlips';
+import { slipWindow } from '../lib/slipWindow';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { cx } from '../lib/format';
@@ -19,8 +20,7 @@ type MonitorState = 'live' | 'pending' | 'won' | 'lost';
 
 const WORD: Record<MonitorState, string> = { live: 'Live', pending: 'Pending', won: 'Won', lost: 'Lost' };
 
-function monitorState(legs: GradedLeg[], matches: Match[]): MonitorState {
-  const byId = new Map(matches.map((match) => [match.id, match]));
+function monitorState(legs: GradedLeg[], byId: Map<string, Match>): MonitorState {
   if (legs.some((leg) => leg.status === 'lost')) return 'lost';
   if (legs.length && legs.every((leg) => leg.status !== 'open')) return 'won';
   if (legs.some((leg) => leg.status === 'open' && live(byId.get(leg.eventId)))) return 'live';
@@ -31,13 +31,11 @@ function live(match: Match | undefined): boolean {
   return match?.status === 'live' || match?.status === 'halftime';
 }
 
-function tally(legs: GradedLeg[], state: MonitorState): string {
-  const won = legs.filter((leg) => leg.status === 'won').length;
-  const lost = legs.filter((leg) => leg.status === 'lost').length;
-  if (state === 'won') return `${won}/${legs.length} won`;
-  if (state === 'lost') return `${won} won · ${lost} lost`;
-  if (state === 'live') return `${won} winning · ${legs.length} legs`;
-  return `0/${legs.length}`;
+function tally(legs: GradedLeg[]): string {
+  const counts = slipCounts(legs);
+  const odds = formatTotalOdds(combinedOdds(legs));
+  const figures = `${counts.won} won · ${counts.lost} lost · ${counts.open} open`;
+  return odds ? `${figures} · odds ${odds}` : figures;
 }
 
 export function SlipMonitor() {
@@ -46,14 +44,22 @@ export function SlipMonitor() {
   const bells = useSlipBells();
   const play = isPlayStoreBuild();
   const [builder, setBuilder] = useState(readBuilder);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const wanted = params.get('slip');
+  const [openId, setOpenId] = useState<string | null>(wanted);
   const [grades, setGrades] = useState<Map<string, { status: GradedLeg['status']; ft: string | null; ht: string | null }>>(new Map());
   const [code, setCode] = useState('');
   const [problem, setProblem] = useState('');
 
   useEffect(() => subscribeBuilder(() => setBuilder(readBuilder())), []);
+  useEffect(() => {
+    if (wanted) setOpenId(wanted);
+  }, [wanted]);
 
   const key = builder.slips.map((slip) => `${slip.id}:${slip.legs.length}`).join('|');
+  const fixtureIds = useMemo(() => slipFixtureIds(builder.slips), [key]);
+  const watched = useMemo(() => matchesForSlips(matches, fixtureIds), [matches, fixtureIds]);
+  const scoreKey = watched.map((match) => `${match.id}:${match.status}:${match.homeScore ?? ''}:${match.awayScore ?? ''}`).join('|');
   useEffect(() => {
     let stop = false;
     const legs = builder.slips.flatMap((slip) => slip.legs);
@@ -61,24 +67,70 @@ export function SlipMonitor() {
       setGrades(new Map());
       return;
     }
-    void gradesFor(legs, matches).then((next) => {
+    void gradesFor(legs, watched).then((next) => {
       if (!stop) setGrades(next);
     });
     return () => {
       stop = true;
     };
-  }, [key, matches]);
+  }, [key, scoreKey]);
 
+  const byId = useMemo(() => new Map(watched.map((match) => [match.id, match])), [scoreKey]);
   const rows = useMemo(
     () =>
       builder.slips.map((slip) => {
         const legs = applyGrades(slip.legs, grades);
-        const status = monitorState(legs, matches);
+        const status = monitorState(legs, byId);
         return { slip, legs, status };
       }),
-    [builder.slips, grades, matches],
+    [builder.slips, grades, byId],
   );
-  const open = rows.find((row) => row.slip.id === openId) || null;
+
+  const listRef = useRef<HTMLUListElement>(null);
+  const heights = useRef(new Map<string, number>());
+  const [layout, setLayout] = useState({ scrollTop: 0, viewHeight: 720, listOffset: 0 });
+  const [revision, setRevision] = useState(0);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list || !rows.length) return;
+    const scroller = scrollBox(list);
+    const read = () => {
+      const next = readLayout(list, scroller);
+      setLayout((current) => (sameLayout(current, next) ? current : next));
+    };
+    read();
+    const target: HTMLElement | Window = scroller ?? window;
+    target.addEventListener('scroll', read, { passive: true });
+    window.addEventListener('resize', read);
+    return () => {
+      target.removeEventListener('scroll', read);
+      window.removeEventListener('resize', read);
+    };
+  }, [rows.length]);
+  const frame = useMemo(() => {
+    const measured = rows.map((row) => heights.current.get(row.slip.id));
+    return slipWindow(rows.length, measured, layout.scrollTop - layout.listOffset, layout.viewHeight);
+  }, [rows, layout, revision, openId]);
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      let changed = false;
+      list.querySelectorAll<HTMLLIElement>('[data-slip-id]').forEach((item) => {
+        const id = item.dataset.slipId || '';
+        const next = Math.ceil(item.getBoundingClientRect().height);
+        if (id && next > 0 && heights.current.get(id) !== next) {
+          heights.current.set(id, next);
+          changed = true;
+        }
+      });
+      if (changed) setRevision((value) => value + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [frame.start, frame.end, openId]);
 
   const addCode = () => {
     const slip = slipFromPublishedCode(state, code);
@@ -89,7 +141,6 @@ export function SlipMonitor() {
     addTrackedSlip(slip);
     setCode('');
     setProblem('');
-    setOpenId(slip.id);
   };
 
   return (
@@ -99,20 +150,39 @@ export function SlipMonitor() {
         <span>{rows.length} {rows.length === 1 ? 'slip' : 'slips'}</span>
       </header>
       {rows.length === 0 && <p className="lede">No tracked slips yet. Paste a code from today’s list, or build one on Trends. Booking another keeps the ones you already have.</p>}
-      <ul className="slip-monitor-list">
-        {rows.map(({ slip, legs, status }) => (
-          <li key={slip.id}>
-            <button type="button" className={cx('slip-monitor-row', openId === slip.id && 'is-on')} onClick={() => setOpenId((current) => (current === slip.id ? null : slip.id))}>
-              <span>
-                <strong>{playTierPhrase(slip.label)}</strong>
-                <small>{rowSub(slip, play)} · {tally(legs, status)}</small>
-              </span>
-              <i className={cx('slip-chip', `is-${status === 'pending' ? 'open' : status}`)}>{WORD[status]}</i>
-            </button>
-          </li>
-        ))}
+      <ul className="slip-monitor-list" ref={listRef}>
+        {frame.padTop > 0 && <li className="slip-monitor-pad" style={{ height: frame.padTop }} aria-hidden="true" />}
+        {rows.slice(frame.start, frame.end).map((row, offset) => {
+          const open = openId === row.slip.id;
+          const index = frame.start + offset;
+          return (
+            <li key={row.slip.id} data-slip-id={row.slip.id} data-index={index}>
+              <button
+                type="button"
+                className={cx('slip-monitor-row', open && 'is-on')}
+                aria-expanded={open}
+                onClick={() => setOpenId((current) => (current === row.slip.id ? null : row.slip.id))}
+              >
+                <span>
+                  <strong>{playTierPhrase(row.slip.label)}</strong>
+                  <small>{rowSub(row.slip, play)} · {tally(row.legs)}</small>
+                </span>
+                <i className={cx('slip-chip', `is-${row.status === 'pending' ? 'open' : row.status}`)}>{WORD[row.status]}</i>
+              </button>
+              {open && (
+                <OpenSlip
+                  row={row}
+                  play={play}
+                  bellOn={Boolean(bells[row.slip.id]?.on)}
+                  matches={watched}
+                  onBell={(on) => toggleBell(row.slip, on, settings.browser, permission, requestPermission)}
+                />
+              )}
+            </li>
+          );
+        })}
+        {frame.padBottom > 0 && <li className="slip-monitor-pad" style={{ height: frame.padBottom }} aria-hidden="true" />}
       </ul>
-      {open && <OpenSlip row={open} play={play} bellOn={Boolean(bells[open.slip.id]?.on)} matches={matches} onBell={(on) => toggleBell(open.slip, on, settings.browser, permission, requestPermission)} />}
       <form
         className="slip-monitor-add"
         onSubmit={(event) => {
@@ -152,24 +222,50 @@ function OpenSlip({
   onBell: (on: boolean) => void;
 }) {
   const byId = new Map(matches.map((match) => [match.id, match]));
-  const won = row.legs.filter((leg) => leg.status === 'won').length;
+  const counts = slipCounts(row.legs);
+  const { active, settled } = splitMonitorLegs(row.legs, matches);
   const desk = deskOf(row.slip);
   const part = row.slip.parts[0];
+  const odds = formatTotalOdds(combinedOdds(row.legs));
   return (
     <article className="slip-monitor-open" aria-label={playTierPhrase(row.slip.label)}>
-      <p className="slip-monitor-won">{won} winning · {row.legs.length} legs · {WORD[row.status]}</p>
+      <p className="slip-monitor-won">{counts.settled}/{counts.total} settled · {counts.won} won · {counts.lost} lost · {counts.open} open{odds ? ` · odds ${odds}` : ''}</p>
       {part && <CodeActions code={part.code} desk={play ? null : desk || null} />}
       <div className="slip-monitor-bell">
         <SlipBell on={bellOn} count={new Set(row.legs.map((leg) => leg.eventId)).size} onToggle={() => onBell(!bellOn)} />
         <span>{bellOn ? 'Alerts on for this slip' : 'Alerts off'}</span>
       </div>
       <ol className="slip-legs2">
-        {row.legs.map((leg) => (
+        {[...active, ...settled].map((leg) => (
           <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} />
         ))}
       </ol>
     </article>
   );
+}
+
+function scrollBox(node: HTMLElement): HTMLElement | null {
+  const main = node.closest('.main');
+  if (!(main instanceof HTMLElement)) return null;
+  const overflow = getComputedStyle(main).overflowY;
+  return overflow === 'auto' || overflow === 'scroll' ? main : null;
+}
+
+function readLayout(list: HTMLElement, scroller: HTMLElement | null) {
+  if (!scroller) {
+    const rect = list.getBoundingClientRect();
+    return { scrollTop: window.scrollY, viewHeight: window.innerHeight, listOffset: rect.top + window.scrollY };
+  }
+  const listRect = list.getBoundingClientRect();
+  const box = scroller.getBoundingClientRect();
+  return { scrollTop: scroller.scrollTop, viewHeight: scroller.clientHeight, listOffset: listRect.top - box.top + scroller.scrollTop };
+}
+
+function sameLayout(
+  current: { scrollTop: number; viewHeight: number; listOffset: number },
+  next: { scrollTop: number; viewHeight: number; listOffset: number },
+) {
+  return current.scrollTop === next.scrollTop && current.viewHeight === next.viewHeight && current.listOffset === next.listOffset;
 }
 
 function toggleBell(

@@ -95,6 +95,46 @@ public class GoalCardLayoutTest {
     }
 
     @Test
+    public void aLegWonCardNamesTheMatchMarketOddsAndSlip() {
+        Context context = RuntimeEnvironment.getApplication();
+        WatchMatch match = TestAlertReceiver.sampleMatch("goal");
+        match.homeScore = 2;
+        match.awayScore = 1;
+        match.status = "finished";
+        WatchNote bare = new WatchNote("slipleg:qc:sr:match:1|over15", match.id, "win", "Leg won · Over 1.5 goals", "");
+        View card = apply(context, ScoreCards.expanded(context, bare, match, true), 360);
+        assertFalse(text(card, R.id.trend_market).toLowerCase().contains("trend hit"));
+        assertEquals("Over 1.5 Goals", text(card, R.id.trend_market));
+        assertTrue(text(card, R.id.score_line), text(card, R.id.score_line).contains("Hearts of Oak 2-1 Asante Kotoko"));
+        assertTrue(text(card, R.id.score_line).contains("FT"));
+        View collapsed = apply(context, ScoreCards.collapsed(context, bare, match), 360);
+        assertTrue(text(collapsed, R.id.collapsed_score).startsWith("LEG WON"));
+        assertTrue(text(collapsed, R.id.collapsed_score).contains("2-1"));
+        assertFalse(text(collapsed, R.id.collapsed_score).toLowerCase().contains("trend hit"));
+        assertEquals("FT", text(collapsed, R.id.collapsed_minute));
+
+        WatchNote full = new WatchNote("slipleg:qc:sr:match:1|over15", match.id, "win", "Leg won · Over 1.5", "ignored");
+        full.marketLabel = "Over 1.5";
+        full.trendLabel = "80%+ Over 1.5";
+        full.oddsText = "1.26";
+        full.slipLabel = "QC0003";
+        full.progress = "29 of 36 won";
+        full.clock = "FT";
+        full.slipId = "qc";
+        View rich = apply(context, ScoreCards.expanded(context, full, match, false), 360);
+        assertEquals("Over 1.5", text(rich, R.id.trend_market));
+        String detail = text(rich, R.id.trend_detail);
+        assertTrue(detail, detail.contains("80%+ Over 1.5") && detail.contains("1.26") && detail.contains("QC0003") && detail.contains("29 of 36 won"));
+        assertEquals("8/10+ Over 1.5", ScoreCards.tier("80%+ Over 1.5", true));
+        assertEquals("10/10", ScoreCards.tier("100%", true));
+        assertEquals("80%+ Over 1.5", ScoreCards.tier("80%+ Over 1.5", false));
+        Intent open = shadowOf(OpenMatch.forNote(context, full)).getSavedIntent();
+        assertEquals("slip", open.getStringExtra(OpenMatch.EXTRA_ROUTE));
+        assertEquals("qc", open.getStringExtra(OpenMatch.EXTRA_TREND));
+        assertEquals("", open.getStringExtra(OpenMatch.EXTRA_MATCH));
+    }
+
+    @Test
     @Config(qualifiers = "w411dp-h891dp")
     public void regularPhonesKeepTheFullMuteLabel() {
         assertEquals("Mute match", RuntimeEnvironment.getApplication().getString(R.string.notif_action_secondary));

@@ -116,4 +116,16 @@ public final class NoteCopy {
     public static Copy trend(WatchMatch match, String label) {
         return new Copy("Trend hit \u00b7 " + label, scoreLine(match) + " \u00b7 " + label);
     }
+
+    /** Short pick name for a card: "Over 1.5", "Home win". */
+    public static String pickName(String label) {
+        String text = clean(label);
+        String lower = text.toLowerCase();
+        if ("full-time home win".equals(lower)) return "Home win";
+        if ("full-time away win".equals(lower)) return "Away win";
+        if ("full-time draw".equals(lower)) return "Draw";
+        if ("both teams to score".equals(lower)) return "Both teams to score";
+        if (lower.endsWith(" goals") && lower.length() > " goals".length()) return text.substring(0, text.length() - " goals".length());
+        return text.isEmpty() ? "Pick" : text;
+    }
 }

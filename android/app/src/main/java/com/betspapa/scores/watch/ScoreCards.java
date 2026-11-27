@@ -41,9 +41,18 @@ final class ScoreCards {
         views.setOnClickPendingIntent(R.id.notif_collapsed, OpenMatch.forNote(context, note));
         boolean trend = trend(note);
         if (trend) {
-            views.setTextViewText(R.id.collapsed_score, "TREND HIT");
-            views.setViewVisibility(R.id.collapsed_dot, View.GONE);
-            views.setViewVisibility(R.id.collapsed_minute, View.GONE);
+            String score = shownFixture(note, match);
+            String head = strip(note, match);
+            String market = market(note);
+            String line = !score.isEmpty() ? head + " \u00b7 " + score : !"Pick".equals(market) ? head + " \u00b7 " + market : head;
+            views.setTextViewText(R.id.collapsed_score, line);
+            String clock = clockOf(note, match);
+            if (clock.isEmpty()) {
+                views.setViewVisibility(R.id.collapsed_dot, View.GONE);
+                views.setViewVisibility(R.id.collapsed_minute, View.GONE);
+            } else {
+                views.setTextViewText(R.id.collapsed_minute, clock);
+            }
             return views;
         }
         views.setTextViewText(R.id.collapsed_score, compactScore(note, match));
@@ -136,10 +145,26 @@ final class ScoreCards {
             views.setImageViewBitmap(R.id.timeline, TimelineArt.draw(markers, minute(note, match), dark, width, dp(context, 40)));
         }
         if (showTrend) {
+            boolean named = namedMatch(match);
+            if (named) {
+                views.setViewVisibility(R.id.line_compact, View.VISIBLE);
+                String score = shownFixture(note, match);
+                String clock = clockOf(note, match);
+                views.setTextViewText(R.id.score_line, clock.isEmpty() || score.contains(clock) ? score : score + " \u00b7 " + clock);
+                views.setTextColor(R.id.score_line, text);
+                views.setImageViewBitmap(R.id.crest_home, crest(context, match, true, dp(context, 22)));
+                views.setImageViewBitmap(R.id.crest_away, crest(context, match, false, dp(context, 22)));
+            }
             views.setTextViewText(R.id.trend_market, market(note));
             views.setTextColor(R.id.trend_market, text);
-            views.setTextViewText(R.id.trend_fixture, fixture(note, match));
+            String fixtureLine = named ? "" : withClock(shownFixture(note, match), clockOf(note, match));
+            views.setTextViewText(R.id.trend_fixture, fixtureLine);
             views.setTextColor(R.id.trend_fixture, muted);
+            views.setViewVisibility(R.id.trend_fixture, fixtureLine.isEmpty() ? View.GONE : View.VISIBLE);
+            String detail = detailLine(note);
+            views.setTextViewText(R.id.trend_detail, detail);
+            views.setTextColor(R.id.trend_detail, muted);
+            views.setViewVisibility(R.id.trend_detail, detail.isEmpty() ? View.GONE : View.VISIBLE);
             boolean booked = note.bookCode != null && !note.bookCode.isEmpty();
             views.setViewVisibility(R.id.book_row, booked ? View.VISIBLE : View.GONE);
             if (booked) {
@@ -199,7 +224,10 @@ final class ScoreCards {
         if (leg && "bust".equals(note.kind)) return "LEG LOST";
         if (note != null && "win".equals(note.kind)) return "TREND HIT";
         if (note != null && "bust".equals(note.kind)) return "BUST";
-        if (note != null && "slip".equals(note.kind)) return "SLIP";
+        if (note != null && "slip".equals(note.kind)) {
+            String title = note.title == null ? "" : note.title.toLowerCase();
+            return title.contains("lost") ? "SLIP LOST" : "SLIP WON";
+        }
         if (note != null && "lineup".equals(note.kind)) return "LINEUPS";
         int at = minute(note, match);
         String mark = at < 0 ? "" : at + "′";
@@ -272,12 +300,87 @@ final class ScoreCards {
     }
 
     private static String market(WatchNote note) {
-        if (note != null && note.marketLabel != null && !note.marketLabel.isEmpty()) return headline(note.marketLabel);
-        if (note != null && note.title != null && note.title.startsWith("Trend hit")) {
-            int cut = note.title.indexOf('·');
-            if (cut >= 0 && cut + 1 < note.title.length()) return headline(note.title.substring(cut + 1).trim());
+        String fromLabel = useful(note == null ? null : note.marketLabel);
+        if (fromLabel != null) return headline(tier(fromLabel));
+        String fromTitle = afterMark(note == null ? null : note.title);
+        if (fromTitle != null) return headline(tier(fromTitle));
+        return "Pick";
+    }
+
+    /** Play builds say 10/10, 9/10+ and 8/10+. The web build keeps the percent. */
+    static String tier(String text) {
+        return tier(text, com.betspapa.scores.BuildConfig.PLAY_STORE);
+    }
+
+    static String tier(String text, boolean play) {
+        if (text == null || text.isEmpty() || !play) return text == null ? "" : text;
+        return text.replace("90%+", "9/10+").replace("80%+", "8/10+").replace("100%", "10/10");
+    }
+
+    private static String useful(String value) {
+        if (value == null) return null;
+        String text = value.trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("Trend hit")) return null;
+        return text;
+    }
+
+    private static String afterMark(String title) {
+        if (title == null) return null;
+        int cut = Math.max(title.indexOf('\u00b7'), title.indexOf('·'));
+        if (cut < 0 || cut + 1 >= title.length()) return null;
+        return useful(title.substring(cut + 1));
+    }
+
+    private static boolean namedMatch(WatchMatch match) {
+        if (match == null) return false;
+        String home = NoteCopy.home(match);
+        String away = NoteCopy.away(match);
+        return !home.isEmpty() && !away.isEmpty() && !"Home team".equals(home) && !"Away team".equals(away);
+    }
+
+    private static String shownFixture(WatchNote note, WatchMatch match) {
+        if (namedMatch(match) && match.homeScore != null && match.awayScore != null) {
+            return NoteCopy.home(match) + " " + match.homeScore + "-" + match.awayScore + " " + NoteCopy.away(match);
         }
-        return "Trend hit";
+        String written = useful(note == null ? null : note.fixture);
+        if (written != null) return tier(written);
+        if (namedMatch(match)) return NoteCopy.fixture(match);
+        String body = useful(note == null ? null : note.body);
+        return body == null ? "" : tier(body);
+    }
+
+    private static String clockOf(WatchNote note, WatchMatch match) {
+        String written = useful(note == null ? null : note.clock);
+        if (written != null) return written;
+        if (match != null && "finished".equals(match.status)) return "FT";
+        if (match != null && "halftime".equals(match.status)) return "HT";
+        int at = minute(note, match);
+        return at < 0 ? "" : at + "\u2032";
+    }
+
+    private static String withClock(String score, String clock) {
+        if (score.isEmpty()) return clock == null ? "" : clock;
+        if (clock == null || clock.isEmpty() || score.contains(clock)) return score;
+        return score + " \u00b7 " + clock;
+    }
+
+    private static String detailLine(WatchNote note) {
+        if (note == null) return "";
+        String market = market(note);
+        StringBuilder built = new StringBuilder();
+        appendDetail(built, tier(useful(note.trendLabel)), market);
+        appendDetail(built, useful(note.oddsText), market);
+        String slip = useful(note.slipLabel);
+        if (slip == null) slip = useful(note.bookCode);
+        appendDetail(built, tier(slip), market);
+        appendDetail(built, useful(note.progress), market);
+        return built.toString();
+    }
+
+    private static void appendDetail(StringBuilder built, String part, String market) {
+        if (part == null || part.isEmpty() || part.equalsIgnoreCase(market)) return;
+        if (built.length() > 0) built.append(" \u00b7 ");
+        built.append(part);
     }
 
     private static String headline(String label) {

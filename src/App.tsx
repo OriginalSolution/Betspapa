@@ -98,13 +98,13 @@ export function App() {
     }>('Watch');
     const follow = (open: OpenTarget | null | undefined) => {
       if (!alive || !open) return;
+      if (open.route === 'slip') {
+        navigate(open.trendId ? `/slips?slip=${encodeURIComponent(open.trendId)}` : '/slips');
+        return;
+      }
       if (open.matchId) {
         const trend = open.trendId ? `?trend=${encodeURIComponent(open.trendId)}` : '';
         navigate(`/match/${open.matchId}${trend}`);
-        return;
-      }
-      if (open.route === 'slip') {
-        navigate('/slips');
         return;
       }
       if (open.route === 'codes') {

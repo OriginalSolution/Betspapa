@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchResults, type RecordPick } from '../lib/results';
+import { recordedPicks } from '../lib/slipScores';
 import { readBuilder, subscribeBuilder, updateTrackedSlip } from '../lib/builderStore';
 import { cx, kickoffClock, longDay } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
@@ -56,15 +56,7 @@ function dayOf(iso: string): string {
 export async function gradesFor(legs: Array<{ key: string; eventId: string; market: string; kickoff: string }>, matches: Match[]) {
   const grades = new Map<string, { status: LegStatus; ft: string | null; ht: string | null }>();
   const days = [...new Set(legs.map((leg) => dayOf(leg.kickoff)).filter(Boolean))];
-  const recorded = new Map<string, RecordPick>();
-  await Promise.all(days.map(async (day) => {
-    try {
-      const view = await fetchResults(day);
-      for (const pick of view.picks) recorded.set(pick.key, pick);
-    } catch {
-      /* the match board can still grade a full-time score */
-    }
-  }));
+  const recorded = await recordedPicks(days);
   const byId = new Map(matches.map((match) => [match.id, match]));
   for (const leg of legs) {
     const pick = recorded.get(leg.key);
