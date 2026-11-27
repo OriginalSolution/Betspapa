@@ -16,7 +16,7 @@ import {
   sessionCookie,
   tooManyFailures,
 } from './adminAuth.mjs';
-import { loadOverview } from './adminData.mjs';
+import { deviceByTail, loadOverview } from './adminData.mjs';
 import { consoleHtml, loginHtml, unavailableHtml } from './adminPage.mjs';
 import { runEngineCycle, getEngineState } from './engine.mjs';
 import { guardianStatus } from './guardian.mjs';
@@ -316,9 +316,11 @@ export async function handleAdminApi(req, res, url, ctx) {
   }
   if (url.pathname === '/api/admin/push-test' && req.method === 'POST') {
     let kind = '';
+    let tail = '';
     try {
       const body = JSON.parse((await readRaw(req, 8_000)) || '{}');
       kind = body?.kind === 'kickoff' ? 'kickoff' : body?.kind === 'goal' ? 'goal' : '';
+      tail = typeof body?.tail === 'string' ? body.tail.trim() : '';
     } catch {
       sendJson(res, 400, { error: 'Test push must be JSON.' });
       return true;
@@ -327,7 +329,15 @@ export async function handleAdminApi(req, res, url, ctx) {
       sendJson(res, 400, { error: 'Choose a test goal or a kick-off.' });
       return true;
     }
-    const result = await sendTestPush(ctx.book, { latest: true, kind }, (message) => console.log(message));
+    const picked = tail ? deviceByTail(ctx.book.list(), tail) : null;
+    if (tail && !picked) {
+      sendJson(res, 400, { error: 'No registered device to test.' });
+      return true;
+    }
+    const request = picked
+      ? { token: picked.token, kind, settings: picked.settings }
+      : { latest: true, kind };
+    const result = await sendTestPush(ctx.book, request, (message) => console.log(message));
     if (result.error && /token/i.test(result.error)) {
       sendJson(res, 400, { error: 'No registered device to test.' });
       return true;

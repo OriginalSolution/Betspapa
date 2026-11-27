@@ -10,6 +10,7 @@ import { canUseLineupAlerts } from '../lib/proAccess';
 import type { GoalSound, NotificationStyle } from '../types';
 import { Mark } from '../components/Icons';
 import { useLineupList } from '../components/Lineups';
+import { playCodeLabel } from '../lib/pickCodes';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { useStore } from '../state/store';
 
@@ -45,7 +46,9 @@ export function SettingsPage() {
       <section className="panel">
         <h2>Notifications</h2>
         <p className="lede">In-app alerts follow these switches. They start from the moment you follow a match or team. With browser alerts on, the phone posts them on the home screen, in another app, and with the screen off.</p>
-        <p className="lede">While a followed match is about to kick off or in play, Android keeps a low-priority notice: Betspapa is watching N live matches. That notice stays up with the app closed, and it stops when the match ends.</p>
+        {!isPlayStoreBuild() && (
+          <p className="lede">While a followed match is about to kick off or in play, Android keeps a low-priority notice: Betspapa is watching N live matches. That notice stays up with the app closed, and it stops when the match ends.</p>
+        )}
         <NotificationStyleSetting
           value={settings.notificationStyle}
           onChange={(value) => setSetting('notificationStyle', value)}
@@ -575,11 +578,11 @@ function LineupSettings() {
 }
 
 const BANKER = [
-  { id: 'classic', label: 'Banker Classic' },
-  { id: 'gold', label: 'Banker Gold' },
-  { id: 'shield', label: 'Banker Shield' },
-  { id: 'capped', label: 'Banker Capped' },
-  { id: 'ladder', label: 'Banker Ladder' },
+  { id: 'classic', label: playCodeLabel('Banker Classic') },
+  { id: 'gold', label: playCodeLabel('Banker Gold') },
+  { id: 'shield', label: playCodeLabel('Banker Shield') },
+  { id: 'capped', label: playCodeLabel('Banker Capped') },
+  { id: 'ladder', label: playCodeLabel('Banker Ladder') },
 ];
 
 function BankerSettings() {
@@ -589,8 +592,8 @@ function BankerSettings() {
     setSetting('bankerCodes', [...new Set(next)]);
   };
   return (
-    <section className="panel" aria-label="Banker code alerts">
-      <h2>Banker codes</h2>
+    <section className="panel" aria-label={playCodeLabel('Banker code alerts')}>
+      <h2>{playCodeLabel('Banker codes')}</h2>
       <p className="lede">Off until you turn a strategy on. One alert when a code is booked, replaced, or settled. Tapping it opens that code.</p>
       {BANKER.map((row) => (
         <div className="setting" key={row.id}>

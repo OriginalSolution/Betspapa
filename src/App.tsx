@@ -19,6 +19,8 @@ import { SlipsPage } from './pages/SlipsPage';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
 import { isNativeApp } from './lib/nativeHttp';
+import { playCodeLabel } from './lib/pickCodes';
+import { isPlayStoreBuild } from './lib/storeBuild';
 import { longDay } from './lib/format';
 import { applyPageMeta, pageMeta } from './lib/seo';
 import { useStore } from './state/store';
@@ -48,11 +50,11 @@ const titles: Record<string, string> = {
 function screenTitle(pathname: string, search: string): string {
   if (pathname.startsWith('/codes/')) {
     const names: Record<string, string> = {
-      classic: 'Banker Classic',
-      gold: 'Banker Gold',
-      shield: 'Banker Shield',
-      capped: 'Banker Capped',
-      ladder: 'Banker Ladder',
+      classic: playCodeLabel('Banker Classic'),
+      gold: playCodeLabel('Banker Gold'),
+      shield: playCodeLabel('Banker Shield'),
+      capped: playCodeLabel('Banker Capped'),
+      ladder: playCodeLabel('Banker Ladder'),
     };
     return names[pathname.split('/')[2] || ''] || 'Codes';
   }
@@ -146,7 +148,7 @@ export function App() {
   return (
     <AlertSetupProvider>
       <LineupProvider>
-      <div className="shell">
+      <div className={isPlayStoreBuild() ? 'shell is-play' : 'shell'}>
         <SideNav />
         <div className="center">
           <TopBar title={title} />

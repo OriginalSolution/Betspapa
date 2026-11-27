@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEngine } from './engineSlips';
-import { playTierPhrase, showsInTier, slipParts, tierLabel, tierSlip } from './pickCodes';
+import { formRingLabel, playCodeLabel, playTierPhrase, showsInTier, slipParts, tierLabel, tierSlip } from './pickCodes';
 import { legsForTier } from './bookFollow';
 
 const state = parseEngine({
@@ -52,6 +52,14 @@ describe('pick codes', () => {
     expect(playTierPhrase('The Betspapa record: every published 80%+ pick, graded from the full-time score.', true)).toBe(
       'The Betspapa record: every published 8/10+ pick, graded from the full-time score.',
     );
+    expect(playCodeLabel('Banker Classic', false)).toBe('Banker Classic');
+    expect(playCodeLabel('Banker rules - own odds limits', true)).toBe('Strategy rules - own odds limits');
+    expect(playCodeLabel('Banker Gold', true)).toBe('Gold');
+    expect(formRingLabel(1, false)).toBe('100%');
+    expect(formRingLabel(0.9, false)).toBe('90%');
+    expect(formRingLabel(1, true)).toBe('10/10');
+    expect(formRingLabel(0.9, true)).toBe('9/10');
+    expect(formRingLabel(0.8, true)).toBe('8/10');
   });
 
   it('uses the tier slip and falls back to the 80% market code', () => {

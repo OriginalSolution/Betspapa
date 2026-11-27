@@ -22,7 +22,7 @@ import {
   tooManyFailures,
   verifySession,
 } from './adminAuth.mjs';
-import { buildOverview, deskRows, deviceSnapshot, summarizeReleases } from './adminData.mjs';
+import { buildOverview, deskRows, deviceByTail, deviceSnapshot, recentDevices, summarizeReleases } from './adminData.mjs';
 import { consoleHtml, loginHtml } from './adminPage.mjs';
 import { createEngine, INTERVAL_MS } from './engine.mjs';
 import { countryForRequest, forgetCountry, isPublicIp, lookupCountry } from './geo.mjs';
@@ -202,6 +202,11 @@ test('the operator snapshot counts devices and does not reveal a token', () => {
   assert.equal(overview.installs.ghana, 1);
   assert.equal(overview.installs.activeNow, 1);
   assert.equal(overview.push.latestTail, '123456');
+  assert.equal(overview.push.recent[0].tail, '123456');
+  assert.equal(overview.push.recent[0].version, '0.4.3');
+  assert.equal(deviceByTail([{ token: 'fcm-token-SECRET-VALUE-123456' }], '123456').token.endsWith('123456'), true);
+  assert.equal(deviceByTail([{ token: 'fcm-token-SECRET-VALUE-123456' }], 'fcm-token-SECRET-VALUE-123456'), null);
+  assert.equal(JSON.stringify(recentDevices([{ token: 'fcm-token-SECRET-VALUE-123456', appVersion: '0.4.3' }])).includes('SECRET'), false);
   assert.equal(overview.status.engine, 'OPEN');
   assert.equal(overview.status.fcm, true);
   assert.equal(overview.status.feed, 12);
@@ -413,7 +418,7 @@ test('admin routes require the session, throttle failures, and store a device wi
     const home = await httpAsk({ path: '/admin', headers: { cookie } });
     assert.equal(home.status, 200);
     assert.match(home.body, /Run cycle now/);
-    assert.match(home.body, /Send test goal/);
+    assert.match(home.body, /Send test goal push to device/);
     const overview = await httpAsk({ path: '/api/admin/overview', headers: { cookie } });
     assert.equal(overview.status, 200);
     const enginePush = await httpAsk({
@@ -459,10 +464,18 @@ test('admin routes require the session, throttle failures, and store a device wi
       method: 'POST',
       path: '/api/admin/push-test',
       headers: { cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ kind: 'goal' }),
+      body: JSON.stringify({ kind: 'goal', tail: TOKEN.slice(-6) }),
     });
     assert.notEqual(tested.status, 401);
     assert.equal(tested.body.includes(TOKEN), false);
+    const refused = await httpAsk({
+      method: 'POST',
+      path: '/api/admin/push-test',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'goal', tail: TOKEN }),
+    });
+    assert.equal(refused.status, 400);
+    assert.equal(refused.body.includes(TOKEN), false);
 
     const secure = await httpAsk({
       method: 'POST',

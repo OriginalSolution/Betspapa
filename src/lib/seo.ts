@@ -1,4 +1,4 @@
-import { playTierPhrase } from './pickCodes';
+import { playCodeLabel, playTierPhrase } from './pickCodes';
 import { isPlayStoreBuild } from './storeBuild';
 
 export const SITE = 'https://betspapa.com';
@@ -28,7 +28,7 @@ export function pageMeta(pathname: string, title: string, match?: { home: string
   const written = match
     ? `${match.home} vs ${match.away}${match.competition ? ` (${match.competition})` : ''}: live score, timeline and alerts on Betspapa.`
     : descriptions[path] ?? DEFAULT_DESCRIPTION;
-  const description = isPlayStoreBuild() ? playTierPhrase(written) : written;
+  const description = isPlayStoreBuild() ? playCodeLabel(playTierPhrase(written)) : written;
   const fullTitle = path === '/' ? 'Betspapa · Live football scores and match alerts' : `${title} · Betspapa`;
   return { title: fullTitle, description, canonical: `${SITE}${path}` };
 }

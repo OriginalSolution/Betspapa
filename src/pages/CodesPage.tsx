@@ -23,6 +23,7 @@ import {
   type CodesView,
   weekCards,
 } from '../lib/codes';
+import { playCodeLabel } from '../lib/pickCodes';
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
 import { canSeeCode } from '../lib/proAccess';
@@ -237,7 +238,7 @@ export function CodesPage() {
           <ul>
             {strategy.rules.map((rule) => <li key={rule}>{rule}</li>)}
           </ul>
-          <p className="code-label">{data.oddsLabel}</p>
+          <p className="code-label">{playCodeLabel(data.oddsLabel)}</p>
         </section>
         {week.parts.length === 0 && <p className="code-empty">{week.empty}</p>}
         {week.parts.map((part, index) => (
@@ -302,7 +303,7 @@ export function CodesPage() {
           </button>
         ))}
       </div>
-      <p className="code-label">{data?.oddsLabel || 'Banker rules - own odds limits'}</p>
+      <p className="code-label">{playCodeLabel(data?.oddsLabel || 'Banker rules - own odds limits')}</p>
       {data?.readAt && <p className="code-when">Read back {gmtClock(data.readAt)} GMT · next {gmtClock(data.nextReadAt)} GMT · dailies book 21:00 GMT the day before. Refresh only reads back.</p>}
       <button type="button" className="btn btn-quiet code-refresh" onClick={readBack} disabled={busy}>{busy ? 'Reading back' : 'Read back'}</button>
       {error && <p className="code-empty">{error}</p>}
@@ -320,7 +321,7 @@ export function CodesPage() {
                 <Link to={`/codes/${item.id}`} className="code-card-main">
                   <i>{item.code}</i>
                   <div>
-                    <strong>{item.name}</strong>
+                    <strong>{playCodeLabel(item.name)}</strong>
                     {part && (
                       <span>{codeText(part, item.week.parts.length > 1 ? ` · +${item.week.parts.length - 1} more code` : '')}</span>
                     )}
@@ -365,7 +366,7 @@ export function CodesPage() {
                 <div className="code-card-main">
                   <i>{item.code}</i>
                   <div>
-                    <strong>{item.name}</strong>
+                    <strong>{playCodeLabel(item.name)}</strong>
                     {part && <span>{codeText(part, part.status === 'lost' ? ` · lost (${part.settled} of ${part.legCount} settled)` : part.status === 'won' ? ' · won' : '')}</span>}
                     {part?.highRisk && <em>HIGH RISK</em>}
                   </div>
@@ -401,7 +402,7 @@ export function CodesPage() {
             return (
               <article className="code-card" key={row.id}>
                 <div>
-                  <strong>{name?.name}</strong>
+                  <strong>{playCodeLabel(name?.name || '')}</strong>
                   <span>{graded ? `${row.won} of ${graded} won` : 'No graded legs yet'} · {row.void} void · {row.open} open{row.mismatch ? ` · ${row.mismatch} mismatch` : ''}</span>
                 </div>
               </article>
