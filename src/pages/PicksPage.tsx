@@ -4,7 +4,7 @@ import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
-import { showsInTier, slipParts, tierSlip, CODE_TIERS, TIER_LABEL, type CodeTier } from '../lib/pickCodes';
+import { showsInTier, slipParts, tierSlip, tierLabel, CODE_TIERS, type CodeTier } from '../lib/pickCodes';
 import { canSeeTier } from '../lib/proAccess';
 import { plainReasons } from '../lib/plainReason';
 import { BookMark } from '../components/BookMark';
@@ -14,6 +14,7 @@ import type { Team } from '../types';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 
 const emptyCatalog: CrestCatalog = { byKey: {}, byId: {} };
 
@@ -99,20 +100,21 @@ export function PicksPage() {
       <div className="pick-tiers" role="tablist" aria-label="Confidence">
         {CODE_TIERS.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={tier === id} className={cx('pick-tier', tier === id && 'is-on')} onClick={() => setTier(id)}>
-            {TIER_LABEL[id]}
+            {tierLabel(id)}
             <small>{tips.filter((tip) => showsInTier(tip.chip.rate, id, tip.chip.teamsAgree)).length}</small>
           </button>
         ))}
       </div>
+      {isPlayStoreBuild() && <p className="pick-disclaimer">18+. Tips are analysis, not guarantees. Bet responsibly.</p>}
       {!canSeeTier(tier) ? (
         <p className="pro-lock">
-          {TIER_LABEL[tier]} picks are part of Pro. <Link to="/pro">See Pro</Link>
+          {tierLabel(tier)} picks are part of Pro. <Link to="/pro">See Pro</Link>
         </p>
       ) : (
       <>
       <section className="master-strip">
         <header>
-          <span>Master code · {TIER_LABEL[tier]} all {band.length}</span>
+          <span>Master code · {tierLabel(tier)} all {band.length}</span>
           <label>
             <BookMark id={desk} />
             <select value={desk} aria-label="Bookmaker" onChange={(event) => setDesk(event.target.value as DeskId)}>
@@ -164,7 +166,7 @@ export function PicksPage() {
             <section key={id} className="pick-group">
               <header>
                 <button type="button" aria-expanded={!shut} onClick={() => setFolded((current) => ({ ...current, [id]: !current[id] }))}>
-                  {shut ? '▸' : '▾'} {TIER_LABEL[id]}
+                  {shut ? '▸' : '▾'} {tierLabel(id)}
                   <small>{rows.length} {rows.length === 1 ? 'pick' : 'picks'}</small>
                 </button>
                 {part?.code && (

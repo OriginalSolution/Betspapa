@@ -2,7 +2,7 @@ import { BookMark } from './BookMark';
 import { CodeActions } from './CodeActions';
 import { DESKS, DESK_NAMES, type DeskId } from '../lib/engineSlips';
 import { kickoffClock, cx } from '../lib/format';
-import { CODE_TIERS, TIER_LABEL, type CodePartView, type CodeTier } from '../lib/pickCodes';
+import { CODE_TIERS, tierLabel, type CodePartView, type CodeTier } from '../lib/pickCodes';
 
 export function CodeStrip({
   desk,
@@ -39,7 +39,7 @@ export function CodeStrip({
       <div className="code-tiers" role="tablist" aria-label="Confidence">
         {CODE_TIERS.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={tier === id} className={cx('code-tier', tier === id && 'is-on')} onClick={() => onTier(id)}>
-            {TIER_LABEL[id]}
+            {tierLabel(id)}
           </button>
         ))}
       </div>
