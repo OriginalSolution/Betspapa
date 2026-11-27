@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, startPushWatch, stripBookmakerUrls, teamFollows, trendNotes } from './push.mjs';
+import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, builderSlipsFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, slipNotes, startPushWatch, stripBookmakerUrls, teamFollows, trendNotes } from './push.mjs';
 
 test('FCM stays off until a service account is configured', () => {
   assert.equal(fcmConfigured({}), false);
@@ -426,6 +426,25 @@ test('a tracked slip alerts once, only after every leg has a final score', () =>
   assert.match(done.note.body, /Aston Villa 0-0 Sunderland missed Over 1.5 goals/);
   assert.match(done.note.body, /Chelsea 2-1 Leeds landed/);
   assert.equal(channelFor('slip', {}), 'betspapa.goal.off.v4');
+});
+
+test('each tracked slip gets its own win or lose card', () => {
+  const device = {
+    builderSlips: builderSlipsFrom({
+      builderSlips: [
+        { id: 'one', legs: [{ eventId: 'sr:match:1', market: 'over15', odds: 1.25, home: 'Chelsea', away: 'Leeds', label: 'Over 1.5 goals' }] },
+        { id: 'two', legs: [{ eventId: 'sr:match:2', market: 'over15', odds: 1.22, home: 'Aston Villa', away: 'Sunderland', label: 'Over 1.5 goals' }] },
+      ],
+    }),
+  };
+  const done = slipNotes(device, [
+    { id: 'sr:match:1', status: 'finished', homeScore: 2, awayScore: 1, home: 'Chelsea', away: 'Leeds' },
+    { id: 'sr:match:2', status: 'finished', homeScore: 0, awayScore: 0, home: 'Aston Villa', away: 'Sunderland' },
+  ]);
+  assert.deepEqual(done.notes.map((note) => note.id), ['slip:one', 'slip:two']);
+  assert.equal(done.notes[0].kind, 'win');
+  assert.equal(done.notes[1].kind, 'bust');
+  assert.equal(done.notes[0].kind === 'slip', false);
 });
 
 test('deleting a device removes that push token and leaves the others', () => {

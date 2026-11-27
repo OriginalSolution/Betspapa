@@ -16,8 +16,15 @@ export type DeviceRegistration = {
   lineupOff?: string[];
   builderSlip?: {
     id: string;
+    label?: string;
     legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
   } | null;
+  /** Every tracked slip. The server alerts each one; booking another does not drop the rest. */
+  builderSlips?: Array<{
+    id: string;
+    label?: string;
+    legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
+  }>;
   /** Slips with the bell on. Each leg gets its own won or lost push, then one for the slip. */
   slipBells?: Array<{
     id: string;

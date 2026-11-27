@@ -19,8 +19,10 @@ import {
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
 import { playTierPhrase } from '../lib/pickCodes';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import type { Team } from '../types';
-import { SlipLegRow, SlipTimeline } from '../components/SlipTrack';
+import { SlipMonitor } from '../components/SlipMonitor';
+import { SlipLegRow } from '../components/SlipTrack';
 import { SlipBell } from '../components/SlipBell';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
@@ -96,14 +98,15 @@ export function SlipsPage() {
 
   return (
     <div className="stack slips-page">
-      <SlipTimeline />
-      <div className="book-switch" role="tablist" aria-label="Bookmaker">
-        {DESKS.map((id) => (
+      <SlipMonitor />
+      <div className="book-switch" role="tablist" aria-label={isPlayStoreBuild() ? 'Code set' : 'Bookmaker'}>
+        {DESKS.map((id, index) => (
           <button
             key={id}
             type="button"
             role="tab"
             aria-selected={desk === id}
+            aria-label={isPlayStoreBuild() ? `Code set ${index + 1}` : DESK_NAMES[id]}
             className={cx('book-chip', `book-chip-${id}`, desk === id && 'is-on')}
             onClick={() => {
               setDesk(id);
@@ -111,7 +114,7 @@ export function SlipsPage() {
             }}
           >
             <BookMark id={id} />
-            <span>{DESK_NAMES[id]}</span>
+            {!isPlayStoreBuild() && <span>{DESK_NAMES[id]}</span>}
           </button>
         ))}
       </div>
@@ -194,10 +197,10 @@ function MasterHero({
   return (
     <article className={cx('master-hero', `book-${desk}`)}>
       <header>
-        <BookMark id={desk} />
+        {!isPlayStoreBuild() && <BookMark id={desk} />}
         <div>
           <p className="master-kicker">Master slip</p>
-          <strong>{DESK_NAMES[desk]}</strong>
+          {!isPlayStoreBuild() && <strong>{DESK_NAMES[desk]}</strong>}
         </div>
       </header>
       {book.parts.length ? (

@@ -2983,6 +2983,43 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   background: rgba(255, 255, 255, 0.08);
   color: #d6dae3;
 }
+.slip-monitor { margin: 8px 14px 16px; }
+.slip-monitor-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.slip-monitor-head h2 { margin: 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.slip-monitor-head span, .slip-monitor-won, .slip-monitor-bell span { color: var(--muted); font-size: 12px; }
+.slip-monitor-list { list-style: none; margin: 8px 0; padding: 0; }
+.slip-monitor-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin: 0 0 8px;
+}
+.slip-monitor-row.is-on { border-color: rgba(225, 29, 46, 0.55); }
+.slip-monitor-row span { flex: 1; min-width: 0; }
+.slip-monitor-row strong { display: block; font-size: 14px; }
+.slip-monitor-row small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.slip-monitor-row .slip-chip { flex: none; font-style: normal; }
+.slip-chip.is-open { background: rgba(255, 255, 255, 0.06); color: var(--muted); }
+.slip-monitor-open { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin: 0 0 10px; }
+.slip-monitor-won { margin: 0 0 8px; }
+.slip-monitor-bell { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.slip-monitor-add { display: grid; gap: 8px; }
+.slip-monitor-add label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.slip-monitor-add input {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: #0c0e14;
+  color: var(--text);
+  padding: 0 12px;
+  font: inherit;
+}
 .slip-chip.is-won { background: rgba(61, 220, 151, 0.16); color: #5ff0b0; }
 .slip-chip.is-lost { background: rgba(225, 29, 46, 0.2); color: #ff8a93; }
 .slip-chip.is-live { background: rgba(255, 77, 90, 0.18); color: #ff6b76; }

@@ -3,11 +3,13 @@ import type { BuilderLeg } from './slipPacks';
 
 const KEY = 'betspapa.builder.v1';
 const EVENT = 'betspapa-builder';
+export const MAX_TRACKED_SLIPS = 12;
 
 export type BookedPart = { desk: string; code: string; legs: number };
 
 export type TrackedSlip = {
   id: string;
+  label: string;
   legs: BuilderLeg[];
   bookedAt: string;
   parts: BookedPart[];
@@ -17,29 +19,56 @@ export type TrackedSlip = {
 
 export type BuilderState = {
   packIds: string[];
+  /** Newest first. Booking adds a slip; it does not replace the others. */
+  slips: TrackedSlip[];
+  /** The newest slip, so a reader that still expects one slip sees the latest booking. */
   tracked: TrackedSlip | null;
 };
 
-const empty: BuilderState = { packIds: [], tracked: null };
+const empty: BuilderState = { packIds: [], slips: [], tracked: null };
 
 export function readBuilder(): BuilderState {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || '');
     const packIds = Array.isArray(parsed?.packIds) ? parsed.packIds.filter((id: unknown) => typeof id === 'string') : [];
-    const tracked = parsed?.tracked && Array.isArray(parsed.tracked.legs) ? normaliseTracked(parsed.tracked) : null;
-    return { packIds, tracked };
+    const slips = slipsFrom(parsed);
+    return { packIds, slips, tracked: slips[0] ?? null };
   } catch {
     return empty;
   }
 }
 
-export function writeBuilder(next: BuilderState) {
+export function writeBuilder(next: { packIds: string[]; slips: TrackedSlip[] }) {
+  const slips = next.slips.map(normaliseTracked).filter((slip) => slip.legs.length).slice(0, MAX_TRACKED_SLIPS);
+  const stored = { packIds: next.packIds, slips, tracked: slips[0] ?? null };
   try {
-    localStorage.setItem(KEY, JSON.stringify(next));
+    localStorage.setItem(KEY, JSON.stringify(stored));
   } catch {
-    /* private mode still shows the slip for this visit */
+    /* private mode still shows the slips for this visit */
   }
   window.dispatchEvent(new Event(EVENT));
+}
+
+/** Keep every tracked slip and put this one first. The same code updates in place. */
+export function addTrackedSlip(slip: TrackedSlip) {
+  const current = readBuilder();
+  const next = normaliseTracked(slip);
+  const code = next.parts[0]?.code;
+  const slips = [next, ...current.slips.filter((item) => item.id !== next.id && (!code || item.parts[0]?.code !== code))];
+  writeBuilder({ packIds: current.packIds, slips });
+}
+
+export function updateTrackedSlip(id: string, patch: Partial<TrackedSlip>) {
+  const current = readBuilder();
+  writeBuilder({
+    packIds: current.packIds,
+    slips: current.slips.map((slip) => (slip.id === id ? normaliseTracked({ ...slip, ...patch, id: slip.id, legs: patch.legs || slip.legs }) : slip)),
+  });
+}
+
+export function replacePackIds(packIds: string[]) {
+  const current = readBuilder();
+  writeBuilder({ packIds, slips: current.slips });
 }
 
 export function subscribeBuilder(onChange: () => void): () => void {
@@ -52,13 +81,26 @@ export function subscribeBuilder(onChange: () => void): () => void {
   };
 }
 
+function slipsFrom(parsed: { slips?: unknown; tracked?: TrackedSlip }): TrackedSlip[] {
+  if (Array.isArray(parsed?.slips)) {
+    return parsed.slips.map((slip) => normaliseTracked(slip as TrackedSlip)).filter((slip) => slip.legs.length).slice(0, MAX_TRACKED_SLIPS);
+  }
+  if (parsed?.tracked && Array.isArray(parsed.tracked.legs)) {
+    const one = normaliseTracked(parsed.tracked);
+    return one.legs.length ? [one] : [];
+  }
+  return [];
+}
+
 function normaliseTracked(value: TrackedSlip): TrackedSlip {
   const parts = Array.isArray(value.parts) ? value.parts.filter((part) => part && typeof part.code === 'string' && typeof part.desk === 'string') : [];
   const desks = Array.isArray(value.desks) ? value.desks : [];
-  return { ...value, parts, desks, alerted: Boolean(value.alerted) };
+  const label = typeof value.label === 'string' && value.label.trim() ? value.label.trim().slice(0, 80) : parts[0]?.code || 'Tracked slip';
+  return { ...value, label, parts, desks, alerted: Boolean(value.alerted), legs: Array.isArray(value.legs) ? value.legs : [] };
 }
 
 export function builderLegKeys(): Set<string> {
-  const { tracked } = readBuilder();
-  return new Set((tracked?.legs || []).map((leg) => leg.key));
+  const keys = new Set<string>();
+  for (const slip of readBuilder().slips) for (const leg of slip.legs) keys.add(leg.key);
+  return keys;
 }
