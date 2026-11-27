@@ -124,7 +124,9 @@ public class GoalCardLayoutTest {
         View rich = apply(context, ScoreCards.expanded(context, full, match, false), 360);
         assertEquals("Over 1.5", text(rich, R.id.trend_market));
         String detail = text(rich, R.id.trend_detail);
-        assertTrue(detail, detail.contains("80%+ Over 1.5") && detail.contains("1.26") && detail.contains("QC0003") && detail.contains("29 of 36 won"));
+        // The Play bundle rewrites 80%+ to 8/10+ while this test runs. The sideload build keeps the percent.
+        String tier = ScoreCards.tier("80%+ Over 1.5", com.betspapa.scores.BuildConfig.PLAY_STORE);
+        assertTrue(detail, detail.contains(tier) && detail.contains("1.26") && detail.contains("QC0003") && detail.contains("29 of 36 won"));
         assertEquals("8/10+ Over 1.5", ScoreCards.tier("80%+ Over 1.5", true));
         assertEquals("10/10", ScoreCards.tier("100%", true));
         assertEquals("80%+ Over 1.5", ScoreCards.tier("80%+ Over 1.5", false));
