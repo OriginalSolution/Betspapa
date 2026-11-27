@@ -6,6 +6,7 @@ import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { DESK_NAMES, DESKS, type DeskId } from '../lib/engineSlips';
 import { cx, longDay, weekdayChip } from '../lib/format';
+import { playTierPhrase } from '../lib/pickCodes';
 import {
   accraToday,
   bandLine,
@@ -311,7 +312,7 @@ function CodesRecord({ view }: { view: ResultsView }) {
   const codes = master.length ? master : view.codes;
   const legs = codes.reduce((sum, code) => sum + code.legCount, 0);
   const first = codes.map((code) => code.firstKickoff).sort()[0];
-  const slipName = codes[0]?.slip || '80%+ Master Slip';
+  const slipName = playTierPhrase(codes[0]?.slip || '80%+ Master Slip');
   return (
     <>
       <section className="rec-slip-head">

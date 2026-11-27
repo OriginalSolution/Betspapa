@@ -8,7 +8,9 @@ import { clearPushDeletion, deletePushDevice } from '../lib/devicePush';
 import { isNativeApp } from '../lib/nativeHttp';
 import { canUseLineupAlerts } from '../lib/proAccess';
 import type { GoalSound, NotificationStyle } from '../types';
+import { Mark } from '../components/Icons';
 import { useLineupList } from '../components/Lineups';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { useStore } from '../state/store';
 
 const toggles: Array<{ key: 'kickoff' | 'goal' | 'red' | 'penalty' | 'ht' | 'ft' | 'var' | 'browser' | 'promos'; label: string; detail: string }> = [
@@ -304,7 +306,7 @@ function StylePreview({ mode }: { mode: 'dark' | 'light' }) {
   return (
     <span className={dark ? 'notif-preview is-dark' : 'notif-preview is-light'} aria-hidden="true">
       <span className="notif-preview-strip">
-        <b>B</b>
+        {isPlayStoreBuild() ? <Mark size={12} /> : <b>B</b>}
         <span>BETSPAPA</span>
         <em>LIVE 67′</em>
       </span>

@@ -801,6 +801,7 @@ img.crest { display: inline-block; padding: 1px; }
   place-items: center;
   font-size: 8px;
 }
+.notif-preview-strip .mark { display: block; flex: none; }
 .notif-preview-strip em { margin-left: auto; font-style: normal; }
 .notif-preview-line { display: block; padding: 6px; font-size: 11px; font-weight: 800; }
 .volume-row {

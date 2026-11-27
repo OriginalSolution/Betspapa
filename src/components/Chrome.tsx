@@ -4,6 +4,7 @@ import { addDays } from '../lib/dates';
 import { ago, cx, dayWord, formatDay, longDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
+import { playTierPhrase } from '../lib/pickCodes';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { IconBell, IconCodes, IconLive, IconPicks, IconRank, IconRecord, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
 
@@ -78,7 +79,7 @@ function topSubtitle(pathname: string, date: string): string {
   if (pathname.startsWith('/codes')) return 'Banker rules - own odds limits';
   if (pathname === '/trends') return 'Add a whole trend to your slip';
   if (pathname === '/slips/booked') return 'Codes for every bookmaker';
-  if (pathname === '/record') return 'Every 80%+ pick, graded';
+  if (pathname === '/record') return playTierPhrase('Every 80%+ pick, graded');
   if (pathname === '/record/picks') return 'Graded picks · top leagues';
   if (pathname === '/record/codes') return 'Booked codes settle with their legs';
   return 'Today’s fixtures';
