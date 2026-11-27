@@ -118,6 +118,17 @@ export type InboxItem = {
   body: string;
   createdAt: number;
   read: boolean;
+  /** Pick name, such as Over 1.5. Carried onto the shade card. */
+  marketLabel?: string;
+  fixture?: string;
+  odds?: string;
+  /** Tier or slip name, such as 80%+ Over 1.5. The Play build rewrites the percent. */
+  trendLabel?: string;
+  progress?: string;
+  clock?: string;
+  slip?: string;
+  slipId?: string;
+  code?: string;
 };
 
 export type AppConfig = {

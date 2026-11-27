@@ -32,7 +32,7 @@ import {
 } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { loadAlerted } from '../lib/storage';
-import { legScore } from '../lib/noteCopy.mjs';
+import { legScore, pickName, settleText } from '../lib/noteCopy.mjs';
 import { useEngineBoard } from '../state/engine';
 import type { InboxItem, Match } from '../types';
 import { useStore } from '../state/store';
@@ -378,17 +378,30 @@ export function useSlipBellAlerts() {
         const grades = await gradesFor(legs, matchesRef.current);
         if (stop) return;
         const graded = applyGrades(legs, grades);
-        const done = graded.filter((leg) => leg.status !== 'open').length;
+        const wins = graded.filter((leg) => leg.status === 'won').length;
         for (const leg of graded) {
           if (leg.status !== 'won' && leg.status !== 'lost') continue;
           const id = legNoteId(bell.id, leg.key);
           if (alerted.has(id)) continue;
-          notes.push(legNotice(id, leg, done, graded.length));
+          notes.push(legNotice(id, leg, wins, graded.length, { id: bell.id, label: bell.label }));
         }
         const final = slipAlert(graded);
         const finalId = slipNoteId(bell.id);
         if (final && !alerted.has(finalId)) {
-          notes.push({ id: finalId, matchId: '', kind: final.kind, title: final.title, body: final.body, createdAt: Date.now(), read: false });
+          notes.push({
+            id: finalId,
+            matchId: '',
+            kind: final.kind,
+            title: final.title,
+            body: settleText([final.body, bell.label, `${wins} of ${graded.length} won`]),
+            marketLabel: final.kind === 'bust' ? 'Slip lost' : 'Slip won',
+            trendLabel: bell.label,
+            progress: `${wins} of ${graded.length} won`,
+            slip: bell.label,
+            slipId: bell.id,
+            createdAt: Date.now(),
+            read: false,
+          });
         }
       }
       if (!notes.length || stop) return;
@@ -409,14 +422,32 @@ export function useSlipBellAlerts() {
   }, [bells, boardKey, pushNotices]);
 }
 
-export function legNotice(id: string, leg: GradedLeg, done: number, total: number): InboxItem {
+export function legNotice(
+  id: string,
+  leg: GradedLeg,
+  wonCount: number,
+  total: number,
+  slip?: { id?: string; label?: string },
+): InboxItem {
   const won = leg.status === 'won';
+  const market = pickName(leg.label);
+  const score = legScore(leg, leg.ft || '');
+  const odds = Number.isFinite(leg.odds) && leg.odds > 1 ? leg.odds.toFixed(2) : '';
+  const progress = `${wonCount} of ${total} won`;
+  const slipName = slip?.label || '';
   return {
     id,
     matchId: leg.eventId,
     kind: won ? 'win' : 'bust',
-    title: `${won ? 'Leg won' : 'Leg lost'} · ${leg.label}`,
-    body: `${legScore(leg, leg.ft || '')} · ${leg.odds.toFixed(2)} · ${done} of ${total} settled`,
+    title: `${won ? 'Leg won' : 'Leg lost'} · ${market}`,
+    body: settleText([score, market, slipName, odds, progress]),
+    marketLabel: market,
+    fixture: score,
+    odds,
+    trendLabel: slipName,
+    progress,
+    slip: slipName,
+    slipId: slip?.id || '',
     createdAt: Date.now(),
     read: false,
   };

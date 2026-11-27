@@ -128,4 +128,65 @@ public final class NoteCopy {
         if (lower.endsWith(" goals") && lower.length() > " goals".length()) return text.substring(0, text.length() - " goals".length());
         return text.isEmpty() ? "Pick" : text;
     }
+
+    /** True when the text is only the words "Trend hit". */
+    public static boolean bareTrend(String value) {
+        if (value == null) return true;
+        String text = clean(value).replaceAll("[.！!]+$", "").trim();
+        return text.equalsIgnoreCase("Trend hit");
+    }
+
+    /** The words after a middle dot. "Trend hit" is not a pick. */
+    public static String afterMark(String title) {
+        if (title == null) return "";
+        int cut = Math.max(title.indexOf('·'), title.indexOf('\u00b7'));
+        if (cut < 0 || cut + 1 >= title.length()) return "";
+        String rest = clean(title.substring(cut + 1));
+        return rest.isEmpty() || bareTrend(rest) ? "" : rest;
+    }
+
+    /** "Arsenal 2-1 Chelsea FT". */
+    public static String scoreWithClock(String score, String clock) {
+        String line = clean(score);
+        String mark = clean(clock);
+        if (line.isEmpty()) return mark;
+        if (mark.isEmpty() || line.contains(mark)) return line;
+        return line + " " + mark;
+    }
+
+    /**
+     * The line under a settle title. A body that is only "Trend hit" is replaced
+     * with the score, the pick, the tier, the odds, the slip or code, and the count.
+     */
+    public static String settleBody(String written, String home, String away, String homeScore, String awayScore, String fixture, String clock, String status, String minute, String market, String title, String tier, String odds, String slip, String code, String progress) {
+        String score = clean(fixture);
+        if (!clean(home).isEmpty() && !clean(away).isEmpty() && !clean(homeScore).isEmpty() && !clean(awayScore).isEmpty()) {
+            score = clean(home) + " " + clean(homeScore) + "-" + clean(awayScore) + " " + clean(away);
+        }
+        String mark = clean(clock);
+        if (mark.isEmpty()) {
+            if ("finished".equals(status)) mark = "FT";
+            else if ("halftime".equals(status)) mark = "HT";
+            else if (!clean(minute).isEmpty()) mark = clean(minute).endsWith("\u2032") ? clean(minute) : clean(minute) + "\u2032";
+        }
+        String pick = clean(market);
+        if (pick.isEmpty() || bareTrend(pick)) pick = afterMark(title);
+        String built = join(scoreWithClock(score, mark), pick, tier, odds, slip, code, progress);
+        String body = clean(written);
+        if (!built.isEmpty() && (bareTrend(body) || body.isEmpty() || built.length() > body.length())) return built;
+        if (!body.isEmpty() && !bareTrend(body)) return body;
+        return built.isEmpty() ? "Pick settled" : built;
+    }
+
+    static String join(String... parts) {
+        StringBuilder built = new StringBuilder();
+        java.util.HashSet<String> seen = new java.util.HashSet<String>();
+        for (String part : parts) {
+            String text = clean(part);
+            if (text.isEmpty() || bareTrend(text) || !seen.add(text.toLowerCase(java.util.Locale.US))) continue;
+            if (built.length() > 0) built.append(" \u00b7 ");
+            built.append(text);
+        }
+        return built.toString();
+    }
 }

@@ -319,14 +319,15 @@ export async function handleAdminApi(req, res, url, ctx) {
     let tail = '';
     try {
       const body = JSON.parse((await readRaw(req, 8_000)) || '{}');
-      kind = body?.kind === 'kickoff' ? 'kickoff' : body?.kind === 'goal' ? 'goal' : '';
+      const kinds = new Set(['goal', 'kickoff', 'win', 'leg', 'bust']);
+      kind = kinds.has(body?.kind) ? body.kind : '';
       tail = typeof body?.tail === 'string' ? body.tail.trim() : '';
     } catch {
       sendJson(res, 400, { error: 'Test push must be JSON.' });
       return true;
     }
     if (!kind) {
-      sendJson(res, 400, { error: 'Choose a test goal or a kick-off.' });
+      sendJson(res, 400, { error: 'Choose a test goal, kick-off, leg, or trend.' });
       return true;
     }
     const picked = tail ? deviceByTail(ctx.book.list(), tail) : null;

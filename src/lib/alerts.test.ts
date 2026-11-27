@@ -74,7 +74,9 @@ describe('trend hits', () => {
     expect(over?.id).toBe('sr:match:1:over05');
     const notes = trendHitNotices(picks, [over!.id], new Set(), Date.parse('2026-11-10T17:16:00.000Z'));
     expect(notes).toHaveLength(1);
-    expect(notes[0]?.title).toContain('Over 0.5 goals');
+    expect(notes[0]?.title).toContain('Over 0.5');
+    expect(notes[0]?.body).not.toBe('Trend hit');
+    expect(notes[0]?.marketLabel).toBe('Over 0.5');
     expect(notes[0]?.matchId).toBe('sr:match:1');
     expect(alertTarget(notes[0]!)).toContain('/match/sr:match:1');
     expect(alertTarget(notes[0]!)).toContain('trend=');

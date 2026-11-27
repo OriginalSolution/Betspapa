@@ -88,27 +88,33 @@ public final class AlertPlanner {
             org.json.JSONObject priced = state.bookingFor(trend);
             if (priced != null && belowFloor(priced.optString("odds", ""))) continue;
             String label = LABELS.get(parts[1]);
-            NoteCopy.Copy copy = NoteCopy.trend(match, label);
-            WatchNote note = new WatchNote(id, match.id, "win", copy.title, copy.body);
-            note.marketLabel = label;
-            note.fixture = NoteCopy.fixture(match);
+            String marketName = NoteCopy.pickName(label);
+            String odds = "";
+            String code = "";
+            String bookId = "";
+            String tier = "";
             org.json.JSONObject booking = state.bookingFor(trend);
             if (booking != null) {
                 String bookedLabel = booking.optString("marketLabel", "");
-                if (!bookedLabel.isEmpty()) note.marketLabel = bookedLabel;
-                String fixture = booking.optString("fixture", "");
-                if (!fixture.isEmpty()) note.fixture = fixture;
-                note.oddsText = booking.optString("odds", "");
-                String code = booking.optString("code", "");
-                if (!code.isEmpty()) {
-                    note.bookId = booking.optString("bookId", "");
-                    note.bookCode = code;
-                }
+                if (!bookedLabel.isEmpty()) marketName = NoteCopy.pickName(bookedLabel);
+                odds = booking.optString("odds", "");
+                code = booking.optString("code", "");
+                bookId = booking.optString("bookId", "");
+                tier = booking.optString("tier", "");
             }
-            note.marketLabel = NoteCopy.pickName(note.marketLabel);
-            if (match.homeScore != null && match.awayScore != null) note.fixture = NoteCopy.scoreLine(match);
-            note.trendLabel = label;
-            note.clock = "finished".equals(match.status) ? "FT" : match.minute == null ? "" : match.minute + "\u2032";
+            String score = match.homeScore != null && match.awayScore != null ? NoteCopy.scoreLine(match) : NoteCopy.fixture(match);
+            String clock = "finished".equals(match.status) ? "FT" : match.minute == null ? "" : match.minute + "\u2032";
+            String body = NoteCopy.settleBody("", match.fullHome(), match.fullAway(), match.homeScore == null ? "" : String.valueOf(match.homeScore), match.awayScore == null ? "" : String.valueOf(match.awayScore), score, clock, match.status, match.minute == null ? "" : String.valueOf(match.minute), marketName, "", tier, odds, "", code, "");
+            WatchNote note = new WatchNote(id, match.id, "win", "Trend hit \u00b7 " + marketName, body);
+            note.marketLabel = marketName;
+            note.fixture = score;
+            note.clock = clock;
+            note.oddsText = odds;
+            note.trendLabel = tier;
+            if (!code.isEmpty()) {
+                note.bookId = bookId;
+                note.bookCode = code;
+            }
             notes.add(note);
         }
         notes.addAll(slipNotes(matches, state, now));
@@ -158,11 +164,14 @@ public final class AlertPlanner {
                 String clock = "finished".equals(match.status) ? "FT" : match.minute == null ? "" : match.minute + "\u2032";
                 String progress = wins + " of " + total + " won";
                 String slipName = slip.optString("label", "");
+                String oddsText = legOdds(leg);
+                String shown = NoteCopy.scoreWithClock(scoreLine, clock);
                 WatchNote note = new WatchNote(id, match.id, won ? "win" : "bust", (won ? "Leg won \u00b7 " : "Leg lost \u00b7 ") + marketName,
-                        joinDetail(scoreLine, clock, marketName, slipName, progress));
+                        joinDetail(shown, marketName, slipName, oddsText, progress));
                 note.marketLabel = marketName;
                 note.fixture = scoreLine;
                 note.clock = clock;
+                note.oddsText = oddsText;
                 note.progress = progress;
                 note.trendLabel = slipName;
                 note.slipLabel = slipName;
@@ -195,6 +204,15 @@ public final class AlertPlanner {
             notes.add(note);
         }
         return notes;
+    }
+
+    private static String legOdds(org.json.JSONObject leg) {
+        if (leg == null || !leg.has("odds") || leg.isNull("odds")) return "";
+        String text = leg.optString("odds", "");
+        if (!text.isEmpty() && text.charAt(0) >= '0' && text.charAt(0) <= '9') return text;
+        double value = leg.optDouble("odds", 0);
+        if (!(value > 1)) return "";
+        return String.format(java.util.Locale.US, "%.2f", value);
     }
 
     private static String joinDetail(String... parts) {

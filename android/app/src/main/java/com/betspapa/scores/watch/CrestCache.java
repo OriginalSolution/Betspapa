@@ -29,18 +29,23 @@ final class CrestCache {
     private CrestCache() {}
 
     static Bitmap badge(Context context, String name, String url, String abbr, String color, int size) {
+        Bitmap found = photo(context, name, url, size);
+        return found != null ? found : initials(abbr, color, name, size);
+    }
+
+    /** A real crest, or null. A settle card uses this so a miss is blank, never an initials badge. */
+    static Bitmap photo(Context context, String name, String url, int size) {
         String remote = url == null ? "" : url.trim();
         String lower = remote.toLowerCase(Locale.US);
         if (lower.contains("sofascore") || lower.contains("sportybet")) remote = "";
         Bitmap bundled = bundled(context, name, remote, size);
         if (bundled != null) return bundled;
-        Bitmap photo = load(context, name, remote, size);
-        if (photo != null) return photo;
-        // Offline or a bad URL: the APK still ships crests for the bigger clubs.
-        String path = remote.isEmpty() ? "" : storedPath(context, name);
-        Bitmap stored = path.isEmpty() ? null : decodeAsset(context, path);
-        if (stored != null) return circle(stored, size);
-        return initials(abbr, color, name, size);
+        Bitmap fetched = load(context, name, remote, size);
+        if (fetched != null) return fetched;
+        String path = storedPath(context, name);
+        if (path.isEmpty()) return null;
+        Bitmap stored = decodeAsset(context, path);
+        return stored == null ? null : circle(stored, size);
     }
 
     /** The same file the board uses from public/crests. */

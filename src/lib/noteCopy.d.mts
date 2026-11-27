@@ -23,6 +23,22 @@ export function incidentCopy(match: CopyMatch, type: string, side: Side, moment?
 export function halfTimeCopy(match: CopyMatch, htHome?: number | string | null, htAway?: number | string | null): Copy;
 export function fullTimeCopy(match: CopyMatch): Copy;
 export function trendCopy(match: CopyMatch, label: string): Copy;
+export function pickName(label: string): string;
+export function bareTrend(value: unknown): boolean;
+export function afterMark(title: string): string;
+export function scoreWithClock(score: string, clock: string): string;
+export function settleText(parts: unknown[]): string;
+export function settleBody(parts?: {
+  written?: string;
+  score?: string;
+  clock?: string;
+  market?: string;
+  tier?: string;
+  odds?: string;
+  slip?: string;
+  code?: string;
+  progress?: string;
+}): string;
 export function legFixture(leg: CopyLeg): string;
 export function legScore(leg: CopyLeg, score?: string): string;
 export function legList<T>(legs: T[], text?: (leg: T) => string, limit?: number): string;
