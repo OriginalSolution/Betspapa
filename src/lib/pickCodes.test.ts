@@ -48,6 +48,10 @@ describe('pick codes', () => {
     expect(playTierPhrase('80%+ Over 1.5 goals', false)).toBe('80%+ Over 1.5 goals');
     expect(playTierPhrase('100% all picks', true)).toBe('10/10 all picks');
     expect(playTierPhrase('90%+ Over 1.5', true)).toBe('9/10+ Over 1.5');
+    expect(playTierPhrase('Every 80%+ pick, graded from the full-time score', true)).toBe('Every 8/10+ pick, graded from the full-time score');
+    expect(playTierPhrase('The Betspapa record: every published 80%+ pick, graded from the full-time score.', true)).toBe(
+      'The Betspapa record: every published 8/10+ pick, graded from the full-time score.',
+    );
   });
 
   it('uses the tier slip and falls back to the 80% market code', () => {

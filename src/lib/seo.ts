@@ -1,3 +1,6 @@
+import { playTierPhrase } from './pickCodes';
+import { isPlayStoreBuild } from './storeBuild';
+
 export const SITE = 'https://betspapa.com';
 
 const DEFAULT_DESCRIPTION =
@@ -22,9 +25,10 @@ export type PageMeta = { title: string; description: string; canonical: string }
 /** Title, description and canonical URL for an app route. Query strings never become canonical. */
 export function pageMeta(pathname: string, title: string, match?: { home: string; away: string; competition?: string }): PageMeta {
   const path = pathname.split(/[?#]/)[0] || '/';
-  const description = match
+  const written = match
     ? `${match.home} vs ${match.away}${match.competition ? ` (${match.competition})` : ''}: live score, timeline and alerts on Betspapa.`
     : descriptions[path] ?? DEFAULT_DESCRIPTION;
+  const description = isPlayStoreBuild() ? playTierPhrase(written) : written;
   const fullTitle = path === '/' ? 'Betspapa · Live football scores and match alerts' : `${title} · Betspapa`;
   return { title: fullTitle, description, canonical: `${SITE}${path}` };
 }

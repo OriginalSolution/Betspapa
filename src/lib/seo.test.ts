@@ -13,6 +13,12 @@ describe('pageMeta', () => {
     expect(meta.canonical).toBe('https://betspapa.com/trends');
     expect(meta.description).toMatch(/trend/i);
   });
+  it('keeps the percent wording in search descriptions outside the Play build', () => {
+    expect(pageMeta('/record', 'Record').description).toContain('80%+');
+    expect(pageMeta('/picks', 'Picks').description).toContain('80%+');
+    expect(pageMeta('/slips', 'Slips').description).toContain('80%+');
+    expect(pageMeta('/codes', 'Codes').description).toContain('Banker');
+  });
   it('describes a match by its real teams', () => {
     const meta = pageMeta('/match/sr:match:1', 'Chelsea vs Leeds United', { home: 'Chelsea', away: 'Leeds United', competition: 'Premier League' });
     expect(meta.title).toBe('Chelsea vs Leeds United · Betspapa');
