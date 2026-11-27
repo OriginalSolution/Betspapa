@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 56
-        versionName "0.4.33" // Play build copies codes, uses FCM alerts, and does not open a bookmaker
+        versionCode 57
+        versionName "0.4.34" // Play build copies codes, uses FCM alerts, and does not open a bookmaker
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         buildConfigField "boolean", "PLAY_STORE", System.getenv("STORE_BUILD") == "play" ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
