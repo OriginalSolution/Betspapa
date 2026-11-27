@@ -1605,6 +1605,7 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
   white-space: nowrap;
 }
 .ring-card .hit-ring.is-full b { font-size: 11px; }
+.ring-card .hit-ring.is-form b { font-size: 9px; letter-spacing: -0.04em; }
 .hit-ring.is-hot b { color: var(--green); }
 .hit-ring.is-warm b { color: var(--gold); }
 .tip-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -2822,12 +2823,41 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .tab { font-size: 11px; }
 }
 
+/* Play phones: the tab bar is in the column, so lists scroll above it and the safe area. */
+@media (max-width: 959px) {
+  .is-play.shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+  .is-play .center {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .is-play .main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: calc(20px + var(--safe-area-inset-bottom));
+    scroll-padding-bottom: calc(16px + var(--safe-area-inset-bottom));
+  }
+  .is-play .tabbar { position: static; flex: none; }
+  .is-play .chips { flex-wrap: wrap; overflow: visible; }
+  .is-play .chip { flex: none; max-width: 100%; }
+}
+
 /* Short landscape screens: free the height for content. */
 @media (orientation: landscape) and (max-height: 520px) {
   :root { --tab: 52px; --topbar: 50px; }
   .topbar { position: relative; }
   .comp-head { top: 0; }
   .tab { flex-direction: row; gap: 6px; }
+  .is-play .main { padding-bottom: calc(24px + var(--safe-area-inset-bottom)); }
 }
 
 /* Desktop and big tablets: the centre column grows with the screen; the right rail

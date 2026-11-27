@@ -29,6 +29,30 @@ export function playTierPhrase(text: string, play = isPlayStoreBuild()): string 
   return text.replace(/90%\+/g, '9/10+').replace(/80%\+/g, '8/10+').replace(/100%/g, '10/10');
 }
 
+const PLAY_CODE_LABELS: Array<[string, string]> = [
+  ['Banker rules - own odds limits', 'Strategy rules - own odds limits'],
+  ['Banker code alerts', 'Strategy code alerts'],
+  ['Banker codes', 'Strategy codes'],
+  ['Banker Classic', 'Classic'],
+  ['Banker Gold', 'Gold'],
+  ['Banker Shield', 'Shield'],
+  ['Banker Capped', 'Capped'],
+  ['Banker Ladder', 'Ladder'],
+];
+
+/** Play listings use neutral strategy names. The website keeps Banker. */
+export function playCodeLabel(text: string, play = isPlayStoreBuild()): string {
+  if (!play || !text) return text;
+  return PLAY_CODE_LABELS.reduce((next, [from, to]) => next.split(from).join(to), text);
+}
+
+/** A pick's recent-form ring. Play shows tenths; the website keeps the percent. */
+export function formRingLabel(rate: number, play = isPlayStoreBuild()): string {
+  if (!play) return `${Math.round(rate * 100)}%`;
+  const tenths = Math.min(10, Math.max(0, Math.round(rate * 10)));
+  return `${tenths}/10`;
+}
+
 export function tierMin(tier: CodeTier): number {
   return tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;
 }

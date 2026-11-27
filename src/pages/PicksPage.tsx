@@ -4,7 +4,7 @@ import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, type DeskId } from '../lib/engineSlips';
-import { showsInTier, slipParts, tierSlip, tierLabel, CODE_TIERS, type CodeTier } from '../lib/pickCodes';
+import { formRingLabel, showsInTier, slipParts, tierSlip, tierLabel, CODE_TIERS, type CodeTier } from '../lib/pickCodes';
 import { canSeeTier } from '../lib/proAccess';
 import { plainReasons } from '../lib/plainReason';
 import { BookMark } from '../components/BookMark';
@@ -220,17 +220,19 @@ export function PicksPage() {
 
 function HitRing({ rate }: { rate: number }) {
   const pct = Math.round(rate * 100);
+  const play = isPlayStoreBuild();
+  const label = formRingLabel(rate, play);
   const hot = pct >= 90;
   const radius = 16;
   const turn = 2 * Math.PI * radius;
   const dash = turn * Math.min(1, Math.max(0, rate));
   return (
-    <span className={cx('hit-ring', hot ? 'is-hot' : 'is-warm', pct >= 100 && 'is-full')} aria-label={`${pct}% hit rate`}>
+    <span className={cx('hit-ring', hot ? 'is-hot' : 'is-warm', pct >= 100 && 'is-full', play && 'is-form')} aria-label={play ? `${label} recent form` : `${pct}% hit rate`}>
       <svg viewBox="0 0 40 40" aria-hidden="true">
         <circle cx="20" cy="20" r={radius} className="hit-track" />
         <circle cx="20" cy="20" r={radius} className="hit-value" strokeDasharray={`${dash} ${turn - dash}`} />
       </svg>
-      <b>{pct}%</b>
+      <b>{label}</b>
     </span>
   );
 }

@@ -97,6 +97,29 @@ export function deviceSnapshot(devices, now = Date.now()) {
   };
 }
 
+/** Last few phones, identified by the tail the console already shows. Never the token. */
+export function recentDevices(list, limit = 8) {
+  const rows = [];
+  for (const device of Array.isArray(list) ? list : []) {
+    const token = String(device?.token || '');
+    if (token.length < 6) continue;
+    rows.push({
+      tail: token.slice(-6),
+      seen: device?.lastSeenAt || device?.updatedAt || null,
+      version: typeof device?.appVersion === 'string' ? device.appVersion : '',
+    });
+    if (rows.length >= limit) break;
+  }
+  return rows;
+}
+
+/** A six-character tail from the console. A full token is refused so the browser cannot send one. */
+export function deviceByTail(list, tail) {
+  const needle = String(tail || '').trim();
+  if (!/^[A-Za-z0-9_-]{6}$/.test(needle)) return null;
+  return (Array.isArray(list) ? list : []).find((item) => String(item?.token || '').endsWith(needle)) || null;
+}
+
 export function deskRows(books, masterLegs = 0) {
   return DESKS.map((id) => {
     const book = books?.[id] || {};
@@ -250,6 +273,7 @@ export function buildOverview({ state = {}, schedule = {}, devices = [], alerts 
       devices: installs.devices,
       latestTail: installs.latestTail,
       latestSeen: installs.latestSeen,
+      recent: recentDevices(devices),
     },
   };
   return stripSecrets(body);
