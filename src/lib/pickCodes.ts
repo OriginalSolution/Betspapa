@@ -1,5 +1,6 @@
 import { deskBook, showOdds, type DeskId, type EngineBook, type EngineSlip, type EngineState } from './engineSlips';
 import { marketFilterLabel } from './matchPicks';
+import { isPlayStoreBuild } from './storeBuild';
 
 export type CodeTier = '100' | '90' | '80';
 
@@ -10,6 +11,23 @@ export const TIER_LABEL: Record<CodeTier, string> = {
   '90': '90%+',
   '80': '80%+',
 };
+
+const PLAY_TIER_LABEL: Record<CodeTier, string> = {
+  '100': '10/10',
+  '90': '9/10+',
+  '80': '8/10+',
+};
+
+/** Play listings say recent form. The website keeps the percent names. */
+export function tierLabel(tier: CodeTier, play = isPlayStoreBuild()): string {
+  return play ? PLAY_TIER_LABEL[tier] : TIER_LABEL[tier];
+}
+
+/** Rewrite a published tier name for the Play build. Other copy is left as written. */
+export function playTierPhrase(text: string, play = isPlayStoreBuild()): string {
+  if (!play) return text;
+  return text.replace(/90%\+/g, '9/10+').replace(/80%\+/g, '8/10+').replace(/100%/g, '10/10');
+}
 
 export function tierMin(tier: CodeTier): number {
   return tier === '100' ? 0.995 : tier === '90' ? 0.9 : 0.8;

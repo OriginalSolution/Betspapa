@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseEngine } from './engineSlips';
-import { showsInTier, slipParts, tierSlip } from './pickCodes';
+import { playTierPhrase, showsInTier, slipParts, tierLabel, tierSlip } from './pickCodes';
 import { legsForTier } from './bookFollow';
 
 const state = parseEngine({
@@ -38,6 +38,18 @@ const state = parseEngine({
 });
 
 describe('pick codes', () => {
+  it('keeps percent tiers on the website and form tiers in the Play build', () => {
+    expect(tierLabel('100', false)).toBe('100%');
+    expect(tierLabel('90', false)).toBe('90%+');
+    expect(tierLabel('80', false)).toBe('80%+');
+    expect(tierLabel('100', true)).toBe('10/10');
+    expect(tierLabel('90', true)).toBe('9/10+');
+    expect(tierLabel('80', true)).toBe('8/10+');
+    expect(playTierPhrase('80%+ Over 1.5 goals', false)).toBe('80%+ Over 1.5 goals');
+    expect(playTierPhrase('100% all picks', true)).toBe('10/10 all picks');
+    expect(playTierPhrase('90%+ Over 1.5', true)).toBe('9/10+ Over 1.5');
+  });
+
   it('uses the tier slip and falls back to the 80% market code', () => {
     expect(slipParts(tierSlip(state, '90', null), 'sportybet').parts[0]?.code).toBe('NINETY');
     expect(slipParts(tierSlip(state, '90', 'over15'), 'sportybet').parts[0]?.code).toBe('N15OK');

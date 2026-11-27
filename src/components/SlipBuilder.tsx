@@ -5,6 +5,7 @@ import { desksFromBooking, failedDeskLine } from '../lib/bookedSlip';
 import { readBuilder, subscribeBuilder, writeBuilder } from '../lib/builderStore';
 import { cx } from '../lib/format';
 import { tipsFromEngine } from '../lib/matchPicks';
+import { playTierPhrase } from '../lib/pickCodes';
 import { legsForPacks, PART_SIZE, partsOf, totalOddsLine, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
 import { goToBookedCodes } from '../lib/useFreshCodes';
 import { useEngineBoard } from '../state/engine';
@@ -112,14 +113,14 @@ export function SlipBuilder() {
   return (
     <div className="stack slip-builder">
       {!state && <p className="lede">Loading today’s trends.</p>}
-      {state && packs.length === 0 && <p className="lede">No 80%+ trend is open inside the odds table right now.</p>}
+      {state && packs.length === 0 && <p className="lede">No {playTierPhrase('80%+')} trend is open inside the odds table right now.</p>}
       {packs.map((pack) => {
         const on = added.has(pack.id);
         return (
           <article key={pack.id} className="pack-row">
             <div>
               <strong>{pack.label}</strong>
-              <p>{pack.legs.length} {pack.legs.length === 1 ? 'pick' : 'picks'} today · 80%+</p>
+              <p>{pack.legs.length} {pack.legs.length === 1 ? 'pick' : 'picks'} today · {playTierPhrase('80%+')}</p>
             </div>
             <button type="button" className={cx('pack-add', on && 'is-on')} onClick={() => toggle(pack)} aria-pressed={on}>
               {on ? 'Added' : 'Add'}

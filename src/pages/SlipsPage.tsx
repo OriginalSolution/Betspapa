@@ -18,6 +18,7 @@ import {
   type EngineSlip,
 } from '../lib/engineSlips';
 import { cx } from '../lib/format';
+import { playTierPhrase } from '../lib/pickCodes';
 import type { Team } from '../types';
 import { SlipLegRow, SlipTimeline } from '../components/SlipTrack';
 import { SlipBell } from '../components/SlipBell';
@@ -263,7 +264,7 @@ function TrendSlip({
     <article id={`slip-${trend.id}`} className={cx('slip-trend', open && 'is-open', focused && 'trend-focus', bellOn && 'is-belled')}>
       <div className="slip-trend-top">
         <button type="button" className="slip-trend-main" aria-expanded={open} onClick={onToggle}>
-          <strong>{trend.label}</strong>
+          <strong>{playTierPhrase(trend.label)}</strong>
           <span className="slip-code">{codes.length ? codes.join(' · ') : 'No code yet'}</span>
         </button>
         {legs.length > 0 && <SlipBell on={bellOn} count={matchCount} onToggle={toggleBell} className="slip-bell-small" />}

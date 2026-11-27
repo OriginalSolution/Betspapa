@@ -3,7 +3,7 @@ import { apiUrl } from './apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from './nativeHttp';
 import type { DeskId, EngineBook } from './engineSlips';
 import { MIN_PUBLISHED_ODDS } from './oddsFloor';
-import { showsInTier, TIER_LABEL, type CodeTier } from './pickCodes';
+import { showsInTier, tierLabel, type CodeTier } from './pickCodes';
 
 export type BookLeg = {
   eventId: string;
@@ -33,7 +33,7 @@ export function tierFallback(legs: BookLeg[], tier: CodeTier, now = Date.now()):
     const next = TIER_ORDER[index];
     const rows = legsForTier(legs, next, null, now);
     if (!rows.length) continue;
-    const note = index === start ? '' : `No open follows at ${TIER_LABEL[tier]}. Showing ${TIER_LABEL[next]} instead.`;
+    const note = index === start ? '' : `No open follows at ${tierLabel(tier)}. Showing ${tierLabel(next)} instead.`;
     return { tier: next, legs: rows, note };
   }
   const anyOpen = legs.some((leg) => {
@@ -41,7 +41,7 @@ export function tierFallback(legs: BookLeg[], tier: CodeTier, now = Date.now()):
     return leg.status !== 'won' && leg.status !== 'bust' && Number.isFinite(kick) && kick >= now;
   });
   if (legs.length && !anyOpen) return { tier, legs: [], note: 'Every follow has kicked off or settled, so nothing is on the code.' };
-  if (legs.length) return { tier, legs: [], note: `No open follows are still at ${TIER_LABEL[tier]} or below.` };
+  if (legs.length) return { tier, legs: [], note: `No open follows are still at ${tierLabel(tier)} or below.` };
   return { tier, legs: [], note: 'No open follows to book.' };
 }
 

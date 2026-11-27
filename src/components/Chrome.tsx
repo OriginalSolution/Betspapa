@@ -4,6 +4,7 @@ import { addDays } from '../lib/dates';
 import { ago, cx, dayWord, formatDay, longDay } from '../lib/format';
 import { applyFilter, isLiveStatus, type BoardFilter } from '../lib/group';
 import { useStore } from '../state/store';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { IconBell, IconCodes, IconLive, IconPicks, IconRank, IconRecord, IconRefresh, IconSettings, IconSlip, IconStar, IconToday, IconTrends, Mark } from './Icons';
 
 const sideLinks = [
@@ -73,7 +74,7 @@ export function TabBar() {
 
 function topSubtitle(pathname: string, date: string): string {
   if (pathname === '/') return longDay(date);
-  if (pathname === '/picks') return 'Today · picks at 80%+';
+  if (pathname === '/picks') return isPlayStoreBuild() ? 'Today · picks at 8/10+' : 'Today · picks at 80%+';
   if (pathname.startsWith('/codes')) return 'Banker rules - own odds limits';
   if (pathname === '/trends') return 'Add a whole trend to your slip';
   if (pathname === '/slips/booked') return 'Codes for every bookmaker';
