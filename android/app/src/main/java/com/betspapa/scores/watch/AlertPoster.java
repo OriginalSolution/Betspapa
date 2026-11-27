@@ -337,9 +337,10 @@ public final class AlertPoster {
         }
         WatchMatch match = shown != null ? shown : findMatch(context, note.matchId);
         boolean dark = NotifTheme.dark(context, styleOf(context));
-        NotificationCompat.Builder builder = base(context, channel, note.title, note.body)
+        String text = ScoreCards.plainText(note, match);
+        NotificationCompat.Builder builder = base(context, channel, note.title, text)
             // High keeps a match event at the top of the shade, where Android draws the big card open.
-            .setPriority(soundOn || matchEvent(note.kind) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(soundOn || matchEvent(note.kind) || settleEvent(note.kind) ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(!note.disallowed)
             .setCategory(Notification.CATEGORY_EVENT)
             .setOnlyAlertOnce(!soundOn || onlyOnce)
@@ -475,6 +476,11 @@ public final class AlertPoster {
     static boolean matchEvent(String kind) {
         return "goal".equals(kind) || "var".equals(kind) || "red".equals(kind) || "penalty".equals(kind)
             || "kickoff".equals(kind) || "ht".equals(kind) || "ft".equals(kind);
+    }
+
+    /** A settle card is posted high so the shade draws the expanded Red Ticker, not the one-line pill. */
+    static boolean settleEvent(String kind) {
+        return "win".equals(kind) || "bust".equals(kind) || "slip".equals(kind);
     }
 
     private static String liveTitle(WatchMatch match) {

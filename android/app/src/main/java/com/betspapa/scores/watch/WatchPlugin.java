@@ -236,17 +236,41 @@ public class WatchPlugin extends Plugin {
         String payload = call.getString("payload", "{}");
         try {
             JSONObject json = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
+            String kind = json.optString("kind", "");
+            String title = json.optString("title", "");
+            String body = json.optString("body", "");
+            if ("win".equals(kind) || "bust".equals(kind) || "slip".equals(kind)) {
+                body = com.betspapa.watch.NoteCopy.settleBody(
+                    body,
+                    json.optString("homeFull", json.optString("home", "")),
+                    json.optString("awayFull", json.optString("away", "")),
+                    json.has("homeScore") && !json.isNull("homeScore") ? String.valueOf(json.optInt("homeScore")) : "",
+                    json.has("awayScore") && !json.isNull("awayScore") ? String.valueOf(json.optInt("awayScore")) : "",
+                    json.optString("fixture", ""),
+                    json.optString("clock", ""),
+                    json.optString("status", ""),
+                    json.has("minute") && !json.isNull("minute") ? String.valueOf(json.optInt("minute")) : "",
+                    json.optString("marketLabel", ""),
+                    title,
+                    json.optString("trendLabel", ""),
+                    json.optString("odds", ""),
+                    json.optString("slip", ""),
+                    json.optString("code", ""),
+                    json.optString("progress", "")
+                );
+            }
             WatchNote note = new WatchNote(
                 json.optString("id", ""),
                 json.optString("matchId", ""),
-                json.optString("kind", ""),
-                json.optString("title", ""),
-                json.optString("body", "")
+                kind,
+                title,
+                body
             );
             if (json.has("minute") && !json.isNull("minute")) note.minute = json.optInt("minute");
             note.player = json.optString("player", "");
             note.varCheck = json.optBoolean("varCheck", "var".equals(note.kind));
             note.marketLabel = json.optString("marketLabel", "");
+            if (note.marketLabel.isEmpty() || note.marketLabel.equalsIgnoreCase("Trend hit")) note.marketLabel = com.betspapa.watch.NoteCopy.afterMark(title);
             note.oddsText = json.optString("odds", "");
             note.bookId = json.optString("bookId", "");
             note.bookCode = json.optString("code", "");
@@ -311,7 +335,9 @@ public class WatchPlugin extends Plugin {
         if (json.has("homeScore") && !json.isNull("homeScore")) match.homeScore = json.optInt("homeScore");
         if (json.has("awayScore") && !json.isNull("awayScore")) match.awayScore = json.optInt("awayScore");
         if (json.has("minute") && !json.isNull("minute")) match.minute = json.optInt("minute");
-        if (match.status == null || match.status.isEmpty() || "scheduled".equals(match.status)) match.status = "live";
+        String status = json.optString("status", "");
+        if (!status.isEmpty()) match.status = status;
+        else if (match.status == null || match.status.isEmpty() || "scheduled".equals(match.status)) match.status = "live";
         int minute = match.minute == null ? -1 : match.minute;
         String player = json.optString("player", "");
         if (minute >= 0 && match.homeScore != null) {

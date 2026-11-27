@@ -131,17 +131,53 @@ export function settleClock(match) {
   return minuteMark(match.minute);
 }
 
+/** True when the text is only the words "Trend hit", with optional trailing punctuation. */
+export function bareTrend(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim().replace(/[.!]+$/g, '').trim();
+  return text.toLowerCase() === 'trend hit';
+}
+
+/** The pick after a middle dot, or '' when the title has none. "Trend hit" is not a pick. */
+export function afterMark(title) {
+  const text = String(title || '');
+  const cut = Math.max(text.indexOf('·'), text.indexOf('\u00b7'));
+  if (cut < 0) return '';
+  const rest = text.slice(cut + 1).replace(/\s+/g, ' ').trim();
+  return rest && !bareTrend(rest) ? rest : '';
+}
+
+/** "Arsenal 2-1 Chelsea FT". The clock is left off when the score already contains it. */
+export function scoreWithClock(score, clock) {
+  const line = String(score || '').replace(/\s+/g, ' ').trim();
+  const mark = String(clock || '').replace(/\s+/g, ' ').trim();
+  if (!line) return mark;
+  if (!mark || line.includes(mark)) return line;
+  return `${line} ${mark}`;
+}
+
 /** One line of the detail a settle card must keep. Empty pieces are left out. "Trend hit" alone is never a piece. */
 export function settleText(parts) {
   const seen = new Set();
   const rows = [];
   for (const part of parts) {
     const text = String(part || '').replace(/\s+/g, ' ').trim();
-    if (!text || text.toLowerCase() === 'trend hit' || seen.has(text.toLowerCase())) continue;
+    if (!text || bareTrend(text) || seen.has(text.toLowerCase())) continue;
     seen.add(text.toLowerCase());
     rows.push(text);
   }
   return rows.join(' · ');
+}
+
+/**
+ * The text under a settle title. Structured pieces win over a body that is only "Trend hit".
+ * A shorter written body is kept only when it already carries the score.
+ */
+export function settleBody({ written = '', score = '', clock = '', market = '', tier = '', odds = '', slip = '', code = '', progress = '' } = {}) {
+  const line = settleText([scoreWithClock(score, clock), market, tier, odds, slip, code, progress]);
+  const body = String(written || '').replace(/\s+/g, ' ').trim();
+  if (line && (bareTrend(body) || !body || line.length > body.length)) return line;
+  if (body && !bareTrend(body)) return body;
+  return line || 'Pick settled';
 }
 
 /** "Arsenal v Chelsea" for a slip or code leg; one name alone when the other is missing. */

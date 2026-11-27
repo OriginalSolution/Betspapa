@@ -1,5 +1,6 @@
 import type { PickView } from '../data/board';
 import { publishableOdds } from './oddsFloor';
+import { pickName, settleText } from './noteCopy.mjs';
 import { signalsFor } from './signals';
 import type { Follows, InboxItem, Match, Settings } from '../types';
 
@@ -139,6 +140,15 @@ export function alertTarget(item: Pick<InboxItem, 'id' | 'kind' | 'matchId'>): s
   return '/';
 }
 
+/** 10/10, 9/10+ and 8/10+ are written as percents here. The Play card rewrites them. */
+function tierPhrase(rate: number): string {
+  if (!Number.isFinite(rate)) return '';
+  if (rate + 1e-12 >= 0.995) return '100%';
+  if (rate + 1e-12 >= 0.9) return '90%+';
+  if (rate + 1e-12 >= 0.8) return '80%+';
+  return '';
+}
+
 /** A followed trend that has already landed. Checked again on the next open, and not repeated. */
 export function trendHitNotices(picks: PickView[], followedIds: string[], seen: Set<string>, now: number): InboxItem[] {
   const want = new Set(followedIds);
@@ -149,12 +159,19 @@ export function trendHitNotices(picks: PickView[], followedIds: string[], seen: 
     if (seen.has(id)) continue;
     const matchId = pick.matchId || matchIdFromTrendAlert(id);
     if (!matchId) continue;
+    const market = pickName(pick.marketLabel);
+    const odds = publishableOdds(pick.odds) ? pick.odds.toFixed(2) : '';
+    const tier = tierPhrase(pick.rate);
     notes.push({
       id,
       matchId,
       kind: 'win',
-      title: `Trend hit · ${pick.marketLabel}`,
-      body: pick.label,
+      title: `Trend hit · ${market}`,
+      body: settleText([pick.label, market, tier, odds]),
+      marketLabel: market,
+      odds,
+      trendLabel: tier,
+      fixture: pick.label,
       createdAt: now,
       read: false,
     });

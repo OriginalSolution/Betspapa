@@ -72,10 +72,50 @@ test('the push carries the scorer, side and minute so the phone card can show th
 test('a trend hit names the fixture and score in full', () => {
   const notes = trendNotes([row({ homeScore: 1, awayScore: 1 })], [row({ homeScore: 2, awayScore: 1, minute: 70 })], { trends: ['sr:match:9:over25'] });
   assert.equal(notes.length, 1);
-  assert.equal(notes[0].body, 'Manchester United 2-1 Brighton & Hove Albion · 70′ · Over 2.5');
+  assert.equal(notes[0].body, 'Manchester United 2-1 Brighton & Hove Albion 70′ · Over 2.5');
   assert.equal(notes[0].fixture, 'Manchester United 2-1 Brighton & Hove Albion');
   assert.equal(notes[0].marketLabel, 'Over 2.5');
+  assert.equal(notes[0].clock, '70′');
   assert.notEqual(notes[0].body, 'Trend hit');
+  const data = messageFor(notes[0], device).message.data;
+  assert.match(data.body, /Manchester United 2-1 Brighton & Hove Albion 70′/);
+  assert.match(data.body, /Over 2.5/);
+  assert.equal(data.home, 'Manchester United');
+  assert.equal(data.away, 'Brighton & Hove Albion');
+  assert.equal(data.homeScore, '2');
+  assert.equal(data.awayScore, '1');
+  assert.notEqual(data.body, 'Trend hit');
+});
+
+test('a body that is only Trend hit is replaced with the score, pick, tier, odds, slip and count', () => {
+  const message = messageFor({
+    id: 'slipleg:qc:sr:match:1|over15',
+    kind: 'win',
+    title: 'Leg won',
+    body: 'Trend hit',
+    marketLabel: 'Over 1.5',
+    trendLabel: '80%+ Over 1.5',
+    odds: '1.45',
+    slip: 'Daily slip',
+    code: 'AB12CD',
+    progress: '29 of 36 won',
+    clock: 'FT',
+    fixture: 'Arsenal 2-1 Chelsea',
+    match: { home: 'Arsenal', away: 'Chelsea', homeScore: 2, awayScore: 1, status: 'finished' },
+  }, device).message;
+  assert.equal(message.notification, undefined);
+  const data = message.data;
+  assert.equal(data.body.includes('Trend hit'), false);
+  assert.match(data.body, /Arsenal 2-1 Chelsea FT/);
+  assert.match(data.body, /Over 1.5/);
+  assert.match(data.body, /80%\+ Over 1.5/);
+  assert.match(data.body, /1\.45/);
+  assert.match(data.body, /Daily slip/);
+  assert.match(data.body, /AB12CD/);
+  assert.match(data.body, /29 of 36 won/);
+  assert.equal(data.marketLabel, 'Over 1.5');
+  assert.equal(data.slip, 'Daily slip');
+  assert.equal(data.progress, '29 of 36 won');
 });
 
 test('code alerts name the real fixtures', () => {

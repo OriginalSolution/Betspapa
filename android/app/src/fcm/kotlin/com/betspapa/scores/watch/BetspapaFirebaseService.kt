@@ -3,6 +3,7 @@ package com.betspapa.scores.watch
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
+import com.betspapa.watch.NoteCopy
 import com.betspapa.watch.WatchMatch
 import java.net.URL
 import com.betspapa.watch.WatchNote
@@ -27,7 +28,29 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
         if (id.isEmpty()) return
         val kind = data["kind"]?.takeIf { it.isNotEmpty() } ?: "goal"
         val title = data["title"]?.takeIf { it.isNotEmpty() } ?: "Betspapa"
-        val body = data["body"].orEmpty()
+        val rawBody = data["body"].orEmpty()
+        val body = if (kind == "win" || kind == "bust" || kind == "slip") {
+            NoteCopy.settleBody(
+                rawBody,
+                data["home"].orEmpty(),
+                data["away"].orEmpty(),
+                data["homeScore"].orEmpty(),
+                data["awayScore"].orEmpty(),
+                data["fixture"].orEmpty(),
+                data["clock"].orEmpty(),
+                data["status"].orEmpty(),
+                data["minute"].orEmpty(),
+                data["marketLabel"].orEmpty(),
+                title,
+                data["trendLabel"].orEmpty(),
+                data["odds"].orEmpty(),
+                data["slip"].orEmpty(),
+                data["code"].orEmpty(),
+                data["progress"].orEmpty(),
+            )
+        } else {
+            rawBody
+        }
         val file = WatchFiles.file(this)
         val sound: String
         val note: WatchNote
@@ -46,7 +69,9 @@ class BetspapaFirebaseService : FirebaseMessagingService() {
             note = WatchNote(id, data["matchId"].orEmpty(), kind, title, body)
             data["minute"]?.toIntOrNull()?.let { note.minute = it }
             data["player"]?.trim()?.takeIf { it.isNotEmpty() }?.let { note.player = it }
-            data["marketLabel"]?.takeIf { it.isNotEmpty() }?.let { note.marketLabel = it }
+            val market = data["marketLabel"]?.takeIf { it.isNotEmpty() && !it.equals("Trend hit", true) }
+                ?: NoteCopy.afterMark(title).takeIf { it.isNotEmpty() }
+            if (!market.isNullOrEmpty()) note.marketLabel = market
             data["fixture"]?.takeIf { it.isNotEmpty() }?.let { note.fixture = it }
             data["odds"]?.takeIf { it.isNotEmpty() }?.let { note.oddsText = it }
             data["code"]?.takeIf { it.isNotEmpty() }?.let { note.bookCode = it }

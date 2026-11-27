@@ -86,6 +86,11 @@ export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSo
     try {
       const { registerPlugin } = await import('@capacitor/core');
       const Watch = registerPlugin<{ present(options: { payload: string }): Promise<void> }>('Watch');
+      const home = match?.home.name || match?.home.shortName || '';
+      const away = match?.away.name || match?.away.shortName || '';
+      const scored = match?.homeScore != null && match?.awayScore != null;
+      const fixture = item.fixture || (home && away && scored ? `${home} ${match?.homeScore}-${match?.awayScore} ${away}` : '');
+      const clock = item.clock || (match?.status === 'finished' ? 'FT' : match?.status === 'halftime' ? 'HT' : match?.minute != null ? `${match.minute}′` : '');
       const payload = {
         id: item.id,
         matchId: item.matchId,
@@ -96,10 +101,10 @@ export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSo
         varCheck: item.kind === 'var',
         minute: match?.minute ?? null,
         player: match?.events.find((event) => event.id === item.id)?.player || '',
-        home: match?.home.shortName,
-        away: match?.away.shortName,
-        homeFull: match?.home.name,
-        awayFull: match?.away.name,
+        home: match?.home.shortName || home,
+        away: match?.away.shortName || away,
+        homeFull: match?.home.name || home,
+        awayFull: match?.away.name || away,
         homeAbbr: match?.home.abbr,
         awayAbbr: match?.away.abbr,
         homeColor: match?.home.color,
@@ -109,6 +114,16 @@ export async function pushBrowserNotification(item: InboxItem, goalSound: GoalSo
         competition: match?.competition?.name || '',
         homeScore: match?.homeScore,
         awayScore: match?.awayScore,
+        status: match?.status || '',
+        marketLabel: item.marketLabel || '',
+        fixture,
+        odds: item.odds || '',
+        trendLabel: item.trendLabel || '',
+        progress: item.progress || '',
+        clock,
+        slip: item.slip || '',
+        slipId: item.slipId || '',
+        code: item.code || '',
       };
       await Watch.present({ payload: JSON.stringify(payload) });
     } catch {

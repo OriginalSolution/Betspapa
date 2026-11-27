@@ -212,7 +212,6 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       })
       .filter((row) => row.odds);
     stageWatch({ trends: trendFollows, matches, bookings });
-    const followedPicks = picks.filter((pick) => trendFollows.includes(pick.id));
     const trackedSlips = readBuilder().slips;
     const tracked = trackedSlips[0] ?? null;
     const slipPayload = (slip: typeof tracked) =>
@@ -234,7 +233,13 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       follows: withBellFollows(follows),
       slipBells: bellRegistration(),
       trends: trendFollows,
-      bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
+      bookings: bookings.map((row) => ({
+        id: row.id,
+        odds: Number(row.odds),
+        marketLabel: row.marketLabel,
+        fixture: row.fixture,
+        code: row.code,
+      })),
       builderSlip: slipPayload(tracked),
       builderSlips: trackedSlips.map((slip) => slipPayload(slip)).filter((slip): slip is NonNullable<typeof slip> => Boolean(slip)),
       teamLists: lists.filter((item) => item.scope === 'team').map((item) => ({ id: item.id, name: item.name, list: item.list, crest: item.crest || '' })),

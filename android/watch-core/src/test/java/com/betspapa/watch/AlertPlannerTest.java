@@ -238,8 +238,10 @@ public class AlertPlannerTest {
         for (WatchNote note : notes) {
             if (!"win".equals(note.kind)) continue;
             hits += 1;
-            assertTrue(note.title.contains("Over 0.5 goals"));
+            assertTrue(note.title.contains("Over 0.5"));
             assertTrue(note.body.contains("Al Astiklal"));
+            assertTrue(note.body.contains("1-0"));
+            assertFalse(note.body.equalsIgnoreCase("Trend hit"));
             assertFalse(note.title.toLowerCase().contains("sportybet"));
             assertFalse(note.body.toLowerCase().contains("sofascore"));
         }

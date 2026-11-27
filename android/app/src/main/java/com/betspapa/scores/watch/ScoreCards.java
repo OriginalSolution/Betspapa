@@ -148,12 +148,11 @@ final class ScoreCards {
             boolean named = namedMatch(match);
             if (named) {
                 views.setViewVisibility(R.id.line_compact, View.VISIBLE);
-                String score = shownFixture(note, match);
-                String clock = clockOf(note, match);
-                views.setTextViewText(R.id.score_line, clock.isEmpty() || score.contains(clock) ? score : score + " \u00b7 " + clock);
+                String score = withClock(shownFixture(note, match), clockOf(note, match));
+                views.setTextViewText(R.id.score_line, score);
                 views.setTextColor(R.id.score_line, text);
-                views.setImageViewBitmap(R.id.crest_home, crest(context, match, true, dp(context, 22)));
-                views.setImageViewBitmap(R.id.crest_away, crest(context, match, false, dp(context, 22)));
+                paintCrest(views, R.id.crest_home, crestPhoto(context, match, true, dp(context, 22)));
+                paintCrest(views, R.id.crest_away, crestPhoto(context, match, false, dp(context, 22)));
             }
             views.setTextViewText(R.id.trend_market, market(note));
             views.setTextColor(R.id.trend_market, text);
@@ -166,7 +165,9 @@ final class ScoreCards {
             views.setTextColor(R.id.trend_detail, muted);
             views.setViewVisibility(R.id.trend_detail, detail.isEmpty() ? View.GONE : View.VISIBLE);
             boolean booked = note.bookCode != null && !note.bookCode.isEmpty();
-            views.setViewVisibility(R.id.book_row, booked ? View.VISIBLE : View.GONE);
+            // The code is named in the detail line. SportyBet is not shown as the source of the price.
+            boolean showBrand = booked && note.bookId != null && !note.bookId.isEmpty() && !"sportybet".equals(note.bookId);
+            views.setViewVisibility(R.id.book_row, showBrand ? View.VISIBLE : View.GONE);
             if (booked) {
                 views.setTextViewText(R.id.book_name, bookName(note.bookId));
                 views.setTextColor(R.id.book_name, bookText(note.bookId));
@@ -304,7 +305,34 @@ final class ScoreCards {
         if (fromLabel != null) return headline(tier(fromLabel));
         String fromTitle = afterMark(note == null ? null : note.title);
         if (fromTitle != null) return headline(tier(fromTitle));
-        return "Pick";
+        String fromBody = firstPiece(note == null ? null : note.body);
+        if (fromBody != null) return headline(tier(fromBody));
+        return "Settled";
+    }
+
+    /** The notification's plain text. Never only the words "Trend hit". */
+    static String plainText(WatchNote note, WatchMatch match) {
+        if (note == null) return "";
+        if (!trend(note)) {
+            String body = note.body == null ? "" : note.body;
+            return body.equalsIgnoreCase("Trend hit") ? "Pick settled" : body;
+        }
+        String score = withClock(shownFixture(note, match), clockOf(note, match));
+        String pick = market(note);
+        String detail = detailLine(note);
+        StringBuilder built = new StringBuilder();
+        if (!score.isEmpty()) built.append(score);
+        if (!"Settled".equals(pick) && (built.length() == 0 || built.indexOf(pick) < 0)) {
+            if (built.length() > 0) built.append(" \u00b7 ");
+            built.append(pick);
+        }
+        if (!detail.isEmpty() && built.indexOf(detail) < 0) {
+            if (built.length() > 0) built.append(" \u00b7 ");
+            built.append(detail);
+        }
+        String text = tier(built.toString());
+        if (text.isEmpty() || text.equalsIgnoreCase("Trend hit")) return "Pick settled";
+        return text;
     }
 
     /** Play builds say 10/10, 9/10+ and 8/10+. The web build keeps the percent. */
@@ -361,7 +389,7 @@ final class ScoreCards {
     private static String withClock(String score, String clock) {
         if (score.isEmpty()) return clock == null ? "" : clock;
         if (clock == null || clock.isEmpty() || score.contains(clock)) return score;
-        return score + " \u00b7 " + clock;
+        return score + " " + clock;
     }
 
     private static String detailLine(WatchNote note) {
@@ -371,10 +399,35 @@ final class ScoreCards {
         appendDetail(built, tier(useful(note.trendLabel)), market);
         appendDetail(built, useful(note.oddsText), market);
         String slip = useful(note.slipLabel);
-        if (slip == null) slip = useful(note.bookCode);
         appendDetail(built, tier(slip), market);
+        String code = useful(note.bookCode);
+        if (code != null && (slip == null || !slip.equalsIgnoreCase(code))) appendDetail(built, code, market);
         appendDetail(built, useful(note.progress), market);
+        if (built.length() == 0) appendLeftover(built, note.body, market);
         return built.toString();
+    }
+
+    /** Pieces of a rich body that are not the score line or the pick, when the structured fields were empty. */
+    private static void appendLeftover(StringBuilder built, String body, String market) {
+        if (body == null) return;
+        for (String piece : body.split("\u00b7|·")) {
+            String text = useful(piece);
+            if (text == null) continue;
+            if (text.matches(".*\\d+\\s*-\\s*\\d+.*")) continue;
+            appendDetail(built, tier(text), market);
+        }
+    }
+
+    private static String firstPiece(String body) {
+        if (body == null) return null;
+        for (String piece : body.split("\u00b7|·")) {
+            String text = useful(piece);
+            if (text == null || text.matches(".*\\d+\\s*-\\s*\\d+.*")) continue;
+            if (text.matches("(?i)\\d+(\\.\\d+)?") || text.matches("(?i)\\d+ of \\d+ won")) continue;
+            if ("FT".equals(text) || "HT".equals(text) || text.endsWith("\u2032")) continue;
+            return text;
+        }
+        return null;
     }
 
     private static void appendDetail(StringBuilder built, String part, String market) {
@@ -401,6 +454,27 @@ final class ScoreCards {
             : match == null ? "" : NoteCopy.fixture(match);
         if (note != null && note.oddsText != null && !note.oddsText.isEmpty()) line = line + " " + note.oddsText;
         return line;
+    }
+
+    /** A stored badge, or null. A missing crest stays blank. It is never an initials circle. */
+    private static Bitmap crestPhoto(Context context, WatchMatch match, boolean home, int size) {
+        if (match == null) return null;
+        String full = home ? match.fullHome() : match.fullAway();
+        String url = home ? match.homeCrest : match.awayCrest;
+        try {
+            return CrestCache.photo(context, full, url, size);
+        } catch (RuntimeException error) {
+            return null;
+        }
+    }
+
+    private static void paintCrest(RemoteViews views, int id, Bitmap badge) {
+        if (badge == null) {
+            views.setViewVisibility(id, View.GONE);
+            return;
+        }
+        views.setViewVisibility(id, View.VISIBLE);
+        views.setImageViewBitmap(id, badge);
     }
 
     private static Bitmap crest(Context context, WatchMatch match, boolean home, int size) {

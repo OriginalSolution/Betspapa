@@ -12,7 +12,7 @@ export type DeviceRegistration = {
   appVersion: string;
   follows: Follows;
   trends: string[];
-  bookings: Array<{ id: string; odds: number }>;
+  bookings: Array<{ id: string; odds: number; marketLabel?: string; fixture?: string; code?: string; tier?: string }>;
   lineupOff?: string[];
   builderSlip?: {
     id: string;

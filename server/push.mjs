@@ -34,9 +34,10 @@ import {
   legList,
   scoreLine,
   pickName,
+  scoreWithClock,
+  settleBody,
   settleClock,
   settleText,
-  trendCopy,
   varReviewCopy,
 } from '../src/lib/noteCopy.mjs';
 
@@ -156,18 +157,17 @@ export function stripBookmakerUrls(value) {
 
 /** The text under the title. Never the bare words "Trend hit". */
 export function pushBody(note) {
-  const written = stripBookmakerUrls(note?.body || '');
-  if (written && written.toLowerCase() !== 'trend hit') return written;
-  const built = settleText([
-    note?.fixture,
-    note?.clock,
-    note?.marketLabel,
-    note?.trendLabel,
-    note?.odds,
-    note?.slip || note?.code,
-    note?.progress,
-  ]);
-  return built || 'Pick settled';
+  return settleBody({
+    written: stripBookmakerUrls(note?.body || ''),
+    score: note?.fixture || '',
+    clock: note?.clock || '',
+    market: note?.marketLabel || '',
+    tier: note?.trendLabel || '',
+    odds: note?.odds || '',
+    slip: note?.slip || '',
+    code: note?.code || '',
+    progress: note?.progress || '',
+  });
 }
 
 /**
@@ -623,11 +623,22 @@ export function settleTrend(market, match) {
   return scored > 0 && finished ? 'won' : 'open';
 }
 
+function bookingOf(device, trendId) {
+  return (device.bookings || []).find((item) => item.id === trendId) || null;
+}
+
 function oddsOf(device, trendId) {
-  const row = (device.bookings || []).find((item) => item.id === trendId);
+  const row = bookingOf(device, trendId);
   if (!row || row.odds == null) return null;
   const value = Number(row.odds);
   return Number.isFinite(value) ? value : null;
+}
+
+/** "80%+" or "8/10+" kept apart from the pick name. Anything else is not a tier. */
+function tierPhrase(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  const found = text.match(/^(100%|90%\+|80%\+|10\/10|9\/10\+|8\/10\+)\b\s*/i);
+  return found ? found[1] : '';
 }
 
 export function trendNotes(previous, next, device) {
@@ -646,23 +657,27 @@ export function trendNotes(previous, next, device) {
     if (!match || !before) continue;
     if (settleTrend(market, before) === 'won') continue;
     if (settleTrend(market, match) !== 'won') continue;
-    const odds = oddsOf(device, id);
+    const booked = bookingOf(device, id);
+    const odds = booked && booked.odds != null && Number.isFinite(Number(booked.odds)) ? Number(booked.odds) : null;
     if (odds != null && !priceInRange(market, odds)) continue;
     const marketName = pickName(label);
     const clock = settleClock(match);
     const oddsText = odds == null ? '' : odds.toFixed(2);
     const score = scoreLine(match);
+    const tier = tierPhrase(booked?.marketLabel || booked?.tier || '');
+    const code = String(booked?.code || '').trim();
     notes.push({
       id: `trend:${id}:hit`,
       matchId,
       kind: 'win',
       title: `Trend hit · ${marketName}`,
-      body: settleText([score, clock, marketName, oddsText]),
+      body: settleText([scoreWithClock(score, clock), marketName, tier, oddsText, code]),
       marketLabel: marketName,
-      trendLabel: label,
+      trendLabel: tier,
       fixture: score,
       clock,
       odds: oddsText,
+      code,
       minute: match.minute,
       match,
     });
@@ -861,7 +876,8 @@ export function slipBellsFrom(body) {
       };
     }).filter(Boolean);
     if (!id || !legs.length) return null;
-    return { id, label: String(slip?.label || '').slice(0, 80), legs };
+    const code = String(slip?.code || '').trim().slice(0, 40);
+    return { id, label: String(slip?.label || '').slice(0, 80), code, legs };
   }).filter(Boolean);
 }
 
@@ -904,12 +920,13 @@ export function bellNotes(device, matches) {
       const score = legScore(row);
       const progress = `${wonCount} of ${bell.legs.length} won`;
       const slipName = String(bell.label || '');
+      const code = String(bell.code || '').trim();
       notes.push({
         id: `slipleg:${bell.id}:${leg.key}`,
         matchId: leg.eventId,
         kind: status === 'won' ? 'win' : 'bust',
         title: `${status === 'won' ? 'Leg won' : 'Leg lost'} · ${marketName}`,
-        body: settleText([score, clock, marketName, slipName, oddsText, progress]),
+        body: settleText([scoreWithClock(score, clock), marketName, slipName, oddsText, code, progress]),
         marketLabel: marketName,
         market: leg.market,
         trendLabel: slipName,
@@ -978,7 +995,15 @@ export function acceptDevice(body) {
         .filter((row) => row && typeof row.id === 'string')
         .map((row) => {
           const odds = Number(row.odds);
-          return { id: row.id.slice(0, 120), odds: Number.isFinite(odds) ? odds : null };
+          const marketLabel = String(row.marketLabel || '').slice(0, 80);
+          return {
+            id: row.id.slice(0, 120),
+            odds: Number.isFinite(odds) ? odds : null,
+            marketLabel,
+            fixture: String(row.fixture || '').slice(0, 140),
+            code: String(row.code || '').replace(/\s+/g, '').slice(0, 40),
+            tier: tierPhrase(row.tier || marketLabel),
+          };
         })
         .slice(0, 200)
     : [];
@@ -1256,32 +1281,54 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
   let token = typeof body?.token === 'string' ? body.token.trim() : '';
   if (!token && body?.latest) token = book.list()[0]?.token || '';
   if (token.length < 20 || /\s/.test(token)) return { status: 400, error: 'A device token is required.' };
-  const allowed = new Set(['goal', 'kickoff', 'win', 'red', 'var', 'penalty']);
+  const allowed = new Set(['goal', 'kickoff', 'win', 'leg', 'bust', 'red', 'var', 'penalty']);
   const kind = allowed.has(body?.kind) ? body.kind : 'goal';
   const matchId = typeof body?.matchId === 'string' && body.matchId.trim() ? body.matchId.trim() : 'qc-arsenal';
-  const sample = { home: 'Arsenal', away: 'Chelsea', homeScore: 2, awayScore: 1, competition: 'Premier League' };
+  const sample = { home: 'Arsenal', away: 'Chelsea', homeScore: 2, awayScore: 1, status: 'finished', minute: 90, competition: 'Premier League' };
+  const score = scoreLine(sample);
+  const settle = {
+    marketLabel: 'Over 1.5',
+    trendLabel: '80%+ Over 1.5',
+    odds: '1.45',
+    slip: 'Daily slip',
+    slipId: 'qc-slip',
+    progress: '29 of 36 won',
+    clock: 'FT',
+    fixture: score,
+    code: '',
+  };
   const copy = {
-    goal: { ...goalCopy({ ...sample, minute: 54 }, 'home', { player: 'Saka' }), minute: 54, player: 'Saka', side: 'home' },
+    goal: { ...goalCopy({ ...sample, minute: 54, status: 'live' }, 'home', { player: 'Saka' }), minute: 54, player: 'Saka', side: 'home' },
     kickoff: { ...kickoffCopy(sample), minute: 1 },
-    win: { ...trendCopy(sample, 'Over 2.5 goals'), minute: 54 },
-    red: { ...incidentCopy(sample, 'red', 'away', { player: 'Keeper', minute: 50 }), minute: 50, player: 'Keeper', side: 'away' },
-    var: { ...varReviewCopy(sample, 'home', { player: 'Saka', minute: 54 }), minute: 54, player: 'Saka', side: 'home' },
-    penalty: { ...incidentCopy(sample, 'penalty', 'home', { player: 'Saka', minute: 61 }), minute: 61, player: 'Saka', side: 'home' },
+    win: { title: 'Trend hit · Over 1.5', body: 'Trend hit', minute: 90, ...settle },
+    leg: { title: 'Leg won · Over 1.5', body: 'Trend hit', minute: 90, ...settle, id: `slipleg:qc-slip:${matchId}|over15` },
+    bust: { title: 'Leg lost · Over 1.5', body: 'Trend hit', minute: 90, ...settle, id: `slipleg:qc-slip:${matchId}|over15` },
+    red: { ...incidentCopy({ ...sample, minute: 50 }, 'red', 'away', { player: 'Keeper', minute: 50 }), minute: 50, player: 'Keeper', side: 'away' },
+    var: { ...varReviewCopy({ ...sample, minute: 54, status: 'live' }, 'home', { player: 'Saka', minute: 54 }), minute: 54, player: 'Saka', side: 'home' },
+    penalty: { ...incidentCopy({ ...sample, minute: 61, status: 'live' }, 'penalty', 'home', { player: 'Saka', minute: 61 }), minute: 61, player: 'Saka', side: 'home' },
   }[kind];
+  const settled = kind === 'win' || kind === 'leg' || kind === 'bust';
   const note = {
-    id: `test:${kind}:${Date.now()}`,
+    id: copy.id || `test:${kind}:${Date.now()}`,
     matchId,
-    kind,
+    kind: kind === 'leg' ? 'win' : kind === 'bust' ? 'bust' : kind,
     title: copy.title,
     body: copy.body,
     player: copy.player || '',
     side: copy.side || '',
     minute: copy.minute,
-    market: kind === 'win' ? 'over25' : '',
-    marketLabel: kind === 'win' ? 'Over 2.5 goals' : '',
-    trendId: kind === 'win' ? `${matchId}:over25` : '',
-    fixture: fixtureLine(sample),
-    odds: kind === 'win' ? '1.72' : '',
+    market: settled ? 'over15' : '',
+    marketLabel: copy.marketLabel || '',
+    trendId: kind === 'win' ? `${matchId}:over15` : '',
+    trendLabel: copy.trendLabel || '',
+    fixture: copy.fixture || (settled ? score : fixtureLine(sample)),
+    clock: copy.clock || '',
+    odds: copy.odds || '',
+    slip: copy.slip || '',
+    slipId: copy.slipId || '',
+    progress: copy.progress || '',
+    code: copy.code || '',
+    route: kind === 'leg' || kind === 'bust' ? 'slip' : '',
     match: {
       id: matchId,
       home: 'Arsenal',
@@ -1289,10 +1336,10 @@ export async function sendTestPush(book, body, log = (message) => console.log(me
       homeScore: 2,
       awayScore: 1,
       minute: copy.minute,
-      status: 'live',
+      status: settled ? 'finished' : 'live',
       competition: 'Premier League',
-      homeCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/Arsenal_FC.svg/250px-Arsenal_FC.svg.png',
-      awayCrest: 'https://upload.wikimedia.org/wikipedia/en/thumb/c/cc/Chelsea_FC.svg/250px-Chelsea_FC.svg.png',
+      homeCrest: 'https://api.betspapa.com/crests/id/arsenal.png',
+      awayCrest: 'https://api.betspapa.com/crests/id/chelsea.png',
     },
   };
   try {
@@ -1637,6 +1684,9 @@ export function startPushWatch(options = {}) {
       if (dropped.has(device.token)) continue;
       if (book.alreadySent(device.token, item.id)) continue;
       try {
+        if (item.kind === 'win' || item.kind === 'bust' || item.kind === 'slip') {
+          log(`Settle ${item.kind} ${item.id} ${pushBody(item).slice(0, 180)}`);
+        }
         const result = await deliver(account, messageFor(item, device));
         const fcm = publicFcm(result.body);
         if (result.dropped) {
