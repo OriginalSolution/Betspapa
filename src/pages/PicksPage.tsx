@@ -15,6 +15,7 @@ import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 import { isPlayStoreBuild } from '../lib/storeBuild';
+import { teamOnList } from '../lib/teamMarks';
 
 const emptyCatalog: CrestCatalog = { byKey: {}, byId: {} };
 
@@ -62,15 +63,18 @@ export function PicksPage() {
   }, []);
 
   const blocked = useMemo(() => {
-    const teams = new Set(lists.filter((item) => item.list === 'black' && item.scope === 'team').map((item) => item.id));
     const markets = new Set(lists.filter((item) => item.list === 'black' && item.scope === 'market').map((item) => item.id));
     const competitions = new Set(lists.filter((item) => item.list === 'black' && item.scope === 'competition').map((item) => item.id));
-    return { teams, markets, competitions };
+    return { markets, competitions };
   }, [lists]);
 
   const tips = useMemo(() => {
     return tipsFromEngine(state, matches).filter(
-      (tip) => !blocked.markets.has(tip.chip.market) && !blocked.teams.has(tip.chip.teamId) && !blocked.competitions.has(tip.competitionId),
+      (tip) =>
+        !blocked.markets.has(tip.chip.market) &&
+        !blocked.competitions.has(tip.competitionId) &&
+        !teamOnList(lists, 'black', { id: tip.chip.teamId, name: tip.chip.teamName }) &&
+        !teamOnList(lists, 'black', { id: tip.chip.opponentId, name: tip.chip.opponentName }),
     );
   }, [state, matches, blocked]);
   const band = useMemo(() => tips.filter((tip) => showsInTier(tip.chip.rate, tier, tip.chip.teamsAgree)), [tips, tier]);

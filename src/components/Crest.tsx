@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Team } from '../types';
+import { catalogCrest, loadCrestCatalog } from '../lib/crestCatalog';
 import { resolveMissingCrest } from '../lib/crestLive';
 import { cx } from '../lib/format';
 
@@ -87,8 +88,20 @@ export function Crest({
         decoding="sync"
         referrerPolicy="no-referrer"
         onError={() => {
-          if (attempt < CREST_RETRIES) setAttempt((current) => current + 1);
-          else setBroken(true);
+          if (attempt < CREST_RETRIES) {
+            setAttempt((current) => current + 1);
+            return;
+          }
+          void loadCrestCatalog().then((catalog) => {
+            const found = catalogCrest(catalog, team);
+            if (found && found !== url) {
+              setAttempt(0);
+              setBroken(false);
+              setUrl(found);
+              return;
+            }
+            setBroken(true);
+          });
         }}
       />
     );

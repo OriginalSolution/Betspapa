@@ -16,6 +16,8 @@ import { PicksPage } from './pages/PicksPage';
 import { RankingsPage } from './pages/RankingsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SlipsPage } from './pages/SlipsPage';
+import { TeamListsPage } from './pages/TeamListsPage';
+import { TeamMarkProvider } from './components/TeamMark';
 import { TodayPage } from './pages/TodayPage';
 import { TrendsPage } from './pages/TrendsPage';
 import { isNativeApp } from './lib/nativeHttp';
@@ -35,6 +37,7 @@ const titles: Record<string, string> = {
   '/codes': 'Codes',
   '/trends': 'Trends',
   '/slips': 'Slips',
+  '/slips/teams': 'Teams',
   '/slips/booked': 'Booked & tracking',
   '/record': 'Record',
   '/record/codes': 'Codes record',
@@ -148,6 +151,7 @@ export function App() {
   return (
     <AlertSetupProvider>
       <LineupProvider>
+      <TeamMarkProvider>
       <div className={isPlayStoreBuild() ? 'shell is-play' : 'shell'}>
         <SideNav />
         <div className="center">
@@ -191,6 +195,7 @@ export function App() {
               <Route path="/inbox" element={<InboxPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/slips/booked" element={<BookedPage />} />
+              <Route path="/slips/teams" element={<TeamListsPage />} />
               <Route path="/codes" element={<CodesPage />} />
               <Route path="/codes/:strategy" element={<CodesPage />} />
               <Route path="/match/:id" element={<MatchPage />} />
@@ -202,6 +207,7 @@ export function App() {
         <TabBar />
         <Toasts />
       </div>
+      </TeamMarkProvider>
       </LineupProvider>
     </AlertSetupProvider>
   );

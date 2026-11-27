@@ -98,7 +98,6 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const baseline = useRef<{ t0: number; status: Map<string, LegStatus>; codes: Map<string, LegStatus> } | null>(null);
 
   const picks = useMemo(() => buildPicks(matches), [matches]);
-  const trends = useMemo(() => trendsFromPicks(picks), [picks]);
   const ledger = extra;
   const greenMarkets = lists.filter((item) => item.list === 'green' && item.scope === 'market').map((item) => item.id);
   const autoIds = useMemo(
@@ -113,6 +112,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const slipPicks = useMemo(() => picks.filter((pick) => slip.includes(pick.id)), [picks, slip]);
   const codes = useMemo(() => bookingCodes(slipPicks), [slipPicks]);
   const visiblePicks = useMemo(() => picks.filter((pick) => !isBlacklisted(pick, lists)), [picks, lists]);
+  const trends = useMemo(() => trendsFromPicks(visiblePicks), [visiblePicks]);
   const hiddenCount = picks.length - visiblePicks.length;
 
   useEffect(() => write(SLIP_KEY, manual), [manual]);
@@ -237,6 +237,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       bookings: followedPicks.map((pick) => ({ id: pick.id, odds: pick.odds })),
       builderSlip: slipPayload(tracked),
       builderSlips: trackedSlips.map((slip) => slipPayload(slip)).filter((slip): slip is NonNullable<typeof slip> => Boolean(slip)),
+      teamLists: lists.filter((item) => item.scope === 'team').map((item) => ({ id: item.id, name: item.name, list: item.list, crest: item.crest || '' })),
       lineupOff: settings.lineupOff,
       settings: {
         kickoff: settings.kickoff,
@@ -260,7 +261,7 @@ export function ProductProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     syncDeviceRef.current();
-  }, [trendFollows, matches, picks, engineTick, follows, settings, bells, builderTick]);
+  }, [trendFollows, matches, picks, engineTick, follows, settings, bells, builderTick, lists]);
 
   useEffect(() => {
     const send = () => syncDeviceRef.current();

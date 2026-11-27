@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BookMark } from '../components/BookMark';
 import { CodeActions } from '../components/CodeActions';
 import { PickCard } from '../components/PickCard';
@@ -29,6 +29,7 @@ import { useSlipBells } from '../lib/useSlipBells';
 import { packLabel } from '../lib/slipPacks';
 import { useEngineBoard } from '../state/engine';
 import { useProduct } from '../state/product';
+import { legBlocked } from '../lib/teamMarks';
 import { useStore } from '../state/store';
 
 const emptyCatalog: CrestCatalog = { byKey: {}, byId: {} };
@@ -71,7 +72,7 @@ export function SlipsPage() {
   const focus = params.get('trend');
   const requested = params.get('book');
   const { state, problem } = useEngineSlips();
-  const { picks, slip } = useProduct();
+  const { picks, slip, lists } = useProduct();
   const { matches } = useStore();
   const [desk, setDesk] = useState<DeskId>(DESKS.includes(requested as DeskId) ? (requested as DeskId) : 'sportybet');
   const [visible, setVisible] = useState(30);
@@ -99,6 +100,7 @@ export function SlipsPage() {
   return (
     <div className="stack slips-page">
       <SlipMonitor />
+      <p className="slip-monitor-head"><Link to="/slips/teams">Blacklist and Greenlight</Link></p>
       <div className="book-switch" role="tablist" aria-label={isPlayStoreBuild() ? 'Code set' : 'Bookmaker'}>
         {DESKS.map((id, index) => (
           <button
@@ -157,6 +159,7 @@ export function SlipsPage() {
               focused={focus === trend.id}
               catalog={catalog}
               matches={matches}
+              lists={lists}
               onToggle={() => setOpenTrend((current) => (current === trend.id ? null : trend.id))}
             />
           ))
@@ -234,6 +237,7 @@ function TrendSlip({
   focused,
   catalog,
   matches,
+  lists,
   onToggle,
 }: {
   trend: EngineSlip;
@@ -242,13 +246,15 @@ function TrendSlip({
   focused: boolean;
   catalog: CrestCatalog;
   matches: ReturnType<typeof useStore>['matches'];
+  lists: ReturnType<typeof useProduct>['lists'];
   onToggle: () => void;
 }) {
   const book = deskBook(trend, desk);
   const codes = book.parts.map((part) => part.code);
   const odds = book.parts.map((part) => showOdds(part.totalOdds)).filter((value): value is string => Boolean(value));
   const count = book.parts.length ? book.parts.reduce((sum, part) => sum + part.legs, 0) : visibleLegs(trend).length;
-  const legs = visibleLegs(trend);
+  const legs = visibleLegs(trend).filter((leg) => !legBlocked(lists, leg));
+  if (visibleLegs(trend).length > 0 && legs.length === 0) return null;
   const { settings, permission, requestPermission } = useStore();
   const bells = useSlipBells();
   const bellId = `trend:${trend.id}:${(trend.bookedAt || '').slice(0, 10)}`;
@@ -294,8 +300,10 @@ function TrendSlip({
                   key: `${leg.eventId}|${leg.market}`,
                   home: homeName,
                   away: awayName || '',
-                  homeCrest: home.crest || null,
-                  awayCrest: away?.crest || null,
+                  homeCrest: home.crest || leg.homeCrest || null,
+                  awayCrest: away?.crest || leg.awayCrest || null,
+                  homeId: leg.homeId,
+                  awayId: leg.awayId,
                   label: `${marketLabel(leg.market)}${leg.sample ? ` · ${leg.sample}` : ''}`,
                   odds: Number(leg.odds) || 0,
                   kickoff: leg.kickoff || '',

@@ -8,7 +8,9 @@ import { tipsFromEngine } from '../lib/matchPicks';
 import { playTierPhrase } from '../lib/pickCodes';
 import { legsForPacks, PART_SIZE, partsOf, totalOddsLine, trendPacks, type BuilderLeg, type TrendPack } from '../lib/slipPacks';
 import { goToBookedCodes } from '../lib/useFreshCodes';
+import { legBlocked } from '../lib/teamMarks';
 import { useEngineBoard } from '../state/engine';
+import { useProduct } from '../state/product';
 import { useStore } from '../state/store';
 import { Crest } from './Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
@@ -33,6 +35,7 @@ export function SlipBuilder() {
   const navigate = useNavigate();
   const { state } = useEngineBoard();
   const { matches } = useStore();
+  const { lists } = useProduct();
   const [builder, setBuilder] = useState(readBuilder);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -61,8 +64,14 @@ export function SlipBuilder() {
     return found;
   }, [matches]);
 
-  const packs = useMemo(() => trendPacks(tipsFromEngine(state, matches), matches), [state, matches]);
-  const selected = builder.tracked?.legs?.length ? builder.tracked.legs : legsForPacks(packs, builder.packIds);
+  const packs = useMemo(
+    () =>
+      trendPacks(tipsFromEngine(state, matches), matches)
+        .map((pack) => ({ ...pack, legs: pack.legs.filter((leg) => !legBlocked(lists, leg)) }))
+        .filter((pack) => pack.legs.length),
+    [state, matches, lists],
+  );
+  const selected = (builder.tracked?.legs?.length ? builder.tracked.legs : legsForPacks(packs, builder.packIds)).filter((leg) => !legBlocked(lists, leg));
   const added = new Set(builder.packIds);
   const matchCount = new Set(selected.map((leg) => leg.eventId)).size;
   const average = selected.length ? selected.reduce((sum, leg) => sum + leg.odds, 0) / selected.length : 0;
@@ -142,8 +151,8 @@ export function SlipBuilder() {
             {selected.map((leg) => (
               <li key={leg.key} className={cx('slip-leg', editing && 'is-editing')}>
                 <span className="slip-leg-crests" aria-hidden="true">
-                  <Crest team={teamOf(leg.home, sideCrest(leg.home, leg.homeCrest, boardCrests, catalog))} size={22} fallback="initials" />
-                  <Crest team={teamOf(leg.away, sideCrest(leg.away, leg.awayCrest, boardCrests, catalog))} size={22} fallback="initials" />
+                  <Crest team={teamOf(leg.home, sideCrest(leg.home, leg.homeCrest, boardCrests, catalog))} size={22} />
+                  <Crest team={teamOf(leg.away, sideCrest(leg.away, leg.awayCrest, boardCrests, catalog))} size={22} />
                 </span>
                 <span className="slip-leg-main">
                   <span className="slip-leg-teams">

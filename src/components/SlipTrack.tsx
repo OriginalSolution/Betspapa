@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { recordedPicks } from '../lib/slipScores';
 import { readBuilder, subscribeBuilder, updateTrackedSlip } from '../lib/builderStore';
 import { cx, kickoffClock, longDay } from '../lib/format';
+import { teamKey } from '../lib/teamMarks';
+import { TeamTap } from './TeamMark';
 import { tipsFromEngine } from '../lib/matchPicks';
 import {
   applyGrades,
@@ -127,7 +129,7 @@ export function SlipLegRow({
   match,
   fresh,
 }: {
-  leg: Pick<GradedLeg, 'key' | 'home' | 'away' | 'homeCrest' | 'awayCrest' | 'label' | 'odds' | 'kickoff' | 'status' | 'ft'>;
+  leg: Pick<GradedLeg, 'key' | 'home' | 'away' | 'homeCrest' | 'awayCrest' | 'label' | 'odds' | 'kickoff' | 'status' | 'ft'> & { homeId?: string | null; awayId?: string | null };
   match?: Match;
   fresh?: boolean;
 }) {
@@ -161,12 +163,16 @@ export function SlipLegRow({
       </span>
       <div className="slip-leg2-main">
         <p className="slip-leg2-side">
-          <Crest team={home} size={20} fallback="initials" />
-          <span>{home.name}</span>
+          <TeamTap team={{ id: leg.homeId || teamKey(home.name), name: home.name, crest: home.crest }}>
+            <Crest team={home} size={20} />
+            <span>{home.name}</span>
+          </TeamTap>
         </p>
         <p className="slip-leg2-side">
-          <Crest team={away} size={20} fallback="initials" />
-          <span>{away.name}</span>
+          <TeamTap team={{ id: leg.awayId || teamKey(away.name), name: away.name, crest: away.crest }}>
+            <Crest team={away} size={20} />
+            <span>{away.name}</span>
+          </TeamTap>
         </p>
         <p className="slip-leg2-meta">
           <span className="slip-pill">{leg.label}</span>

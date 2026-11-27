@@ -3157,6 +3157,30 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @keyframes slip-live { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
 .slip-leg2-main { min-width: 0; display: grid; gap: 3px; }
 .slip-leg2-side { margin: 0; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.team-tap { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.team-mark-dim { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.62); display: grid; place-items: center; padding: calc(24px + var(--safe-area-inset-top)) 24px calc(24px + var(--safe-area-inset-bottom)); }
+.team-mark-card { width: min(342px, 100%); background: #161a22; border: 1px solid var(--line); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); }
+.team-mark-who { display: flex; gap: 12px; align-items: center; }
+.team-mark-who strong { display: block; font-size: 17px; }
+.team-mark-who span { color: var(--muted); font-size: 12px; }
+.team-mark-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.team-mark-actions button { border: 0; border-radius: 14px; min-height: 48px; font: inherit; font-weight: 750; color: #fff; }
+.team-mark-actions button:first-child { background: var(--red); }
+.team-mark-actions button:last-child { background: #1c8f5e; }
+.team-mark-actions button.is-on { outline: 2px solid #fff; }
+.team-mark-card p { margin: 12px 0 0; color: var(--muted); font-size: 13px; }
+.team-lists-tabs { display: flex; gap: 8px; }
+.team-lists-tabs button { border: 0; border-radius: 999px; padding: 8px 14px; background: var(--surface-2); color: var(--muted); font: inherit; font-weight: 700; }
+.team-lists-tabs button.is-on { background: var(--text); color: #12141a; }
+.team-lists-search { width: 100%; min-height: 44px; border-radius: 12px; border: 1px solid var(--line-strong); background: #0c0e14; color: var(--text); padding: 0 12px; font: inherit; }
+.team-lists-rows { list-style: none; margin: 8px 0; padding: 0; }
+.team-lists-rows li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.team-lists-rows strong { flex: 1; min-width: 0; }
+.team-lists-rows button, .team-lists-undo button { border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; }
+.team-lists-undo { display: flex; justify-content: space-between; align-items: center; background: #1c212c; border-radius: 12px; padding: 10px 12px; }
+.team-lists-undo button { color: var(--gold); }
+.team-lists-book { display: grid; gap: 8px; }
+.slip-monitor-head a { color: var(--muted); font-size: 12px; font-weight: 700; }
 .slip-leg2-side .crest { flex: none; }
 .slip-leg2-side span { min-width: 0; overflow-wrap: anywhere; }
 .slip-leg2-meta { margin: 3px 0 0; display: flex; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
