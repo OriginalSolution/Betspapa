@@ -26,6 +26,7 @@ export type DeviceRegistration = {
     legs: Array<{ eventId: string; market: string; home: string; away: string; odds: number; label: string }>;
   }>;
   /** Slips with the bell on. Each leg gets its own won or lost push, then one for the slip. */
+  teamLists?: Array<{ id: string; name: string; list: 'black' | 'green'; crest?: string }>;
   slipBells?: Array<{
     id: string;
     label: string;

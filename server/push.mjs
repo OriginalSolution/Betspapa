@@ -818,6 +818,24 @@ export function slipNotes(device, matches) {
 }
 
 /** Slips with the bell on. Omitted means "leave the stored bells alone". An empty list clears them. */
+/** Team marks saved with the phone. Omitted leaves the stored list alone. */
+export function teamListsFrom(body) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, 'teamLists')) return undefined;
+  const rows = Array.isArray(body.teamLists) ? body.teamLists : [];
+  const seen = new Set();
+  return rows.map((row) => {
+    const id = String(row?.id || '').trim().slice(0, 80);
+    const name = String(row?.name || '').trim().slice(0, 80);
+    const list = row?.list === 'green' ? 'green' : row?.list === 'black' ? 'black' : '';
+    if (!id || !name || !list) return null;
+    const key = `${list}:${id}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const crest = typeof row?.crest === 'string' && row.crest.startsWith('https://') ? row.crest.slice(0, 240) : '';
+    return { id, name, list, crest };
+  }).filter(Boolean).slice(0, 200);
+}
+
 export function slipBellsFrom(body) {
   if (!body || !Object.prototype.hasOwnProperty.call(body, 'slipBells')) return undefined;
   const rows = Array.isArray(body.slipBells) ? body.slipBells : [];
@@ -1079,6 +1097,7 @@ export function createDeviceBook(dir) {
         slipProgress: slips.slip?.id && existing?.builderSlip?.id === slips.slip.id ? existing?.slipProgress || {} : {},
         slipProgressBySlip: keepSlipProgress(existing?.slipProgressBySlip, slips.slips),
         slipBells: slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells,
+        teamLists: teamListsFrom(body) === undefined ? existing?.teamLists || [] : teamListsFrom(body),
         bellProgress: keepBellProgress(existing?.bellProgress, slipBellsFrom(body) === undefined ? existing?.slipBells || [] : accepted.device.slipBells),
         sent: existing?.sent || [],
         appVersion: accepted.device.appVersion || (typeof existing?.appVersion === 'string' ? existing.appVersion : ''),

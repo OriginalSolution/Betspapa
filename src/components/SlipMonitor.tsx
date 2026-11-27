@@ -12,6 +12,8 @@ import { slipWindow } from '../lib/slipWindow';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { cx } from '../lib/format';
+import { legBlocked } from '../lib/teamMarks';
+import { useProduct } from '../state/product';
 import { useEngineBoard } from '../state/engine';
 import { useStore } from '../state/store';
 import type { Match } from '../types';
@@ -40,6 +42,7 @@ function tally(legs: GradedLeg[]): string {
 
 export function SlipMonitor() {
   const { matches, settings, permission, requestPermission } = useStore();
+  const { lists } = useProduct();
   const { state } = useEngineBoard();
   const bells = useSlipBells();
   const play = isPlayStoreBuild();
@@ -79,11 +82,11 @@ export function SlipMonitor() {
   const rows = useMemo(
     () =>
       builder.slips.map((slip) => {
-        const legs = applyGrades(slip.legs, grades);
+        const legs = applyGrades(slip.legs.filter((leg) => !legBlocked(lists, leg)), grades);
         const status = monitorState(legs, byId);
         return { slip, legs, status };
       }),
-    [builder.slips, grades, byId],
+    [builder.slips, grades, byId, lists],
   );
 
   const listRef = useRef<HTMLUListElement>(null);
@@ -148,6 +151,7 @@ export function SlipMonitor() {
       <header className="slip-monitor-head">
         <h2>Tracked</h2>
         <span>{rows.length} {rows.length === 1 ? 'slip' : 'slips'}</span>
+        <Link to="/slips/teams">Teams</Link>
       </header>
       {rows.length === 0 && <p className="lede">No tracked slips yet. Paste a code from today’s list, or build one on Trends. Booking another keeps the ones you already have.</p>}
       <ul className="slip-monitor-list" ref={listRef}>

@@ -3,7 +3,20 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, builderSlipsFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, slipNotes, startPushWatch, stripBookmakerUrls, teamFollows, trendNotes } from './push.mjs';
+import { acceptDevice, BASELINE_MAX_AGE_MS, builderSlipFrom, builderSlipsFrom, CARRY_MS, carryForward, tokenIsDead, ttlFor, channelFor, createDeviceBook, diffMatches, fcmConfigured, messageFor, normalizeLive, notesForDevice, publicFcm, PUSH_TTL, slipNote, slipNotes, startPushWatch, stripBookmakerUrls, teamFollows, teamListsFrom, trendNotes } from './push.mjs';
+
+test('team marks travel with the phone and are not capped at a dozen', () => {
+  assert.equal(teamListsFrom({}), undefined);
+  const rows = teamListsFrom({
+    teamLists: Array.from({ length: 24 }, (_, index) => ({ id: `t${index}`, name: `Club ${index}`, list: index % 2 ? 'green' : 'black' })),
+  });
+  assert.equal(rows.length, 24);
+  const book = createDeviceBook(mkdtempSync(join(tmpdir(), 'betspapa-lists-')));
+  book.register({ token: 'fcm-token-value-that-is-long-enough', teamLists: [{ id: 'uta', name: 'Uttaradit Saksiam FC', list: 'black' }] });
+  assert.equal(book.list()[0].teamLists[0].name, 'Uttaradit Saksiam FC');
+  book.register({ token: 'fcm-token-value-that-is-long-enough', follows: { matches: [], teams: [] } });
+  assert.equal(book.list()[0].teamLists.length, 1);
+});
 
 test('FCM stays off until a service account is configured', () => {
   assert.equal(fcmConfigured({}), false);

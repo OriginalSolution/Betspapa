@@ -28,6 +28,9 @@ import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
 import { canSeeCode } from '../lib/proAccess';
 import { useStore } from '../state/store';
+import { useProduct } from '../state/product';
+import { legBlocked, teamKey } from '../lib/teamMarks';
+import { TeamTap } from '../components/TeamMark';
 import { markFresh, newCodes } from '../lib/freshCode';
 import { goToBookedCodes, useFreshCodes } from '../lib/useFreshCodes';
 
@@ -159,6 +162,7 @@ export function CodesPage() {
   const { strategy: strategyId = '' } = useParams();
   const navigate = useNavigate();
   const { settings } = useStore();
+  const { lists } = useProduct();
   const [data, setData] = useState<CodesView | null>(null);
   const [error, setError] = useState('');
   const [segment, setSegment] = useState<'week' | 'daily' | 'record'>('week');
@@ -247,17 +251,21 @@ export function CodesPage() {
         {week.parts[0] && (
           <section className="code-legs">
             <h2>Legs {week.parts.reduce((sum, part) => sum + part.legCount, 0)}</h2>
-            {week.parts.flatMap((part) => part.legs).map((leg) => (
+            {week.parts.flatMap((part) => part.legs).filter((leg) => !legBlocked(lists, leg)).map((leg) => (
               <div className="code-leg" key={`${leg.eventId}-${leg.label}`}>
                 <time>{gmtClock(leg.kickoff)}</time>
                 <div>
                   <p>
-                    <Crest team={{ id: leg.home, name: leg.home, shortName: leg.home, abbr: '', color: '', crest: leg.homeCrest }} size={22} />
-                    <span>{leg.home}</span>
+                    <TeamTap team={{ id: teamKey(leg.home), name: leg.home, crest: leg.homeCrest }}>
+                      <Crest team={{ id: leg.home, name: leg.home, shortName: leg.home, abbr: '', color: '', crest: leg.homeCrest }} size={22} />
+                      <span>{leg.home}</span>
+                    </TeamTap>
                   </p>
                   <p>
-                    <Crest team={{ id: leg.away, name: leg.away, shortName: leg.away, abbr: '', color: '', crest: leg.awayCrest }} size={22} />
-                    <span>{leg.away}</span>
+                    <TeamTap team={{ id: teamKey(leg.away), name: leg.away, crest: leg.awayCrest }}>
+                      <Crest team={{ id: leg.away, name: leg.away, shortName: leg.away, abbr: '', color: '', crest: leg.awayCrest }} size={22} />
+                      <span>{leg.away}</span>
+                    </TeamTap>
                   </p>
                 </div>
                 <div className="code-leg-pick">

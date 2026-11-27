@@ -1,4 +1,5 @@
 import { publishableOdds } from '../lib/oddsFloor';
+import { pickBlocked } from '../lib/teamMarks';
 import type { Match } from '../types';
 import { teams } from './catalog';
 
@@ -216,7 +217,7 @@ export type LedgerEntry = {
 };
 
 export type ListScope = 'team' | 'competition' | 'market';
-export type ListItem = { scope: ListScope; id: string; name: string; list: 'black' | 'green' };
+export type ListItem = { scope: ListScope; id: string; name: string; list: 'black' | 'green'; crest?: string | null };
 
 export type Bookmaker = {
   id: string;
@@ -758,11 +759,11 @@ export function rankLedger(
 }
 
 export function isBlacklisted(pick: PickView, lists: ListItem[]): boolean {
+  if (pickBlocked(lists, pick)) return true;
   return lists.some(
     (item) =>
       item.list === 'black' &&
-      ((item.scope === 'team' && item.id === pick.teamId) ||
-        (item.scope === 'competition' && item.id === pick.competitionId) ||
+      ((item.scope === 'competition' && item.id === pick.competitionId) ||
         (item.scope === 'market' && item.id === pick.market)),
   );
 }
