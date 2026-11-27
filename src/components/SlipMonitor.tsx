@@ -76,7 +76,6 @@ export function SlipMonitor() {
       }),
     [builder.slips, grades, matches],
   );
-  const open = rows.find((row) => row.slip.id === openId) || null;
 
   const addCode = () => {
     const slip = slipFromPublishedCode(state, code);
@@ -97,19 +96,35 @@ export function SlipMonitor() {
       </header>
       {rows.length === 0 && <p className="lede">No tracked slips yet. Paste a code from today’s list, or build one on Trends. Booking another keeps the ones you already have.</p>}
       <ul className="slip-monitor-list">
-        {rows.map(({ slip, legs, status }) => (
-          <li key={slip.id}>
-            <button type="button" className={cx('slip-monitor-row', openId === slip.id && 'is-on')} onClick={() => setOpenId((current) => (current === slip.id ? null : slip.id))}>
-              <span>
-                <strong>{playTierPhrase(slip.label)}</strong>
-                <small>{rowSub(slip, play)} · {tally(legs)}</small>
-              </span>
-              <i className={cx('slip-chip', `is-${status === 'pending' ? 'open' : status}`)}>{WORD[status]}</i>
-            </button>
-          </li>
-        ))}
+        {rows.map((row) => {
+          const open = openId === row.slip.id;
+          return (
+            <li key={row.slip.id}>
+              <button
+                type="button"
+                className={cx('slip-monitor-row', open && 'is-on')}
+                aria-expanded={open}
+                onClick={() => setOpenId((current) => (current === row.slip.id ? null : row.slip.id))}
+              >
+                <span>
+                  <strong>{playTierPhrase(row.slip.label)}</strong>
+                  <small>{rowSub(row.slip, play)} · {tally(row.legs)}</small>
+                </span>
+                <i className={cx('slip-chip', `is-${row.status === 'pending' ? 'open' : row.status}`)}>{WORD[row.status]}</i>
+              </button>
+              {open && (
+                <OpenSlip
+                  row={row}
+                  play={play}
+                  bellOn={Boolean(bells[row.slip.id]?.on)}
+                  matches={matches}
+                  onBell={(on) => toggleBell(row.slip, on, settings.browser, permission, requestPermission)}
+                />
+              )}
+            </li>
+          );
+        })}
       </ul>
-      {open && <OpenSlip row={open} play={play} bellOn={Boolean(bells[open.slip.id]?.on)} matches={matches} onBell={(on) => toggleBell(open.slip, on, settings.browser, permission, requestPermission)} />}
       <form
         className="slip-monitor-add"
         onSubmit={(event) => {
@@ -151,7 +166,6 @@ function OpenSlip({
   const byId = new Map(matches.map((match) => [match.id, match]));
   const counts = slipCounts(row.legs);
   const { active, settled } = splitMonitorLegs(row.legs, matches);
-  const [settledOpen, setSettledOpen] = useState(false);
   const desk = deskOf(row.slip);
   const part = row.slip.parts[0];
   const odds = formatTotalOdds(combinedOdds(row.legs));
@@ -164,24 +178,10 @@ function OpenSlip({
         <span>{bellOn ? 'Alerts on for this slip' : 'Alerts off'}</span>
       </div>
       <ol className="slip-legs2">
-        {active.map((leg) => (
+        {[...active, ...settled].map((leg) => (
           <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} />
         ))}
       </ol>
-      {settled.length > 0 && (
-        <div className="slip-monitor-settled">
-          <button type="button" className="slip-monitor-settled-toggle" aria-expanded={settledOpen} onClick={() => setSettledOpen((open) => !open)}>
-            {settledOpen ? '▾' : '▸'} Settled ({settled.length})
-          </button>
-          {settledOpen && (
-            <ol className="slip-legs2">
-              {settled.map((leg) => (
-                <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} />
-              ))}
-            </ol>
-          )}
-        </div>
-      )}
     </article>
   );
 }
