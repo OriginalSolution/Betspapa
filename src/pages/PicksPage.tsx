@@ -119,14 +119,16 @@ export function PicksPage() {
       <section className="master-strip">
         <header>
           <span>Master code · {tierLabel(tier)} all {band.length}</span>
-          <label>
-            <BookMark id={desk} />
-            <select value={desk} aria-label="Bookmaker" onChange={(event) => setDesk(event.target.value as DeskId)}>
-              {DESKS.map((id) => (
-                <option key={id} value={id}>{DESK_NAMES[id]}</option>
-              ))}
-            </select>
-          </label>
+          {!isPlayStoreBuild() && (
+            <label>
+              <BookMark id={desk} />
+              <select value={desk} aria-label="Bookmaker" onChange={(event) => setDesk(event.target.value as DeskId)}>
+                {DESKS.map((id) => (
+                  <option key={id} value={id}>{DESK_NAMES[id]}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </header>
         {booked.parts.length === 0 && <p>{state?.showingCached ? 'Showing the last booked board' : 'No code yet'}</p>}
         <div className="master-parts">

@@ -115,10 +115,11 @@ public class GoalCardLayoutTest {
         assertTrue(text(card, R.id.score_line), text(card, R.id.score_line).contains("Hearts of Oak 2-1 Asante Kotoko"));
         assertTrue(text(card, R.id.score_line).contains("FT"));
         View collapsed = apply(context, ScoreCards.collapsed(context, bare, match), 360);
-        assertTrue(text(collapsed, R.id.collapsed_score).startsWith("LEG WON"));
-        assertTrue(text(collapsed, R.id.collapsed_score).contains("2-1"));
+        assertEquals("Hearts of Oak 2-1 Asante Kotoko · FT", text(collapsed, R.id.collapsed_score));
+        assertTrue(text(collapsed, R.id.collapsed_sub).contains("Leg won"));
         assertFalse(text(collapsed, R.id.collapsed_score).toLowerCase().contains("trend hit"));
-        assertEquals("FT", text(collapsed, R.id.collapsed_minute));
+        assertTrue(text(collapsed, R.id.collapsed_score).contains("· FT"));
+        assertEquals(View.GONE, collapsed.findViewById(R.id.collapsed_minute).getVisibility());
 
         WatchNote full = new WatchNote("slipleg:qc:sr:match:1|over15", match.id, "win", "Leg won · Over 1.5", "ignored");
         full.marketLabel = "Over 1.5";
@@ -198,10 +199,13 @@ public class GoalCardLayoutTest {
         View collapsed = apply(context, ScoreCards.collapsed(context, note, match), widthDp);
         View expanded = apply(context, ScoreCards.expanded(context, note, match, true), widthDp);
         String collapsedText = text(collapsed, R.id.collapsed_score);
+        String collapsedSub = text(collapsed, R.id.collapsed_sub);
         String expandedText = text(expanded, R.id.score_line) + " " + text(expanded, R.id.trend_market) + " " + text(expanded, R.id.trend_fixture) + " " + text(expanded, R.id.trend_detail);
-        assertTrue(collapsedText, collapsedText.startsWith("LEG WON") && collapsedText.contains("Arsenal 2-1 Chelsea"));
+        assertEquals("Arsenal 2-1 Chelsea · FT", collapsedText);
+        assertTrue(collapsedSub, collapsedSub.contains("Leg won") && collapsedSub.contains("Over 1.5"));
         assertFalse(collapsedText.toLowerCase().contains("trend hit"));
-        assertTrue(expandedText, expandedText.contains("Arsenal 2-1 Chelsea") && expandedText.contains("FT"));
+        assertFalse(collapsedSub.toLowerCase().contains("trend hit"));
+        assertTrue(expandedText, expandedText.contains("Arsenal 2-1 Chelsea · FT"));
         assertTrue(expandedText, expandedText.contains("Over 1.5") && expandedText.contains("1.45") && expandedText.contains("Daily slip") && expandedText.contains("29 of 36 won"));
         assertFalse(expandedText.toLowerCase().contains("trend hit"));
         assertFalse(expandedText.toLowerCase().contains("sportybet"));

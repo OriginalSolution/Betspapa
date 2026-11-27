@@ -24,6 +24,7 @@ import {
   weekCards,
 } from '../lib/codes';
 import { playCodeLabel } from '../lib/pickCodes';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
 import { canSeeCode } from '../lib/proAccess';
@@ -119,9 +120,9 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
         </div>
         {open ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />}
       </header>
-      <Logos part={part} />
+      {!isPlayStoreBuild() && <Logos part={part} />}
       <p className="code-odds">{part.legCount} legs · {oddsText(part.totalOdds)} odds{part.firstKick ? ` · ${gmtDay(part.firstKick.slice(0, 10))} ${gmtClock(part.firstKick)} – ${gmtClock(part.lastKick)} GMT` : ''}</p>
-      {open && part.football && part.footballCode && part.footballCode !== part.code && (
+      {!isPlayStoreBuild() && open && part.football && part.footballCode && part.footballCode !== part.code && (
         <p className="code-foot">Football.com <CodeCopy code={part.footballCode} desk="footballcom" link={part.footballLink} /></p>
       )}
       <Risk part={part} warning={warning} />

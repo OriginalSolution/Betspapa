@@ -10,6 +10,7 @@ import { DESKS, marketLabel, type DeskId } from '../lib/engineSlips';
 import { kickoffClock } from '../lib/format';
 import { combinedOdds, formatTotalOdds, type BuilderLeg } from '../lib/slipPacks';
 import { shareTrackedSlip } from '../lib/shareSlip';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { useFreshCodes } from '../lib/useFreshCodes';
 import type { Team } from '../types';
 
@@ -32,7 +33,9 @@ export function BookedPage() {
   const first = [...(tracked?.legs || [])].sort((a, b) => a.kickoff.localeCompare(b.kickoff))[0];
   const when = tracked?.bookedAt ? kickoffClock(tracked.bookedAt) : '';
   const slipOdds = tracked?.legs.length ? formatTotalOdds(combinedOdds(tracked.legs)) : '';
-  const failed = failedDeskLine(desks);
+  const failed = isPlayStoreBuild()
+    ? (desks.some((desk) => desk.error && !desk.parts.length) ? 'A code did not come back. Try again.' : null)
+    : failedDeskLine(desks);
 
   const copyAll = () => {
     const lines = desks.flatMap((desk) => desk.parts.map((part) => `${desk.name} ${part.code}`));
@@ -75,10 +78,11 @@ export function BookedPage() {
         <button type="button" className="btn booked-copyall" onClick={copyAll}>Copy all {codes} codes</button>
         <button type="button" className="btn btn-quiet" onClick={share} aria-label="Share on WhatsApp" disabled={sharing} aria-busy={sharing}>{sharing ? 'Sharing…' : 'WhatsApp'}</button>
       </div>
-      {DESKS.map((id) => desks.find((desk) => desk.desk === id)).filter((desk): desk is BookedDeskView => Boolean(desk)).map((desk) => (
+      {DESKS.map((id) => desks.find((desk) => desk.desk === id)).filter((desk): desk is BookedDeskView => Boolean(desk)).map((desk, index) => (
         <DeskCard
           key={desk.desk}
           desk={desk}
+          label={isPlayStoreBuild() ? `Code ${index + 1}` : desk.name}
           total={total}
           expanded={Boolean(open[desk.desk])}
           onToggle={() => setOpen((current) => ({ ...current, [desk.desk]: !current[desk.desk] }))}
@@ -111,12 +115,14 @@ export function BookedPage() {
 
 function DeskCard({
   desk,
+  label,
   total,
   expanded,
   onToggle,
   onCopy,
 }: {
   desk: BookedDeskView;
+  label: string;
   total: number;
   expanded: boolean;
   onToggle: () => void;
@@ -127,9 +133,9 @@ function DeskCard({
   return (
     <article className="booked-desk">
       <header>
-        <BookMark id={desk.desk} />
+        {!isPlayStoreBuild() && <BookMark id={desk.desk} />}
         <div>
-          <strong>{desk.name}</strong>
+          <strong>{label}</strong>
           <small>{coverageLine(desk.bookedLegs, total, desk.codes)}</small>
         </div>
         {desk.codes > 1 && (

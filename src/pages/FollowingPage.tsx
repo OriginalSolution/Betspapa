@@ -10,6 +10,7 @@ import { EmptyState, MatchBoard, MatchSkeleton } from '../components/MatchBoard'
 import { followIsStale } from '../lib/alerts';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
 import { DESKS, DESK_NAMES, marketLabel, showOdds, type DeskId } from '../lib/engineSlips';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { markFresh, newCodes, type FreshCode } from '../lib/freshCode';
 import { useFreshCodes } from '../lib/useFreshCodes';
 import { cx, kickoffWhen, scoreDash, statusLine } from '../lib/format';
@@ -263,7 +264,7 @@ export function FollowedTrends() {
   }, [faces, known, activeMarket, engine, picks]);
   const followCount = (activeMarket ? openLegs.filter((leg) => leg.market === activeMarket) : openLegs).length;
   const codeLine = chosenParts.parts.length
-    ? `${chosenParts.parts.length === 1 ? 'One' : String(chosenParts.parts.length)} ${DESK_NAMES[desk]} ${chosenParts.parts.length === 1 ? 'code' : 'codes'} for your ${followCount} open ${followCount === 1 ? 'follow' : 'follows'}.`
+    ? `${chosenParts.parts.length === 1 ? 'One' : String(chosenParts.parts.length)} ${isPlayStoreBuild() ? '' : `${DESK_NAMES[desk]} `}${chosenParts.parts.length === 1 ? 'code' : 'codes'} for your ${followCount} open ${followCount === 1 ? 'follow' : 'follows'}.`
     : '';
   if (!trendFollows.length) return null;
   return (
@@ -272,7 +273,7 @@ export function FollowedTrends() {
       <CodeStrip
         desk={desk}
         tier={tier}
-        title={`${DESK_NAMES[desk]} code`}
+        title={isPlayStoreBuild() ? 'Master code' : `${DESK_NAMES[desk]} code`}
         parts={chosenParts.parts}
         bookedAt={chosenParts.bookedAt}
         line={codeLine}

@@ -19,6 +19,11 @@ final class ScoreCards {
     private ScoreCards() {}
 
     static void attach(Context context, NotificationCompat.Builder builder, WatchNote note, WatchMatch match, boolean dark) {
+        if (trend(note)) {
+            // The system title is the score, so a one-line shade keeps the teams instead of "Leg won".
+            builder.setContentTitle(settleHeadline(note, match));
+            builder.setContentText(settleSub(note, match));
+        }
         builder.setCustomContentView(collapsed(context, note, match));
         builder.setCustomBigContentView(expanded(context, note, match, dark));
         // The pop-up uses the heads-up view. Without one Android shows the one-line pill,
@@ -41,20 +46,17 @@ final class ScoreCards {
         views.setOnClickPendingIntent(R.id.notif_collapsed, OpenMatch.forNote(context, note));
         boolean trend = trend(note);
         if (trend) {
-            String score = shownFixture(note, match);
-            String head = strip(note, match);
-            String market = market(note);
-            String line = !score.isEmpty() ? head + " \u00b7 " + score : !"Pick".equals(market) ? head + " \u00b7 " + market : head;
-            views.setTextViewText(R.id.collapsed_score, line);
-            String clock = clockOf(note, match);
-            if (clock.isEmpty()) {
-                views.setViewVisibility(R.id.collapsed_dot, View.GONE);
-                views.setViewVisibility(R.id.collapsed_minute, View.GONE);
-            } else {
-                views.setTextViewText(R.id.collapsed_minute, clock);
-            }
+            // The match fills the line. "Leg won · Over 1.5" sits under it, so the teams are not cut at 360dp.
+            views.setViewVisibility(R.id.collapsed_brand, View.GONE);
+            views.setViewVisibility(R.id.collapsed_dot, View.GONE);
+            views.setViewVisibility(R.id.collapsed_minute, View.GONE);
+            views.setViewVisibility(R.id.collapsed_sub, View.VISIBLE);
+            String score = settleHeadline(note, match);
+            views.setTextViewText(R.id.collapsed_score, score.isEmpty() ? settleSub(note, match) : score);
+            views.setTextViewText(R.id.collapsed_sub, settleSub(note, match));
             return views;
         }
+        views.setViewVisibility(R.id.collapsed_sub, View.GONE);
         views.setTextViewText(R.id.collapsed_score, compactScore(note, match));
         String minute = collapsedMinute(note, match);
         if (minute.isEmpty()) {
@@ -386,10 +388,30 @@ final class ScoreCards {
         return at < 0 ? "" : at + "\u2032";
     }
 
+    /** "Arsenal 2-1 Chelsea · FT". */
+    static String settleHeadline(WatchNote note, WatchMatch match) {
+        return withClock(shownFixture(note, match), clockOf(note, match));
+    }
+
+    /** "Leg won · Over 1.5". Never only "Trend hit". */
+    static String settleSub(WatchNote note, WatchMatch match) {
+        String status = strip(note, match);
+        String label = status
+            .replace("LEG WON", "Leg won")
+            .replace("LEG LOST", "Leg lost")
+            .replace("SLIP WON", "Slip won")
+            .replace("SLIP LOST", "Slip lost")
+            .replace("TREND HIT", "Trend")
+            .replace("BUST", "Lost");
+        String pick = market(note);
+        if (pick == null || pick.isEmpty() || "Settled".equals(pick) || pick.equalsIgnoreCase(label)) return label;
+        return label + " \u00b7 " + pick;
+    }
+
     private static String withClock(String score, String clock) {
         if (score.isEmpty()) return clock == null ? "" : clock;
         if (clock == null || clock.isEmpty() || score.contains(clock)) return score;
-        return score + " " + clock;
+        return score + " \u00b7 " + clock;
     }
 
     private static String detailLine(WatchNote note) {

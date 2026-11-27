@@ -2,6 +2,7 @@ import { BookMark } from './BookMark';
 import { CodeActions } from './CodeActions';
 import { DESKS, DESK_NAMES, type DeskId } from '../lib/engineSlips';
 import { kickoffClock, cx } from '../lib/format';
+import { isPlayStoreBuild } from '../lib/storeBuild';
 import { CODE_TIERS, tierLabel, type CodePartView, type CodeTier } from '../lib/pickCodes';
 
 export function CodeStrip({
@@ -26,8 +27,10 @@ export function CodeStrip({
   onTier: (tier: CodeTier) => void;
 }) {
   const when = kickoffClock(bookedAt || '');
+  const play = isPlayStoreBuild();
   return (
-    <section className="code-strip" aria-label={title}>
+    <section className="code-strip" aria-label={play ? 'Master code' : title}>
+      {!play && (
       <div className="trend-seg code-desks" role="tablist" aria-label="Bookmaker">
         {DESKS.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={desk === id} className={cx('trend-seg-btn', `desk-${id}`, desk === id && 'is-on')} onClick={() => onDesk(id)}>
@@ -36,6 +39,7 @@ export function CodeStrip({
           </button>
         ))}
       </div>
+      )}
       <div className="code-tiers" role="tablist" aria-label="Confidence">
         {CODE_TIERS.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={tier === id} className={cx('code-tier', tier === id && 'is-on')} onClick={() => onTier(id)}>

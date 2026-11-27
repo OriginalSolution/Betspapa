@@ -115,7 +115,7 @@ export function SlipsPage() {
               setDropsOpen(false);
             }}
           >
-            <BookMark id={id} />
+            {isPlayStoreBuild() ? <span>Code {index + 1}</span> : <BookMark id={id} />}
             {!isPlayStoreBuild() && <span>{DESK_NAMES[id]}</span>}
           </button>
         ))}
@@ -128,7 +128,7 @@ export function SlipsPage() {
       {book.dropped.length > 0 && (
         <section className="drop-note">
           <button type="button" className="drop-toggle" aria-expanded={dropsOpen} onClick={() => setDropsOpen((open) => !open)}>
-            {picksLabel(book.dropped.length)} not on this bookmaker
+            {picksLabel(book.dropped.length)} {isPlayStoreBuild() ? 'not in this code' : 'not on this bookmaker'}
           </button>
           {dropsOpen && (
             <ul className="drop-list">
