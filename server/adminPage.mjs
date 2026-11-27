@@ -43,7 +43,7 @@ const frame = (body) => `<!doctype html>
 </head>
 <body>
   <main>
-    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#E11D2E"/><path fill="#fff" d="M9 7.2h8.1c3.3 0 5.4 1.6 5.4 4.1 0 1.7-1 3-2.6 3.6 2 .6 3.2 2.1 3.2 4.1 0 2.8-2.4 4.8-6.1 4.8H9V7.2zm3.1 6.4h4.2c1.4 0 2.3-.7 2.3-1.7s-.9-1.7-2.3-1.7h-4.2v3.4zm0 6.8h4.8c1.6 0 2.6-.8 2.6-2s-1-2-2.6-2h-4.8V20.4z"/></svg>
+    <svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#E11D2E"/><rect x="30" y="22" width="36" height="25" fill="#fff"/><rect x="30" y="22" width="10" height="56" fill="#fff"/><rect x="30" y="50" width="40" height="28" fill="#fff"/><rect x="50" y="32" width="8" height="8" fill="#E11D2E"/><rect x="51" y="60" width="9" height="9" fill="#E11D2E"/></svg>
     ${body}
   </main>
   <script>
