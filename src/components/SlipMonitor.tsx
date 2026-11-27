@@ -6,8 +6,8 @@ import { SlipLegRow, gradesFor } from './SlipTrack';
 import { readBuilder, subscribeBuilder, addTrackedSlip, type TrackedSlip } from '../lib/builderStore';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { playTierPhrase } from '../lib/pickCodes';
-import { applyGrades, type GradedLeg } from '../lib/slipPacks';
-import { deskOf, slipFromPublishedCode } from '../lib/trackedSlips';
+import { applyGrades, combinedOdds, formatTotalOdds, type GradedLeg } from '../lib/slipPacks';
+import { deskOf, slipCounts, slipFromPublishedCode, splitMonitorLegs } from '../lib/trackedSlips';
 import { setBell, toBellLeg } from '../lib/slipBells';
 import { useSlipBells } from '../lib/useSlipBells';
 import { cx } from '../lib/format';
@@ -31,13 +31,11 @@ function live(match: Match | undefined): boolean {
   return match?.status === 'live' || match?.status === 'halftime';
 }
 
-function tally(legs: GradedLeg[], state: MonitorState): string {
-  const won = legs.filter((leg) => leg.status === 'won').length;
-  const lost = legs.filter((leg) => leg.status === 'lost').length;
-  if (state === 'won') return `${won}/${legs.length} won`;
-  if (state === 'lost') return `${won} won · ${lost} lost`;
-  if (state === 'live') return `${won} winning · ${legs.length} legs`;
-  return `0/${legs.length}`;
+function tally(legs: GradedLeg[]): string {
+  const counts = slipCounts(legs);
+  const odds = formatTotalOdds(combinedOdds(legs));
+  const figures = `${counts.won} won · ${counts.lost} lost · ${counts.open} open`;
+  return odds ? `${figures} · odds ${odds}` : figures;
 }
 
 export function SlipMonitor() {
@@ -89,7 +87,6 @@ export function SlipMonitor() {
     addTrackedSlip(slip);
     setCode('');
     setProblem('');
-    setOpenId(slip.id);
   };
 
   return (
@@ -105,7 +102,7 @@ export function SlipMonitor() {
             <button type="button" className={cx('slip-monitor-row', openId === slip.id && 'is-on')} onClick={() => setOpenId((current) => (current === slip.id ? null : slip.id))}>
               <span>
                 <strong>{playTierPhrase(slip.label)}</strong>
-                <small>{rowSub(slip, play)} · {tally(legs, status)}</small>
+                <small>{rowSub(slip, play)} · {tally(legs)}</small>
               </span>
               <i className={cx('slip-chip', `is-${status === 'pending' ? 'open' : status}`)}>{WORD[status]}</i>
             </button>
@@ -152,22 +149,39 @@ function OpenSlip({
   onBell: (on: boolean) => void;
 }) {
   const byId = new Map(matches.map((match) => [match.id, match]));
-  const won = row.legs.filter((leg) => leg.status === 'won').length;
+  const counts = slipCounts(row.legs);
+  const { active, settled } = splitMonitorLegs(row.legs, matches);
+  const [settledOpen, setSettledOpen] = useState(false);
   const desk = deskOf(row.slip);
   const part = row.slip.parts[0];
+  const odds = formatTotalOdds(combinedOdds(row.legs));
   return (
     <article className="slip-monitor-open" aria-label={playTierPhrase(row.slip.label)}>
-      <p className="slip-monitor-won">{won} winning · {row.legs.length} legs · {WORD[row.status]}</p>
+      <p className="slip-monitor-won">{counts.settled}/{counts.total} settled · {counts.won} won · {counts.lost} lost · {counts.open} open{odds ? ` · odds ${odds}` : ''}</p>
       {part && <CodeActions code={part.code} desk={play ? null : desk || null} />}
       <div className="slip-monitor-bell">
         <SlipBell on={bellOn} count={new Set(row.legs.map((leg) => leg.eventId)).size} onToggle={() => onBell(!bellOn)} />
         <span>{bellOn ? 'Alerts on for this slip' : 'Alerts off'}</span>
       </div>
       <ol className="slip-legs2">
-        {row.legs.map((leg) => (
+        {active.map((leg) => (
           <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} />
         ))}
       </ol>
+      {settled.length > 0 && (
+        <div className="slip-monitor-settled">
+          <button type="button" className="slip-monitor-settled-toggle" aria-expanded={settledOpen} onClick={() => setSettledOpen((open) => !open)}>
+            {settledOpen ? '▾' : '▸'} Settled ({settled.length})
+          </button>
+          {settledOpen && (
+            <ol className="slip-legs2">
+              {settled.map((leg) => (
+                <SlipLegRow key={leg.key} leg={leg} match={byId.get(leg.eventId)} />
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
     </article>
   );
 }

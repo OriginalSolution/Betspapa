@@ -31,7 +31,7 @@ export function readBuilder(): BuilderState {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || '');
     const packIds = Array.isArray(parsed?.packIds) ? parsed.packIds.filter((id: unknown) => typeof id === 'string') : [];
-    const slips = slipsFrom(parsed);
+    const slips = slipsFromStored(parsed);
     return { packIds, slips, tracked: slips[0] ?? null };
   } catch {
     return empty;
@@ -81,15 +81,14 @@ export function subscribeBuilder(onChange: () => void): () => void {
   };
 }
 
-function slipsFrom(parsed: { slips?: unknown; tracked?: TrackedSlip }): TrackedSlip[] {
-  if (Array.isArray(parsed?.slips)) {
-    return parsed.slips.map((slip) => normaliseTracked(slip as TrackedSlip)).filter((slip) => slip.legs.length).slice(0, MAX_TRACKED_SLIPS);
-  }
-  if (parsed?.tracked && Array.isArray(parsed.tracked.legs)) {
-    const one = normaliseTracked(parsed.tracked);
-    return one.legs.length ? [one] : [];
-  }
-  return [];
+/** Old phones stored one slip under `tracked`. It joins the list and is never dropped. */
+export function slipsFromStored(parsed: { slips?: unknown; tracked?: TrackedSlip } | null): TrackedSlip[] {
+  const listed = Array.isArray(parsed?.slips)
+    ? parsed.slips.map((slip) => normaliseTracked(slip as TrackedSlip)).filter((slip) => slip.legs.length)
+    : [];
+  const legacy = parsed?.tracked && Array.isArray(parsed.tracked.legs) ? normaliseTracked(parsed.tracked) : null;
+  const withLegacy = legacy && legacy.legs.length && !listed.some((slip) => slip.id === legacy.id) ? [legacy, ...listed] : listed;
+  return withLegacy.slice(0, MAX_TRACKED_SLIPS);
 }
 
 function normaliseTracked(value: TrackedSlip): TrackedSlip {

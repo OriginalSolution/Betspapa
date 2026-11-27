@@ -1,7 +1,8 @@
 import type { TrackedSlip } from './builderStore';
 import { DESKS, marketLabel, splitMatch, type DeskId, type EngineLeg, type EngineSlip, type EngineState } from './engineSlips';
 import { publishableOdds } from './oddsFloor';
-import type { BuilderLeg } from './slipPacks';
+import type { BuilderLeg, GradedLeg } from './slipPacks';
+import type { Match } from '../types';
 
 /** A pasted code is tracked only when this engine payload already published it. Nothing is invented. */
 export function slipFromPublishedCode(state: EngineState | null, raw: string, now = new Date().toISOString()): TrackedSlip | null {
@@ -28,6 +29,28 @@ export function slipFromPublishedCode(state: EngineState | null, raw: string, no
     }
   }
   return null;
+}
+
+export function slipCounts(legs: GradedLeg[]) {
+  const won = legs.filter((leg) => leg.status === 'won').length;
+  const lost = legs.filter((leg) => leg.status === 'lost').length;
+  const voided = legs.filter((leg) => leg.status === 'void').length;
+  const open = legs.length - won - lost - voided;
+  return { won, lost, voided, open, settled: won + lost + voided, total: legs.length };
+}
+
+/** Live and still-open legs stay out. Settled legs are the ones a long slip can hide. */
+export function splitMonitorLegs(legs: GradedLeg[], matches: Match[]) {
+  const byId = new Map(matches.map((match) => [match.id, match]));
+  const live: GradedLeg[] = [];
+  const open: GradedLeg[] = [];
+  const settled: GradedLeg[] = [];
+  for (const leg of legs) {
+    if (leg.status === 'won' || leg.status === 'lost' || leg.status === 'void') settled.push(leg);
+    else if (byId.get(leg.eventId)?.status === 'live' || byId.get(leg.eventId)?.status === 'halftime') live.push(leg);
+    else open.push(leg);
+  }
+  return { active: [...live, ...open], settled };
 }
 
 export function deskOf(slip: TrackedSlip): DeskId | '' {
