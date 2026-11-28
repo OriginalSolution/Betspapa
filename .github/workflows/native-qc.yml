@@ -1,0 +1,69 @@
+name: Native QC
+# Photographs the debug app on an emulator against api.betspapa.com.
+# It never creates a GitHub release, pushes a tag, or uploads to Play.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/native-qc.yml
+      - scripts/native-qc.sh
+      - android/app/src/androidTest/java/com/betspapa/scores/watch/AgreeQcTest.java
+permissions:
+  contents: read
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [sideload, play]
+    env:
+      STORE_BUILD: ${{ matrix.flavor == 'play' && 'play' || '' }}
+      VITE_STORE_BUILD: ${{ matrix.flavor == 'play' && 'play' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Confirm this is the 0.4.40 build
+        run: |
+          set -euo pipefail
+          grep -q 'versionCode 63' android/app/build.gradle
+          grep -q 'versionName "0.4.40"' android/app/build.gradle
+          grep -q "APP_VERSION = '0.4.40'" src/lib/appVersion.ts
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Assemble debug app and test
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Emulator screenshots
+        uses: reactivecircus/android-emulator-runner@v2.33.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          cores: 2
+          disk-size: 6000M
+          disable-animations: true
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            bash scripts/native-qc.sh ${{ matrix.flavor }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-qc-${{ matrix.flavor }}
+          path: native-qc-shots/
+          if-no-files-found: error
+          retention-days: 14
