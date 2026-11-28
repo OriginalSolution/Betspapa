@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agreeAside, rateName, readAgreeBoard, visibleAgree, type AgreeFixture } from './bothAgree';
+import { agreeActionLabels, agreeAside, agreeCopyText, agreeQuote, rateName, readAgreeBoard, visibleAgree, type AgreeFixture } from './bothAgree';
 
 const fixture: AgreeFixture = {
   id: 'sr:match:1',
@@ -14,6 +14,7 @@ const fixture: AgreeFixture = {
     { id: 'dc1x', label: 'Double chance 1X', tier: '80', home: { hit: 10, n: 10 }, away: { hit: 8, n: 10 } },
   ],
   miss: { id: '1h15', label: '1st half over 1.5', home: { hit: 6, n: 10 }, away: { hit: 5, n: 10 } },
+  quote: { market: 'over15', odds: 1.25 },
 };
 
 describe('both teams agree copy', () => {
@@ -26,6 +27,13 @@ describe('both teams agree copy', () => {
     expect(play).toContain('8/10+');
     expect(play).not.toMatch(/80%\+|90%\+|100%/);
     expect(play).not.toMatch(/sportybet|football\.com|msport|betika|betpawa/i);
+    expect(agreeActionLabels(false)).toEqual(['Copy', 'Load', 'Alerts']);
+    expect(agreeActionLabels(true)).toEqual(['Copy', 'Alerts']);
+    expect(agreeCopyText(fixture)).toBe('SC Freiburg v Heidenheim · Over 1.5 · 10/10 and 10/10');
+    expect(agreeCopyText(fixture)).not.toMatch(/https?:|sportybet|football\.com|msport|betika|betpawa/i);
+    expect(agreeQuote(fixture)?.odds).toBe(1.25);
+    expect(agreeQuote({ quote: { market: 'over15', odds: 1.05 } })).toBeNull();
+    expect(agreeQuote({ quote: { market: 'dc1x', odds: 1.22 } })).toBeNull();
     expect(rateName('SC Freiburg')).toBe('Freiburg');
     expect(rateName('Inter Miami')).toBe('Inter Miami');
   });

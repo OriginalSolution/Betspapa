@@ -2,7 +2,7 @@
  * Fixtures where both teams' real last 10 agree. Nothing here is invented, and
  * nothing here is added to a slip or a code.
  */
-import { agreedRows, nearestMiss } from './agreeMarkets.mjs';
+import { agreedRows, nearestMiss, quoteFor } from './agreeMarkets.mjs';
 import { loadTeamLast10 } from './matchInsight.mjs';
 
 const HORIZON_MS = 36 * 60 * 60 * 1000;
@@ -49,6 +49,7 @@ export function agreeFixture(event, home, away) {
     market,
     also,
     miss: nearestMiss(home.markets, away.markets),
+    quote: quoteFor(market.id, event.odds),
   };
 }
 

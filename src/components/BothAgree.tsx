@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CapacitorHttp } from '@capacitor/core';
 import { Link } from 'react-router-dom';
+import { CodeActions } from './CodeActions';
 import { Crest } from './Crest';
+import { SlipBell } from './SlipBell';
 import { catalogCrest, type CrestCatalog } from '../lib/crestCatalog';
-import { agreeAside, rateName, readAgreeBoard, sampleText, visibleAgree, type AgreeFixture } from '../lib/bothAgree';
+import { agreeAside, agreeCopyText, agreeQuote, rateName, readAgreeBoard, sampleText, visibleAgree, type AgreeFixture } from '../lib/bothAgree';
 import { apiUrl } from '../lib/apiJson';
+import { bookGroups, type BookedGroup } from '../lib/bookFollow';
+import { copyText, openBookmaker } from '../lib/bookmakerLink';
 import { kickoffClock } from '../lib/format';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
 import { tierLabel } from '../lib/pickCodes';
+import { setBell } from '../lib/slipBells';
+import { useSlipBells } from '../lib/useSlipBells';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { teamOnList } from '../lib/teamMarks';
+import type { DeskId } from '../lib/engineSlips';
 import type { ListItem } from '../data/board';
 import type { Match, Team } from '../types';
 
@@ -35,7 +42,7 @@ function teamOf(name: string, id: string, crest: string | undefined, color: stri
   return stored ? { ...team, crest: stored } : team;
 }
 
-export function BothAgree({ lists, matches, catalog }: { lists: ListItem[]; matches: Match[]; catalog: CrestCatalog }) {
+export function BothAgree({ lists, matches, catalog, desk }: { lists: ListItem[]; matches: Match[]; catalog: CrestCatalog; desk: DeskId }) {
   const [rows, setRows] = useState<AgreeFixture[] | null>(null);
   const [open, setOpen] = useState(false);
   const play = isPlayStoreBuild();
@@ -86,7 +93,8 @@ export function BothAgree({ lists, matches, catalog }: { lists: ListItem[]; matc
         const clock = kickoffClock(row.kickoff);
         const aside = agreeAside(row, play);
         return (
-          <Link key={row.id} className="agree-card" to={`/match/${row.id}`}>
+          <article key={row.id} className="agree-card">
+            <Link className="agree-link" to={`/match/${row.id}`}>
             <span className="agree-row">
               <span className="agree-crests">
                 <Crest team={home} size={28} />
@@ -112,7 +120,9 @@ export function BothAgree({ lists, matches, catalog }: { lists: ListItem[]; matc
               </span>
             </span>
             {aside && <p className="agree-meta">{aside}</p>}
-          </Link>
+            </Link>
+            <AgreeActions row={row} desk={desk} />
+          </article>
         );
       })}
       {shown.length > PREVIEW && (
@@ -121,5 +131,114 @@ export function BothAgree({ lists, matches, catalog }: { lists: ListItem[]; matc
         </button>
       )}
     </section>
+  );
+}
+
+function codeFrom(group: BookedGroup | undefined, desk: DeskId, play: boolean): { code: string; link: string } | null {
+  if (!group?.books) return null;
+  const books = play ? Object.values(group.books) : [group.books[desk]];
+  for (const book of books) {
+    const part = book?.parts?.find((item) => item.code);
+    if (part?.code) return { code: part.code, link: play ? '' : part.link || '' };
+  }
+  return null;
+}
+
+function AgreeActions({ row, desk }: { row: AgreeFixture; desk: DeskId }) {
+  const play = isPlayStoreBuild();
+  const bells = useSlipBells();
+  const bellId = `agree:${row.id}:${row.market.id}`;
+  const bellOn = Boolean(bells[bellId]?.on);
+  const quote = agreeQuote(row);
+  const [booked, setBooked] = useState<{ code: string; link: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
+
+  const remember = async (): Promise<{ code: string; link: string } | null> => {
+    if (booked) return booked;
+    if (!quote) return null;
+    setBusy(true);
+    setStatus('');
+    try {
+      const groups = await bookGroups([
+        {
+          id: bellId,
+          legs: [{ eventId: row.id, market: quote.market, odds: quote.odds, kickoff: row.kickoff, match: `${row.home} vs ${row.away}` }],
+        },
+      ]);
+      const found = codeFrom(groups[0], desk, play);
+      if (!found) {
+        setStatus('No code yet.');
+        return null;
+      }
+      setBooked(found);
+      return found;
+    } catch {
+      setStatus('No code yet.');
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copyPlain = () => {
+    void copyText(agreeCopyText(row)).then(() => setStatus('Copied'));
+  };
+
+  const onCopy = () => {
+    if (!quote) {
+      copyPlain();
+      return;
+    }
+    void remember().then((found) => {
+      if (found) void copyText(found.code).then(() => setStatus('Copied'));
+    });
+  };
+
+  const onLoad = () => {
+    if (play) return;
+    if (!quote) {
+      setStatus('Outside the odds range.');
+      return;
+    }
+    void remember().then((found) => {
+      if (found) void openBookmaker(desk, found.code, found.link);
+    });
+  };
+
+  const toggleBell = () => {
+    const market = quote?.market || row.market.id;
+    const leg = {
+      key: `${row.id}|${market}`,
+      eventId: row.id,
+      market,
+      label: row.market.label,
+      odds: quote?.odds || 0,
+      kickoff: row.kickoff,
+      home: row.home,
+      away: row.away,
+    };
+    setBell(bellId, !bellOn, { label: `${row.home} v ${row.away}`, legs: [leg] });
+  };
+
+  return (
+    <div className="agree-actions">
+      {booked ? (
+        <CodeActions code={booked.code} desk={play ? null : desk} link={play ? '' : booked.link} />
+      ) : (
+        <span className="code-pair">
+          <button type="button" className="btn btn-tiny btn-quiet" disabled={busy} onClick={onCopy}>
+            {busy ? 'Wait' : 'Copy'}
+          </button>
+          {!play && (
+            <button type="button" className="btn btn-tiny" disabled={busy} onClick={onLoad}>
+              Load
+            </button>
+          )}
+        </span>
+      )}
+      <SlipBell on={bellOn} count={1} onToggle={toggleBell} className="slip-bell-small" />
+      {status && <p className="agree-status">{status}</p>}
+    </div>
   );
 }

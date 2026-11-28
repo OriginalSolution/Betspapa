@@ -111,7 +111,7 @@ export function PicksPage() {
         ))}
       </div>
       {isPlayStoreBuild() && <p className="pick-disclaimer">18+. Tips are analysis, not guarantees. Bet responsibly.</p>}
-      <BothAgree lists={lists} matches={matches} catalog={catalog} />
+      <BothAgree lists={lists} matches={matches} catalog={catalog} desk={desk} />
       {!canSeeTier(tier) ? (
         <p className="pro-lock">
           {tierLabel(tier)} picks are part of Pro. <Link to="/pro">See Pro</Link>

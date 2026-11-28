@@ -60,4 +60,11 @@ test('a fixture is listed from real last-10 samples and a short sample does not 
   const board = buildAgreeBoard([event('sr:match:9', 'sr:competitor:9', 'sr:competitor:8', '2026-11-28T10:00:00.000Z')], sides, now);
   assert.equal(board.length, 1);
   assert.equal(board[0].home, 'Freiburg');
+  assert.equal(board[0].quote, null);
+  const priced = agreeFixture(
+    { ...event('sr:match:9', 'sr:competitor:9', 'sr:competitor:8', '2026-11-28T10:00:00.000Z'), odds: { 'over-15': 1.25, 'over-25': 1.9 } },
+    home,
+    away,
+  );
+  assert.deepEqual(priced.quote, { market: 'over15', odds: 1.25 });
 });

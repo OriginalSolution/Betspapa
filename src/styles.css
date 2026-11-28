@@ -2427,7 +2427,12 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .agree-head { display: flex; align-items: baseline; gap: 8px; margin: 2px 2px 6px; }
 .agree-head strong { font-size: 15px; }
 .agree-head small { color: var(--muted); }
-.agree-card { display: block; margin: 0 0 8px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); color: inherit; text-decoration: none; }
+.agree-card { display: block; margin: 0 0 8px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); color: inherit; }
+.agree-link { display: block; color: inherit; text-decoration: none; }
+.agree-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; min-width: 0; }
+.agree-actions .code-pair { flex: 1 1 auto; justify-content: flex-start; }
+.agree-actions .slip-bell { flex: none; }
+.agree-status { flex: 1 1 100%; margin: 0; color: var(--faint); font-size: 11px; line-height: 1.35; }
 .agree-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .agree-crests { display: flex; flex: none; }
 .agree-crests .crest + .crest { margin-left: -8px; }
@@ -2443,10 +2448,13 @@ button.banner.banner-alert { font-size: 13px; line-height: 1.35; }
 .agree-rate b { display: block; color: var(--text); font-size: 14px; }
 .agree-meta { margin: 6px 0 0; color: var(--faint); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
 .agree-more { width: 100%; border: 0; background: transparent; color: var(--muted); font-weight: 750; padding: 6px 0 2px; }
-@media (max-width: 360px) {
+@media (max-width: 380px) {
   .agree-row { gap: 8px; }
   .agree-tier { padding: 3px 6px; font-size: 11px; }
   .agree-who span { white-space: normal; }
+  .agree-actions .code-pair { flex: 1 1 100%; }
+  .agree-actions .slip-bell { justify-content: flex-start; }
+  .agree-actions .slip-bell-text { display: inline; }
 }
 .pick-tier { flex: 1; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 6px; font-weight: 800; }
 .pick-tier small { display: block; font-size: 11px; font-weight: 650; color: var(--faint); }
@@ -3482,3 +3490,5 @@ button.ad-slot { width: calc(100% - 28px); background: transparent; }
 @media (min-width: 720px) { .pro-limits { grid-template-columns: 1fr 1fr; } }
 .pro-limits h2 { margin: 0 0 4px; font-size: 13px; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
 .pro-limits p { margin: 0; }
+.agree-actions .slip-bell { width: max-content; max-width: 100%; }
+.agree-actions .slip-bell-text { display: inline !important; }

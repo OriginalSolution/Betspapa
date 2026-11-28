@@ -10,15 +10,43 @@ export const AGREE_MIN_SAMPLE = 8;
 
 const TIER_RANK = { '100': 3, '90': 2, '80': 1 };
 
-/** Priced lines whose definition matches the last-10 row. Team-centric 1X is not home 1X. */
+/**
+ * Priced lines whose definition matches the last-10 row.
+ * Team 1X is that team's win or draw, so it is not home 1X.
+ * Double chance 12 is a winner either side, which is the priced 12 line.
+ */
 const BOOKABLE = {
   over15: 'over15',
   over25: 'over25',
   over35: 'over35',
   btts: 'btts',
+  dc12: 'dc-12',
   '1h05': 'fh-over05',
   '1h15': 'fh-over15',
 };
+
+const ODDS_KEY = {
+  over15: 'over-15',
+  over25: 'over-25',
+  over35: 'over-35',
+  btts: 'btts-yes',
+  'dc-12': 'dc-12',
+  'fh-over05': 'fh-over-05',
+  'fh-over15': 'fh-over-15',
+};
+
+export function pricedMarket(marketId) {
+  return BOOKABLE[String(marketId || '')] || null;
+}
+
+/** A catalogue price for this last-10 line, only when it sits inside the odds band. */
+export function quoteFor(marketId, odds) {
+  const market = pricedMarket(marketId);
+  const key = market ? ODDS_KEY[market] : '';
+  const value = Number(key ? odds?.[key] : NaN);
+  if (!market || !bookableAgreed({ marketId, odds: value })) return null;
+  return { market, odds: value };
+}
 
 export function rateTier(hit, n) {
   const hits = Number(hit);

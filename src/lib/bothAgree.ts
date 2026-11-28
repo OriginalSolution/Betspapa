@@ -1,3 +1,4 @@
+import { priceAllowed } from './slipPacks';
 import { tierLabel, type CodeTier } from './pickCodes';
 
 export type AgreeSample = { hit: number; n: number };
@@ -25,6 +26,8 @@ export type AgreeFixture = {
   market: AgreeMarket;
   also: AgreeMarket[];
   miss: AgreeMiss | null;
+  /** Present only when this row's market has a price inside its odds band. */
+  quote: { market: string; odds: number } | null;
 };
 
 /** Blacklist ids for the same named line. Booking still refuses team 1X, which is not home 1X. */
@@ -49,7 +52,7 @@ export function visibleAgree(row: AgreeFixture, blocked: ReadonlySet<string>): A
   const open = [row.market, ...(row.also || [])].filter((market) => market && TIERS.has(market.tier) && !agreeMarketBlocked(blocked, market.id));
   if (!open.length) return null;
   const [market, ...also] = open;
-  return { ...row, market, also };
+  return { ...row, market, also, quote: market.id === row.market.id ? row.quote : null };
 }
 
 export function sampleText(sample: AgreeSample): string {
@@ -59,6 +62,23 @@ export function sampleText(sample: AgreeSample): string {
 export function rateName(name: string): string {
   const clean = String(name || '').replace(/^(SC|FC|AC|AS|SS|CD|CF)\s+/i, '').replace(/\s+(FC|SC|CF)$/i, '').trim();
   return clean || name;
+}
+
+/** Web and sideload load a code. Play copies it and never names a bookmaker. */
+export function agreeActionLabels(play: boolean): Array<'Copy' | 'Load' | 'Alerts'> {
+  return play ? ['Copy', 'Alerts'] : ['Copy', 'Load', 'Alerts'];
+}
+
+/** The priced leg for this row. A missing or out-of-band price is not bookable, and a green light is not consulted. */
+export function agreeQuote(row: Pick<AgreeFixture, 'quote'>): { market: string; odds: number } | null {
+  const quote = row.quote;
+  if (!quote || !priceAllowed(quote.market, quote.odds)) return null;
+  return { market: quote.market, odds: quote.odds };
+}
+
+/** Plain text for Copy when this row has no code. No link and no bookmaker. */
+export function agreeCopyText(row: AgreeFixture): string {
+  return `${row.home} v ${row.away} · ${row.market.label} · ${sampleText(row.market.home)} and ${sampleText(row.market.away)}`;
 }
 
 export function agreeAside(row: AgreeFixture, play: boolean): string {
@@ -98,6 +118,7 @@ export function readAgreeBoard(body: unknown): AgreeFixture[] {
     const lead = market(row.market);
     if (!lead || typeof row.id !== 'string' || typeof row.home !== 'string' || typeof row.away !== 'string') continue;
     const missMarket = row.miss ? market({ ...row.miss, tier: '80' }) : null;
+    const quote = row.quote && typeof row.quote === 'object' ? agreeQuote({ quote: { market: String(row.quote.market || ''), odds: Number(row.quote.odds) } }) : null;
     rows.push({
       id: row.id,
       home: row.home,
@@ -111,6 +132,7 @@ export function readAgreeBoard(body: unknown): AgreeFixture[] {
       market: lead,
       also: (row.also || []).map(market).filter((item): item is AgreeMarket => Boolean(item)),
       miss: missMarket ? { id: missMarket.id, label: missMarket.label, home: missMarket.home, away: missMarket.away } : null,
+      quote,
     });
   }
   return rows;
