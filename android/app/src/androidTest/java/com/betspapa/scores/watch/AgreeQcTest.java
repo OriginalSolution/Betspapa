@@ -59,8 +59,9 @@ public class AgreeQcTest {
 
         String picks = waitJs(activity, picksReady(BuildConfig.PLAY_STORE), 50000L);
         assertTrue("Picks did not show both-teams rows from production. " + snippet(activity), "ready".equals(picks));
-        js(activity, "(function(){var node=document.querySelector('.agree-actions'); var scroller=document.querySelector('.main'); if(!node||!scroller) return false; var box=node.getBoundingClientRect(); var view=scroller.getBoundingClientRect(); scroller.scrollTop += box.bottom - view.bottom + 96; return true;})()");
-        Thread.sleep(500);
+        js(activity, "(function(){var node=document.querySelector('.agree-actions'); var scroller=document.querySelector('.main'); if(!node||!scroller) return false; var box=node.getBoundingClientRect(); var view=scroller.getBoundingClientRect(); scroller.scrollTop += box.bottom - view.bottom + 120; return true;})()");
+        Thread.sleep(400);
+        dismissAnr(device);
         shot(device, name + "-picks");
 
         js(activity, "(function(){var link=document.querySelector('.agree-link'); if(!link) return false; window.location.assign(link.getAttribute('href')); return true;})()");
@@ -68,11 +69,13 @@ public class AgreeQcTest {
         assertTrue("Last 10 did not show the expanded markets. " + snippet(activity), "ready".equals(last));
         js(activity, "(function(){var table=document.querySelector('[aria-label=\"Last 10\"]'); var scroller=document.querySelector('.main'); if(!table||!scroller) return false; var box=table.getBoundingClientRect(); var view=scroller.getBoundingClientRect(); scroller.scrollTop += box.top - view.top; return true;})()");
         Thread.sleep(400);
+        dismissAnr(device);
         shot(device, name + "-last10");
         for (int page = 2; page <= 5; page++) {
             String more = jsText(activity, "(function(){var scroller=document.querySelector('.main'); var table=document.querySelector('[aria-label=\"Last 10\"]'); if(!scroller||!table) return 'done'; var view=scroller.getBoundingClientRect(); var bottom=table.getBoundingClientRect().bottom; if(bottom<=view.bottom+2) return 'done'; scroller.scrollTop += Math.max(160, scroller.clientHeight*0.72); return 'more';})()");
             if (!"more".equals(more)) break;
-            Thread.sleep(350);
+            Thread.sleep(300);
+            dismissAnr(device);
             shot(device, name + "-last10-" + page);
         }
     }
@@ -132,6 +135,14 @@ public class AgreeQcTest {
     private static String snippet(MainActivity activity) {
         String text = jsText(activity, "(function(){return (location.pathname||'')+' '+(document.body?document.body.innerText:'').slice(0,180);})()");
         return "last=" + text;
+    }
+
+    private static void dismissAnr(UiDevice device) {
+        try {
+            device.executeShellCommand("am force-stop com.google.android.apps.nexuslauncher");
+        } catch (Exception ignored) {
+            /* a missing launcher must not fail the shot */
+        }
     }
 
     private static void shot(UiDevice device, String name) throws Exception {

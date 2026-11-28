@@ -2870,13 +2870,14 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Phones and the fold: the tab bar sits in the column. Lists scroll inside main,
    with room for the tab bar and the system nav so the last row can clear both. */
 @media (max-width: 959px) {
+  html, body, #root { height: 100%; overflow: hidden; }
   .shell {
+    position: fixed;
+    inset: 0;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    height: 100svh;
-    max-height: 100dvh;
-    max-height: 100svh;
+    height: auto;
+    max-height: none;
     overflow: hidden;
   }
   .center {
