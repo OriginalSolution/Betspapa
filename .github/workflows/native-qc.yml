@@ -42,7 +42,19 @@ jobs:
       - run: npx cap sync android
       - name: Assemble debug app and test
         working-directory: android
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
+        run: |
+          set -euo pipefail
+          # Maven sometimes answers 429 while Gradle resolves plugins. A real compile failure still fails the job.
+          for attempt in 1 2 3 4 5; do
+            if ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest; then
+              exit 0
+            fi
+            echo "Assemble failed on attempt ${attempt}."
+            if [ "$attempt" -eq 5 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 30))
+          done
       - name: Emulator screenshots
         uses: reactivecircus/android-emulator-runner@v2.33.0
         with:
@@ -61,9 +73,9 @@ jobs:
             adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             bash scripts/native-qc.sh ${{ matrix.flavor }}
       - uses: actions/upload-artifact@v4
-        if: success()
+        if: always()
         with:
           name: native-qc-${{ matrix.flavor }}
           path: native-qc-shots/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14

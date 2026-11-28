@@ -46,6 +46,10 @@ profile fold-inner 673 841 1.0 420
 profile tablet 800 1280 1.0 320
 profile landscape 915 412 1.0 420
 profile font 412 915 1.3 420
+# A display cutout plus the status and navigation bars, so the safe insets are on screen.
+adb shell cmd overlay enable com.android.internal.display.cutout.emulation.waterfall || true
+profile safe 412 915 1.0 420
+adb shell cmd overlay disable com.android.internal.display.cutout.emulation.waterfall || true
 
 adb shell wm size reset || true
 adb shell wm density reset || true
