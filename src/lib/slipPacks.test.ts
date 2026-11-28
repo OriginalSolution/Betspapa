@@ -58,8 +58,8 @@ function graded(partial: Partial<GradedLeg> & Pick<GradedLeg, 'status' | 'home'>
 describe('slip packs', () => {
   it('keeps an in-range 80% pack and drops a price outside the table', () => {
     const now = Date.parse('2026-11-23T12:00:00.000Z');
-    const packs = trendPacks([tip('over15', 1.25), tip('over15', 1.9, 'sr:match:2'), tip('dc-12', 1.22, 'sr:match:3')], [], now);
-    expect(packs.map((pack) => pack.id)).toEqual(['dc-12', 'over15']);
+    const packs = trendPacks([tip('over15', 1.25), tip('over15', 1.9, 'sr:match:2'), tip('dc-12', 1.22, 'sr:match:3'), tip('btts', 1.4, 'sr:match:3')], [], now);
+    expect(packs.map((pack) => pack.id).sort()).toEqual(['btts', 'over15']);
     expect(packs.find((pack) => pack.id === 'over15')?.legs).toHaveLength(1);
     expect(priceAllowed('fh-over15', 1.79)).toBe(true);
     expect(priceAllowed('fh-over15', 1.8)).toBe(false);

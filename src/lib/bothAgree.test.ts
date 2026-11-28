@@ -47,6 +47,15 @@ describe('both teams agree copy', () => {
     expect(open?.also).toHaveLength(2);
     const dc = visibleAgree(fixture, new Set(['dc-1x']));
     expect(dc?.also.map((market) => market.id)).toEqual(['team15']);
+    const twelve = visibleAgree({
+      ...fixture,
+      market: { id: 'dc12', label: 'Double chance 12', tier: '100', home: { hit: 10, n: 10 }, away: { hit: 10, n: 10 } },
+      also: fixture.also,
+      quote: { market: 'dc-12', odds: 1.22 },
+    }, new Set());
+    expect(twelve?.market.id).toBe('team15');
+    expect(twelve?.also.map((market) => market.id)).not.toContain('dc12');
+    expect(twelve?.quote).toBeNull();
   });
 
   it('drops a fixture that is not a real agreement payload', () => {

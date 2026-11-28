@@ -4,6 +4,7 @@
  * not waive the odds band, and markets that are not the same priced line are
  * not booked.
  */
+import { isDc12 } from './dc12.mjs';
 import { priceInRange } from './oddsRange.mjs';
 
 export const AGREE_MIN_SAMPLE = 8;
@@ -13,14 +14,13 @@ const TIER_RANK = { '100': 3, '90': 2, '80': 1 };
 /**
  * Priced lines whose definition matches the last-10 row.
  * Team 1X is that team's win or draw, so it is not home 1X.
- * Double chance 12 is a winner either side, which is the priced 12 line.
+ * Double chance 12 is not booked. The last-10 table may still show the stat.
  */
 const BOOKABLE = {
   over15: 'over15',
   over25: 'over25',
   over35: 'over35',
   btts: 'btts',
-  dc12: 'dc-12',
   '1h05': 'fh-over05',
   '1h15': 'fh-over15',
 };
@@ -51,6 +51,7 @@ export function pricedMarket(marketId) {
 
 /** A priced engine market, only when the catalogue price is inside that market's band. */
 export function quotePriced(market, odds) {
+  if (isDc12(market)) return null;
   const id = String(market || '');
   const key = ODDS_KEY[id];
   const value = Number(key ? odds?.[key] : NaN);
@@ -142,7 +143,7 @@ export function nearestMiss(homeMarkets, awayMarkets) {
  * price is inside that market's band. Greenlit does not override a miss.
  */
 export function bookableAgreed(row) {
-  if (row?.blocked) return false;
+  if (row?.blocked || isDc12(row?.marketId)) return false;
   const market = BOOKABLE[String(row?.marketId || '')];
   if (!market) return false;
   return priceInRange(market, row?.odds, { market, sample: row?.sample, opponentSample: row?.opponentSample });

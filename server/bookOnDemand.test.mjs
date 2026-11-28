@@ -75,4 +75,12 @@ test('a green light does not book the team that is lower on the table', () => {
     now,
   );
   assert.equal(guessed.length, 0);
+  const twelve = prepareLegs(
+    [
+      { eventId: 'sr:match:4', market: 'dc-12', odds: 1.22, kickoff: future, greenlit: true },
+      { eventId: 'sr:match:4', market: 'over15', odds: 1.25, kickoff: future },
+    ],
+    now,
+  );
+  assert.deepEqual(twelve.map((leg) => leg.market), ['over15']);
 });

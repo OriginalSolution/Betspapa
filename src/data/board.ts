@@ -688,8 +688,9 @@ export function applyShares(codes: BookingCode[], shares: SharePayload | null): 
 }
 
 export function suggestPicks(picks: PickView[], slipIds: string[], greenMarketIds: string[]): PickView[] {
-  const open = picks.filter((pick) => pick.status === 'open' && pick.bookmarked && !pick.softened);
-  const chosen = picks.filter((pick) => slipIds.includes(pick.id) || greenMarketIds.includes(pick.market));
+  const usable = picks.filter((pick) => pick.market !== 'dc-12');
+  const open = usable.filter((pick) => pick.status === 'open' && pick.bookmarked && !pick.softened);
+  const chosen = usable.filter((pick) => slipIds.includes(pick.id) || greenMarketIds.includes(pick.market));
   const markets = new Set(chosen.map((pick) => pick.market));
   const pool = markets.size ? open.filter((pick) => markets.has(pick.market) && !slipIds.includes(pick.id)) : open;
   return [...pool].sort((a, b) => b.confidence - a.confidence).slice(0, 4);

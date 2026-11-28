@@ -276,3 +276,36 @@ test('team score lines back the higher-placed side and are dropped without a tab
   assert.equal(hidden.includes('over15'), true);
   assert.match(noTable.notes.join('\n'), /no league table, so the side was not guessed/);
 });
+
+test('double chance 12 is replaced by the next qualifying tip for that match', () => {
+  const games = (teamIsHome, idStart) => played(10, (index) => row({
+    matchId: idStart + index,
+    uts: 100 - index,
+    teamIsHome,
+    ftHome: teamIsHome ? (index < 8 ? 2 : 1) : 0,
+    ftAway: teamIsHome ? 0 : (index < 8 ? 2 : 1),
+  }));
+  const histories = new Map([[1, games(true, 1)], [2, games(false, 40)]]);
+  const event = {
+    eventId: 'sr:match:40',
+    home: 'Alpha',
+    away: 'Beta',
+    homeId: 'sr:competitor:1',
+    awayId: 'sr:competitor:2',
+    kickoff: '2026-11-13T18:00:00.000Z',
+    odds: { 'dc-12': 1.22, 'over-15': 1.25 },
+  };
+  const board = buildOccurrenceBoard([event], histories, now);
+  const markets = board.legs.filter((leg) => leg.eventId === 'sr:match:40').map((leg) => leg.market);
+  assert.equal(markets.includes('dc-12'), false);
+  assert.equal(markets.includes('over15'), true);
+  assert.match(board.notes.join('\n'), /double chance 12 replaced by Over 1.5 goals/);
+  const only = buildOccurrenceBoard([{ ...event, eventId: 'sr:match:41', odds: { 'dc-12': 1.22 } }], histories, now);
+  assert.equal(only.legs.some((leg) => leg.market === 'dc-12'), false);
+  assert.match(only.notes.join('\n'), /double chance 12 left off; nothing else qualified/);
+  const picked = masterPick([
+    { eventId: 'sr:match:40', market: 'dc-12', odds: 1.22, rate: 1, kickoff: '2026-11-13T18:00:00.000Z' },
+    { eventId: 'sr:match:40', market: 'over15', odds: 1.25, rate: 0.8, kickoff: '2026-11-13T18:00:00.000Z' },
+  ]);
+  assert.equal(picked[0].market, 'over15');
+});

@@ -99,6 +99,7 @@ function legChips(legs: EngineLeg[], board: Map<string, Match>): PickChip[] {
   const chips: PickChip[] = [];
   const seen = new Set<string>();
   for (const leg of legs) {
+    if (leg.market === 'dc-12' || leg.market === 'dc12') continue;
     if (!publishableOdds(leg.odds)) continue;
     const rate = hitRate(leg.occurrence, leg.sample, leg.rate);
     if (rate != null && rate + 1e-12 < 0.8) continue;

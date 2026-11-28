@@ -80,9 +80,10 @@ test('several markets publish only inside their odds band and at 80% or better',
     'sh-over-05': 1.2,
     'dc-12': 1.22,
   });
-  for (const market of ['over15', 'home', 'btts', 'sh-over05', 'dc-12']) {
+  for (const market of ['over15', 'home', 'btts', 'sh-over05']) {
     assert.equal(kept.legs.some((leg) => leg.market === market && leg.rate + 1e-12 >= 0.8), true, market);
   }
+  assert.equal(kept.legs.some((leg) => leg.market === 'dc-12'), false);
 
   const weak = boardFor(10, 6, {
     'over-15': 1.25,
