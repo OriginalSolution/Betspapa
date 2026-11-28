@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BothAgree } from '../components/BothAgree';
 import { CodeActions } from '../components/CodeActions';
 import { Crest } from '../components/Crest';
 import { catalogCrest, loadCrestCatalog, type CrestCatalog } from '../lib/crestCatalog';
@@ -110,6 +111,7 @@ export function PicksPage() {
         ))}
       </div>
       {isPlayStoreBuild() && <p className="pick-disclaimer">18+. Tips are analysis, not guarantees. Bet responsibly.</p>}
+      <BothAgree lists={lists} matches={matches} catalog={catalog} />
       {!canSeeTier(tier) ? (
         <p className="pro-lock">
           {tierLabel(tier)} picks are part of Pro. <Link to="/pro">See Pro</Link>

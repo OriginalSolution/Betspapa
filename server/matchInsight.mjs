@@ -1,14 +1,34 @@
 /** Head-to-head, last 10, league table, and live stats from the Sportradar feeds already used for grading. */
 
+import { agreedRows } from './agreeMarkets.mjs';
+
 const GISMO = 'https://stats.fn.sportradar.com/common/en/Europe:Berlin/gismo';
 const TTL_MS = 60_000;
 
+/**
+ * Last-10 lines. 1X is that team's win or draw, X2 is a draw or a loss, 12 is a
+ * winner either side, and draw no bet counts a win only. Half lines need a
+ * first-half score; the second half is full time minus that half.
+ */
 const MARKETS = [
-  { id: 'over15', label: 'Over 1.5', hit: (scored, conceded) => scored + conceded >= 2 },
-  { id: 'over25', label: 'Over 2.5', hit: (scored, conceded) => scored + conceded >= 3 },
-  { id: 'over35', label: 'Over 3.5', hit: (scored, conceded) => scored + conceded >= 4 },
-  { id: 'btts', label: 'Both teams to score', hit: (scored, conceded) => scored >= 1 && conceded >= 1 },
-  { id: 'scored', label: 'Scored', hit: (scored) => scored >= 1 },
+  { id: 'over15', label: 'Over 1.5', hit: (row) => row.scored + row.conceded >= 2 },
+  { id: 'over25', label: 'Over 2.5', hit: (row) => row.scored + row.conceded >= 3 },
+  { id: 'over35', label: 'Over 3.5', hit: (row) => row.scored + row.conceded >= 4 },
+  { id: 'btts', label: 'Both teams to score', hit: (row) => row.scored >= 1 && row.conceded >= 1 },
+  { id: 'scored', label: 'Scored', hit: (row) => row.scored >= 1 },
+  { id: 'conceded', label: 'Conceded', hit: (row) => row.conceded >= 1 },
+  { id: 'team15', label: 'Team over 1.5', hit: (row) => row.scored >= 2 },
+  { id: 'dc1x', label: 'Double chance 1X', hit: (row) => row.scored >= row.conceded },
+  { id: 'dcx2', label: 'Double chance X2', hit: (row) => row.scored <= row.conceded },
+  { id: 'dc12', label: 'Double chance 12', hit: (row) => row.scored !== row.conceded },
+  { id: 'dnb', label: 'Draw no bet', hit: (row) => row.scored > row.conceded },
+  { id: '1h05', label: '1st half over 0.5', half: true, hit: (row) => row.first.scored + row.first.conceded >= 1 },
+  { id: '1h15', label: '1st half over 1.5', half: true, hit: (row) => row.first.scored + row.first.conceded >= 2 },
+  { id: '2h05', label: '2nd half over 0.5', half: true, hit: (row) => row.second.scored + row.second.conceded >= 1 },
+  { id: '2h15', label: '2nd half over 1.5', half: true, hit: (row) => row.second.scored + row.second.conceded >= 2 },
+  { id: 's1h', label: 'Scored in 1st half', half: true, hit: (row) => row.first.scored >= 1 },
+  { id: 's2h', label: 'Scored in 2nd half', half: true, hit: (row) => row.second.scored >= 1 },
+  { id: 'sboth', label: 'Scored in both halves', half: true, hit: (row) => row.first.scored >= 1 && row.second.scored >= 1 },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -89,10 +109,27 @@ export function finishedRows(payload, teamUid) {
     if (!teamIsHome && awayUid !== want) continue;
     const score = finitePair(match?.result) || finitePair(match?.periods?.ft);
     if (!score) continue;
+    const scored = teamIsHome ? score.home : score.away;
+    const conceded = teamIsHome ? score.away : score.home;
+    const opening = finitePair(match?.periods?.p1);
+    let first = null;
+    let second = null;
+    if (opening) {
+      const firstScored = teamIsHome ? opening.home : opening.away;
+      const firstConceded = teamIsHome ? opening.away : opening.home;
+      const secondScored = scored - firstScored;
+      const secondConceded = conceded - firstConceded;
+      if (secondScored >= 0 && secondConceded >= 0) {
+        first = { scored: firstScored, conceded: firstConceded };
+        second = { scored: secondScored, conceded: secondConceded };
+      }
+    }
     rows.push({
       uts: Number(match?.time?.uts) || 0,
-      scored: teamIsHome ? score.home : score.away,
-      conceded: teamIsHome ? score.away : score.home,
+      scored,
+      conceded,
+      first,
+      second,
     });
   }
   rows.sort((a, b) => b.uts - a.uts);
@@ -106,11 +143,16 @@ export function last10Side(payload, teamUid, fallbackName) {
   return {
     name: named,
     n: rows.length,
-    markets: MARKETS.map((market) => ({
-      id: market.id,
-      label: market.label,
-      hit: rows.filter((row) => market.hit(row.scored, row.conceded)).length,
-    })),
+    markets: MARKETS.flatMap((market) => {
+      const sample = market.half ? rows.filter((row) => row.first && row.second) : rows;
+      if (!sample.length) return [];
+      return [{
+        id: market.id,
+        label: market.label,
+        hit: sample.filter((row) => market.hit(row)).length,
+        n: sample.length,
+      }];
+    }),
   };
 }
 
@@ -194,6 +236,26 @@ export function parseLiveStats(payload, status) {
   };
 }
 
+function stampAgreement(home, away) {
+  if (!home && !away) return null;
+  const tiers = new Map((home && away ? agreedRows(home.markets, away.markets) : []).map((row) => [row.id, row.tier]));
+  const apply = (side) => {
+    if (!side) return null;
+    return {
+      ...side,
+      markets: side.markets.map((market) => (tiers.has(market.id) ? { ...market, tier: tiers.get(market.id) } : market)),
+    };
+  };
+  return { home: apply(home), away: apply(away) };
+}
+
+export async function loadTeamLast10(teamUid, fetchImpl = fetch, fallbackName = '') {
+  const uid = numericId(teamUid);
+  if (!uid) return null;
+  const payload = await gismo(`stats_team_lastx/${uid}/10`, fetchImpl);
+  return last10Side(payload, uid, fallbackName);
+}
+
 async function gismo(path, fetchImpl) {
   try {
     const response = await fetchImpl(`${GISMO}/${path}`, {
@@ -227,7 +289,7 @@ export async function loadMatchInsight(matchId, fetchImpl = fetch) {
   const away = last10Side(awayLast, awayUid, teamName(match.teams?.away));
   return {
     h2h: parseH2H(h2h, id),
-    last10: home || away ? { home, away } : null,
+    last10: stampAgreement(home, away),
     table: parseTable(table, homeUid, awayUid),
     stats: parseLiveStats(stats, match.status),
   };

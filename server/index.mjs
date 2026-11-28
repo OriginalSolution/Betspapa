@@ -30,6 +30,7 @@ import { flattenPrematch, loadUpcomingEvents } from './upcoming.mjs';
 import { loadMarketRules } from './marketRules.mjs';
 import { installDiskGuard } from './safeWrite.mjs';
 import { cachedMatchInsight } from './matchInsight.mjs';
+import { cachedBothAgree } from './bothAgree.mjs';
 import { readEntitlements, rememberEntitlement, verifyPlayPurchase, writeEntitlements } from './proBilling.mjs';
 installDiskGuard();
 loadMarketRules();
@@ -630,6 +631,20 @@ async function handleApi(req, res, url) {
       send(req, res, 200, await cachedMatchInsight(id), 'public, max-age=30');
     } catch (error) {
       send(req, res, 502, { error: error.message || 'Match facts failed' });
+    }
+    return;
+  }
+  if (url.pathname === '/api/both-agree') {
+    try {
+      const body = await cachedBothAgree({ events: await loadUpcomingEvents({ force: url.searchParams.get('force') === '1' }) });
+      const fixtures = (body.fixtures || []).map((row) => ({
+        ...row,
+        homeCrest: crests.crestFor(row.homeId, row.home) || '',
+        awayCrest: crests.crestFor(row.awayId, row.away) || '',
+      }));
+      send(req, res, 200, { fixtures }, 'public, max-age=60');
+    } catch (error) {
+      send(req, res, 502, { error: error.message || 'Both-teams board failed' });
     }
     return;
   }
