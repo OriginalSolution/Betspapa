@@ -37,7 +37,7 @@ function teamOf(name: string, id: string, abbr: string, color: string, catalog: 
 export function PicksPage() {
   const { matches } = useStore();
   const { lists, addLeg, removeLeg, slip } = useProduct();
-  const { state, problem } = useEngineBoard();
+  const { state, problem, ready } = useEngineBoard();
   const [market, setMarket] = useState('all');
   const [desk, setDesk] = useState<DeskId>('sportybet');
   const [tier, setTier] = useState<CodeTier>('80');
@@ -102,11 +102,11 @@ export function PicksPage() {
 
   return (
     <div className={cx('stack', 'picks-page', selected.length > 0 && 'has-float')}>
-      <div className="pick-tiers" role="tablist" aria-label="Confidence">
+      <div className="pick-tiers" role="tablist" aria-label="Confidence" aria-busy={!ready}>
         {CODE_TIERS.map((id) => (
           <button key={id} type="button" role="tab" aria-selected={tier === id} className={cx('pick-tier', tier === id && 'is-on')} onClick={() => setTier(id)}>
             {tierLabel(id)}
-            <small>{tips.filter((tip) => showsInTier(tip.chip.rate, id, tip.chip.teamsAgree)).length}</small>
+            <small className={ready ? undefined : 'is-wait'}>{ready ? tips.filter((tip) => showsInTier(tip.chip.rate, id, tip.chip.teamsAgree)).length : '…'}</small>
           </button>
         ))}
       </div>
