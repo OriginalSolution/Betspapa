@@ -21,6 +21,7 @@ import {
   STRATEGIES,
   U45_PART,
   addDays,
+  isUnder45Strategy,
   dueDaily,
   dueWeek,
   gmtParts,
@@ -486,7 +487,7 @@ export function createBanker(options = {}) {
     const weekId = slot === 'week' ? id : weekMonday(parseDay(id));
     let candidates = [];
     try {
-      candidates = strategy === 'under45'
+      candidates = isUnder45Strategy(strategy)
         ? await collectUnder45(request, fetchImpl, { fromMs, toMs })
         : await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
     } catch (error) {
@@ -500,7 +501,7 @@ export function createBanker(options = {}) {
       save();
       return;
     }
-    const size = strategy === 'under45' ? U45_PART : built.legs.length;
+    const size = isUnder45Strategy(strategy) ? U45_PART : built.legs.length;
     const groups = [];
     for (let index = 0; index < built.legs.length; index += size) groups.push(built.legs.slice(index, index + size));
     const placedAll = [];
@@ -607,7 +608,7 @@ export function createBanker(options = {}) {
       const current = new Set(state.order[key] || []);
       let candidates = [];
       try {
-        candidates = row.strategy === 'under45'
+        candidates = isUnder45Strategy(row.strategy)
           ? await collectUnder45(request, fetchImpl, { fromMs, toMs })
           : await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
       } catch {
@@ -615,7 +616,7 @@ export function createBanker(options = {}) {
       }
       const built = assemble(row.strategy, candidates, { slot: row.slot, cap: row.cap, counts: eventCounts(row.strategy, row.week, current) });
       if (!built.legs.length) continue;
-      const size = row.strategy === 'under45' ? U45_PART : built.legs.length;
+      const size = isUnder45Strategy(row.strategy) ? U45_PART : built.legs.length;
       const groups = [];
       for (let index = 0; index < built.legs.length; index += size) groups.push(built.legs.slice(index, index + size));
       const placedAll = [];
@@ -724,7 +725,10 @@ export function createBanker(options = {}) {
       }
       const openMonday = weekMonday(clock);
       const openWeekEnd = parseDay(addDays(openMonday, 7));
-      if (clock < openWeekEnd) await bookSlot('under45', 'week', openMonday, clock, openWeekEnd);
+      if (clock < openWeekEnd) {
+        await bookSlot('under45', 'week', openMonday, clock, openWeekEnd);
+        await bookSlot('under45plus', 'week', openMonday, clock, openWeekEnd);
+      }
       await rebookDrifted();
       if (options.results?.settle) await options.results.settle();
       pullGrades();

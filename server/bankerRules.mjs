@@ -29,6 +29,7 @@ import {
   U45_O15_PUSH_UNDER,
   U45_O15_XG,
   U45_O25_XG,
+  U45_PLUS_MIN,
   U45_REGULAR_SCORED,
   WEEK_MAX_LEGS,
 } from './bankerConfig.mjs';
@@ -115,7 +116,7 @@ function goalsLeg(candidate, pick, label) {
  * Under 4.5 is the filter. The leg is Over 1.5 or Over 2.5 from last-10
  * goal averages. The general odds table and the AH pool do not apply.
  */
-export function pickUnder45(candidate) {
+export function pickUnder45(candidate, band = {}) {
   const name = dropReason(candidate?.country, candidate?.league, candidate?.home, candidate?.away);
   if (name) return { drop: name };
   if (candidate?.blacklisted) return { drop: 'blacklisted' };
@@ -129,17 +130,21 @@ export function pickUnder45(candidate) {
   const regular = under45Regular(home) && under45Regular(away);
   const over25Bar = expected + 1e-9 >= U45_O25_XG && regular;
   const over15Bar = expected + 1e-9 >= U45_O15_XG;
+  const floor = band.min;
   const over25 = () => {
     if (!candidate.o25) return { drop: 'no Over 2.5' };
+    if (floor != null && candidate.o25.price < floor) return { drop: 'Over 2.5 under 1.29' };
     if (candidate.o25.price > U45_LEG_MAX + 1e-9) return { drop: 'Over 2.5 over 1.50' };
     return goalsLeg(candidate, candidate.o25, 'Over 2.5');
   };
   if (over25Bar) return over25();
   if (!over15Bar) return { drop: `expected goals ${expected.toFixed(2)} under 2.00` };
   if (!candidate.o15) return { drop: 'no Over 1.5' };
-  if (candidate.o15.price < U45_O15_PUSH_UNDER) {
-    // The Over 2.5 bar was already missed, so a short Over 1.5 cannot be pushed up.
-    return { drop: 'Over 1.5 under 1.17 and goal stats miss Over 2.5' };
+  const pushUnder = floor != null ? floor : U45_O15_PUSH_UNDER;
+  if (candidate.o15.price < pushUnder) {
+    // A short Over 1.5 moves up only when the Over 2.5 bar was already met.
+    if (over25Bar) return over25();
+    return { drop: floor != null ? 'Over 1.5 under 1.29 and goal stats miss Over 2.5' : 'Over 1.5 under 1.17 and goal stats miss Over 2.5' };
   }
   if (candidate.o15.price > U45_LEG_MAX + 1e-9) return { drop: 'Over 1.5 over 1.50' };
   return goalsLeg(candidate, candidate.o15, 'Over 1.5');
@@ -182,6 +187,7 @@ function underCap(picked, cap) {
 
 export function pickLeg(strategy, candidate, config = {}) {
   if (strategy === 'under45') return pickUnder45(candidate);
+  if (strategy === 'under45plus') return pickUnder45(candidate, { min: U45_PLUS_MIN });
   const pool = poolDrop(candidate);
   if (pool) return { drop: pool };
   if (strategy === 'classic') {
@@ -260,7 +266,7 @@ export function assemble(strategy, candidates, { slot = 'week', cap, counts = ne
     }
     kept.push(picked);
   }
-  if (strategy === 'under45') {
+  if (strategy === 'under45' || strategy === 'under45plus') {
     kept.sort((a, b) => a.kickMs - b.kickMs || String(a.eventId).localeCompare(String(b.eventId)));
     const misses = dropped.filter((row) => row.ah != null && row.reason !== 'already on 2 codes in this strategy');
     misses.sort((a, b) => a.ah - b.ah);
@@ -289,6 +295,9 @@ export function priceStillOk(strategy, leg, cap = CAPPED_CAP) {
     const line = String(leg?.specifier || '');
     if (line.includes('1.5') && odds < U45_O15_PUSH_UNDER) return false;
     return true;
+  }
+  if (strategy === 'under45plus') {
+    return odds >= U45_PLUS_MIN - 1e-9 && odds <= U45_LEG_MAX + 1e-9;
   }
   if (!(odds >= MIN_LEG)) return false;
   if (strategy === 'capped' && odds > cap + 1e-9) return false;
