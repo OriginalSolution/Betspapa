@@ -11,6 +11,7 @@ adb shell 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 2; done'
 adb shell input keyevent 82 || true
 adb shell wm dismiss-keyguard || true
 # Keep the status and navigation bars on screen. Do not turn on immersive mode.
+adb shell settings put global hide_error_dialogs 1 || true
 adb shell settings put global policy_control null || true
 adb shell settings put secure navigation_mode 0 || true
 adb shell cmd overlay enable com.android.internal.systemui.navbar.threebutton || true
