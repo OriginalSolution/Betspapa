@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { CapacitorHttp } from '@capacitor/core';
 import { apiUrl } from '../lib/apiJson';
 import { isNativeApp, nativeRequestOptions, readJsonBody } from '../lib/nativeHttp';
+import { tierLabel, type CodeTier } from '../lib/pickCodes';
 
 type Pair = { home: number; away: number };
 type H2HRow = { id: string; date: string; home: string; away: string; homeScore: number; awayScore: number };
-type MarketRow = { id: string; label: string; hit: number };
+type MarketRow = { id: string; label: string; hit: number; n?: number; tier?: CodeTier };
 type Side = { name: string; n: number; markets: MarketRow[] } | null;
 type TableRow = { pos: number; name: string; played: number; gd: number; points: number; side: 'home' | 'away' | null };
 export type MatchInsight = {
@@ -106,13 +107,23 @@ export function MatchFacts({ id, home, away }: { id: string; home: string; away:
             <span>{last.home?.name || home}</span>
             <span>{last.away?.name || away}</span>
           </div>
-          {markets.map((market) => (
-            <div key={market.id} className="last10-row">
-              <span>{market.label}</span>
-              <b>{last.home ? `${last.home.markets.find((item) => item.id === market.id)?.hit ?? 0}/${last.home.n}` : '–'}</b>
-              <b>{last.away ? `${last.away.markets.find((item) => item.id === market.id)?.hit ?? 0}/${last.away.n}` : '–'}</b>
-            </div>
-          ))}
+          {markets.map((market) => {
+            const homeRow = last.home?.markets.find((item) => item.id === market.id);
+            const awayRow = last.away?.markets.find((item) => item.id === market.id);
+            const tier = homeRow?.tier || awayRow?.tier;
+            const count = (row: MarketRow | undefined, side: Side) => (row && side ? `${row.hit}/${row.n ?? side.n}` : '–');
+            return (
+              <div key={market.id} className={tier ? 'last10-row is-agree' : 'last10-row'}>
+                <span>
+                  {market.label}
+                  {tier && <i className="agree-pill">{tierLabel(tier)}</i>}
+                </span>
+                <b>{count(homeRow, last.home)}</b>
+                <b>{count(awayRow, last.away)}</b>
+              </div>
+            );
+          })}
+          <p className="last10-note">1X is that team&apos;s win or draw. X2 is a draw or a loss. 12 is a winner either side. Draw no bet counts a win. Half lines use the first-half score; the second half is full time minus the first half.</p>
         </section>
       )}
       {facts.table && (

@@ -38,16 +38,55 @@ test('last 10 counts only finished matches for that team', () => {
   assert.equal(side.name, 'Dinamo');
   assert.equal(side.n, 2);
   assert.deepEqual(
-    side.markets.map((market) => [market.id, market.hit]),
+    side.markets.map((market) => [market.id, market.hit, market.n]),
     [
-      ['over15', 1],
-      ['over25', 1],
-      ['over35', 1],
-      ['btts', 1],
-      ['scored', 1],
+      ['over15', 1, 2],
+      ['over25', 1, 2],
+      ['over35', 1, 2],
+      ['btts', 1, 2],
+      ['scored', 1, 2],
+      ['conceded', 1, 2],
+      ['team15', 1, 2],
+      ['dc1x', 2, 2],
+      ['dcx2', 1, 2],
+      ['dc12', 1, 2],
+      ['dnb', 1, 2],
     ],
   );
+  assert.equal(side.markets.some((market) => market.id === '1h05'), false);
   assert.equal(last10Side(doc({ matches: [] }), 5, 'X'), null);
+});
+
+test('half lines use the first-half score and drop a half that exceeds full time', () => {
+  const payload = doc({
+    team: { mediumname: 'Crew' },
+    matches: [
+      {
+        _id: 1,
+        teams: { home: { uid: 5, name: 'Crew' }, away: { uid: 9, name: 'Other' } },
+        result: { home: 3, away: 1 },
+        periods: { p1: { home: 2, away: 0 }, ft: { home: 3, away: 1 } },
+        time: { uts: 30 },
+      },
+      {
+        _id: 2,
+        teams: { home: { uid: 9, name: 'Other' }, away: { uid: 5, name: 'Crew' } },
+        result: { home: 1, away: 0 },
+        periods: { p1: { home: 2, away: 0 }, ft: { home: 1, away: 0 } },
+        time: { uts: 20 },
+      },
+    ],
+  });
+  const side = last10Side(payload, 5, 'Crew');
+  const byId = Object.fromEntries(side.markets.map((market) => [market.id, market]));
+  assert.equal(byId['1h05'].hit, 1);
+  assert.equal(byId['1h05'].n, 1);
+  assert.equal(byId['2h05'].hit, 1);
+  assert.equal(byId.s1h.hit, 1);
+  assert.equal(byId.s2h.hit, 1);
+  assert.equal(byId.sboth.hit, 1);
+  assert.equal(byId['1h15'].hit, 1);
+  assert.equal(finishedRows(payload, 5)[1].first, null);
 });
 
 test('table prefers the standings that contain both teams', () => {
