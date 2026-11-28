@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agreeActionLabels, agreeAside, agreeCopyText, agreeQuote, rateName, readAgreeBoard, visibleAgree, type AgreeFixture } from './bothAgree';
+import { agreeActionLabels, agreeAside, agreeCopyText, agreeQuote, loadAgreeRows, rateName, readAgreeBoard, visibleAgree, type AgreeFixture } from './bothAgree';
 
 const fixture: AgreeFixture = {
   id: 'sr:match:1',
@@ -56,6 +56,25 @@ describe('both teams agree copy', () => {
     expect(twelve?.market.id).toBe('team15');
     expect(twelve?.also.map((market) => market.id)).not.toContain('dc12');
     expect(twelve?.quote).toBeNull();
+  });
+
+  it('asks again when the first both-teams load is empty or fails', async () => {
+    let calls = 0;
+    const rows = await loadAgreeRows(async () => {
+      calls += 1;
+      if (calls === 1) throw new Error('timeout');
+      return [fixture];
+    }, 3, async () => {});
+    expect(calls).toBe(2);
+    expect(rows).toHaveLength(1);
+
+    let emptyCalls = 0;
+    const empty = await loadAgreeRows(async () => {
+      emptyCalls += 1;
+      return [];
+    }, 3, async () => {});
+    expect(emptyCalls).toBe(3);
+    expect(empty).toEqual([]);
   });
 
   it('drops a fixture that is not a real agreement payload', () => {

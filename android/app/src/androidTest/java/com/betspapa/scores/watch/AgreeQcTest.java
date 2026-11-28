@@ -57,8 +57,8 @@ public class AgreeQcTest {
         js(activity, "(function(){localStorage.setItem('betspapa.alertSetup.v1', JSON.stringify({version:3,finished:true})); return true;})()");
         js(activity, "window.location.assign('/picks')");
 
-        String picks = waitJs(activity, picksReady(BuildConfig.PLAY_STORE), 50000L);
-        assertTrue("Picks did not show both-teams rows from production. " + snippet(activity), "ready".equals(picks));
+        String picks = waitJs(activity, picksReady(BuildConfig.PLAY_STORE), 70000L);
+        assertTrue("Picks did not show both-teams rows from production (" + picks + "). " + snippet(activity), "ready".equals(picks));
         js(activity, "(function(){var node=document.querySelector('.agree-actions'); var scroller=document.querySelector('.main'); if(!node||!scroller) return false; var box=node.getBoundingClientRect(); var view=scroller.getBoundingClientRect(); scroller.scrollTop += box.bottom - view.bottom + 120; return true;})()");
         Thread.sleep(400);
         dismissAnr(device);

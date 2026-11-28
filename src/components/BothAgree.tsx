@@ -5,7 +5,7 @@ import { CodeActions } from './CodeActions';
 import { Crest } from './Crest';
 import { SlipBell } from './SlipBell';
 import { catalogCrest, type CrestCatalog } from '../lib/crestCatalog';
-import { agreeAside, agreeCopyText, agreeQuote, rateName, readAgreeBoard, sampleText, visibleAgree, type AgreeFixture } from '../lib/bothAgree';
+import { agreeAside, agreeCopyText, agreeQuote, loadAgreeRows, rateName, readAgreeBoard, sampleText, visibleAgree, type AgreeFixture } from '../lib/bothAgree';
 import { apiUrl } from '../lib/apiJson';
 import { bookGroups, type BookedGroup } from '../lib/bookFollow';
 import { copyText, openBookmaker } from '../lib/bookmakerLink';
@@ -48,13 +48,9 @@ export function BothAgree({ lists, matches, catalog, desk }: { lists: ListItem[]
   const play = isPlayStoreBuild();
   useEffect(() => {
     let stop = false;
-    void loadBoard()
-      .then((body) => {
-        if (!stop) setRows(body);
-      })
-      .catch(() => {
-        if (!stop) setRows([]);
-      });
+    void loadAgreeRows(loadBoard).then((body) => {
+      if (!stop) setRows(body);
+    });
     return () => {
       stop = true;
     };
