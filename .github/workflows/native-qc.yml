@@ -42,7 +42,7 @@ jobs:
       - run: npx cap sync android
       - name: Assemble debug app and test
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Emulator screenshots
         uses: reactivecircus/android-emulator-runner@v2.33.0
         with:
@@ -61,7 +61,7 @@ jobs:
             adb install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             bash scripts/native-qc.sh ${{ matrix.flavor }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: native-qc-${{ matrix.flavor }}
           path: native-qc-shots/
