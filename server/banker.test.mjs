@@ -164,6 +164,37 @@ test('Under 4.5 Goals uses last-10 averages and ignores the general odds table',
   assert.match(rulesFor('under45').join(' '), /2\.8/);
   assert.match(rulesFor('under45').join(' '), /above 1\.25/);
   assert.match(rulesFor('under45').join(' '), /does not use the general odds table/);
+  const plusShort = pickLeg('under45plus', underGame({
+    homeGoals: goalSample(2.0, 1.4, 8),
+    awayGoals: goalSample(1.8, 1.6, 8),
+    o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.28 },
+  }));
+  assert.equal(plusShort.drop, 'Over 2.5 under 1.29');
+  const plusFloor = pickLeg('under45plus', underGame({
+    homeGoals: goalSample(2.0, 1.4, 8),
+    awayGoals: goalSample(1.8, 1.6, 8),
+    o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.1 },
+    o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.29 },
+  }));
+  assert.equal(plusFloor.label, 'Over 2.5');
+  assert.equal(plusFloor.odds, 1.29);
+  const plusStay = pickLeg('under45plus', underGame({ o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.29 } }));
+  assert.equal(plusStay.label, 'Over 1.5');
+  assert.equal(plusStay.odds, 1.29);
+  const plusPush = pickLeg('under45plus', underGame({ o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.18 } }));
+  assert.equal(plusPush.drop, 'Over 1.5 under 1.29 and goal stats miss Over 2.5');
+  assert.equal(priceStillOk('under45plus', { odds: 1.28, specifier: 'total=2.5' }), false);
+  assert.equal(priceStillOk('under45plus', { odds: 1.29, specifier: 'total=1.5' }), true);
+  assert.equal(priceStillOk('under45plus', { odds: 1.5, specifier: 'total=2.5' }), true);
+  assert.equal(priceStillOk('under45plus', { odds: 1.51, specifier: 'total=2.5' }), false);
+  const plusMany = Array.from({ length: 51 }, (_, index) => underGame({
+    eventId: `sr:match:${index + 1}`,
+    kickMs: clock + index * 1000,
+    o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.3 },
+  }));
+  assert.equal(assemble('under45plus', plusMany, { slot: 'week' }).legs.length, 51);
+  assert.match(rulesFor('under45plus').join(' '), /1\.29 to 1\.50/);
+  assert.match(rulesFor('under45').join(' '), /below 1\.17/);
 });
 
 test('overlap is counted inside one strategy, and Ladder has no week code', () => {

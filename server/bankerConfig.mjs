@@ -57,6 +57,12 @@ export const U45_MIN_GAMES = 8;
 /** Of a full last 10, both teams must have scored in at least this many. */
 export const U45_REGULAR_SCORED = 7;
 export const U45_PART = 50;
+/** Second Under 4.5 strategy. Every booked leg, Over 1.5 or Over 2.5, sits in this band. */
+export const U45_PLUS_MIN = 1.29;
+
+export function isUnder45Strategy(id) {
+  return id === 'under45' || id === 'under45plus';
+}
 
 /** Ladder: how often the weaker side has scored in its last 10. */
 export const LADDER_WEAK_RARE_MAX = 3;
@@ -109,6 +115,7 @@ export const STRATEGIES = [
   { id: 'capped', code: 'S4', name: 'Banker Capped', week: true },
   { id: 'ladder', code: 'S5', name: 'Banker Ladder', week: false },
   { id: 'under45', code: 'S6', name: 'Under 4.5 Goals', week: true },
+  { id: 'under45plus', code: 'S7', name: 'Under 4.5 Goals 1.29+', week: true },
 ];
 
 export function strategyById(id) {
@@ -211,6 +218,15 @@ export function rulesFor(id) {
       `Last ${U45_LAST_N} competitive games, at least ${U45_MIN_GAMES} for each team. Expected goals = average of home scored and away conceded, plus average of away scored and home conceded.`,
       `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
       `No booked price above ${U45_LEG_MAX.toFixed(2)}. Over 1.5 below ${U45_O15_PUSH_UNDER.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is ${U45_LEG_MAX.toFixed(2)} or under. Otherwise the game is dropped.`,
+      `This strategy does not use the general odds table. Parts of ${U45_PART}, each with its own code. SportyBet and Football.com only. A blacklisted team, competition, or market is left off this phone.`,
+    ];
+  }
+  if (id === 'under45plus') {
+    return [
+      `Same games as Under 4.5 Goals: Under 4.5 above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped.`,
+      `Last ${U45_LAST_N} competitive games, at least ${U45_MIN_GAMES} for each team. Expected goals = average of home scored and away conceded, plus average of away scored and home conceded.`,
+      `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
+      `Every booked leg is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Over 2.5 below ${U45_PLUS_MIN.toFixed(2)} is dropped. Over 1.5 below ${U45_PLUS_MIN.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Otherwise the game is dropped.`,
       `This strategy does not use the general odds table. Parts of ${U45_PART}, each with its own code. SportyBet and Football.com only. A blacklisted team, competition, or market is left off this phone.`,
     ];
   }

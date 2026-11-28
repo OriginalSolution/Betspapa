@@ -584,6 +584,7 @@ const BANKER = [
   { id: 'capped', label: playCodeLabel('Banker Capped') },
   { id: 'ladder', label: playCodeLabel('Banker Ladder') },
   { id: 'under45', label: 'Under 4.5 Goals' },
+  { id: 'under45plus', label: 'Under 4.5 Goals 1.29+' },
 ];
 
 function BankerSettings() {
