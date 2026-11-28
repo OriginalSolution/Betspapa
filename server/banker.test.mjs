@@ -111,6 +111,9 @@ function underGame(patch = {}) {
     o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.44 },
     homeGoals: goalSample(1.6, 1.2),
     awayGoals: goalSample(1.4, 1.3),
+    hpos: 8,
+    apos: 14,
+    tableN: 18,
     ...patch,
   };
 }
@@ -195,6 +198,12 @@ test('Under 4.5 Goals uses last-10 averages and ignores the general odds table',
   assert.equal(assemble('under45plus', plusMany, { slot: 'week' }).legs.length, 51);
   assert.match(rulesFor('under45plus').join(' '), /1\.29 to 1\.50/);
   assert.match(rulesFor('under45').join(' '), /below 1\.17/);
+  assert.equal(pickLeg('under45', underGame({ hpos: 0, apos: 0, tableN: 0 })).drop, 'no league table');
+  assert.equal(pickLeg('under45', underGame({ hpos: 2, apos: 4, tableN: 20 })).drop, 'top-5 v top-5');
+  assert.equal(pickLeg('under45plus', underGame({ hpos: 18, apos: 20, tableN: 20 })).drop, 'bottom-3 v bottom-3');
+  assert.equal(pickLeg('under45', underGame({ hpos: 2, apos: 18, tableN: 20 })).label, 'Over 1.5');
+  assert.match(rulesFor('under45').join(' '), /Top-5 v top-5/);
+  assert.match(rulesFor('under45plus').join(' '), /bottom-3 v bottom-3/);
 });
 
 test('overlap is counted inside one strategy, and Ladder has no week code', () => {

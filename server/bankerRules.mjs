@@ -121,6 +121,9 @@ export function pickUnder45(candidate, band = {}) {
   if (name) return { drop: name };
   if (candidate?.blacklisted) return { drop: 'blacklisted' };
   if (candidate?.open === false) return { drop: 'already started' };
+  if (!candidate?.hpos || !candidate?.apos || !candidate?.tableN) return { drop: 'no league table' };
+  const clash = tableClash(candidate.hpos, candidate.apos, candidate.tableN);
+  if (clash) return { drop: clash };
   if (!(candidate?.u45 && candidate.u45.price > U45_FILTER_OVER)) return { drop: 'Under 4.5 not above 1.25' };
   const home = candidate.homeGoals;
   const away = candidate.awayGoals;
