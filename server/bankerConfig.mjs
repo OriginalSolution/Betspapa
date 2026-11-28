@@ -64,6 +64,9 @@ export function isUnder45Strategy(id) {
   return id === 'under45' || id === 'under45plus';
 }
 
+/** Bump when a booked Under 4.5 week must be built again. 2 adds the table extremes. */
+export const U45_RULES = 2;
+
 /** Ladder: how often the weaker side has scored in its last 10. */
 export const LADDER_WEAK_RARE_MAX = 3;
 export const LADDER_WEAK_OFTEN = 6;
@@ -214,7 +217,7 @@ export function rulesFor(id) {
   }
   if (id === 'under45') {
     return [
-      `Under 4.5 goals above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped.`,
+      `Under 4.5 goals above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped. No live league table: skip the match. Top-5 v top-5 and bottom-3 v bottom-3 are skipped. A top-5 side against a bottom-3 side can still be booked.`,
       `Last ${U45_LAST_N} competitive games, at least ${U45_MIN_GAMES} for each team. Expected goals = average of home scored and away conceded, plus average of away scored and home conceded.`,
       `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
       `No booked price above ${U45_LEG_MAX.toFixed(2)}. Over 1.5 below ${U45_O15_PUSH_UNDER.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is ${U45_LEG_MAX.toFixed(2)} or under. Otherwise the game is dropped.`,
@@ -223,7 +226,7 @@ export function rulesFor(id) {
   }
   if (id === 'under45plus') {
     return [
-      `Same games as Under 4.5 Goals: Under 4.5 above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped.`,
+      `Same games as Under 4.5 Goals: Under 4.5 above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped. No live league table: skip the match. Top-5 v top-5 and bottom-3 v bottom-3 are skipped. A top-5 side against a bottom-3 side can still be booked.`,
       `Last ${U45_LAST_N} competitive games, at least ${U45_MIN_GAMES} for each team. Expected goals = average of home scored and away conceded, plus average of away scored and home conceded.`,
       `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
       `Every booked leg is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Over 2.5 below ${U45_PLUS_MIN.toFixed(2)} is dropped. Over 1.5 below ${U45_PLUS_MIN.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Otherwise the game is dropped.`,

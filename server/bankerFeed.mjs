@@ -381,6 +381,7 @@ export async function collectUnder45(request, fetchImpl, { fromMs, toMs }) {
   rows = rows.filter(Boolean);
   const infoCache = new Map();
   const lastx = new Map();
+  const tables = new Map();
   await mapPool(rows, 4, async (row) => {
     const mid = numericId(row.eventId);
     if (!mid) return;
@@ -389,6 +390,9 @@ export async function collectUnder45(request, fetchImpl, { fromMs, toMs }) {
     const match = body?.doc?.[0]?.data?.match;
     const homeUid = match?.teams?.home?.uid;
     const awayUid = match?.teams?.away?.uid;
+    row.seasonId = String(match?._seasonid || '');
+    row.homeUid = homeUid;
+    row.awayUid = awayUid;
     const load = async (uid) => {
       const id = numericId(uid);
       if (!id) return [];
@@ -397,6 +401,19 @@ export async function collectUnder45(request, fetchImpl, { fromMs, toMs }) {
     };
     row.homeGoals = averagesOf(await load(homeUid), U45_LAST_N);
     row.awayGoals = averagesOf(await load(awayUid), U45_LAST_N);
+    if (!row.seasonId || row.homeUid == null || row.awayUid == null) return;
+    if (!tables.has(row.seasonId)) tables.set(row.seasonId, gismoGet(fetchImpl, `stats_season_tables/${row.seasonId}`));
+    const positions = tablePositions(await tables.get(row.seasonId), row.homeUid, row.awayUid);
+    if (!positions) return;
+    row.hpos = positions.hpos;
+    row.apos = positions.apos;
+    row.tableN = positions.n;
   });
-  return rows;
+  return rows.map((row) => {
+    const { homeUid, awayUid, seasonId, ...rest } = row;
+    void homeUid;
+    void awayUid;
+    void seasonId;
+    return rest;
+  });
 }

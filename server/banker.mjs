@@ -20,6 +20,7 @@ import {
   SPORTY_SHARE,
   STRATEGIES,
   U45_PART,
+  U45_RULES,
   addDays,
   isUnder45Strategy,
   dueDaily,
@@ -574,6 +575,7 @@ export function createBanker(options = {}) {
         day: slot === 'daily' ? id : '',
         cap: strategy === 'capped' ? 1.45 : null,
         part: index + 1,
+        rulesVersion: isUnder45Strategy(strategy) ? U45_RULES : 1,
         frozen: false,
         seed: false,
         readOk: true,
@@ -694,6 +696,68 @@ export function createBanker(options = {}) {
     return view();
   }
 
+  async function ensureUnder45(id, monday, fromMs, toMs) {
+    const key = slotKey(id, 'week', monday);
+    const currentCodes = state.order[key] || [];
+    const current = currentCodes.map((code) => state.codes[code]).filter((row) => row && row.readOk && !row.superseded && !row.seed);
+    const stale = current.some((row) => (row.rulesVersion || 1) < U45_RULES);
+    if (!stale) {
+      await bookSlot(id, 'week', monday, fromMs, toMs);
+      return;
+    }
+    let candidates = [];
+    try {
+      candidates = await collectUnder45(request, fetchImpl, { fromMs, toMs });
+    } catch (error) {
+      log.error?.(`[codes] ${id} rebuild: ${error instanceof Error ? error.message : error}`);
+      return;
+    }
+    const built = assemble(id, candidates, { slot: 'week', counts: eventCounts(id, monday, new Set(currentCodes)) });
+    if (!built.legs.length) return;
+    const groups = [];
+    for (let index = 0; index < built.legs.length; index += U45_PART) groups.push(built.legs.slice(index, index + U45_PART));
+    const placedAll = [];
+    for (const group of groups) {
+      const placed = await place(id, group, null);
+      if (placed) placedAll.push(placed);
+    }
+    if (!placedAll.length) return;
+    const replaced = current[0]?.code || '';
+    for (const code of currentCodes) {
+      const old = state.codes[code];
+      if (!old) continue;
+      old.superseded = true;
+      old.readOk = false;
+    }
+    state.order[key] = placedAll.map((item) => item.code);
+    for (const [index, placed] of placedAll.entries()) {
+      state.codes[placed.code] = {
+        code: placed.code,
+        strategy: id,
+        slot: 'week',
+        week: monday,
+        day: '',
+        cap: null,
+        part: index + 1,
+        rulesVersion: U45_RULES,
+        frozen: false,
+        seed: false,
+        readOk: true,
+        superseded: false,
+        replaced,
+        football: placed.football,
+        footballCode: placed.footballCode,
+        legs: placed.legs,
+        totalOdds: productOdds(placed.legs),
+        readAt: new Date(now()).toISOString(),
+        firstKick: Math.min(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+        lastKick: Math.max(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+      };
+      rememberNotice(state.codes[placed.code], 'rebooked');
+    }
+    save();
+  }
+
   async function tick() {
     if (busy || !request) return view();
     busy = true;
@@ -726,8 +790,8 @@ export function createBanker(options = {}) {
       const openMonday = weekMonday(clock);
       const openWeekEnd = parseDay(addDays(openMonday, 7));
       if (clock < openWeekEnd) {
-        await bookSlot('under45', 'week', openMonday, clock, openWeekEnd);
-        await bookSlot('under45plus', 'week', openMonday, clock, openWeekEnd);
+        await ensureUnder45('under45', openMonday, clock, openWeekEnd);
+        await ensureUnder45('under45plus', openMonday, clock, openWeekEnd);
       }
       await rebookDrifted();
       if (options.results?.settle) await options.results.settle();
