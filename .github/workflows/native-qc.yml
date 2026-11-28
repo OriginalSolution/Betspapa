@@ -40,6 +40,13 @@ jobs:
           grep -q "APP_VERSION = '0.4.40'" src/lib/appVersion.ts
       - run: npm run build
       - run: npx cap sync android
+      - name: Enable KVM
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.users.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
       - name: Assemble debug app and test
         working-directory: android
         run: |
@@ -62,7 +69,8 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          ram-size: 4096M
+          disable-linux-hw-accel: false
+          ram-size: 3072M
           cores: 2
           disk-size: 6000M
           disable-animations: true
