@@ -32,12 +32,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
-      - name: Confirm this is the 0.4.40 build
+      - name: Confirm this is the 0.4.41 build
         run: |
           set -euo pipefail
-          grep -q 'versionCode 63' android/app/build.gradle
-          grep -q 'versionName "0.4.40"' android/app/build.gradle
-          grep -q "APP_VERSION = '0.4.40'" src/lib/appVersion.ts
+          grep -q 'versionCode 64' android/app/build.gradle
+          grep -q 'versionName "0.4.41"' android/app/build.gradle
+          grep -q "APP_VERSION = '0.4.41'" src/lib/appVersion.ts
       - run: npm run build
       - run: npx cap sync android
       - name: Enable KVM
