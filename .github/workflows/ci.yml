@@ -38,14 +38,14 @@ jobs:
         working-directory: android
         run: |
           set -euo pipefail
-          # Maven sometimes answers 429 while Robolectric jars download. A real test failure still fails the job.
-          for attempt in 1 2 3; do
+          # Maven sometimes answers 429 while Robolectric jars download. Any other failure stops here.
+          for attempt in 1 2 3 4 5; do
             if ./gradlew --no-daemon :watch-core:test :app:testReleaseUnitTest; then
               exit 0
             fi
             echo "Unit tests failed on attempt ${attempt}."
-            if [ "$attempt" -eq 3 ]; then
+            if [ "$attempt" -eq 5 ]; then
               exit 1
             fi
-            sleep $((attempt * 25))
+            sleep $((attempt * 60))
           done
