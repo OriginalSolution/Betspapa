@@ -58,3 +58,21 @@ test('a timed-out on-demand book is not cached', async () => {
   const again = await bookGroups([{ id: 'all', legs }], request, now, 'local', { deadlineMs: 5_000 });
   assert.equal(again.groups[0].books.sportybet.parts[0].code, 'REAL9');
 });
+
+test('a green light does not book the team that is lower on the table', () => {
+  const stronger = prepareLegs(
+    [{ eventId: 'sr:match:1', market: 'dnb-home', odds: 1.25, kickoff: future, hpos: 2, apos: 9 }],
+    now,
+  );
+  assert.equal(stronger.length, 1);
+  const weaker = prepareLegs(
+    [{ eventId: 'sr:match:1', market: 'dnb-away', odds: 1.25, kickoff: future, hpos: 2, apos: 9, greenlit: true }],
+    now,
+  );
+  assert.equal(weaker.length, 0);
+  const guessed = prepareLegs(
+    [{ eventId: 'sr:match:1', market: 'home-score', odds: 1.22, kickoff: future, greenlit: true }],
+    now,
+  );
+  assert.equal(guessed.length, 0);
+});

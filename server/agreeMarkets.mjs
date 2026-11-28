@@ -33,13 +33,30 @@ const ODDS_KEY = {
   'dc-12': 'dc-12',
   'fh-over05': 'fh-over-05',
   'fh-over15': 'fh-over-15',
+  'dc-1x': 'dc-1x',
+  'dc-x2': 'dc-x2',
+  'dnb-home': 'home-dnb',
+  'dnb-away': 'away-dnb',
+  'home-score': 'home-over-05',
+  'away-score': 'away-over-05',
+  'home-over15': 'home-over-15',
+  'away-over15': 'away-over-15',
+  'home-over25': 'home-over-25',
+  'away-over25': 'away-over-25',
 };
 
 export function pricedMarket(marketId) {
   return BOOKABLE[String(marketId || '')] || null;
 }
 
-/** A catalogue price for this last-10 line, only when it sits inside the odds band. */
+/** A priced engine market, only when the catalogue price is inside that market's band. */
+export function quotePriced(market, odds) {
+  const id = String(market || '');
+  const key = ODDS_KEY[id];
+  const value = Number(key ? odds?.[key] : NaN);
+  if (!key || !priceInRange(id, value)) return null;
+  return { market: id, odds: value };
+}
 export function quoteFor(marketId, odds) {
   const market = pricedMarket(marketId);
   const key = market ? ODDS_KEY[market] : '';

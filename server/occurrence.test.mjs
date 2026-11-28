@@ -249,3 +249,30 @@ test('a home trend uses home games only and ignores neutral grounds', () => {
   assert.equal(rate.hits, 8);
   assert.equal(rate.sample, 8);
 });
+
+test('team score lines back the higher-placed side and are dropped without a table', () => {
+  const homeRows = played(10, (index) => row({ matchId: index + 1, uts: 100 - index, teamIsHome: true, ftHome: 2, ftAway: 1 }));
+  const awayRows = played(10, (index) => row({ matchId: index + 40, uts: 100 - index, teamIsHome: false, ftHome: 1, ftAway: 2 }));
+  const histories = new Map([[1, homeRows], [2, awayRows]]);
+  const base = {
+    home: 'Alpha',
+    away: 'Beta',
+    homeId: 'sr:competitor:1',
+    awayId: 'sr:competitor:2',
+    kickoff: '2026-11-13T18:00:00.000Z',
+    odds: { 'home-over-05': 1.22, 'away-over-05': 1.22, 'over-15': 1.25 },
+  };
+  const weakerHome = buildOccurrenceBoard([{ ...base, eventId: 'sr:match:20', hpos: 8, apos: 2 }], histories, now);
+  const markets = weakerHome.legs.filter((leg) => leg.eventId === 'sr:match:20').map((leg) => leg.market);
+  assert.equal(markets.includes('away-score'), true);
+  assert.equal(markets.includes('home-score'), false);
+  assert.equal(markets.includes('over15'), true);
+  assert.match(weakerHome.notes.join('\n'), /home-score left off: away is higher on the table/);
+
+  const noTable = buildOccurrenceBoard([{ ...base, eventId: 'sr:match:21' }], histories, now);
+  const hidden = noTable.legs.filter((leg) => leg.eventId === 'sr:match:21').map((leg) => leg.market);
+  assert.equal(hidden.includes('home-score'), false);
+  assert.equal(hidden.includes('away-score'), false);
+  assert.equal(hidden.includes('over15'), true);
+  assert.match(noTable.notes.join('\n'), /no league table, so the side was not guessed/);
+});

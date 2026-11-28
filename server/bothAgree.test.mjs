@@ -49,7 +49,19 @@ test('a fixture is listed from real last-10 samples and a short sample does not 
   const row = agreeFixture(event('sr:match:9', 'sr:competitor:9', 'sr:competitor:8', '2026-11-28T10:00:00.000Z'), home, away);
   assert.equal(row.market.id, 'over15');
   assert.equal(row.market.tier, '100');
-  assert.equal(row.also[0].id, 'team15');
+  assert.equal(row.also.some((market) => market.id === 'team15'), false);
+  const placed = agreeFixture(
+    { ...event('sr:match:9', 'sr:competitor:9', 'sr:competitor:8', '2026-11-28T10:00:00.000Z'), hpos: 1, apos: 8 },
+    home,
+    away,
+  );
+  assert.equal(placed.also.find((market) => market.id === 'team15')?.label, 'Home over 1.5');
+  const flipped = agreeFixture(
+    { ...event('sr:match:9', 'sr:competitor:9', 'sr:competitor:8', '2026-11-28T10:00:00.000Z'), hpos: 8, apos: 1 },
+    home,
+    away,
+  );
+  assert.equal(flipped.also.find((market) => market.id === 'team15')?.label, 'Away over 1.5');
   assert.equal(row.also.some((market) => market.id === '1h15' || market.id === 's1h'), false);
   assert.equal(row.miss.id, '1h15');
   assert.equal(row.miss.away.hit, 5);
