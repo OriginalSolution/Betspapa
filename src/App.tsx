@@ -60,6 +60,7 @@ function screenTitle(pathname: string, search: string): string {
       ladder: playCodeLabel('Banker Ladder'),
       under45: 'Under 4.5 Goals',
       under45plus: 'Under 4.5 Goals 1.29+',
+      outsidebox: 'Shots Outside Box',
     };
     return names[pathname.split('/')[2] || ''] || 'Codes';
   }

@@ -23,7 +23,7 @@ import {
   type CodesView,
   weekCards,
 } from '../lib/codes';
-import { playCodeLabel } from '../lib/pickCodes';
+import { playCodeLabel, playShotTier } from '../lib/pickCodes';
 import { isPlayStoreBuild } from '../lib/storeBuild';
 import { recordingSince } from '../lib/results';
 import { cx } from '../lib/format';
@@ -116,7 +116,7 @@ function PartBlock({ part, warning, index, total }: { part: CodePart; warning: s
     <article className="code-part">
       <header>
         <div>
-          <p>Part {index + 1} of {total}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
+          <p>Part {index + 1} of {total}{part.tier ? ` · ${playShotTier(part.tier)}` : ''}{part.cap ? ` · cap ${part.cap.toFixed(2)}` : ''}</p>
         </div>
         {open ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />}
       </header>
@@ -340,7 +340,7 @@ export function CodesPage() {
                 {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
                 {item.week.parts.slice(1).map((extra, index) => (
                   <div className="code-today" key={extra.code}>
-                    <span>Part {index + 2} · {extra.legCount} legs</span>
+                    <span>Part {index + 2}{extra.tier ? ` · ${playShotTier(extra.tier)}` : ''} · {extra.legCount} legs</span>
                     {canSeeCode(extra.code, extra.firstKick) ? <CodeCopy code={extra.code} link={extra.link} /> : <EarlyCode code={extra.code} firstKick={extra.firstKick} />}
                   </div>
                 ))}
@@ -389,7 +389,7 @@ export function CodesPage() {
                 {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
                 {slot.parts.slice(1).map((extra, index) => (
                   <div className="code-today" key={extra.code}>
-                    <span>Part {index + 2} · {extra.legCount} legs</span>
+                    <span>Part {index + 2}{extra.tier ? ` · ${playShotTier(extra.tier)}` : ''} · {extra.legCount} legs</span>
                     {canSeeCode(extra.code, extra.firstKick) ? <CodeCopy code={extra.code} link={extra.link} /> : <EarlyCode code={extra.code} firstKick={extra.firstKick} />}
                   </div>
                 ))}

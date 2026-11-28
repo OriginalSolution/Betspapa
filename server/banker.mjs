@@ -36,6 +36,8 @@ import {
   weekMonday,
 } from './bankerConfig.mjs';
 import { collectCandidates, collectUnder45, coverageFromEvents, mapPool } from './bankerFeed.mjs';
+import { collectOutsideBox } from './outsideBoxFeed.mjs';
+import { OUTSIDE_PART } from './outsideBox.mjs';
 import { bookShare, readCode, readDesk, sameSelections } from './bankerRead.mjs';
 import { assemble, priceStillOk, productOdds } from './bankerRules.mjs';
 import { legFixture, legList, legScore } from '../src/lib/noteCopy.mjs';
@@ -314,6 +316,7 @@ export function createBanker(options = {}) {
     return {
       code: row.code,
       cap: row.cap,
+      tier: row.tier || '',
       legs: legs.map((leg) => publicLeg(leg, options.crestFor)),
       legCount: legs.length,
       totalOdds: row.totalOdds,
@@ -482,6 +485,7 @@ export function createBanker(options = {}) {
 
   async function bookSlot(strategy, slot, id, fromMs, toMs) {
     if (!bookEnabled || !request) return;
+    if (strategy === 'outsidebox') return bookOutsideBox(slot, id, fromMs, toMs);
     if (strategy === 'ladder' && slot === 'week') return;
     const key = slotKey(strategy, slot, id);
     if (Object.prototype.hasOwnProperty.call(state.order, key)) return;
@@ -596,6 +600,7 @@ export function createBanker(options = {}) {
     const seen = new Set();
     for (const row of Object.values(state.codes)) {
       if (!row.readOk || row.frozen || row.seed || row.superseded) continue;
+      if (row.strategy === 'outsidebox') continue;
       if (row.firstKick && row.firstKick <= now()) {
         row.frozen = true;
         continue;
@@ -696,6 +701,88 @@ export function createBanker(options = {}) {
     return view();
   }
 
+  async function bookOutsideBox(slot, id, fromMs, toMs) {
+    if (!bookEnabled || !request) return;
+    const key = slotKey('outsidebox', slot, id);
+    if (Object.prototype.hasOwnProperty.call(state.order, key)) return;
+    const weekId = slot === 'week' ? id : weekMonday(parseDay(id));
+    let rows = [];
+    try {
+      rows = await collectOutsideBox(request, fetchImpl, { fromMs, toMs });
+    } catch (error) {
+      log.error?.(`[codes] outsidebox ${slot} ${id}: ${error instanceof Error ? error.message : error}`);
+      return;
+    }
+    const legs = rows.map((row) => ({
+      eventId: row.eventId,
+      home: row.home,
+      away: row.away,
+      homeId: row.homeId,
+      awayId: row.awayId,
+      league: row.league,
+      tournamentId: row.tournamentId,
+      country: row.country,
+      kickMs: row.kickMs,
+      marketId: '800054',
+      specifier: '',
+      outcomeId: row.pick.outcomeId,
+      odds: row.pick.odds,
+      side: '',
+      label: row.pick.label,
+      tier: row.pick.tier,
+    }));
+    const rank = { '100': 0, '90': 1, '80': 2 };
+    legs.sort((a, b) => (rank[a.tier] - rank[b.tier]) || a.kickMs - b.kickMs || String(a.eventId).localeCompare(String(b.eventId)));
+    if (!legs.length) {
+      state.order[key] = [];
+      state.empty[key] = { closest: null, at: new Date(now()).toISOString() };
+      save();
+      return;
+    }
+    const groups = [];
+    for (const tier of ['100', '90', '80']) {
+      const tierLegs = legs.filter((leg) => leg.tier === tier);
+      for (let index = 0; index < tierLegs.length; index += OUTSIDE_PART) groups.push({ tier, legs: tierLegs.slice(index, index + OUTSIDE_PART) });
+    }
+    const placedAll = [];
+    for (const group of groups) {
+      const placed = await place('outsidebox', group.legs, null);
+      if (placed) placedAll.push({ ...placed, tier: group.tier });
+    }
+    if (!placedAll.length) {
+      state.order[key] = [];
+      state.empty[key] = { closest: { match: 'Shots Outside Box', reason: 'the share readback did not match' }, at: new Date(now()).toISOString() };
+      save();
+      return;
+    }
+    const weekIdUsed = weekId;
+    state.order[key] = placedAll.map((row) => row.code);
+    for (const [index, placed] of placedAll.entries()) {
+      state.codes[placed.code] = {
+        code: placed.code,
+        strategy: 'outsidebox',
+        slot,
+        week: weekIdUsed,
+        day: slot === 'daily' ? id : '',
+        cap: null,
+        tier: placed.tier,
+        part: index + 1,
+        frozen: false,
+        seed: false,
+        readOk: true,
+        football: placed.football,
+        footballCode: placed.footballCode,
+        legs: placed.legs,
+        totalOdds: productOdds(placed.legs),
+        readAt: new Date(now()).toISOString(),
+        firstKick: Math.min(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+        lastKick: Math.max(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+      };
+      rememberNotice(state.codes[placed.code], 'booked');
+    }
+    save();
+  }
+
   async function ensureUnder45(id, monday, fromMs, toMs) {
     const key = slotKey(id, 'week', monday);
     const currentCodes = state.order[key] || [];
@@ -792,6 +879,7 @@ export function createBanker(options = {}) {
       if (clock < openWeekEnd) {
         await ensureUnder45('under45', openMonday, clock, openWeekEnd);
         await ensureUnder45('under45plus', openMonday, clock, openWeekEnd);
+        await bookOutsideBox('week', openMonday, clock, openWeekEnd);
       }
       await rebookDrifted();
       if (options.results?.settle) await options.results.settle();

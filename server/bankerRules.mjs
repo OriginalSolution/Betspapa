@@ -302,6 +302,7 @@ export function priceStillOk(strategy, leg, cap = CAPPED_CAP) {
   if (strategy === 'under45plus') {
     return odds >= U45_PLUS_MIN - 1e-9 && odds <= U45_LEG_MAX + 1e-9;
   }
+  if (strategy === 'outsidebox') return odds > 1;
   if (!(odds >= MIN_LEG)) return false;
   if (strategy === 'capped' && odds > cap + 1e-9) return false;
   if ((strategy === 'ladder' || strategy === 'shield') && String(leg?.marketId) === '18' && !(odds < SHIELD_O25_MAX_EXCL)) return false;
