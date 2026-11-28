@@ -6,6 +6,7 @@ import { bookAll } from './bookers.mjs';
 import { loadHistories } from './history.mjs';
 import { assertBookingRanges, boardDirty, projectBoard, serveBoard } from './oddsRange.mjs';
 import { buildOccurrenceBoard, isOpenToday, isRealFixture, masterPick, teamUid } from './occurrence.mjs';
+import { attachTableSides } from './tableSides.mjs';
 import { loadSettled, rememberSettled, saveSettled } from './research.mjs';
 import { inspectBooks, repairSettlement } from './quality.mjs';
 import { SLIP_CONCURRENCY, bookSlips, bookableLegs, bookingGroups, slipView, tierSlips, trendGroups } from './slips.mjs';
@@ -483,7 +484,16 @@ export function createEngine(options = {}) {
 
     const settledFile = join(dir, 'research-settled.json');
     const settledRows = loadSettled(settledFile);
-    const board = buildOccurrenceBoard(events, loaded.histories, now, { settled: settledRows });
+    let positioned = events;
+    if (!options.loadHistories) {
+      try {
+        positioned = await attachTableSides(events, options.fetchImpl || fetch);
+      } catch (error) {
+        issues.push(`League table failed: ${error instanceof Error ? error.message : 'table failed'}. Side lines were left off.`);
+        log('error', issues[issues.length - 1]);
+      }
+    }
+    const board = buildOccurrenceBoard(positioned, loaded.histories, now, { settled: settledRows });
     if (loaded.statsMissing) board.notes.push(`No corner or card count for ${loaded.statsMissing} recent matches, so those lines were skipped where the sample fell under 8.`);
     if (loaded.statsDeferred) board.notes.push(`Corner and card counts for ${loaded.statsDeferred} recent matches wait for the next cycle.`);
     const fresh = board.legs.map((leg) => {

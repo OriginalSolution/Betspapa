@@ -13,6 +13,7 @@ import { MIN_ODDS, priceInRange } from './oddsRange.mjs';
 import { indexLeagues, reviewPick } from './research.mjs';
 import { minConfidence } from './thresholds.mjs';
 import { isSimulated } from './upcoming.mjs';
+import { sideAllowed } from './strongerSide.mjs';
 
 export const WINDOW = 10;
 export const MIN_SAMPLE = 8;
@@ -335,6 +336,8 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   let confidenceDropped = 0;
   let leagueDropped = 0;
   let leagueMarked = 0;
+  let tableDropped = 0;
+  const tableNotes = [];
   const unpriced = new Map();
   for (const event of Array.isArray(events) ? events : []) {
     if (!isRealFixture(event) || !isOpenToday(event, now)) continue;
@@ -399,6 +402,12 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
         researchDrops.push(report);
         continue;
       }
+      const table = sideAllowed(market.id, event.hpos, event.apos);
+      if (!table.keep) {
+        tableDropped += 1;
+        if (tableNotes.length < 8) tableNotes.push(`${match} ${market.id} left off: ${table.reason} (table ${event.hpos ?? '–'}-${event.apos ?? '–'}).`);
+        continue;
+      }
       if (review.leagueRisk === 'penalise') leagueMarked += 1;
       const sample = `${review.hits}/${review.sample}`;
       legs.push({
@@ -439,6 +448,8 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   if (confidenceDropped) notes.push(`${confidenceDropped} lines were left off the code because the grade was under that market's minimum.`);
   if (leagueDropped) notes.push(`${leagueDropped} lines were left off the code because that league's results make the price unreliable.`);
   if (leagueMarked) notes.push(`${leagueMarked} lines were marked down to 90% by the league score or an owner override.`);
+  if (tableDropped) notes.push(`${tableDropped} team-score, draw-no-bet, or double-chance lines were left off because that side is not higher on the league table.`);
+  notes.push(...tableNotes);
   for (const drop of researchDrops.slice(0, 6)) {
     notes.push(`${drop.match} ${drop.market} ${drop.odds}: ${drop.reasons[drop.reasons.length - 1]}`);
   }

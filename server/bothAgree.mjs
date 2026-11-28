@@ -2,8 +2,10 @@
  * Fixtures where both teams' real last 10 agree. Nothing here is invented, and
  * nothing here is added to a slip or a code.
  */
-import { agreedRows, nearestMiss, quoteFor } from './agreeMarkets.mjs';
+import { agreedRows, nearestMiss, quoteFor, quotePriced } from './agreeMarkets.mjs';
+import { agreeEngineMarket, agreeSideOffers, strongerSide } from './strongerSide.mjs';
 import { loadTeamLast10 } from './matchInsight.mjs';
+import { attachTableSides } from './tableSides.mjs';
 
 const HORIZON_MS = 36 * 60 * 60 * 1000;
 const FIXTURE_LIMIT = 80;
@@ -35,9 +37,10 @@ export function selectFixtures(events, now = Date.now(), horizonMs = HORIZON_MS,
 
 export function agreeFixture(event, home, away) {
   if (!home?.markets?.length || !away?.markets?.length) return null;
-  const agreed = agreedRows(home.markets, away.markets);
+  const agreed = agreeSideOffers(agreedRows(home.markets, away.markets), strongerSide(event.hpos, event.apos));
   if (!agreed.length) return null;
   const [market, ...also] = agreed;
+  const priced = market.side ? agreeEngineMarket(market.id, market.side) : null;
   return {
     id: String(event.eventId),
     home: home.name || String(event.home || ''),
@@ -49,7 +52,7 @@ export function agreeFixture(event, home, away) {
     market,
     also,
     miss: nearestMiss(home.markets, away.markets),
-    quote: quoteFor(market.id, event.odds),
+    quote: priced ? quotePriced(priced, event.odds) : quoteFor(market.id, event.odds),
   };
 }
 
@@ -88,6 +91,7 @@ async function cachedSide(uid, fetchImpl, now) {
 
 export async function loadBothAgree({ events, fetchImpl = fetch, now = Date.now() } = {}) {
   const chosen = selectFixtures(events, now);
+  await attachTableSides(chosen, fetchImpl);
   const uids = [...new Set(chosen.flatMap((event) => [competitorUid(event.homeId), competitorUid(event.awayId)]))];
   const sides = new Map();
   await mapLimit(uids, FETCH_LIMIT, async (uid) => {
