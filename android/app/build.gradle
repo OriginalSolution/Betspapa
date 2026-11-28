@@ -14,8 +14,8 @@ android {
         applicationId "com.betspapa.scores"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 64
-        versionName "0.4.41" // Higher-table side on team lines, and no double chance 12. Play copy stays tenth-based and bookmaker-free
+        versionCode 65
+        versionName "0.4.42" // Layout fixes on top of the higher-table side and no double chance 12. The both-teams board retries a missed load. Play copy stays tenth-based and bookmaker-free
         buildConfigField "boolean", "FCM_ENABLED", fcmEnabled ? "true" : "false"
         buildConfigField "boolean", "PLAY_STORE", System.getenv("STORE_BUILD") == "play" ? "true" : "false"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

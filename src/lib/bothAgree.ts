@@ -108,6 +108,28 @@ function market(value: unknown): AgreeMarket | null {
   return { id: row.id, label: row.label, tier: row.tier, home, away };
 }
 
+/**
+ * A cold phone can drop the first both-teams request. Ask again before the
+ * section stays hidden for the rest of the visit.
+ */
+export async function loadAgreeRows(
+  load: () => Promise<AgreeFixture[]>,
+  attempts = 3,
+  pause: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<AgreeFixture[]> {
+  let last: AgreeFixture[] = [];
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      last = await load();
+    } catch {
+      last = [];
+    }
+    if (last.length > 0 || attempt === attempts - 1) return last;
+    await pause(1500);
+  }
+  return last;
+}
+
 export function readAgreeBoard(body: unknown): AgreeFixture[] {
   const fixtures = body && typeof body === 'object' ? (body as { fixtures?: unknown }).fixtures : null;
   if (!Array.isArray(fixtures)) return [];
