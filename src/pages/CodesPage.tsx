@@ -30,7 +30,7 @@ import { cx } from '../lib/format';
 import { canSeeCode } from '../lib/proAccess';
 import { useStore } from '../state/store';
 import { useProduct } from '../state/product';
-import { legBlocked, teamKey } from '../lib/teamMarks';
+import { codeLegHidden, teamKey } from '../lib/teamMarks';
 import { TeamTap } from '../components/TeamMark';
 import { markFresh, newCodes } from '../lib/freshCode';
 import { goToBookedCodes, useFreshCodes } from '../lib/useFreshCodes';
@@ -252,7 +252,7 @@ export function CodesPage() {
         {week.parts[0] && (
           <section className="code-legs">
             <h2>Legs {week.parts.reduce((sum, part) => sum + part.legCount, 0)}</h2>
-            {week.parts.flatMap((part) => part.legs).filter((leg) => !legBlocked(lists, leg)).map((leg) => (
+            {week.parts.flatMap((part) => part.legs).filter((leg) => !codeLegHidden(lists, leg)).map((leg) => (
               <div className="code-leg" key={`${leg.eventId}-${leg.label}`}>
                 <time>{gmtClock(leg.kickoff)}</time>
                 <div>
@@ -338,6 +338,12 @@ export function CodesPage() {
                   </div>
                 </Link>
                 {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
+                {item.week.parts.slice(1).map((extra, index) => (
+                  <div className="code-today" key={extra.code}>
+                    <span>Part {index + 2} · {extra.legCount} legs</span>
+                    {canSeeCode(extra.code, extra.firstKick) ? <CodeCopy code={extra.code} link={extra.link} /> : <EarlyCode code={extra.code} firstKick={extra.firstKick} />}
+                  </div>
+                ))}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{data.warning}</span></p>}
                 {hasCode(item.today) && (
                   <div className="code-today">
@@ -381,6 +387,12 @@ export function CodesPage() {
                   </div>
                 </div>
                 {part && (canSeeCode(part.code, part.firstKick) ? <CodeCopy code={part.code} link={part.link} /> : <EarlyCode code={part.code} firstKick={part.firstKick} />)}
+                {slot.parts.slice(1).map((extra, index) => (
+                  <div className="code-today" key={extra.code}>
+                    <span>Part {index + 2} · {extra.legCount} legs</span>
+                    {canSeeCode(extra.code, extra.firstKick) ? <CodeCopy code={extra.code} link={extra.link} /> : <EarlyCode code={extra.code} firstKick={extra.firstKick} />}
+                  </div>
+                ))}
                 {part?.highRisk && <p className="code-risk code-risk-tight"><span>{part.highRiskWhy}. {data.warning}</span></p>}
               </article>
             );

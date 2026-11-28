@@ -51,6 +51,7 @@ export function gradeBanker(market, ft, timeline) {
   const home = ft.home;
   const away = ft.away;
   const goals = home + away;
+  if (key === 'over15') return goals >= 2 ? 'won' : 'lost';
   if (key === 'over25') return goals >= 3 ? 'won' : 'lost';
   if (key === 'home-over15') return home >= 2 ? 'won' : 'lost';
   if (key === 'away-over15') return away >= 2 ? 'won' : 'lost';

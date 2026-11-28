@@ -43,6 +43,21 @@ export const SHIELD_MIN_VENUE_GAMES = 6;
 export const SHIELD_GA_RATIO = 1;
 export const SHIELD_O25_MAX_EXCL = 1.6;
 
+/**
+ * Under 4.5 Goals. Under 4.5 is only the filter. The booked leg is Over 1.5
+ * or Over 2.5, and this strategy does not use the general odds table.
+ */
+export const U45_FILTER_OVER = 1.25;
+export const U45_LEG_MAX = 1.5;
+export const U45_O15_PUSH_UNDER = 1.17;
+export const U45_O25_XG = 2.8;
+export const U45_O15_XG = 2.0;
+export const U45_LAST_N = 10;
+export const U45_MIN_GAMES = 8;
+/** Of a full last 10, both teams must have scored in at least this many. */
+export const U45_REGULAR_SCORED = 7;
+export const U45_PART = 50;
+
 /** Ladder: how often the weaker side has scored in its last 10. */
 export const LADDER_WEAK_RARE_MAX = 3;
 export const LADDER_WEAK_OFTEN = 6;
@@ -93,6 +108,7 @@ export const STRATEGIES = [
   { id: 'shield', code: 'S3', name: 'Banker Shield', week: true },
   { id: 'capped', code: 'S4', name: 'Banker Capped', week: true },
   { id: 'ladder', code: 'S5', name: 'Banker Ladder', week: false },
+  { id: 'under45', code: 'S6', name: 'Under 4.5 Goals', week: true },
 ];
 
 export function strategyById(id) {
@@ -187,6 +203,15 @@ export function rulesFor(id) {
       `AH −1 under 1.60: match Over 2.5. From 1.60 to under 2.00: favourite 2UP. Every leg at or under ${CAPPED_CAP.toFixed(2)}.`,
       'If the main pick is over the cap, use the favourite’s team Over 1.5 when that is at or under the cap. Otherwise drop the game.',
       floor,
+    ];
+  }
+  if (id === 'under45') {
+    return [
+      `Under 4.5 goals above ${U45_FILTER_OVER.toFixed(2)} is the filter, not the leg. Youth, reserve, women and SRL matches are skipped.`,
+      `Last ${U45_LAST_N} competitive games, at least ${U45_MIN_GAMES} for each team. Expected goals = average of home scored and away conceded, plus average of away scored and home conceded.`,
+      `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
+      `No booked price above ${U45_LEG_MAX.toFixed(2)}. Over 1.5 below ${U45_O15_PUSH_UNDER.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is ${U45_LEG_MAX.toFixed(2)} or under. Otherwise the game is dropped.`,
+      `This strategy does not use the general odds table. Parts of ${U45_PART}, each with its own code. SportyBet and Football.com only. A blacklisted team, competition, or market is left off this phone.`,
     ];
   }
   return [

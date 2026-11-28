@@ -58,6 +58,7 @@ function screenTitle(pathname: string, search: string): string {
       shield: playCodeLabel('Banker Shield'),
       capped: playCodeLabel('Banker Capped'),
       ladder: playCodeLabel('Banker Ladder'),
+      under45: 'Under 4.5 Goals',
     };
     return names[pathname.split('/')[2] || ''] || 'Codes';
   }

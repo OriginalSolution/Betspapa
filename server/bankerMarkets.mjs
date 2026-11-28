@@ -112,6 +112,14 @@ export function findO25(data) {
   return findMkt(data, '18', 'total=2.5', (desc) => String(desc || '').toLowerCase().startsWith('over'));
 }
 
+export function findOver15(data) {
+  return findMkt(data, '18', 'total=1.5', (desc) => String(desc || '').toLowerCase().startsWith('over'));
+}
+
+export function findUnder45(data) {
+  return findMkt(data, '18', 'total=4.5', (desc) => String(desc || '').toLowerCase().startsWith('under'));
+}
+
 export function findTeamO15(data, side) {
   const mid = side === 'H' ? '19' : '20';
   return findMkt(data, mid, 'total=1.5', (desc) => String(desc || '').toLowerCase().startsWith('over'));
@@ -121,11 +129,14 @@ export function isOpenStatus(status) {
   return OPEN.has(String(status ?? '').trim().toLowerCase());
 }
 
-export function marketLabel(marketId, desc, side) {
+export function marketLabel(marketId, desc, side, specifier = '') {
   const id = String(marketId);
   const who = side === 'A' ? 'Away' : side === 'H' ? 'Home' : '';
+  const line = String(specifier || '');
   if (id === '60100') return `${who} 2UP`.trim();
   if (id === '60200') return `${who} 1UP`.trim();
+  if (id === '18' && line.includes('1.5')) return 'Over 1.5';
+  if (id === '18' && line.includes('4.5')) return String(desc || '').toLowerCase().startsWith('under') ? 'Under 4.5' : 'Over 4.5';
   if (id === '18') return 'Over 2.5';
   if (id === '19') return 'Home 2+';
   if (id === '20') return 'Away 2+';
@@ -143,10 +154,12 @@ export function sideOf(desc, outcomeId) {
 }
 
 /** Grade key used by the results tracker. Empty when this is not a Banker market. */
-export function gradeKey(marketId, side) {
+export function gradeKey(marketId, side, specifier = '') {
   const id = String(marketId);
+  const line = String(specifier || '');
   if (id === '60100') return side === 'A' ? '2up-away' : '2up-home';
   if (id === '60200') return side === 'A' ? '1up-away' : '1up-home';
+  if (id === '18' && line.includes('1.5')) return 'over15';
   if (id === '18') return 'over25';
   if (id === '19') return 'home-over15';
   if (id === '20') return 'away-over15';

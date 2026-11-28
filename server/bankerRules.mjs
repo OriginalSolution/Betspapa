@@ -22,6 +22,14 @@ import {
   MAX_CODES_PER_MATCH,
   MIN_LEG,
   SHIELD_O25_MAX_EXCL,
+  U45_FILTER_OVER,
+  U45_LAST_N,
+  U45_LEG_MAX,
+  U45_MIN_GAMES,
+  U45_O15_PUSH_UNDER,
+  U45_O15_XG,
+  U45_O25_XG,
+  U45_REGULAR_SCORED,
   WEEK_MAX_LEGS,
 } from './bankerConfig.mjs';
 import { dropReason, strongAway, tableClash } from './bankerFilters.mjs';
@@ -64,6 +72,79 @@ function teamO15(candidate) {
   return leg(candidate, { ...candidate.teamO15, side: candidate.ah.side }, candidate.ah.side === 'A' ? 'Away 2+' : 'Home 2+');
 }
 
+/** Last-10 expected goals. Each half is the average of one team's scoring and the other's concessions. */
+export function under45Expected(home, away) {
+  const values = [home?.scoredAvg, home?.concededAvg, away?.scoredAvg, away?.concededAvg].map(Number);
+  if (values.some((value) => !Number.isFinite(value))) return null;
+  const [homeFor, homeAgainst, awayFor, awayAgainst] = values;
+  return (homeFor + awayAgainst) / 2 + (awayFor + homeAgainst) / 2;
+}
+
+/** Both teams scoring regularly: 7 of a last 10, or 70% when the sample is 8 or 9. */
+export function under45Regular(sample) {
+  const n = Number(sample?.n) || 0;
+  const scored = Number(sample?.scoredGames) || 0;
+  if (n < U45_MIN_GAMES) return false;
+  const need = n >= U45_LAST_N ? U45_REGULAR_SCORED : Math.ceil(n * 0.7);
+  return scored >= need;
+}
+
+function goalsLeg(candidate, pick, label) {
+  if (!pick || !(pick.price > 1) || pick.price > U45_LEG_MAX + 1e-9) return { drop: `${label} over ${U45_LEG_MAX.toFixed(2)} or missing` };
+  return {
+    eventId: candidate.eventId,
+    home: candidate.home,
+    away: candidate.away,
+    homeId: candidate.homeId || '',
+    awayId: candidate.awayId || '',
+    league: candidate.league || '',
+    tournamentId: candidate.tournamentId || '',
+    country: candidate.country || '',
+    kickMs: candidate.kickMs,
+    ah: candidate.u45?.price ?? 0,
+    marketId: pick.mid,
+    specifier: pick.spec || '',
+    outcomeId: pick.oid,
+    odds: pick.price,
+    side: '',
+    label,
+  };
+}
+
+/**
+ * Under 4.5 is the filter. The leg is Over 1.5 or Over 2.5 from last-10
+ * goal averages. The general odds table and the AH pool do not apply.
+ */
+export function pickUnder45(candidate) {
+  const name = dropReason(candidate?.country, candidate?.league, candidate?.home, candidate?.away);
+  if (name) return { drop: name };
+  if (candidate?.blacklisted) return { drop: 'blacklisted' };
+  if (candidate?.open === false) return { drop: 'already started' };
+  if (!(candidate?.u45 && candidate.u45.price > U45_FILTER_OVER)) return { drop: 'Under 4.5 not above 1.25' };
+  const home = candidate.homeGoals;
+  const away = candidate.awayGoals;
+  if (!home || !away || home.n < U45_MIN_GAMES || away.n < U45_MIN_GAMES) return { drop: 'no last-10 goal averages' };
+  const expected = under45Expected(home, away);
+  if (expected == null) return { drop: 'no last-10 goal averages' };
+  const regular = under45Regular(home) && under45Regular(away);
+  const over25Bar = expected + 1e-9 >= U45_O25_XG && regular;
+  const over15Bar = expected + 1e-9 >= U45_O15_XG;
+  const over25 = () => {
+    if (!candidate.o25) return { drop: 'no Over 2.5' };
+    if (candidate.o25.price > U45_LEG_MAX + 1e-9) return { drop: 'Over 2.5 over 1.50' };
+    return goalsLeg(candidate, candidate.o25, 'Over 2.5');
+  };
+  if (over25Bar) return over25();
+  if (!over15Bar) return { drop: `expected goals ${expected.toFixed(2)} under 2.00` };
+  if (!candidate.o15) return { drop: 'no Over 1.5' };
+  if (candidate.o15.price < U45_O15_PUSH_UNDER) {
+    // The Over 2.5 bar was already missed, so a short Over 1.5 cannot be pushed up.
+    return { drop: 'Over 1.5 under 1.17 and goal stats miss Over 2.5' };
+  }
+  if (candidate.o15.price > U45_LEG_MAX + 1e-9) return { drop: 'Over 1.5 over 1.50' };
+  return goalsLeg(candidate, candidate.o15, 'Over 1.5');
+}
+
 /** Shared pool. A string is the drop reason. */
 export function poolDrop(candidate) {
   if (!candidate?.ah || !(candidate.ah.price <= AH_MAX_INCL)) return 'AH −1 over 2.00 or missing';
@@ -100,6 +181,7 @@ function underCap(picked, cap) {
 }
 
 export function pickLeg(strategy, candidate, config = {}) {
+  if (strategy === 'under45') return pickUnder45(candidate);
   const pool = poolDrop(candidate);
   if (pool) return { drop: pool };
   if (strategy === 'classic') {
@@ -173,10 +255,16 @@ export function assemble(strategy, candidates, { slot = 'week', cap, counts = ne
     }
     const picked = pickLeg(strategy, candidate, { cap });
     if (picked.drop) {
-      dropped.push({ eventId: candidate.eventId, match: `${candidate.home} v ${candidate.away}`, reason: picked.drop, ah: candidate.ah?.price ?? null });
+      dropped.push({ eventId: candidate.eventId, match: `${candidate.home} v ${candidate.away}`, reason: picked.drop, ah: candidate.u45?.price ?? candidate.ah?.price ?? null });
       continue;
     }
     kept.push(picked);
+  }
+  if (strategy === 'under45') {
+    kept.sort((a, b) => a.kickMs - b.kickMs || String(a.eventId).localeCompare(String(b.eventId)));
+    const misses = dropped.filter((row) => row.ah != null && row.reason !== 'already on 2 codes in this strategy');
+    misses.sort((a, b) => a.ah - b.ah);
+    return { legs: kept, dropped, closest: misses[0] || null };
   }
   kept.sort((a, b) => a.ah - b.ah || a.kickMs - b.kickMs);
   const limit = maxLegs(slot);
@@ -196,6 +284,12 @@ export function productOdds(legs) {
 /** A read-back price has left the strategy's own rule. Classic and Gold have no extra cap. */
 export function priceStillOk(strategy, leg, cap = CAPPED_CAP) {
   const odds = Number(leg?.odds);
+  if (strategy === 'under45') {
+    if (!(odds > 1) || odds > U45_LEG_MAX + 1e-9) return false;
+    const line = String(leg?.specifier || '');
+    if (line.includes('1.5') && odds < U45_O15_PUSH_UNDER) return false;
+    return true;
+  }
   if (!(odds >= MIN_LEG)) return false;
   if (strategy === 'capped' && odds > cap + 1e-9) return false;
   if ((strategy === 'ladder' || strategy === 'shield') && String(leg?.marketId) === '18' && !(odds < SHIELD_O25_MAX_EXCL)) return false;

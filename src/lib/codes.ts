@@ -5,8 +5,13 @@ export type CodeLeg = {
   eventId: string;
   home: string;
   away: string;
+  homeId?: string;
+  awayId?: string;
   homeCrest: string;
   awayCrest: string;
+  league?: string;
+  tournamentId?: string;
+  market?: string;
   label: string;
   odds: number;
   kickoff: string;
