@@ -88,7 +88,15 @@ button:disabled { cursor: default; opacity: 0.35; }
   font-weight: 650;
   letter-spacing: -0.03em;
 }
-.top-title p { margin: 1px 0 0; color: var(--muted); font-size: 12px; }
+.top-title p {
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
 .top-actions { display: flex; align-items: center; gap: 4px; }
 .brand {
   display: flex;
@@ -2859,30 +2867,34 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .tab { font-size: 11px; }
 }
 
-/* Play phones: the tab bar is in the column, so lists scroll above it and the safe area. */
+/* Phones and the fold: the tab bar sits in the column. Lists scroll inside main,
+   with room for the tab bar and the system nav so the last row can clear both. */
 @media (max-width: 959px) {
-  .is-play.shell {
+  html, body, #root { height: 100%; overflow: hidden; }
+  .shell {
+    position: fixed;
+    inset: 0;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    max-height: 100dvh;
+    height: auto;
+    max-height: none;
     overflow: hidden;
   }
-  .is-play .center {
+  .center {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
-  .is-play .main {
+  .main {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding-bottom: calc(20px + var(--safe-area-inset-bottom));
-    scroll-padding-bottom: calc(16px + var(--safe-area-inset-bottom));
+    padding-bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 24px);
+    scroll-padding-bottom: calc(var(--tab) + var(--safe-area-inset-bottom) + 24px);
   }
-  .is-play .tabbar { position: static; flex: none; }
+  .tabbar { position: static; flex: none; }
   .is-play .chips { flex-wrap: wrap; overflow: visible; }
   .is-play .chip { flex: none; max-width: 100%; }
 }
@@ -2893,7 +2905,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .topbar { position: relative; }
   .comp-head { top: 0; }
   .tab { flex-direction: row; gap: 6px; }
-  .is-play .main { padding-bottom: calc(24px + var(--safe-area-inset-bottom)); }
 }
 
 /* Desktop and big tablets: the centre column grows with the screen; the right rail
@@ -3485,6 +3496,36 @@ button.ad-slot { width: calc(100% - 28px); background: transparent; }
 }
 .pro-prices p { margin: 0 0 6px; font-size: 20px; font-weight: 750; letter-spacing: -0.03em; }
 .pro-prices .btn { margin-top: 8px; width: 100%; }
+
+/* Team names wrap on spaces. A word that does not fit is ellipsized, never split. */
+.fixture-side strong, .side-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: 100%;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  line-height: 1.2;
+}
+.h2h-row span, .last10-head span {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+.top-title h1, .top-title p {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.top-title p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.pick-tier small.is-wait { color: var(--faint); letter-spacing: 0.08em; }
 .pro-prices .btn:disabled, button.ad-slot:disabled { opacity: 0.55; }
 .pro-limits { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 720px) { .pro-limits { grid-template-columns: 1fr 1fr; } }

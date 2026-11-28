@@ -2,18 +2,22 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { FeedPause } from '../lib/backoff';
 import { ENGINE_POLL_MS, fetchEngine, readEngineCache, writeEngineCache, type EngineState } from '../lib/engineSlips';
 
-type EngineBoard = { state: EngineState | null; problem: string | null };
+type EngineBoard = { state: EngineState | null; problem: string | null; ready: boolean };
 
-const EngineContext = createContext<EngineBoard>({ state: null, problem: null });
+const EngineContext = createContext<EngineBoard>({ state: null, problem: null, ready: false });
 
 /** One engine read for the whole app. Tabs subscribe; they do not fetch or parse again. */
 export function EngineProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<EngineState | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     let stop = false;
     const cached = readEngineCache();
-    if (cached) setState(cached);
+    if (cached) {
+      setState(cached);
+      setReady(true);
+    }
     let pauseUntil = 0;
     const pull = async () => {
       if (document.visibilityState === 'hidden' || Date.now() < pauseUntil) return;
@@ -23,6 +27,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
         writeEngineCache(next);
         setState(next);
         setProblem(null);
+        setReady(true);
       } catch (error) {
         if (error instanceof FeedPause) pauseUntil = error.retryAt;
         if (!stop) setProblem(error instanceof Error ? error.message : 'Could not load the board');
@@ -35,7 +40,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
     };
   }, []);
-  return <EngineContext.Provider value={{ state, problem }}>{children}</EngineContext.Provider>;
+  return <EngineContext.Provider value={{ state, problem, ready }}>{children}</EngineContext.Provider>;
 }
 
 export function useEngineBoard(): EngineBoard {
