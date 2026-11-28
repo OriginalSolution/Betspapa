@@ -3,14 +3,14 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { rulesFor, SHIELD_GA_RATIO } from './bankerConfig.mjs';
+import { rulesFor, SHIELD_GA_RATIO, U45_LEG_MAX, U45_O25_XG } from './bankerConfig.mjs';
 import { createBanker } from './banker.mjs';
 import { defenceFor } from './bankerDefence.mjs';
 import { dropReason, isCupLeague, tableClash } from './bankerFilters.mjs';
 import { gradeBanker, mismatchNote } from './bankerGrade.mjs';
 import { findAhMinus1 } from './bankerMarkets.mjs';
 import { parseShare, sameSelections } from './bankerRead.mjs';
-import { assemble, pickLeg } from './bankerRules.mjs';
+import { assemble, pickLeg, priceStillOk, under45Expected } from './bankerRules.mjs';
 import { createResults } from './results.mjs';
 import { channelFor } from './push.mjs';
 
@@ -93,6 +93,79 @@ test('strategies follow their own prices and the HARD cap is not applied', () =>
   assert.equal(clash.drop, 'top-5 v top-5');
 });
 
+function goalSample(scoredAvg, concededAvg, scoredGames = 8, n = 10) {
+  return { n, scoredAvg, concededAvg, scoredGames };
+}
+
+function underGame(patch = {}) {
+  return {
+    eventId: 'sr:match:45',
+    home: 'Frosinone',
+    away: 'Parma',
+    country: 'Italy',
+    league: 'Serie B',
+    kickMs: clock + 86400000,
+    open: true,
+    u45: { mid: '18', spec: 'total=4.5', oid: '13', price: 1.32 },
+    o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.28 },
+    o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.44 },
+    homeGoals: goalSample(1.6, 1.2),
+    awayGoals: goalSample(1.4, 1.3),
+    ...patch,
+  };
+}
+
+test('Under 4.5 Goals uses last-10 averages and ignores the general odds table', () => {
+  const base = underGame();
+  assert.equal(Number(under45Expected(base.homeGoals, base.awayGoals).toFixed(2)), 2.75);
+  const over15 = pickLeg('under45', base);
+  assert.equal(over15.label, 'Over 1.5');
+  assert.equal(over15.odds, 1.28);
+  const keptShort = pickLeg('under45', underGame({ o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.18 } }));
+  assert.equal(keptShort.label, 'Over 1.5');
+  assert.equal(keptShort.odds, 1.18);
+  const atFloor = pickLeg('under45', underGame({ o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.17 } }));
+  assert.equal(atFloor.label, 'Over 1.5');
+  const filter = pickLeg('under45', underGame({ u45: { mid: '18', spec: 'total=4.5', oid: '13', price: 1.25 } }));
+  assert.equal(filter.drop, 'Under 4.5 not above 1.25');
+  const thin = pickLeg('under45', underGame({ homeGoals: goalSample(1.0, 0.6), awayGoals: goalSample(0.9, 0.5) }));
+  assert.match(thin.drop, /under 2\.00/);
+  const pushed = pickLeg('under45', underGame({
+    homeGoals: goalSample(2.0, 1.4, 8),
+    awayGoals: goalSample(1.8, 1.6, 8),
+    o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.1 },
+    o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.44 },
+  }));
+  assert.equal(under45Expected(goalSample(2.0, 1.4, 8), goalSample(1.8, 1.6, 8)) >= U45_O25_XG, true);
+  assert.equal(pushed.label, 'Over 2.5');
+  assert.equal(pushed.odds, 1.44);
+  const shortStay = pickLeg('under45', underGame({ o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.1 } }));
+  assert.equal(shortStay.drop, 'Over 1.5 under 1.17 and goal stats miss Over 2.5');
+  const dear = pickLeg('under45', underGame({
+    homeGoals: goalSample(2.0, 1.4, 8),
+    awayGoals: goalSample(1.8, 1.6, 8),
+    o25: { mid: '18', spec: 'total=2.5', oid: '12', price: 1.55 },
+  }));
+  assert.equal(dear.drop, 'Over 2.5 over 1.50');
+  const quiet = pickLeg('under45', underGame({
+    homeGoals: goalSample(2.0, 1.4, 4),
+    awayGoals: goalSample(1.8, 1.6, 4),
+    o15: { mid: '18', spec: 'total=1.5', oid: '12', price: 1.22 },
+  }));
+  assert.equal(quiet.label, 'Over 1.5');
+  assert.equal(pickLeg('under45', underGame({ blacklisted: true })).drop, 'blacklisted');
+  assert.match(pickLeg('under45', underGame({ home: 'Jong Ajax' })).drop, /Jong|reserve/);
+  assert.equal(priceStillOk('under45', { odds: 1.18, specifier: 'total=1.5' }), true);
+  assert.equal(priceStillOk('under45', { odds: 1.1, specifier: 'total=1.5' }), false);
+  assert.equal(priceStillOk('under45', { odds: U45_LEG_MAX + 0.01, specifier: 'total=2.5' }), false);
+  const many = Array.from({ length: 51 }, (_, index) => underGame({ eventId: `sr:match:${index + 1}`, kickMs: clock + index * 1000 }));
+  const built = assemble('under45', many, { slot: 'week' });
+  assert.equal(built.legs.length, 51);
+  assert.match(rulesFor('under45').join(' '), /2\.8/);
+  assert.match(rulesFor('under45').join(' '), /above 1\.25/);
+  assert.match(rulesFor('under45').join(' '), /does not use the general odds table/);
+});
+
 test('overlap is counted inside one strategy, and Ladder has no week code', () => {
   const counts = new Map([['sr:match:1', 2]]);
   const blocked = assemble('classic', [game()], { slot: 'daily', counts });
@@ -134,6 +207,8 @@ test('2UP uses the goal timeline and an AH −1 one-goal win is void', () => {
   assert.equal(gradeBanker('ah-1-home', { home: 1, away: 0 }, null), 'void');
   assert.equal(gradeBanker('ah-1-home', { home: 2, away: 0 }, null), 'won');
   assert.equal(gradeBanker('over25', { home: 2, away: 0 }, null), 'lost');
+  assert.equal(gradeBanker('over15', { home: 1, away: 0 }, null), 'lost');
+  assert.equal(gradeBanker('over15', { home: 2, away: 0 }, null), 'won');
   assert.equal(gradeBanker('2up-home', ft, [{ type: 'goal', result: { home: 1, away: 0 } }]), 'open');
   assert.equal(mismatchNote('won', 'lost'), 'Sportradar says won. The share readback says lost.');
   assert.equal(mismatchNote('lost', 'lost'), '');

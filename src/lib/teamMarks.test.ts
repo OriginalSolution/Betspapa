@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ListItem } from '../data/board';
 import type { EngineState } from './engineSlips';
-import { legBlocked, personalLegs, pickBlocked, teamOnList } from './teamMarks';
+import { codeLegHidden, legBlocked, personalLegs, pickBlocked, teamOnList } from './teamMarks';
 
 const lists: ListItem[] = [
   { scope: 'team', id: 'sr:competitor:344394', name: 'Uttaradit Saksiam FC', list: 'black' },
@@ -19,6 +19,17 @@ describe('team marks', () => {
     expect(legBlocked(lists, { home: 'Uttaradit Saksiam FC', away: 'Songkhla FC' })).toBe(true);
     expect(legBlocked(lists, { home: 'Chirundu United', away: 'Zesco United' })).toBe(false);
     expect(pickBlocked(lists, { teamId: 'songkhla', teamName: 'Songkhla FC', opponentName: 'Uttaradit Saksiam FC' })).toBe(true);
+  });
+
+  it('hides a code leg on a blacklisted team, competition, or market', () => {
+    const marked: ListItem[] = [
+      ...lists,
+      { scope: 'competition', id: 'sr:tournament:1', name: 'Serie A', list: 'black' },
+      { scope: 'market', id: 'over25', name: 'Over 2.5', list: 'black' },
+    ];
+    expect(codeLegHidden(marked, { home: 'Frosinone', away: 'Parma', league: 'Serie A' })).toBe(true);
+    expect(codeLegHidden(marked, { home: 'Frosinone', away: 'Parma', market: 'over25' })).toBe(true);
+    expect(codeLegHidden(marked, { home: 'Frosinone', away: 'Parma', market: 'over15', league: 'Ligue 2' })).toBe(false);
   });
 
   it('builds a personal code without a blacklisted team and keeps a published greenlit team', () => {

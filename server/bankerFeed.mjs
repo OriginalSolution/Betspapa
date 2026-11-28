@@ -2,8 +2,8 @@
 import { BUSY_FIXTURE_THRESHOLD, BUSY_LEAGUE_SOURCE } from './bankerConfig.mjs';
 import { defenceFor, tablePositions } from './bankerDefence.mjs';
 import { canon, isCupLeague, isSenior, leagueKey } from './bankerFilters.mjs';
-import { find1up, find1x2, find2up, findAhMinus1, findO25, findTeamO15, isOpenStatus } from './bankerMarkets.mjs';
-import { SHIELD_GA_RATIO, SHIELD_MIN_VENUE_GAMES } from './bankerConfig.mjs';
+import { find1up, find1x2, find2up, findAhMinus1, findO25, findOver15, findTeamO15, findUnder45, isOpenStatus } from './bankerMarkets.mjs';
+import { SHIELD_GA_RATIO, SHIELD_MIN_VENUE_GAMES, U45_FILTER_OVER, U45_LAST_N } from './bankerConfig.mjs';
 
 const UPCOMING = 'https://www.sportybet.com/api/gh/factsCenter/pcUpcomingEvents';
 const EVENT = 'https://www.sportybet.com/api/gh/factsCenter/event';
@@ -155,9 +155,24 @@ export function formRows(payload, uid) {
     if (!venue) continue;
     const goals = venue === 'H' ? Number(result.home) : Number(result.away);
     const opp = venue === 'H' ? Number(result.away) : Number(result.home);
-    rows.push({ venue, goals, opp });
+    rows.push({ venue, goals, opp, uts: Number(match?.time?.uts) || 0 });
   }
   return rows;
+}
+
+/** Mean goals scored and conceded over the newest games in the sample. */
+export function averagesOf(rows, n = U45_LAST_N) {
+  const ordered = [...(rows || [])].sort((a, b) => (b.uts || 0) - (a.uts || 0));
+  const sample = ordered.slice(0, n);
+  if (!sample.length) return { n: 0, scoredAvg: 0, concededAvg: 0, scoredGames: 0 };
+  const scored = sample.reduce((sum, row) => sum + Number(row.goals || 0), 0);
+  const conceded = sample.reduce((sum, row) => sum + Number(row.opp || 0), 0);
+  return {
+    n: sample.length,
+    scoredAvg: scored / sample.length,
+    concededAvg: conceded / sample.length,
+    scoredGames: sample.filter((row) => row.goals >= 1).length,
+  };
 }
 
 export function scoringOf(rows, n = 10) {
@@ -305,4 +320,83 @@ export async function collectCandidates(request, fetchImpl, { fromMs, toMs, cove
     void canon;
     return rest;
   });
+}
+
+function goalsCandidate(event) {
+  const under = findUnder45(event);
+  if (!under || !(under.price > U45_FILTER_OVER)) return null;
+  const home = event.homeTeamName || '';
+  const away = event.awayTeamName || '';
+  const country = event._country || '';
+  const league = event._league || '';
+  const kickMs = Number(event.estimateStartTime) || 0;
+  if (!isOpenStatus(event.matchStatus || event.status)) return null;
+  if (!isSenior(country, league, home, away)) return null;
+  return {
+    eventId: String(event.eventId || ''),
+    home,
+    away,
+    homeId: event.homeTeamId || '',
+    awayId: event.awayTeamId || '',
+    country,
+    league,
+    cup: isCupLeague(league),
+    tournamentId: event._tournamentId || '',
+    kickMs,
+    open: true,
+    senior: true,
+    u45: under,
+    o15: findOver15(event),
+    o25: findO25(event),
+    homeGoals: null,
+    awayGoals: null,
+    blacklisted: false,
+  };
+}
+
+/**
+ * Games whose Under 4.5 price is above 1.25. Prices are refreshed from the
+ * event, then both teams' last-10 goal averages are attached. No share booking.
+ */
+export async function collectUnder45(request, fetchImpl, { fromMs, toMs }) {
+  const upcoming = await fetchUpcoming(request);
+  let rows = upcoming.events
+    .map(goalsCandidate)
+    .filter((row) => row && row.eventId && row.kickMs >= fromMs && row.kickMs < toMs);
+  rows = await mapPool(rows, 4, async (row) => {
+    const body = await request('GET', `${EVENT}?eventId=${quote(row.eventId)}&productId=3`);
+    const data = body?.bizCode === 10000 ? body.data : null;
+    if (!data) return row;
+    const refreshed = goalsCandidate({
+      ...data,
+      _country: row.country,
+      _league: row.league,
+      _tournamentId: row.tournamentId,
+      estimateStartTime: row.kickMs,
+      matchStatus: 'Not start',
+    });
+    if (!refreshed) return null;
+    return { ...row, u45: refreshed.u45, o15: refreshed.o15, o25: refreshed.o25 };
+  });
+  rows = rows.filter(Boolean);
+  const infoCache = new Map();
+  const lastx = new Map();
+  await mapPool(rows, 4, async (row) => {
+    const mid = numericId(row.eventId);
+    if (!mid) return;
+    if (!infoCache.has(mid)) infoCache.set(mid, gismoGet(fetchImpl, `match_info/${mid}`));
+    const body = await infoCache.get(mid);
+    const match = body?.doc?.[0]?.data?.match;
+    const homeUid = match?.teams?.home?.uid;
+    const awayUid = match?.teams?.away?.uid;
+    const load = async (uid) => {
+      const id = numericId(uid);
+      if (!id) return [];
+      if (!lastx.has(id)) lastx.set(id, gismoGet(fetchImpl, `stats_team_lastx/${id}/30`));
+      return formRows(await lastx.get(id), id);
+    };
+    row.homeGoals = averagesOf(await load(homeUid), U45_LAST_N);
+    row.awayGoals = averagesOf(await load(awayUid), U45_LAST_N);
+  });
+  return rows;
 }

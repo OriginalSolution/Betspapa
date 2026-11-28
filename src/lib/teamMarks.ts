@@ -25,6 +25,17 @@ export function teamOnList(lists: ListItem[], list: 'black' | 'green', team: { i
   return teamsOn(lists, list).some((item) => sameTeam(item, team));
 }
 
+export function codeLegHidden(
+  lists: ListItem[],
+  leg: { home?: string | null; away?: string | null; homeId?: string | null; awayId?: string | null; match?: string | null; league?: string | null; tournamentId?: string | null; market?: string | null },
+): boolean {
+  if (legBlocked(lists, leg)) return true;
+  if (leg.market && lists.some((item) => item.list === 'black' && item.scope === 'market' && item.id === leg.market)) return true;
+  return lists.some((item) => item.list === 'black' && item.scope === 'competition' && (
+    (leg.tournamentId && item.id === leg.tournamentId) || (leg.league && teamKey(item.name) === teamKey(leg.league))
+  ));
+}
+
 export function legBlocked(lists: ListItem[], leg: { home?: string | null; away?: string | null; homeId?: string | null; awayId?: string | null; match?: string | null }): boolean {
   let home = leg.home || '';
   let away = leg.away || '';

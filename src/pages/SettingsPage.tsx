@@ -583,6 +583,7 @@ const BANKER = [
   { id: 'shield', label: playCodeLabel('Banker Shield') },
   { id: 'capped', label: playCodeLabel('Banker Capped') },
   { id: 'ladder', label: playCodeLabel('Banker Ladder') },
+  { id: 'under45', label: 'Under 4.5 Goals' },
 ];
 
 function BankerSettings() {

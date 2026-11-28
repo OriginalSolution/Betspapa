@@ -19,6 +19,7 @@ import {
   SEED_CODES,
   SPORTY_SHARE,
   STRATEGIES,
+  U45_PART,
   addDays,
   dueDaily,
   dueWeek,
@@ -32,7 +33,7 @@ import {
   weekDays,
   weekMonday,
 } from './bankerConfig.mjs';
-import { collectCandidates, coverageFromEvents, mapPool } from './bankerFeed.mjs';
+import { collectCandidates, collectUnder45, coverageFromEvents, mapPool } from './bankerFeed.mjs';
 import { bookShare, readCode, readDesk, sameSelections } from './bankerRead.mjs';
 import { assemble, priceStillOk, productOdds } from './bankerRules.mjs';
 import { legFixture, legList, legScore } from '../src/lib/noteCopy.mjs';
@@ -121,8 +122,13 @@ function publicLeg(leg, crestFor) {
     eventId: leg.eventId,
     home: leg.home,
     away: leg.away,
+    homeId: leg.homeId || '',
+    awayId: leg.awayId || '',
     homeCrest: crestFor ? crestFor(leg.homeId, leg.home) || '' : leg.homeCrest || '',
     awayCrest: crestFor ? crestFor(leg.awayId, leg.away) || '' : leg.awayCrest || '',
+    league: leg.league || '',
+    tournamentId: leg.tournamentId || '',
+    market: leg.grade || '',
     label: leg.label,
     odds: leg.odds,
     kickoff: leg.kickMs ? new Date(leg.kickMs).toISOString() : '',
@@ -332,7 +338,8 @@ export function createBanker(options = {}) {
     const parts = shown(key).map(partOf);
     if (parts.length) return { parts, empty: '' };
     if (strategy.id === 'ladder' && slot === 'week') return { parts: [], empty: 'Ladder has dailies only. There is no week code.' };
-    if (slot === 'daily') return { parts: [], empty: state.empty[key]?.closest ? `0 qualified. Closest miss: ${state.empty[key].closest.match}, ${state.empty[key].closest.reason}.` : dailyEmpty(id, clock) };
+    if (state.empty[key]?.closest) return { parts: [], empty: `0 qualified. Closest miss: ${state.empty[key].closest.match}, ${state.empty[key].closest.reason}.` };
+    if (slot === 'daily') return { parts: [], empty: dailyEmpty(id, clock) };
     return { parts: [], empty: 'No week code in the log.' };
   }
 
@@ -457,11 +464,12 @@ export function createBanker(options = {}) {
   }
 
   function eventCounts(strategy, weekId, except = '') {
+    const skip = except instanceof Set ? except : new Set(except ? [except] : []);
     const counts = new Map();
     const keys = [slotKey(strategy, 'week', weekId), ...weekDays(weekId).map((day) => slotKey(strategy, 'daily', day))];
     for (const key of keys) {
       for (const code of state.order[key] || []) {
-        if (code === except) continue;
+        if (skip.has(code)) continue;
         const row = state.codes[code];
         if (!row?.readOk) continue;
         for (const leg of row.legs || []) counts.set(leg.eventId, (counts.get(leg.eventId) || 0) + 1);
@@ -478,7 +486,9 @@ export function createBanker(options = {}) {
     const weekId = slot === 'week' ? id : weekMonday(parseDay(id));
     let candidates = [];
     try {
-      candidates = await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
+      candidates = strategy === 'under45'
+        ? await collectUnder45(request, fetchImpl, { fromMs, toMs })
+        : await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
     } catch (error) {
       log.error?.(`[codes] ${strategy} ${slot} ${id}: ${error instanceof Error ? error.message : error}`);
       return;
@@ -490,33 +500,21 @@ export function createBanker(options = {}) {
       save();
       return;
     }
-    const placed = await place(strategy, built.legs, null);
-    if (!placed) {
+    const size = strategy === 'under45' ? U45_PART : built.legs.length;
+    const groups = [];
+    for (let index = 0; index < built.legs.length; index += size) groups.push(built.legs.slice(index, index + size));
+    const placedAll = [];
+    for (const group of groups) {
+      const placed = await place(strategy, group, null);
+      if (placed) placedAll.push(placed);
+    }
+    if (!placedAll.length) {
       state.empty[key] = { closest: { match: strategy, reason: 'the share readback did not match' }, at: new Date(now()).toISOString() };
       state.order[key] = [];
       save();
       return;
     }
-    state.order[key] = [placed.code];
-    state.codes[placed.code] = {
-      code: placed.code,
-      strategy,
-      slot,
-      week: weekId,
-      day: slot === 'daily' ? id : '',
-      cap: strategy === 'capped' ? 1.45 : null,
-      frozen: false,
-      seed: false,
-      readOk: true,
-      football: placed.football,
-      footballCode: placed.footballCode,
-      legs: placed.legs,
-      totalOdds: productOdds(placed.legs),
-      readAt: new Date(now()).toISOString(),
-      firstKick: Math.min(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
-      lastKick: Math.max(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
-    };
-    rememberNotice(state.codes[placed.code], 'booked');
+    rememberPlaced(strategy, slot, id, weekId, placedAll);
     save();
   }
 
@@ -546,11 +544,53 @@ export function createBanker(options = {}) {
         footballCode = other.code;
       }
     }
-    return { code: read.sporty.code, legs: read.sporty.legs, football, footballCode };
+    return { code: read.sporty.code, legs: withSentMeta(read.sporty.legs, used), football, footballCode };
+  }
+
+  function withSentMeta(readLegs, sent) {
+    const byEvent = new Map((sent || []).map((leg) => [leg.eventId, leg]));
+    return (readLegs || []).map((leg) => {
+      const source = byEvent.get(leg.eventId);
+      if (!source) return leg;
+      return {
+        ...leg,
+        league: source.league || leg.league || '',
+        tournamentId: source.tournamentId || leg.tournamentId || '',
+        country: source.country || leg.country || '',
+      };
+    });
+  }
+
+  function rememberPlaced(strategy, slot, id, weekId, placedAll) {
+    const key = slotKey(strategy, slot, id);
+    state.order[key] = placedAll.map((row) => row.code);
+    for (const [index, placed] of placedAll.entries()) {
+      state.codes[placed.code] = {
+        code: placed.code,
+        strategy,
+        slot,
+        week: weekId,
+        day: slot === 'daily' ? id : '',
+        cap: strategy === 'capped' ? 1.45 : null,
+        part: index + 1,
+        frozen: false,
+        seed: false,
+        readOk: true,
+        football: placed.football,
+        footballCode: placed.footballCode,
+        legs: placed.legs,
+        totalOdds: productOdds(placed.legs),
+        readAt: new Date(now()).toISOString(),
+        firstKick: Math.min(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+        lastKick: Math.max(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+      };
+      rememberNotice(state.codes[placed.code], 'booked');
+    }
   }
 
   async function rebookDrifted() {
     if (!bookEnabled) return;
+    const seen = new Set();
     for (const row of Object.values(state.codes)) {
       if (!row.readOk || row.frozen || row.seed || row.superseded) continue;
       if (row.firstKick && row.firstKick <= now()) {
@@ -560,43 +600,67 @@ export function createBanker(options = {}) {
       const bad = (row.legs || []).filter((leg) => !leg.open || !priceStillOk(row.strategy, leg, row.cap || 1.45));
       if (!bad.length) continue;
       const key = slotKey(row.strategy, row.slot, row.slot === 'week' ? row.week : row.day);
+      if (seen.has(key)) continue;
+      seen.add(key);
       const fromMs = row.slot === 'week' ? parseDay(row.week) : parseDay(row.day);
       const toMs = row.slot === 'week' ? parseDay(addDays(row.week, 7)) : parseDay(addDays(row.day, 1));
+      const current = new Set(state.order[key] || []);
       let candidates = [];
       try {
-        candidates = await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
+        candidates = row.strategy === 'under45'
+          ? await collectUnder45(request, fetchImpl, { fromMs, toMs })
+          : await collectCandidates(request, fetchImpl, { fromMs, toMs, coverage: coverageSet });
       } catch {
         continue;
       }
-      const built = assemble(row.strategy, candidates, { slot: row.slot, cap: row.cap, counts: eventCounts(row.strategy, row.week, row.code) });
+      const built = assemble(row.strategy, candidates, { slot: row.slot, cap: row.cap, counts: eventCounts(row.strategy, row.week, current) });
       if (!built.legs.length) continue;
-      const placed = await place(row.strategy, built.legs, row.cap);
-      if (!placed) {
-        row.needsReview = true;
-        row.readOk = false;
+      const size = row.strategy === 'under45' ? U45_PART : built.legs.length;
+      const groups = [];
+      for (let index = 0; index < built.legs.length; index += size) groups.push(built.legs.slice(index, index + size));
+      const placedAll = [];
+      for (const group of groups) {
+        const placed = await place(row.strategy, group, row.cap);
+        if (placed) placedAll.push(placed);
+      }
+      if (!placedAll.length) {
+        for (const code of current) {
+          const old = state.codes[code];
+          if (!old || old.superseded) continue;
+          old.needsReview = true;
+          old.readOk = false;
+        }
         continue;
       }
-      row.superseded = true;
-      row.readOk = false;
       const replaced = row.code;
-      delete state.order[key];
-      state.codes[placed.code] = {
-        ...row,
-        code: placed.code,
-        superseded: false,
-        needsReview: false,
-        readOk: true,
-        frozen: false,
-        seed: false,
-        replaced,
-        legs: placed.legs,
-        football: placed.football,
-        footballCode: placed.footballCode,
-        totalOdds: productOdds(placed.legs),
-        readAt: new Date(now()).toISOString(),
-      };
-      state.order[key] = [placed.code];
-      rememberNotice(state.codes[placed.code], 'rebooked');
+      for (const code of current) {
+        const old = state.codes[code];
+        if (!old) continue;
+        old.superseded = true;
+        old.readOk = false;
+      }
+      state.order[key] = placedAll.map((item) => item.code);
+      for (const [index, placed] of placedAll.entries()) {
+        state.codes[placed.code] = {
+          ...row,
+          code: placed.code,
+          part: index + 1,
+          superseded: false,
+          needsReview: false,
+          readOk: true,
+          frozen: false,
+          seed: false,
+          replaced,
+          legs: placed.legs,
+          football: placed.football,
+          footballCode: placed.footballCode,
+          totalOdds: productOdds(placed.legs),
+          readAt: new Date(now()).toISOString(),
+          firstKick: Math.min(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+          lastKick: Math.max(...placed.legs.map((leg) => leg.kickMs).filter(Boolean)),
+        };
+        rememberNotice(state.codes[placed.code], 'rebooked');
+      }
     }
   }
 
@@ -658,6 +722,9 @@ export function createBanker(options = {}) {
         const toMs = parseDay(addDays(day, 1));
         for (const strategy of STRATEGIES) await bookSlot(strategy.id, 'daily', day, fromMs, toMs);
       }
+      const openMonday = weekMonday(clock);
+      const openWeekEnd = parseDay(addDays(openMonday, 7));
+      if (clock < openWeekEnd) await bookSlot('under45', 'week', openMonday, clock, openWeekEnd);
       await rebookDrifted();
       if (options.results?.settle) await options.results.settle();
       pullGrades();
