@@ -90,7 +90,7 @@ export const HIGH_RISK_WARNING = 'High risk: a week code, or under 25 total odds
 
 export const SPORTY_SHARE = 'https://www.sportybet.com/api/gh/orders/share';
 export const FOOTBALL_SHARE = 'https://www.football.com/api/gh/orders/share';
-export const BOOK_MARKETS = new Set(['16', '18', '19', '20', '60100', '60200']);
+export const BOOK_MARKETS = new Set(['16', '18', '19', '20', '60100', '60200', '800054']);
 
 /**
  * Codes already booked for 23–29 Nov 2026. They are shown after a live
@@ -119,6 +119,7 @@ export const STRATEGIES = [
   { id: 'ladder', code: 'S5', name: 'Banker Ladder', week: false },
   { id: 'under45', code: 'S6', name: 'Under 4.5 Goals', week: true },
   { id: 'under45plus', code: 'S7', name: 'Under 4.5 Goals 1.29+', week: true },
+  { id: 'outsidebox', code: 'S8', name: 'Shots Outside Box', week: true },
 ];
 
 export function strategyById(id) {
@@ -231,6 +232,14 @@ export function rulesFor(id) {
       `Over 2.5 when expected goals are ${U45_O25_XG.toFixed(1)} or more and both teams scored in at least ${U45_REGULAR_SCORED} of their last 10 (70% when the sample is 8 or 9). Otherwise Over 1.5 when expected goals are ${U45_O15_XG.toFixed(1)} or more. Otherwise skip the game.`,
       `Every booked leg is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Over 2.5 below ${U45_PLUS_MIN.toFixed(2)} is dropped. Over 1.5 below ${U45_PLUS_MIN.toFixed(2)} moves to Over 2.5 only when that bar is met and Over 2.5 is from ${U45_PLUS_MIN.toFixed(2)} to ${U45_LEG_MAX.toFixed(2)}. Otherwise the game is dropped.`,
       `This strategy does not use the general odds table. Parts of ${U45_PART}, each with its own code. SportyBet and Football.com only. A blacklisted team, competition, or market is left off this phone.`,
+    ];
+  }
+  if (id === 'outsidebox') {
+    return [
+      'Match Shots Outside Box. A shot is outside the 18-yard box when the timeline places it more than 16.5m from the goal line, or wider than the box. Home attacks the high X, away the low X.',
+      'Each line is checked on both teams’ last 10 competitive games. A match with no shot positions is left out of the sample. A team needs at least 8 positioned games. Both teams must have reached the line in at least 8 of that sample.',
+      'The tier is the lower of the two rates. 100 is 10/10 only. 90+ is at least 9 in 10, or every game of a shorter sample. 80+ is at least 8 in 10. The highest line at the best tier is the one booked.',
+      'Prices are the ones offered. Parts of 50 for each tier, each with its own code. SportyBet and Football.com only. A blacklisted team, competition, or market is left off this phone.',
     ];
   }
   return [

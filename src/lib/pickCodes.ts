@@ -46,6 +46,19 @@ export function playCodeLabel(text: string, play = isPlayStoreBuild()): string {
   return PLAY_CODE_LABELS.reduce((next, [from, to]) => next.split(from).join(to), text);
 }
 
+/** Shots Outside Box parts. Play says the tenth; the website keeps 100, 90+ and 80+. */
+export function playShotTier(tier: string, play = isPlayStoreBuild()): string {
+  if (play) {
+    if (tier === '100') return '10/10';
+    if (tier === '90') return '9/10+';
+    if (tier === '80') return '8/10+';
+  }
+  if (tier === '100') return '100';
+  if (tier === '90') return '90+';
+  if (tier === '80') return '80+';
+  return '';
+}
+
 /** A pick's recent-form ring. Play shows tenths; the website keeps the percent. */
 export function formRingLabel(rate: number, play = isPlayStoreBuild()): string {
   if (!play) return `${Math.round(rate * 100)}%`;

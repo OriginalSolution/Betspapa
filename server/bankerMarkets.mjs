@@ -141,6 +141,10 @@ export function marketLabel(marketId, desc, side, specifier = '') {
   if (id === '19') return 'Home 2+';
   if (id === '20') return 'Away 2+';
   if (id === '16') return `${who} AH −1`.trim();
+  if (id === '800054') {
+    const line = String(desc || '').trim();
+    return line ? `${line} outside box` : 'Shots outside box';
+  }
   return desc || id;
 }
 
@@ -164,5 +168,6 @@ export function gradeKey(marketId, side, specifier = '') {
   if (id === '19') return 'home-over15';
   if (id === '20') return 'away-over15';
   if (id === '16') return side === 'A' ? 'ah-1-away' : 'ah-1-home';
+  if (id === '800054') return 'outside-box';
   return '';
 }

@@ -23,6 +23,7 @@ export type CodeLeg = {
 export type CodePart = {
   code: string;
   cap: number | null;
+  tier?: string;
   legs: CodeLeg[];
   legCount: number;
   totalOdds: number;
