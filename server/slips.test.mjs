@@ -14,7 +14,7 @@ test('drops legs under 1.20 and started games, keeps exactly 1.20', () => {
 
 test('a tier code is capped and labelled once, without a second 80% prefix', () => {
   const rows = Array.from({ length: 25 }, (_, index) => ({
-    ...leg(index + 1, 'dc-12', 1.22),
+    ...leg(index + 1, 'sh-over05', 1.22),
     occurrence: index < 3 ? 100 : 80,
     sample: index < 3 ? '10/10' : '8/10',
     kickoff: `2026-11-13T${String(18 + (index % 5)).padStart(2, '0')}:00:00.000Z`,
@@ -23,15 +23,15 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   assert.equal(chosen.length, CODE_LIMIT);
   assert.equal(chosen[0].occurrence, 100);
   assert.ok(chosen.every((row) => row.odds === 1.22));
-  const wide = { ...leg(99, 'dc-12', 1.28), opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
+  const wide = { ...leg(99, 'sh-over05', 1.28), opponentHeld: true, sample: '10/10', opponentSample: '8/10' };
   assert.equal(codeLegs([wide, ...rows]).some((row) => row.eventId === 'sr:match:99'), false);
-  const tagged = { ...leg(98, 'dc-12', 1.27), sample: '10/10', opponentSample: '10/10', exception: true };
-  assert.equal(bookableLegs([tagged, leg(2, 'dc-12', 1.22)], now).some((row) => row.eventId === 'sr:match:98'), true);
+  const tagged = { ...leg(98, 'sh-over05', 1.27), sample: '10/10', opponentSample: '10/10', exception: true };
+  assert.equal(bookableLegs([tagged, leg(2, 'sh-over05', 1.22)], now).some((row) => row.eventId === 'sr:match:98'), true);
   assert.equal(codeLegs([tagged]).some((row) => row.eventId === 'sr:match:98'), true);
-  const tooHigh = { ...leg(97, 'dc-12', 1.61), sample: '10/10', opponentSample: '10/10', exception: true };
+  const tooHigh = { ...leg(97, 'sh-over05', 1.61), sample: '10/10', opponentSample: '10/10', exception: true };
   assert.equal(bookableLegs([tooHigh], now).some((row) => row.eventId === 'sr:match:97'), false);
-  const hundred = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 1, 'dc-12', 1.22), rate: 1, occurrence: 100 }));
-  const ninety = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 50, 'dc-12', 1.22), rate: 0.92, occurrence: 92 }));
+  const hundred = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 1, 'sh-over05', 1.22), rate: 1, occurrence: 100 }));
+  const ninety = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 50, 'sh-over05', 1.22), rate: 0.92, occurrence: 92 }));
   const bandEighty = Array.from({ length: 12 }, (_, index) => ({ ...leg(index + 80, 'over15', 1.25), rate: 0.84, occurrence: 84 }));
   const top = codeGroups(hundred, '100')[0].map((row) => row.eventId).join();
   const mixed = codeGroups([...hundred, ...ninety], '90')[0];
@@ -47,7 +47,7 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   const many = codeGroups(Array.from({ length: 60 }, (_, index) => ({ ...leg(index + 1, 'over15', 1.25), rate: 1 })), '100');
   assert.deepEqual(many.map((group) => group.length), [50, 10]);
   const slips = tierSlips([
-    { ...leg(1, 'dc-12', 1.22), occurrence: 80, rate: 0.8 },
+    { ...leg(1, 'sh-over05', 1.22), occurrence: 80, rate: 0.8 },
     { ...leg(2, 'over15', 1.25), occurrence: 100, rate: 1, sample: '10/10' },
     { ...leg(3, 'over25', 1.3), occurrence: 70, rate: 0.7, teamsAgree: true },
   ]);
@@ -62,9 +62,9 @@ test('a tier code is capped and labelled once, without a second 80% prefix', () 
   assert.deepEqual(ordered.map((row) => row.rate), [0.84, 1]);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:dc-12'), undefined);
   assert.equal(slips.find((slip) => slip.id === 'tier:100:over15').label, '100% Over 1.5 goals');
-  const eighty = slips.find((slip) => slip.id === 'tier:80:dc-12');
-  assert.equal(eighty.label, '80%+ Double chance 12');
-  assert.equal(eighty.name, '80%+ Double chance 12');
+  const eighty = slips.find((slip) => slip.id === 'tier:80:sh-over05');
+  assert.equal(eighty.label, '80%+ Second-half over 0.5');
+  assert.equal(eighty.name, '80%+ Second-half over 0.5');
 });
 
 test('groups qualifying legs into one trend per market, biggest first', () => {

@@ -49,7 +49,7 @@ export function agreeMarketBlocked(blocked: ReadonlySet<string>, id: string): bo
 
 /** Drop blacklisted markets. A green light does not add a market that did not agree. */
 export function visibleAgree(row: AgreeFixture, blocked: ReadonlySet<string>): AgreeFixture | null {
-  const open = [row.market, ...(row.also || [])].filter((market) => market && TIERS.has(market.tier) && !agreeMarketBlocked(blocked, market.id));
+  const open = [row.market, ...(row.also || [])].filter((market) => market && market.id !== 'dc12' && market.id !== 'dc-12' && TIERS.has(market.tier) && !agreeMarketBlocked(blocked, market.id));
   if (!open.length) return null;
   const [market, ...also] = open;
   return { ...row, market, also, quote: market.id === row.market.id ? row.quote : null };

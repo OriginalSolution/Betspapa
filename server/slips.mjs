@@ -3,6 +3,7 @@
  * once and reused until its legs change. Codes only ever come from the bookmakers.
  */
 import { BOOKING_MAP_VERSION } from './bookers.mjs';
+import { isDc12 } from './dc12.mjs';
 import { labelFor } from './occurrence.mjs';
 import { assertBookingRanges, legOpen, priceInRange, projectSlip, rangeViolations } from './oddsRange.mjs';
 import { inspectBooks } from './quality.mjs';
@@ -25,7 +26,7 @@ function keptForCode(leg) {
 export function bookableLegs(legs, now = new Date()) {
   const clock = now instanceof Date ? now.getTime() : Number(now);
   return (Array.isArray(legs) ? legs : []).filter(
-    (leg) => legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && keptForCode(leg),
+    (leg) => !isDc12(leg?.market) && legOpen(leg, clock) && leg.status !== 'bust' && leg.publish !== false && keptForCode(leg),
   );
 }
 
@@ -49,7 +50,7 @@ function byConfidence(a, b) {
 /** The legs that go on one code. Strict published band only, then the cap. */
 export function codeLegs(legs, limit = CODE_LIMIT) {
   return (Array.isArray(legs) ? legs : [])
-    .filter((leg) => keptForCode(leg))
+    .filter((leg) => !isDc12(leg?.market) && keptForCode(leg))
     .slice()
     .sort(byConfidence)
     .slice(0, limit);
@@ -150,6 +151,7 @@ export function tierSlips(legs) {
 export function trendGroups(legs) {
   const byMarket = new Map();
   for (const leg of legs) {
+    if (isDc12(leg?.market)) continue;
     if (!byMarket.has(leg.market)) byMarket.set(leg.market, []);
     byMarket.get(leg.market).push(leg);
   }

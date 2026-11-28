@@ -5,6 +5,7 @@
 import { bookAll } from './bookers.mjs';
 import { selectionKey } from './selection.mjs';
 import { legOpen, priceInRange } from './oddsRange.mjs';
+import { isDc12 } from './dc12.mjs';
 import { sideAllowed } from './strongerSide.mjs';
 
 const MAX_LEGS = 50;
@@ -33,7 +34,7 @@ export function prepareLegs(rows, now = new Date()) {
     const market = String(row?.market || '');
     const odds = Number(row?.odds);
     const kick = Date.parse(row?.kickoff || '');
-    if (!/^sr:match:\d+$/.test(eventId) || !market) continue;
+    if (!/^sr:match:\d+$/.test(eventId) || !market || isDc12(market)) continue;
     if (!Number.isFinite(odds) || !priceInRange(market, odds, row)) continue;
     if (!sideAllowed(market, row?.hpos, row?.apos, { greenlit: row?.greenlit === true }).keep) continue;
     if (!legOpen({ kickoff: row?.kickoff }, clock)) continue;

@@ -40,7 +40,7 @@ test('green light does not book a price outside the band or a different market',
   assert.equal(quoteFor('dc1x', { 'dc-1x': 1.22 }), null);
   assert.equal(quoteFor('over15', { 'over-15': 1.05 }), null);
   assert.deepEqual(quoteFor('over15', { 'over-15': 1.25 }), { market: 'over15', odds: 1.25 });
-  assert.deepEqual(quoteFor('dc12', { 'dc-12': 1.2 }), { market: 'dc-12', odds: 1.2 });
+  assert.equal(quoteFor('dc12', { 'dc-12': 1.2 }), null);
   assert.equal(bookableAgreed({ marketId: 'over15', odds: 1.25 }), true);
   assert.equal(bookableAgreed({ marketId: '1h05', odds: 1.2 }), true);
   assert.equal(bookableAgreed({ marketId: '1h15', odds: 1.8 }), false);

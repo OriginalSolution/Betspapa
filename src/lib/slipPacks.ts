@@ -77,6 +77,7 @@ export function trendPacks(tips: PickTip[], matches: Match[], now = Date.now()):
   for (const tip of tips) {
     const kick = Date.parse(tip.kickoff);
     if (!Number.isFinite(kick) || kick < now) continue;
+    if (tip.chip.market === 'dc-12' || tip.chip.market === 'dc12') continue;
     if (!priceAllowed(tip.chip.market, tip.chip.odds, tip.chip.exception === true)) continue;
     const match = byId.get(tip.chip.eventId);
     const leg: BuilderLeg = {

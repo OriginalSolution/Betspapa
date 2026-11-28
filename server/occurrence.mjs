@@ -14,6 +14,7 @@ import { indexLeagues, reviewPick } from './research.mjs';
 import { minConfidence } from './thresholds.mjs';
 import { isSimulated } from './upcoming.mjs';
 import { sideAllowed } from './strongerSide.mjs';
+import { isDc12 } from './dc12.mjs';
 
 export const WINDOW = 10;
 export const MIN_SAMPLE = 8;
@@ -327,6 +328,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   const leagueIndex = options.leagueIndex || indexLeagues(histories);
   const settled = options.settled || [];
   const legs = [];
+  const blocked12 = [];
   const researchDrops = [];
   const byEvent = {};
   let skippedNoTeam = 0;
@@ -410,7 +412,7 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
       }
       if (review.leagueRisk === 'penalise') leagueMarked += 1;
       const sample = `${review.hits}/${review.sample}`;
-      legs.push({
+      const row = {
         eventId: String(event.eventId),
         market: market.id,
         odds: report.odds,
@@ -438,7 +440,9 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
         leagueRisk: review.leagueRisk,
         publish: true,
         reasons: review.reasons,
-      });
+      };
+      if (isDc12(row.market)) blocked12.push(row);
+      else legs.push(row);
     }
     if (measured.length) byEvent[String(event.eventId)] = measured;
   }
@@ -450,6 +454,32 @@ export function buildOccurrenceBoard(events, histories, now = new Date(), option
   if (leagueMarked) notes.push(`${leagueMarked} lines were marked down to 90% by the league score or an owner override.`);
   if (tableDropped) notes.push(`${tableDropped} team-score, draw-no-bet, or double-chance lines were left off because that side is not higher on the league table.`);
   notes.push(...tableNotes);
+  if (blocked12.length) {
+    const would = new Map();
+    const keptBest = new Map();
+    for (const leg of [...legs, ...blocked12]) {
+      const current = would.get(leg.eventId);
+      if (!current || prefers(leg, current)) would.set(leg.eventId, leg);
+    }
+    for (const leg of legs) {
+      const current = keptBest.get(leg.eventId);
+      if (!current || prefers(leg, current)) keptBest.set(leg.eventId, leg);
+    }
+    let replaced = 0;
+    let only = 0;
+    for (const leg of would.values()) {
+      if (!isDc12(leg.market)) continue;
+      const next = keptBest.get(leg.eventId);
+      if (next) {
+        replaced += 1;
+        if (replaced <= 8) notes.push(`${leg.match} double chance 12 replaced by ${labelFor(next.market)}.`);
+      } else {
+        only += 1;
+        if (only <= 6) notes.push(`${leg.match} double chance 12 left off; nothing else qualified.`);
+      }
+    }
+    notes.push(`${blocked12.length} double chance 12 lines were not published.`);
+  }
   for (const drop of researchDrops.slice(0, 6)) {
     notes.push(`${drop.match} ${drop.market} ${drop.odds}: ${drop.reasons[drop.reasons.length - 1]}`);
   }
@@ -480,6 +510,7 @@ function prefers(next, current) {
 export function masterPick(legs) {
   const best = new Map();
   for (const leg of legs || []) {
+    if (isDc12(leg?.market)) continue;
     const current = best.get(leg.eventId);
     if (!current || prefers(leg, current)) best.set(leg.eventId, leg);
   }
